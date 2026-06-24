@@ -38,3 +38,11 @@ backend/target/surefire-reports/TEST-com.manabihub.ManabiHubApplicationTests.xml
 backend/target/surefire-reports/2026-06-24T22-59-19_544.dumpstream
 
 *.dumpstream
+
+backend/target/classes/db/migration/V001__init_placeholder.sql
+
+backend/target/classes/application-local.yml
+
+backend/target/classes/db/migration/V001__init_baseline.sql
+
+deploy/docker-compose.local.yml
