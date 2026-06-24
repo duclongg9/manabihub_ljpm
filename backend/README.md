@@ -99,3 +99,16 @@ Once the application has successfully started on port `8080`:
 - **API Documentation & Swagger UI:**
   - Swagger UI: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
   - OpenAPI Spec JSON: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
+
+---
+
+## API Response Convention
+
+All REST API endpoints follow a standardized response envelope format. For full details on:
+- Standard success/error JSON shapes
+- Message code naming convention (`DOMAIN_ACTION_OR_STATE`)
+- Frontend i18n consumption rules
+- Exception handling chain
+
+See **[docs/api-response-convention.md](docs/api-response-convention.md)**.
+

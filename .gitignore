@@ -46,3 +46,5 @@ backend/target/classes/application-local.yml
 backend/target/classes/db/migration/V001__init_baseline.sql
 
 deploy/docker-compose.local.yml
+
+backend/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
