@@ -36,3 +36,5 @@ backend/target/surefire-reports/com.manabihub.ManabiHubApplicationTests.txt
 backend/target/surefire-reports/TEST-com.manabihub.ManabiHubApplicationTests.xml
 
 backend/target/surefire-reports/2026-06-24T22-59-19_544.dumpstream
+
+*.dumpstream
