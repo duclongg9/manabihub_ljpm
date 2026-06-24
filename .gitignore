@@ -24,3 +24,13 @@ hs_err_pid*
 replay_pid*
 
 .vscode/settings.json
+
+backend/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+
+backend/target/maven-status/maven-compiler-plugin/testCompile/default-testCompile/createdFiles.lst
+
+backend/target/surefire-reports/2026-06-25T02-12-22_370.dumpstream
+
+backend/target/surefire-reports/com.manabihub.ManabiHubApplicationTests.txt
+
+backend/target/surefire-reports/TEST-com.manabihub.ManabiHubApplicationTests.xml
