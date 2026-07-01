@@ -69,4 +69,4 @@ try {
 
 Write-Host "Starting Spring Boot backend..." -ForegroundColor Cyan
 Set-Location -Path "backend"
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
