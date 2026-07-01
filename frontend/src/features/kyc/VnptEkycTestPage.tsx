@@ -18,6 +18,7 @@ const troubleshootingNotes = [
   '401/403: check BACKEND_URL, TOKEN_ID, TOKEN_KEY, ACCESS_TOKEN. ACCESS_TOKEN must not include "bearer"; BACKEND_URL must not end with "/"; token may be expired.',
   '404 asset: check public/lib file names.',
   'No camera: use CCCD OCR Upload Only.',
+  'Document type mismatch: try Auto Detect Upload so VNPT classifies front/back before validation.',
   'No callback: check CALL_BACK, CALL_BACK_END_FLOW, CALL_BACK_DOCUMENT_RESULT.',
   'CORS: check VNPT sandbox allowed origin for http://127.0.0.1:5173 or http://localhost:5173.',
 ];

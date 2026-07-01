@@ -1,4 +1,4 @@
-export type VnptEkycModeValue = 'CCCD_OCR_UPLOAD' | 'CCCD_FULL_UPLOAD' | 'CCCD_FULL_CAMERA';
+export type VnptEkycModeValue = 'CCCD_OCR_UPLOAD' | 'AUTO_DETECT_UPLOAD' | 'CCCD_FULL_UPLOAD' | 'CCCD_FULL_CAMERA';
 
 type VnptSdkFlow = 'DOCUMENT' | 'DOCUMENT_TO_FACE';
 type VnptUseMethod = 'UPLOAD' | 'BOTH';
@@ -65,6 +65,29 @@ export const VNPT_EKYC_MODES: VnptEkycMode[] = [
     useUpload: true,
     listTypeDocument: [9],
     documentTypeStart: 9,
+    hasQrScan: false,
+    enableUploadImage: true,
+    enableOcrDocument: true,
+    enableLivenessDocument: true,
+    enableLivenessFace: false,
+    enableMaskedFace: false,
+    enableCompareFace: false,
+    checkLivenessCard: true,
+    checkLivenessFace: false,
+    checkMaskedFace: false,
+    compareFace: false,
+  },
+  {
+    value: 'AUTO_DETECT_UPLOAD',
+    label: 'Auto Detect Upload',
+    description: 'Document-only upload flow that lets VNPT classify the document before OCR validation.',
+    sdkFlow: 'DOCUMENT',
+    flowTaken: 'DOCUMENT',
+    useMethod: 'UPLOAD',
+    useWebcam: false,
+    useUpload: true,
+    listTypeDocument: [-1, 4, 5, 6, 7, 9],
+    documentTypeStart: -1,
     hasQrScan: false,
     enableUploadImage: true,
     enableOcrDocument: true,
