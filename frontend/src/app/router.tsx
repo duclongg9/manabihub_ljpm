@@ -3,6 +3,7 @@ import { PublicLayout } from './layouts/PublicLayout';
 import { StudentLayout } from './layouts/StudentLayout';
 import { TeacherLayout } from './layouts/TeacherLayout';
 import { AdminLayout } from './layouts/AdminLayout';
+import { VnptEkycTestPage } from '../features/kyc/VnptEkycTestPage';
 
 export const router = createBrowserRouter([
   {
@@ -48,5 +49,9 @@ export const router = createBrowserRouter([
         element: <div>Admin Dashboard Placeholder</div>,
       },
     ],
+  },
+  {
+    path: '/dev/vnpt-ekyc-test',
+    element: <VnptEkycTestPage />,
   },
 ]);

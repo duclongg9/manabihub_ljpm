@@ -39,6 +39,9 @@ backend/target/surefire-reports/2026-06-24T22-59-19_544.dumpstream
 
 *.dumpstream
 
+# Local VNPT SDK package extracted from vendor docs. Commit only the sanitized runtime copy under frontend/public.
+web-sdk-version-3.2.1.0/
+
 backend/target/classes/db/migration/V001__init_placeholder.sql
 
 backend/target/classes/application-local.yml
