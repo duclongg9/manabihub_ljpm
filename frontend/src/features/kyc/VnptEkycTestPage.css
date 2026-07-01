@@ -143,6 +143,113 @@
   font-weight: 700;
 }
 
+.vnpt-test-muted {
+  color: #475569;
+  font-weight: 700;
+}
+
+.vnpt-test-copy {
+  margin: 12px 0 0;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.vnpt-test-copy code {
+  display: inline;
+  border-radius: 4px;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  padding: 2px 5px;
+}
+
+.vnpt-test-mode-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.vnpt-test-field {
+  display: block;
+}
+
+.vnpt-test-field span {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.vnpt-test-select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  padding: 8px 10px;
+}
+
+.vnpt-test-mode-meta {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.45;
+  padding: 12px;
+}
+
+.vnpt-test-mode-meta strong {
+  color: #0f172a;
+}
+
+.vnpt-test-warning {
+  margin-bottom: 16px;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 12px 16px;
+}
+
+.vnpt-test-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.vnpt-test-summary-item {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.vnpt-test-summary-item span {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.vnpt-test-summary-item strong {
+  color: #0f172a;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
 .vnpt-test-code {
   display: block;
   width: 100%;
@@ -210,7 +317,9 @@
   }
 
   .vnpt-test-status-grid,
-  .vnpt-test-checklist {
+  .vnpt-test-checklist,
+  .vnpt-test-mode-row,
+  .vnpt-test-summary-grid {
     grid-template-columns: 1fr;
   }
 }
