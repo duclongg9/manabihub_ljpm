@@ -274,7 +274,7 @@ export function VnptEkycTestPage() {
               <span>{selectedMode.description}</span>
               <span>
                 SDK_FLOW={selectedMode.sdkFlow}, USE_METHOD={selectedMode.useMethod}, DOCUMENT_TYPE_START=
-                {selectedMode.documentTypeStart}
+                {selectedMode.documentTypeStart}, HAS_QR_SCAN={String(selectedMode.hasQrScan)}
               </span>
             </div>
           </div>
