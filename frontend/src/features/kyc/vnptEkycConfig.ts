@@ -1,4 +1,9 @@
-export type VnptEkycModeValue = 'CCCD_OCR_UPLOAD' | 'AUTO_DETECT_UPLOAD' | 'CCCD_FULL_UPLOAD' | 'CCCD_FULL_CAMERA';
+export type VnptEkycModeValue =
+  | 'CCCD_OCR_UPLOAD'
+  | 'CCCD_OCR_RELAXED_UPLOAD'
+  | 'AUTO_DETECT_UPLOAD'
+  | 'CCCD_FULL_UPLOAD'
+  | 'CCCD_FULL_CAMERA';
 
 type VnptSdkFlow = 'DOCUMENT' | 'DOCUMENT_TO_FACE';
 type VnptUseMethod = 'UPLOAD' | 'BOTH';
@@ -73,6 +78,29 @@ export const VNPT_EKYC_MODES: VnptEkycMode[] = [
     enableMaskedFace: false,
     enableCompareFace: false,
     checkLivenessCard: true,
+    checkLivenessFace: false,
+    checkMaskedFace: false,
+    compareFace: false,
+  },
+  {
+    value: 'CCCD_OCR_RELAXED_UPLOAD',
+    label: 'CCCD OCR Relaxed Upload',
+    description: 'Document-only CCCD upload flow with OCR enabled and card liveness validation disabled.',
+    sdkFlow: 'DOCUMENT',
+    flowTaken: 'DOCUMENT',
+    useMethod: 'UPLOAD',
+    useWebcam: false,
+    useUpload: true,
+    listTypeDocument: [9],
+    documentTypeStart: 9,
+    hasQrScan: false,
+    enableUploadImage: true,
+    enableOcrDocument: true,
+    enableLivenessDocument: false,
+    enableLivenessFace: false,
+    enableMaskedFace: false,
+    enableCompareFace: false,
+    checkLivenessCard: false,
     checkLivenessFace: false,
     checkMaskedFace: false,
     compareFace: false,
