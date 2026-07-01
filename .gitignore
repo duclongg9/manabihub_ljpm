@@ -48,3 +48,9 @@ backend/target/classes/db/migration/V001__init_baseline.sql
 deploy/docker-compose.local.yml
 
 backend/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
+
+backend/target/classes/db/migration/V002__create_manabihub_core_schema.sql
+
+backend/target/classes/db/migration/V003__seed_manabihub_core_data.sql
+
+backend/target/maven-status/maven-compiler-plugin/testCompile/default-testCompile/inputFiles.lst
