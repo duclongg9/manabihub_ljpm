@@ -2,6 +2,8 @@
 
 Japanese learning platform - SEP490 ManabiHub
 
+👉 **[See Local Development Guide (docs/LOCAL_DEVELOPMENT.md)](docs/LOCAL_DEVELOPMENT.md)** for instructions on how to run the project locally using VS Code tasks or PowerShell scripts.
+
 ## Local Development
 
 ### Prerequisites
