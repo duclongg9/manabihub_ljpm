@@ -92,6 +92,17 @@ export interface KycCertificateSubmissionResponse {
   srsTrace: Record<string, unknown>;
 }
 
+export interface KycRestartVerificationResponse {
+  teacherId: string;
+  teacherKycStatus: string;
+  canPublishCourse: boolean;
+  request: KycRequestResponse;
+  identityVerification: KycModuleStatusResponse;
+  certificateVerification: KycModuleStatusResponse;
+  auditLogged: boolean;
+  srsTrace: Record<string, unknown>;
+}
+
 export interface KycCertificateSubmissionPayload {
   certificate: File;
   certificateCode: string;
@@ -110,6 +121,18 @@ export async function verifyTeacherIdentity(payload: KycIdentityVerificationPayl
   const response = await axiosClient.post<ApiEnvelope<KycIdentityVerificationResponse>>(
     ENDPOINTS.teacherKyc.identityVerifications,
     payload,
+    {
+      headers: demoTeacherHeaders(),
+    },
+  );
+
+  return response.data;
+}
+
+export async function restartTeacherVerification() {
+  const response = await axiosClient.post<ApiEnvelope<KycRestartVerificationResponse>>(
+    ENDPOINTS.teacherKyc.restartVerification,
+    undefined,
     {
       headers: demoTeacherHeaders(),
     },

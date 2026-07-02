@@ -6,7 +6,6 @@ import {
   CardContent,
   Checkbox,
   Chip,
-  Divider,
   FormControlLabel,
   LinearProgress,
   Paper,
@@ -18,23 +17,34 @@ import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import GppGoodIcon from '@mui/icons-material/GppGood';
 import LockIcon from '@mui/icons-material/Lock';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SchoolIcon from '@mui/icons-material/School';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import {
   getTeacherKycStatus,
+  restartTeacherVerification,
   submitTeacherCertificate,
   verifyTeacherIdentity,
   type ApiEnvelope,
   type KycCertificateSubmissionResponse,
   type KycIdentityVerificationResponse,
   type KycModuleStatusResponse,
+  type KycRestartVerificationResponse,
   type KycStatusResponse,
 } from './teacherKycApi';
 import { launchVnptIdentitySdk } from './vnptIdentitySdk';
 
 type CertificateErrors = Partial<Record<'certificate' | 'certificateCode' | 'agreement', string>>;
+type IdentitySummary = {
+  fullName?: string;
+  idNumber?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  address?: string;
+  hasData: boolean;
+};
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const CERTIFICATE_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
@@ -47,9 +57,11 @@ export function TeacherKycPage() {
   const [status, setStatus] = useState<KycStatusResponse | null>(null);
   const [identityEnvelope, setIdentityEnvelope] = useState<ApiEnvelope<KycIdentityVerificationResponse> | null>(null);
   const [certificateEnvelope, setCertificateEnvelope] = useState<ApiEnvelope<KycCertificateSubmissionResponse> | null>(null);
+  const [restartEnvelope, setRestartEnvelope] = useState<ApiEnvelope<KycRestartVerificationResponse> | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [identityLaunching, setIdentityLaunching] = useState(false);
   const [certificateSubmitting, setCertificateSubmitting] = useState(false);
+  const [restartSubmitting, setRestartSubmitting] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,8 +70,10 @@ export function TeacherKycPage() {
 
   const identityStatus = status?.identityVerification ?? fallbackIdentityStatus();
   const certificateStatus = status?.certificateVerification ?? fallbackCertificateStatus();
-  const latestRequest = certificateEnvelope?.data.request ?? identityEnvelope?.data.request ?? status?.latestRequest ?? null;
+  const latestRequest = restartEnvelope?.data.request ?? certificateEnvelope?.data.request ?? identityEnvelope?.data.request ?? status?.latestRequest ?? null;
   const identityVerified = identityStatus.status === 'VERIFIED';
+  const identitySummary = useMemo(() => extractIdentitySummary(latestRequest?.verificationPayload), [latestRequest?.verificationPayload]);
+  const canRestartVerification = Boolean(status && status.teacherKycStatus !== 'APPROVED' && !restartSubmitting && !identityLaunching && !certificateSubmitting);
   const canStartIdentity =
     !identityLaunching
     && status?.teacherKycStatus !== 'APPROVED'
@@ -96,6 +110,28 @@ export function TeacherKycPage() {
     } catch (error) {
       setPageError(readErrorMessage(error));
       setIdentityLaunching(false);
+    }
+  }
+
+  async function handleRestartVerification() {
+    setPageError(null);
+    setIdentityEnvelope(null);
+    setCertificateEnvelope(null);
+    setRestartEnvelope(null);
+    setRestartSubmitting(true);
+
+    try {
+      const response = await restartTeacherVerification();
+      setRestartEnvelope(response);
+      setCertificateFile(null);
+      setCertificateCode('');
+      setAgreementAccepted(false);
+      setErrors({});
+      await refreshStatus();
+    } catch (error) {
+      setPageError(readErrorMessage(error));
+    } finally {
+      setRestartSubmitting(false);
     }
   }
 
@@ -137,7 +173,7 @@ export function TeacherKycPage() {
 
   const dashboardMessage = useMemo(() => {
     if (identityStatus.status === 'FAILED') {
-      return 'VNPT eKYC chưa xác thực được danh tính. Giáo viên có thể thực hiện lại ngay, không cần chờ Admin mở lại.';
+      return 'VNPT eKYC chưa xác thực được danh tính. Giáo viên có thể thực hiện lại ngay, không bị khóa chờ mở lại.';
     }
 
     if (identityStatus.status === 'NOT_STARTED') {
@@ -145,14 +181,14 @@ export function TeacherKycPage() {
     }
 
     if (certificateStatus.status === 'PENDING_REVIEW') {
-      return 'Danh tính đã xác thực. Chứng chỉ đang chờ kiểm tra/đối soát; quyền tạo và xuất bản sản phẩm vẫn khóa cho đến khi KYC đạt.';
+      return 'Danh tính đã xác thực. Chứng chỉ đang chờ đối soát chính chủ với CCCD; nếu không khớp, giáo viên cần xác thực lại từ đầu.';
     }
 
     if (identityVerified) {
-      return 'Danh tính đã xác thực thành công. Hãy nộp JLPT / J-Test / NAT-TEST Certificate để hệ thống đối soát chứng chỉ.';
+      return 'Danh tính đã xác thực thành công. Hãy nộp chứng chỉ để hệ thống đối soát mã chứng chỉ với thông tin chính chủ trên CCCD.';
     }
 
-    return 'Bắt đầu bằng VNPT eKYC realtime. Phần chứng chỉ chỉ mở sau khi xác thực danh tính thành công.';
+    return 'Bắt đầu bằng VNPT eKYC realtime. Chỉ khi CCCD và chứng chỉ khớp chính chủ thì tài khoản mới được mở khóa Teacher.';
   }, [certificateStatus.status, identityStatus.status, identityVerified]);
 
   return (
@@ -167,11 +203,22 @@ export function TeacherKycPage() {
               Xác thực giáo viên
             </Typography>
             <Typography sx={{ color: 'text.secondary', maxWidth: 860, mt: 1 }}>
-              Luồng KYC được tách thành từng module: VNPT eKYC xử lý danh tính realtime, còn chứng chỉ chuyên môn đi qua kiểm tra/đối soát riêng.
-              Nếu một bước lỗi, giáo viên chỉ làm lại đúng bước đó.
+              Luồng KYC được tách thành từng module: VNPT eKYC xử lý danh tính realtime, còn chứng chỉ chuyên môn được đối soát với thông tin chính chủ trên CCCD.
+              Nếu danh tính hoặc chứng chỉ không khớp, giáo viên có thể xác thực lại từ đầu bằng một lượt sạch.
             </Typography>
           </Box>
-          <StatusChip status={status?.teacherKycStatus ?? 'UNKNOWN'} label={status?.teacherKycStatusLabel ?? 'Loading'} />
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' } }}>
+            <StatusChip status={status?.teacherKycStatus ?? 'UNKNOWN'} label={status?.teacherKycStatusLabel ?? 'Loading'} />
+            <Button
+              color="inherit"
+              disabled={!canRestartVerification}
+              onClick={handleRestartVerification}
+              startIcon={<RestartAltIcon />}
+              variant="outlined"
+            >
+              {restartSubmitting ? 'Đang tạo lượt mới...' : 'Xác thực lại từ đầu'}
+            </Button>
+          </Stack>
         </Stack>
       </Paper>
 
@@ -188,52 +235,67 @@ export function TeacherKycPage() {
           Chứng chỉ đã được ghi nhận và chuyển sang bước kiểm tra/đối soát.
         </Alert>
       ) : null}
+      {restartEnvelope ? (
+        <Alert severity="success" icon={<RestartAltIcon />}>
+          Đã tạo lượt xác thực mới. Dữ liệu test cũ không còn được dùng cho màn hình hiện tại.
+        </Alert>
+      ) : null}
 
-      <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.45fr) minmax(320px, 0.9fr)' }, alignItems: 'start' }}>
-        <Stack spacing={3}>
-          <ModuleCard
-            icon={<VerifiedUserIcon color="success" />}
-            index="Module 1"
-            status={identityStatus}
-            title="Xác thực danh tính"
-          >
-            <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-              VNPT eKYC sẽ chụp CCCD và kiểm tra liveness khuôn mặt theo thời gian thực. Module này không dùng upload file CCCD/selfie tĩnh.
+      <Stack spacing={3}>
+        <ModuleCard
+          icon={<VerifiedUserIcon color="success" />}
+          index="Module 1"
+          status={identityStatus}
+          title="Xác thực danh tính"
+        >
+          <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
+            VNPT eKYC sẽ chụp CCCD và kiểm tra liveness khuôn mặt theo thời gian thực. Module này không dùng upload file CCCD/selfie tĩnh.
+          </Typography>
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Chuẩn bị CCCD gốc, cho phép camera, đặt giấy tờ vào đúng khung và làm theo hướng dẫn video/overlay của VNPT SDK.
+            Nếu SDK báo lỗi, đóng popup và bấm thực hiện lại ngay.
+          </Alert>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
+            <Button
+              color="success"
+              disabled={!canStartIdentity}
+              onClick={handleStartIdentity}
+              startIcon={identityStatus.status === 'FAILED' ? <RefreshIcon /> : <GppGoodIcon />}
+              variant="contained"
+            >
+              {identityLaunching ? 'Đang mở VNPT eKYC...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác thực danh tính'}
+            </Button>
+          </Stack>
+          {identityVerified ? <IdentityOcrSummaryCard summary={identitySummary} /> : null}
+          {latestRequest?.providerTransactionId ? (
+            <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 1.5 }}>
+              Transaction: {latestRequest.providerTransactionId}
             </Typography>
-            <Alert severity="info" sx={{ mt: 2 }}>
-              Chuẩn bị CCCD gốc, cho phép camera, đặt giấy tờ vào đúng khung và làm theo hướng dẫn video/overlay của VNPT SDK.
-              Nếu SDK báo lỗi, đóng popup và bấm thực hiện lại ngay.
-            </Alert>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
-              <Button
-                color="success"
-                disabled={!canStartIdentity}
-                onClick={handleStartIdentity}
-                startIcon={identityStatus.status === 'FAILED' ? <RefreshIcon /> : <GppGoodIcon />}
-                variant="contained"
-              >
-                {identityLaunching ? 'Đang mở VNPT eKYC...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác thực danh tính'}
-              </Button>
-            </Stack>
-            {latestRequest?.providerTransactionId ? (
-              <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 1.5 }}>
-                Transaction: {latestRequest.providerTransactionId}
-              </Typography>
-            ) : null}
-          </ModuleCard>
+          ) : null}
+        </ModuleCard>
 
+        {!identityVerified ? (
           <ModuleCard
-            icon={identityVerified ? <SchoolIcon color="success" /> : <LockIcon color="disabled" />}
+            icon={<LockIcon color="disabled" />}
             index="Module 2"
             status={certificateStatus}
             title="JLPT / J-Test / NAT-TEST Certificate"
           >
-            {!identityVerified ? (
-              <Alert severity="warning">Module này chỉ mở sau khi Module 1 xác thực danh tính thành công.</Alert>
-            ) : (
-              <Box component="form" onSubmit={handleCertificateSubmit}>
+            <Alert severity="warning">Module này chỉ mở sau khi Module 1 xác thực danh tính thành công.</Alert>
+          </ModuleCard>
+        ) : (
+          <Box component="form" onSubmit={handleCertificateSubmit}>
+            <Stack spacing={3}>
+              <ModuleCard
+                icon={<SchoolIcon color="success" />}
+                index="Module 2"
+                status={certificateStatus}
+                title="JLPT / J-Test / NAT-TEST Certificate"
+              >
                 <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-                  Giáo viên chỉ nộp chứng chỉ chuyên môn ở bước này. Nếu chứng chỉ cần bổ sung, chỉ cần nộp lại chứng chỉ, không phải xác thực lại danh tính.
+                  Giáo viên nộp chứng chỉ chuyên môn và mã chứng chỉ bắt buộc ở bước này.
+                  Hệ thống sẽ dùng mã này để đối soát registry với thông tin chính chủ đã bóc tách từ CCCD.
+                  Nếu chứng chỉ không khớp chính chủ, giáo viên cần bấm "Xác thực lại từ đầu".
                 </Typography>
 
                 <Paper elevation={0} sx={{ bgcolor: 'grey.50', border: '1px solid', borderColor: errors.certificate ? 'error.light' : 'divider', borderRadius: 2, mt: 2, p: 2 }}>
@@ -267,75 +329,59 @@ export function TeacherKycPage() {
                     setErrors((current) => ({ ...current, certificateCode: undefined }));
                   }}
                 />
+              </ModuleCard>
 
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={agreementAccepted}
-                      disabled={!canSubmitCertificate}
-                      onChange={(event) => {
-                        setAgreementAccepted(event.target.checked);
-                        setErrors((current) => ({ ...current, agreement: undefined }));
-                      }}
+              <Card variant="outlined">
+                <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                      <AssignmentTurnedInIcon color="success" />
+                      <Box>
+                        <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                          Role Agreement
+                        </Typography>
+                        <Typography component="h3" sx={{ fontSize: 20, fontWeight: 800 }}>
+                          Digital Copyright Liability Agreement
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
+                      Cam kết này áp dụng cho toàn bộ vai trò Teacher và các sản phẩm giáo viên tạo trên nền tảng, không phải file upload riêng của chứng chỉ.
+                    </Typography>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={agreementAccepted}
+                          disabled={!canSubmitCertificate}
+                          onChange={(event) => {
+                            setAgreementAccepted(event.target.checked);
+                            setErrors((current) => ({ ...current, agreement: undefined }));
+                          }}
+                        />
+                      }
+                      label="Tôi chấp nhận Digital Copyright Liability Agreement và điều khoản dịch vụ của nền tảng."
+                      sx={{ alignItems: 'flex-start' }}
                     />
-                  }
-                  label="Tôi chấp nhận Digital Copyright Liability Agreement và điều khoản dịch vụ của nền tảng."
-                  sx={{ alignItems: 'flex-start', mt: 1 }}
-                />
-                {errors.agreement ? <FieldError>{errors.agreement}</FieldError> : null}
+                    {errors.agreement ? <FieldError>{errors.agreement}</FieldError> : null}
+                  </Stack>
+                </CardContent>
+              </Card>
 
-                <Button
-                  color="success"
-                  disabled={!canSubmitCertificate}
-                  fullWidth
-                  size="large"
-                  sx={{ mt: 2, py: 1.25, fontWeight: 800 }}
-                  type="submit"
-                  variant="contained"
-                >
-                  {certificateSubmitting ? 'Đang nộp chứng chỉ...' : 'Nộp chứng chỉ'}
-                </Button>
-              </Box>
-            )}
-          </ModuleCard>
-        </Stack>
-
-        <Card variant="outlined" sx={{ position: { lg: 'sticky' }, top: 16 }}>
-          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <GppGoodIcon color="success" />
-              <Typography component="h3" sx={{ fontSize: 20, fontWeight: 800 }}>
-                Bằng chứng trạng thái
-              </Typography>
+              <Button
+                color="success"
+                disabled={!canSubmitCertificate}
+                fullWidth
+                size="large"
+                sx={{ py: 1.25, fontWeight: 800 }}
+                type="submit"
+                variant="contained"
+              >
+                {certificateSubmitting ? 'Đang nộp chứng chỉ...' : 'Nộp chứng chỉ'}
+              </Button>
             </Stack>
-
-            <Stack divider={<Divider flexItem />} spacing={1.5} sx={{ my: 2 }}>
-              <EvidenceRow label="Trạng thái KYC" value={status?.teacherKycStatusLabel ?? 'Đang tải'} />
-              <EvidenceRow label="Module danh tính" value={identityStatus.statusLabel} />
-              <EvidenceRow label="Module chứng chỉ" value={certificateStatus.statusLabel} />
-              <EvidenceRow label="Mở khóa authoring" value={status?.canPublishCourse ? 'Có' : 'Không'} />
-              <EvidenceRow label="Request mới nhất" value={latestRequest?.requestId ?? 'N/A'} />
-              <EvidenceRow label="Provider status" value={latestRequest?.ekycProvider ?? 'N/A'} />
-              <EvidenceRow label="Risk level" value={latestRequest?.riskLevel ?? 'N/A'} />
-              <EvidenceRow label="Mã chứng chỉ" value={latestRequest?.certificateCode ?? 'N/A'} />
-            </Stack>
-
-            <Typography sx={{ fontSize: 15, fontWeight: 800, mt: 2 }}>File chứng chỉ đã lưu</Typography>
-            {latestRequest?.documents.length ? (
-              <Stack spacing={1} sx={{ mt: 1 }}>
-                {latestRequest.documents.map((document) => (
-                  <Paper key={document.id} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1.5 }}>
-                    <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800 }}>{document.documentType}</Typography>
-                    <Typography sx={{ overflowWrap: 'anywhere' }}>{document.fileName}</Typography>
-                  </Paper>
-                ))}
-              </Stack>
-            ) : (
-              <Typography sx={{ color: 'text.secondary', fontSize: 14, mt: 1 }}>N/A</Typography>
-            )}
-          </CardContent>
-        </Card>
-      </Box>
+          </Box>
+        )}
+      </Stack>
     </Stack>
   );
 }
@@ -389,6 +435,41 @@ function StatusChip({ status, label }: { status: string; label: string }) {
   return <Chip color={statusChipColor(status)} label={label} sx={{ fontWeight: 800 }} />;
 }
 
+function IdentityOcrSummaryCard({ summary }: { summary: IdentitySummary }) {
+  return (
+    <Paper elevation={0} sx={{ bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider', borderRadius: 2, mt: 2, p: 2 }}>
+      <Stack spacing={1.5}>
+        <Typography sx={{ fontSize: 14, fontWeight: 800 }}>Thông tin CCCD VNPT OCR</Typography>
+        {summary.hasData ? (
+          <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' } }}>
+            <SummaryField label="Họ và tên" value={summary.fullName} />
+            <SummaryField label="Số CCCD" value={summary.idNumber} />
+            <SummaryField label="Ngày sinh" value={summary.dateOfBirth} />
+            <SummaryField label="Giới tính" value={summary.gender} />
+            <SummaryField label="Nơi thường trú" value={summary.address} wide />
+          </Box>
+        ) : (
+          <Alert severity="warning">
+            VNPT eKYC đã trả trạng thái thành công nhưng payload hiện tại chưa có dữ liệu OCR đọc được.
+            Giáo viên có thể bấm "Xác thực lại từ đầu" nếu thông tin nhận diện không chắc chắn.
+          </Alert>
+        )}
+      </Stack>
+    </Paper>
+  );
+}
+
+function SummaryField({ label, value, wide = false }: { label: string; value?: string; wide?: boolean }) {
+  return (
+    <Box sx={{ minWidth: 0, gridColumn: { sm: wide ? '1 / -1' : 'auto' } }}>
+      <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        {label}
+      </Typography>
+      <Typography sx={{ fontSize: 15, fontWeight: 800, overflowWrap: 'anywhere' }}>{value || 'N/A'}</Typography>
+    </Box>
+  );
+}
+
 function statusChipColor(status: string): 'default' | 'success' | 'warning' | 'error' {
   if (['APPROVED', 'VERIFIED'].includes(status)) {
     return 'success';
@@ -403,17 +484,6 @@ function statusChipColor(status: string): 'default' | 'success' | 'warning' | 'e
   }
 
   return 'default';
-}
-
-function EvidenceRow({ label, value }: { label: string; value: string }) {
-  return (
-    <Box>
-      <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-        {label}
-      </Typography>
-      <Typography sx={{ fontSize: 15, fontWeight: 800, overflowWrap: 'anywhere' }}>{value}</Typography>
-    </Box>
-  );
 }
 
 function validateCertificateForm(certificateFile: File | null, certificateCode: string, agreementAccepted: boolean) {
@@ -436,6 +506,80 @@ function validateCertificateForm(certificateFile: File | null, certificateCode: 
   }
 
   return nextErrors;
+}
+
+function extractIdentitySummary(payload?: Record<string, unknown> | null): IdentitySummary {
+  const entries = flattenPayloadEntries(payload);
+  const summary = {
+    fullName: findPayloadValue(entries, ['fullName', 'full_name', 'hoTen', 'ho_ten', 'customerName', 'name']),
+    idNumber: findPayloadValue(entries, ['idNumber', 'idNo', 'identityNumber', 'documentNumber', 'cardNumber', 'soCccd', 'cccd', 'id']),
+    dateOfBirth: findPayloadValue(entries, ['dateOfBirth', 'birthDate', 'birthday', 'dob', 'ngaySinh']),
+    gender: findPayloadValue(entries, ['gender', 'sex', 'gioiTinh']),
+    address: findPayloadValue(entries, ['address', 'residentAddress', 'permanentAddress', 'noiThuongTru', 'thuongTru']),
+  };
+
+  return {
+    ...summary,
+    hasData: Object.values(summary).some(Boolean),
+  };
+}
+
+function flattenPayloadEntries(value: unknown) {
+  const entries: Array<{ path: string; key: string; value: unknown }> = [];
+
+  function visit(current: unknown, path: string, depth: number) {
+    if (current == null || depth > 8) {
+      return;
+    }
+
+    if (Array.isArray(current)) {
+      current.forEach((item, index) => visit(item, `${path}.${index}`, depth + 1));
+      return;
+    }
+
+    if (typeof current === 'object') {
+      Object.entries(current as Record<string, unknown>).forEach(([key, nestedValue]) => {
+        const nextPath = path ? `${path}.${key}` : key;
+        entries.push({ path: nextPath, key, value: nestedValue });
+        visit(nestedValue, nextPath, depth + 1);
+      });
+    }
+  }
+
+  visit(value, '', 0);
+  return entries;
+}
+
+function findPayloadValue(entries: Array<{ path: string; key: string; value: unknown }>, aliases: string[]) {
+  const normalizedAliases = aliases.map(normalizePayloadKey);
+  const exact = entries.find((entry) => normalizedAliases.includes(normalizePayloadKey(entry.key)));
+  const relaxed = exact ?? entries.find((entry) => {
+    const normalizedPath = normalizePayloadKey(entry.path);
+    return normalizedAliases.some((alias) => alias.length > 2 && normalizedPath.endsWith(alias));
+  });
+
+  return toDisplayValue(relaxed?.value);
+}
+
+function normalizePayloadKey(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase();
+}
+
+function toDisplayValue(value: unknown) {
+  if (typeof value === 'string') {
+    const text = value.trim();
+    return text.length > 0 && text.length <= 240 ? text : undefined;
+  }
+
+  if (typeof value === 'number') {
+    return String(value);
+  }
+
+  return undefined;
 }
 
 function fallbackIdentityStatus(): KycModuleStatusResponse {

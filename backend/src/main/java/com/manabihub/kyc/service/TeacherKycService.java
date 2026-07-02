@@ -21,6 +21,7 @@ import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
 import com.manabihub.kyc.dto.KycIdentityVerificationResponse;
 import com.manabihub.kyc.dto.KycModuleStatusResponse;
 import com.manabihub.kyc.dto.KycRequestResponse;
+import com.manabihub.kyc.dto.KycRestartVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
 import com.manabihub.kyc.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.InternalAdminAccountRepository;
@@ -55,6 +56,7 @@ public class TeacherKycService {
     private static final Set<String> CERTIFICATE_MIME_TYPES = Set.of("image/jpeg", "image/png", "application/pdf");
     private static final Set<String> CERTIFICATE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "pdf");
     private static final List<String> ADMIN_NOTIFICATION_ROLE_CODES = List.of("COURSE_MANAGER", "SYSTEM_ADMIN");
+    private static final String VNPT_PROVIDER = "VNPT_EKYC_WEB_SDK";
 
     private final TeacherProfileRepository teacherProfileRepository;
     private final KycRequestRepository kycRequestRepository;
@@ -126,14 +128,14 @@ public class TeacherKycService {
 
         kycRequest.setStatus(KycRequestStatus.DRAFT);
         kycRequest.setTeacherProfile(teacherProfile);
-        kycRequest.setEkycProvider("VNPT_EKYC_WEB_SDK");
+        kycRequest.setEkycProvider(VNPT_PROVIDER);
         kycRequest.setProviderSessionId(blankToNull(request.providerSessionId()));
         kycRequest.setProviderTransactionId(blankToNull(request.providerTransactionId()));
         kycRequest.setIdentityStatus(verified ? IdentityVerificationStatus.VERIFIED : IdentityVerificationStatus.FAILED);
         kycRequest.setIdentityVerifiedAt(verified ? now : null);
         kycRequest.setCertificateStatus(verified ? CertificateVerificationStatus.NOT_SUBMITTED : CertificateVerificationStatus.LOCKED);
         kycRequest.setVerificationPayload(Map.of(
-                "identityProvider", "VNPT_EKYC_WEB_SDK",
+                "identityProvider", VNPT_PROVIDER,
                 "providerResult", request.sdkResult() == null ? Map.of() : request.sdkResult(),
                 "providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED",
                 "certificateAsyncReviewRequired", true,
@@ -149,6 +151,59 @@ public class TeacherKycService {
                 teacherProfile.getId(),
                 teacherProfile.getKycStatus().name(),
                 toRequestResponse(savedRequest),
+                identityModuleStatus(teacherProfile, savedRequest),
+                certificateModuleStatus(teacherProfile, savedRequest),
+                auditLogged,
+                srsTrace()
+        );
+    }
+
+    @Transactional
+    public KycRestartVerificationResponse restartVerification(UUID userId, String ipAddress, String userAgent) {
+        TeacherProfile teacherProfile = resolveTeacher(userId);
+        AppUser user = teacherProfile.getUser();
+
+        if (user.getUserStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException(
+                    MessageCodes.MSG_ADM_002,
+                    "Teacher account is not allowed to restart verification",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+
+        if (teacherProfile.getKycStatus() == TeacherKycStatus.APPROVED) {
+            throw new BusinessException(
+                    MessageCodes.KYC_ALREADY_APPROVED,
+                    "Approved KYC cannot be restarted",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        TeacherKycStatus beforeStatus = teacherProfile.getKycStatus();
+        KycRequest restartRequest = new KycRequest();
+        restartRequest.setTeacherProfile(teacherProfile);
+        restartRequest.setStatus(KycRequestStatus.DRAFT);
+        restartRequest.setIdentityStatus(IdentityVerificationStatus.NOT_STARTED);
+        restartRequest.setCertificateStatus(CertificateVerificationStatus.LOCKED);
+        restartRequest.setCopyrightAgreed(false);
+        restartRequest.setVerificationPayload(Map.of(
+                "restart", true,
+                "previousTeacherKycStatus", beforeStatus.name(),
+                "moduleFlow", "FULL_RESTART",
+                "srs", srsTrace()
+        ));
+
+        teacherProfile.setKycStatus(TeacherKycStatus.NOT_SUBMITTED);
+        teacherProfile.setCanPublishCourse(false);
+
+        KycRequest savedRequest = kycRequestRepository.save(restartRequest);
+        boolean auditLogged = createRestartAudit(savedRequest, user, beforeStatus, ipAddress, userAgent);
+
+        return new KycRestartVerificationResponse(
+                teacherProfile.getId(),
+                teacherProfile.getKycStatus().name(),
+                teacherProfile.isCanPublishCourse(),
+                toRequestResponse(savedRequest, List.of()),
                 identityModuleStatus(teacherProfile, savedRequest),
                 certificateModuleStatus(teacherProfile, savedRequest),
                 auditLogged,
@@ -229,7 +284,7 @@ public class TeacherKycService {
 
         if (latestRequest != null
                 && latestRequest.getStatus() == KycRequestStatus.PENDING
-                && latestRequest.getIdentityStatus() == IdentityVerificationStatus.VERIFIED
+                && resolvedIdentityStatus(latestRequest) == IdentityVerificationStatus.VERIFIED
                 && resolvedCertificateStatus(latestRequest) == CertificateVerificationStatus.PENDING_REVIEW) {
             throw new BusinessException(
                     MessageCodes.KYC_ALREADY_PENDING,
@@ -255,19 +310,27 @@ public class TeacherKycService {
                 ));
         validateIdentityAllowed(user, teacherProfile, latestRequest);
 
-        if (latestRequest.getIdentityStatus() != IdentityVerificationStatus.VERIFIED) {
+        if (resolvedIdentityStatus(latestRequest) != IdentityVerificationStatus.VERIFIED) {
             throw new BusinessException(
                     MessageCodes.MSG_KYC_002,
                     "Identity verification must be successful before certificate submission"
             );
         }
 
+        CertificateVerificationStatus certificateStatus = resolvedCertificateStatus(latestRequest);
         if (latestRequest.getStatus() == KycRequestStatus.PENDING
-                || resolvedCertificateStatus(latestRequest) == CertificateVerificationStatus.PENDING_REVIEW) {
+                || certificateStatus == CertificateVerificationStatus.PENDING_REVIEW) {
             throw new BusinessException(
                     MessageCodes.KYC_ALREADY_PENDING,
-                    "Certificate is already pending admin review",
+                    "Certificate is already waiting for registry matching",
                     HttpStatus.CONFLICT
+            );
+        }
+
+        if (certificateStatus != CertificateVerificationStatus.NOT_SUBMITTED) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_002,
+                    "Start a fresh teacher verification attempt before submitting another certificate"
             );
         }
 
@@ -436,6 +499,38 @@ public class TeacherKycService {
         return true;
     }
 
+    private boolean createRestartAudit(
+            KycRequest request,
+            AppUser user,
+            TeacherKycStatus beforeStatus,
+            String ipAddress,
+            String userAgent
+    ) {
+        AuditLog auditLog = new AuditLog();
+        auditLog.setActorType("USER");
+        auditLog.setActorUserId(user.getId());
+        auditLog.setActorRoleCode("TEACHER");
+        auditLog.setAction("KYC_RESTART_VERIFICATION");
+        auditLog.setTargetType("KYC_REQUEST");
+        auditLog.setTargetId(request.getId());
+        auditLog.setBeforeValue(Map.of("teacherKycStatus", beforeStatus.name()));
+        auditLog.setAfterValue(Map.of(
+                "teacherKycStatus", TeacherKycStatus.NOT_SUBMITTED.name(),
+                "requestStatus", request.getStatus().name(),
+                "identityStatus", request.getIdentityStatus().name(),
+                "certificateStatus", request.getCertificateStatus().name()
+        ));
+        auditLog.setMetadata(Map.of(
+                "uc", "UC-22",
+                "module", "FULL_RESTART",
+                "reason", "Teacher requested fresh identity and certificate verification"
+        ));
+        auditLog.setIpAddress(ipAddress);
+        auditLog.setUserAgent(userAgent);
+        auditLogRepository.save(auditLog);
+        return true;
+    }
+
     private KycRequestResponse toRequestResponse(KycRequest request) {
         List<KycDocument> documents = kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(request.getId());
 
@@ -452,9 +547,9 @@ public class TeacherKycService {
                 request.getEkycReferenceId(),
                 request.getProviderSessionId(),
                 request.getProviderTransactionId(),
-                request.getIdentityStatus().name(),
-                identityStatusLabel(request.getIdentityStatus()),
-                request.getIdentityVerifiedAt(),
+                resolvedIdentityStatus(request).name(),
+                identityStatusLabel(resolvedIdentityStatus(request)),
+                resolvedIdentityStatus(request) == IdentityVerificationStatus.VERIFIED ? request.getIdentityVerifiedAt() : null,
                 resolvedCertificateStatus(request).name(),
                 certificateStatusLabel(resolvedCertificateStatus(request)),
                 request.getCertificateSubmittedAt(),
@@ -489,18 +584,18 @@ public class TeacherKycService {
         );
         }
 
-        IdentityVerificationStatus status = latestRequest.getIdentityStatus();
+        IdentityVerificationStatus status = resolvedIdentityStatus(latestRequest);
         return new KycModuleStatusResponse(
                 status.name(),
                 identityStatusLabel(status),
                 canInteractWithIdentityModule(teacherProfile, latestRequest),
-                latestRequest.getIdentityVerifiedAt(),
+                status == IdentityVerificationStatus.VERIFIED ? latestRequest.getIdentityVerifiedAt() : null,
                 identityStatusDetail(status)
         );
     }
 
     private KycModuleStatusResponse certificateModuleStatus(TeacherProfile teacherProfile, KycRequest latestRequest) {
-        if (latestRequest == null || latestRequest.getIdentityStatus() != IdentityVerificationStatus.VERIFIED) {
+        if (latestRequest == null || resolvedIdentityStatus(latestRequest) != IdentityVerificationStatus.VERIFIED) {
             return new KycModuleStatusResponse(
                     CertificateVerificationStatus.LOCKED.name(),
                     certificateStatusLabel(CertificateVerificationStatus.LOCKED),
@@ -512,10 +607,7 @@ public class TeacherKycService {
 
         CertificateVerificationStatus status = resolvedCertificateStatus(latestRequest);
         boolean canInteract = teacherProfile.getKycStatus() != TeacherKycStatus.APPROVED
-                && (status == CertificateVerificationStatus.NOT_SUBMITTED
-                || status == CertificateVerificationStatus.REJECTED
-                || latestRequest.getStatus() == KycRequestStatus.REJECTED
-                || latestRequest.getStatus() == KycRequestStatus.CORRECTION_REQUIRED);
+                && status == CertificateVerificationStatus.NOT_SUBMITTED;
 
         return new KycModuleStatusResponse(
                 status.name(),
@@ -534,13 +626,25 @@ public class TeacherKycService {
         };
     }
 
+    private IdentityVerificationStatus resolvedIdentityStatus(KycRequest request) {
+        if (request.getIdentityStatus() == IdentityVerificationStatus.NOT_STARTED
+                || request.getIdentityStatus() == IdentityVerificationStatus.FAILED
+                || request.getIdentityStatus() == IdentityVerificationStatus.PROCESSING) {
+            return request.getIdentityStatus();
+        }
+
+        return VNPT_PROVIDER.equals(request.getEkycProvider())
+                ? request.getIdentityStatus()
+                : IdentityVerificationStatus.NOT_STARTED;
+    }
+
     private boolean canInteractWithIdentityModule(TeacherProfile teacherProfile, KycRequest latestRequest) {
         if (teacherProfile.getKycStatus() == TeacherKycStatus.APPROVED) {
             return false;
         }
 
-        if (latestRequest.getIdentityStatus() == IdentityVerificationStatus.VERIFIED
-                || latestRequest.getIdentityStatus() == IdentityVerificationStatus.PROCESSING) {
+        IdentityVerificationStatus status = resolvedIdentityStatus(latestRequest);
+        if (status == IdentityVerificationStatus.VERIFIED || status == IdentityVerificationStatus.PROCESSING) {
             return false;
         }
 
@@ -727,7 +831,7 @@ public class TeacherKycService {
         return switch (status) {
             case LOCKED -> "Chưa mở khóa";
             case NOT_SUBMITTED -> "Chưa nộp chứng chỉ";
-            case PENDING_REVIEW -> "Đang chờ kiểm tra chứng chỉ";
+            case PENDING_REVIEW -> "Đang chờ đối soát chứng chỉ";
             case APPROVED -> "Đã duyệt";
             case REJECTED -> "Bị từ chối";
         };
@@ -737,9 +841,9 @@ public class TeacherKycService {
         return switch (status) {
             case LOCKED -> "Hoàn tất xác thực danh tính trước khi nộp chứng chỉ.";
             case NOT_SUBMITTED -> "Nộp JLPT / J-Test / NAT-TEST Certificate và mã chứng chỉ bắt buộc.";
-            case PENDING_REVIEW -> "Hồ sơ chứng chỉ đã vào hàng chờ kiểm tra/đối soát.";
-            case APPROVED -> "Chứng chỉ đã được Admin duyệt.";
-            case REJECTED -> "Chỉ cần nộp lại module chứng chỉ.";
+            case PENDING_REVIEW -> "Chứng chỉ đang chờ đối soát registry với thông tin chính chủ trên CCCD.";
+            case APPROVED -> "Chứng chỉ đã khớp thông tin chính chủ và đạt yêu cầu.";
+            case REJECTED -> "Chứng chỉ không khớp thông tin chính chủ trên CCCD. Giáo viên cần xác thực lại từ đầu.";
         };
     }
 

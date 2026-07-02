@@ -5,6 +5,7 @@ import com.manabihub.common.response.ApiResponse;
 import com.manabihub.kyc.dto.KycCertificateSubmissionResponse;
 import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
 import com.manabihub.kyc.dto.KycIdentityVerificationResponse;
+import com.manabihub.kyc.dto.KycRestartVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
 import com.manabihub.kyc.service.TeacherKycService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -62,6 +63,24 @@ public class TeacherKycController {
         ));
     }
 
+    @PostMapping("/restart-verification")
+    public ResponseEntity<ApiResponse<KycRestartVerificationResponse>> restartVerification(
+            @RequestHeader(value = "X-Demo-User-Id", required = false) UUID userId,
+            HttpServletRequest request
+    ) {
+        KycRestartVerificationResponse response = teacherKycService.restartVerification(
+                resolveUserId(userId),
+                request.getRemoteAddr(),
+                request.getHeader("User-Agent")
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.MSG_KYC_003,
+                "Teacher verification was restarted.",
+                response
+        ));
+    }
+
     @PostMapping(value = "/certificate-submissions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<KycCertificateSubmissionResponse>> submitCertificate(
             @RequestHeader(value = "X-Demo-User-Id", required = false) UUID userId,
@@ -81,7 +100,7 @@ public class TeacherKycController {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
                 MessageCodes.MSG_KYC_003,
-                "Certificate submitted successfully. KYC status is pending review.",
+                "Certificate submitted successfully. KYC is waiting for registry matching.",
                 response
         ));
     }
