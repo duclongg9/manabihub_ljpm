@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   FormControlLabel,
+  IconButton,
   LinearProgress,
   Paper,
   Stack,
@@ -19,6 +20,7 @@ import {
   Typography,
 } from '@mui/material';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import CloseIcon from '@mui/icons-material/Close';
 import GppGoodIcon from '@mui/icons-material/GppGood';
 import LockIcon from '@mui/icons-material/Lock';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -428,8 +430,18 @@ function TeacherKycPageContent() {
         open={identityLaunching} 
         maxWidth="md" 
         fullWidth 
-        sx={{ '& .MuiDialog-paper': { bgcolor: '#0F2B3B', height: '90vh', p: 0, m: 2 } }}
+        keepMounted
+        sx={{ '& .MuiDialog-paper': { bgcolor: '#0F2B3B', height: '90vh', p: 0, m: 2, position: 'relative' } }}
       >
+        <IconButton
+          onClick={() => {
+            setIdentityLaunching(false);
+            window.location.reload();
+          }}
+          sx={{ position: 'absolute', top: 8, right: 8, zIndex: 10000, color: 'white' }}
+        >
+          <CloseIcon />
+        </IconButton>
         <DialogContent sx={{ p: 0 }}>
           <Box
             id="ekyc_sdk_intergrated"
