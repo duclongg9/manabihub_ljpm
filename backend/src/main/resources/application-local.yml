@@ -24,12 +24,29 @@ spring:
       client:
         registration:
           google:
-            client-id: dummy-client-id
-            client-secret: dummy-client-secret
+            client-id: 1014389452992-8pq9068v81vuq68s5d1vkapubva7uoc0.apps.googleusercontent.com
+            client-secret: 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
             scope: openid, profile, email
         provider:
           google:
             issuer-uri: https://accounts.google.com
 
+  
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:thanhmdx12@gmail.com}
+    password: ${MAIL_PASSWORD:uvzitlruqqxqzifx}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        transport:
+          protocol: smtp
+
 server:
   port: 8081
+

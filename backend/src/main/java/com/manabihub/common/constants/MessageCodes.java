@@ -143,6 +143,9 @@ public final class MessageCodes {
     // ──────────────────────────────────────────────
     public static final String NOTIFICATION_SENT = "NOTIFICATION_SENT";
     public static final String NOTIFICATION_FAILED = "NOTIFICATION_FAILED";
+    public static final String NOTIFICATION_NOT_FOUND = "NOTIFICATION_NOT_FOUND";
+    public static final String NOTIFICATION_MARKED_READ = "NOTIFICATION_MARKED_READ";
+    public static final String NOTIFICATION_EMAIL_FAILED = "NOTIFICATION_EMAIL_FAILED";
 
     // ──────────────────────────────────────────────
     // SYSTEM — system-level codes
