@@ -1,6 +1,7 @@
 package com.manabihub;
 
 import com.manabihub.kyc.service.TeacherKycService;
+import com.manabihub.mock.repository.MockJlptRegistryRepository;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,6 +20,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
+
+    @MockBean
+    private MockJlptRegistryRepository mockJlptRegistryRepository;
 
     @Test
     void contextLoads() {
