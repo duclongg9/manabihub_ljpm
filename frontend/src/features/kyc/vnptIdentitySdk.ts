@@ -67,6 +67,11 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
     SDK_FLOW: 'DOCUMENT_TO_FACE',
     ENABLE_API_LIVENESS_FACE: true,
     ENABLE_API_COMPARE_FACE: true,
+    ENABLE_API_OCR_DOCUMENT: true,
+    HAS_RESULT_SCREEN: true,
+    SHOW_TAB_RESULT_INFORMATION: true,
+    SHOW_TAB_RESULT_VALIDATION: true,
+    SHOW_TAB_RESULT_QRCODE: true,
   });
 }
 
