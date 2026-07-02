@@ -40,7 +40,7 @@ public class KycRequest {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private KycRequestStatus status = KycRequestStatus.PENDING;
+    private KycRequestStatus status = KycRequestStatus.DRAFT;
 
     @Column(name = "submitted_at", nullable = false)
     private Instant submittedAt;
@@ -53,6 +53,26 @@ public class KycRequest {
 
     @Column(name = "ekyc_reference_id")
     private String ekycReferenceId;
+
+    @Column(name = "provider_session_id")
+    private String providerSessionId;
+
+    @Column(name = "provider_transaction_id")
+    private String providerTransactionId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "identity_status", nullable = false)
+    private IdentityVerificationStatus identityStatus = IdentityVerificationStatus.NOT_STARTED;
+
+    @Column(name = "identity_verified_at")
+    private Instant identityVerifiedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "certificate_status", nullable = false)
+    private CertificateVerificationStatus certificateStatus = CertificateVerificationStatus.LOCKED;
+
+    @Column(name = "certificate_submitted_at")
+    private Instant certificateSubmittedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "risk_level")

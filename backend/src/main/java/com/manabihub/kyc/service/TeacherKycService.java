@@ -4,20 +4,24 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.AuditLog;
+import com.manabihub.kyc.domain.CertificateVerificationStatus;
+import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.InternalAdminAccount;
 import com.manabihub.kyc.domain.KycDocument;
 import com.manabihub.kyc.domain.KycDocumentType;
 import com.manabihub.kyc.domain.KycRequest;
 import com.manabihub.kyc.domain.KycRequestStatus;
 import com.manabihub.kyc.domain.Notification;
-import com.manabihub.kyc.domain.RiskLevel;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.domain.UserStatus;
+import com.manabihub.kyc.dto.KycCertificateSubmissionResponse;
 import com.manabihub.kyc.dto.KycDocumentResponse;
+import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
+import com.manabihub.kyc.dto.KycIdentityVerificationResponse;
+import com.manabihub.kyc.dto.KycModuleStatusResponse;
 import com.manabihub.kyc.dto.KycRequestResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
-import com.manabihub.kyc.dto.KycSubmissionResponse;
 import com.manabihub.kyc.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.InternalAdminAccountRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
@@ -38,6 +42,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,10 +52,8 @@ import java.util.UUID;
 public class TeacherKycService {
 
     private static final long MAX_FILE_SIZE_BYTES = 5L * 1024L * 1024L;
-    private static final Set<String> IMAGE_MIME_TYPES = Set.of("image/jpeg", "image/png");
-    private static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png");
-    private static final Set<String> DOCUMENT_MIME_TYPES = Set.of("image/jpeg", "image/png", "application/pdf");
-    private static final Set<String> DOCUMENT_EXTENSIONS = Set.of("jpg", "jpeg", "png", "pdf");
+    private static final Set<String> CERTIFICATE_MIME_TYPES = Set.of("image/jpeg", "image/png", "application/pdf");
+    private static final Set<String> CERTIFICATE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "pdf");
     private static final List<String> ADMIN_NOTIFICATION_ROLE_CODES = List.of("COURSE_MANAGER", "SYSTEM_ADMIN");
 
     private final TeacherProfileRepository teacherProfileRepository;
@@ -82,8 +85,7 @@ public class TeacherKycService {
     @Transactional(readOnly = true)
     public KycStatusResponse getStatus(UUID userId) {
         TeacherProfile teacherProfile = resolveTeacher(userId);
-        KycRequestResponse latestRequest = kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
-                .map(this::toRequestResponse)
+        KycRequest latestRequest = kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
                 .orElse(null);
 
         return new KycStatusResponse(
@@ -92,74 +94,115 @@ public class TeacherKycService {
                 teacherProfile.getKycStatus().name(),
                 statusLabel(teacherProfile.getKycStatus()),
                 teacherProfile.isCanPublishCourse(),
-                latestRequest,
+                identityModuleStatus(teacherProfile, latestRequest),
+                certificateModuleStatus(teacherProfile, latestRequest),
+                latestRequest == null ? null : toRequestResponse(latestRequest),
                 srsTrace()
         );
     }
 
     @Transactional
-    public KycSubmissionResponse submit(
+    public KycIdentityVerificationResponse verifyIdentity(
             UUID userId,
-            MultipartFile cccdFront,
-            MultipartFile cccdBack,
-            MultipartFile selfie,
+            KycIdentityVerificationRequest request,
+            String ipAddress,
+            String userAgent
+    ) {
+        if (request == null || request.sdkResult() == null || request.sdkResult().isEmpty()) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_002,
+                    "VNPT eKYC SDK result is required before identity verification can be recorded"
+            );
+        }
+
+        TeacherProfile teacherProfile = resolveTeacher(userId);
+        AppUser user = teacherProfile.getUser();
+        KycRequest latestRequest = findLatestRequest(teacherProfile);
+        validateIdentityAllowed(user, teacherProfile, latestRequest);
+
+        KycRequest kycRequest = findReusableRealtimeRequest(teacherProfile, latestRequest);
+        boolean verified = isSdkResultVerified(request.sdkResult());
+        Instant now = Instant.now();
+
+        kycRequest.setStatus(KycRequestStatus.DRAFT);
+        kycRequest.setTeacherProfile(teacherProfile);
+        kycRequest.setEkycProvider("VNPT_EKYC_WEB_SDK");
+        kycRequest.setProviderSessionId(blankToNull(request.providerSessionId()));
+        kycRequest.setProviderTransactionId(blankToNull(request.providerTransactionId()));
+        kycRequest.setIdentityStatus(verified ? IdentityVerificationStatus.VERIFIED : IdentityVerificationStatus.FAILED);
+        kycRequest.setIdentityVerifiedAt(verified ? now : null);
+        kycRequest.setCertificateStatus(verified ? CertificateVerificationStatus.NOT_SUBMITTED : CertificateVerificationStatus.LOCKED);
+        kycRequest.setVerificationPayload(Map.of(
+                "identityProvider", "VNPT_EKYC_WEB_SDK",
+                "providerResult", request.sdkResult() == null ? Map.of() : request.sdkResult(),
+                "providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED",
+                "certificateAsyncReviewRequired", true,
+                "autoApproval", false,
+                "srs", srsTrace()
+        ));
+
+        KycRequest savedRequest = kycRequestRepository.save(kycRequest);
+        savedRequest.setEkycReferenceId("VNPT-SDK-" + savedRequest.getId());
+        boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
+
+        return new KycIdentityVerificationResponse(
+                teacherProfile.getId(),
+                teacherProfile.getKycStatus().name(),
+                toRequestResponse(savedRequest),
+                identityModuleStatus(teacherProfile, savedRequest),
+                certificateModuleStatus(teacherProfile, savedRequest),
+                auditLogged,
+                srsTrace()
+        );
+    }
+
+    @Transactional
+    public KycCertificateSubmissionResponse submitCertificate(
+            UUID userId,
             MultipartFile certificate,
-            MultipartFile copyrightAgreement,
-            boolean copyrightAgreementAccepted,
             String certificateCode,
+            boolean copyrightAgreementAccepted,
             String ipAddress,
             String userAgent
     ) {
         TeacherProfile teacherProfile = resolveTeacher(userId);
         AppUser user = teacherProfile.getUser();
-        validateSubmissionAllowed(user, teacherProfile);
+        KycRequest kycRequest = validateCertificateSubmissionAllowed(user, teacherProfile);
         validateAgreement(copyrightAgreementAccepted);
 
-        PreparedFile frontFile = prepareFile(cccdFront, KycDocumentType.ID_CARD_FRONT);
-        PreparedFile backFile = prepareFile(cccdBack, KycDocumentType.ID_CARD_BACK);
-        PreparedFile selfieFile = prepareFile(selfie, KycDocumentType.SELFIE);
-        PreparedFile certificateFile = prepareFile(certificate, KycDocumentType.CERTIFICATE);
-        PreparedFile copyrightAgreementFile = prepareFile(copyrightAgreement, KycDocumentType.COPYRIGHT_AGREEMENT);
+        if (!StringUtils.hasText(certificateCode)) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_002,
+                    "Certificate code is required for JLPT / J-Test / NAT-TEST registry matching"
+            );
+        }
 
-        validateDuplicateIdentityDocuments(teacherProfile, frontFile, backFile, user, ipAddress, userAgent);
-
-        KycRequest kycRequest = new KycRequest();
-        kycRequest.setTeacherProfile(teacherProfile);
-        kycRequest.setStatus(KycRequestStatus.PENDING);
-        kycRequest.setEkycProvider("MANUAL_REVIEW");
-        kycRequest.setRiskLevel(RiskLevel.MEDIUM);
-        kycRequest.setCertificateCode(StringUtils.hasText(certificateCode) ? certificateCode.trim() : null);
-        kycRequest.setCopyrightAgreed(true);
-        kycRequest.setVerificationPayload(Map.of(
-                "providerStatus", "ADAPTER_DEFERRED_TO_MHB_12",
-                "adminReviewRequired", true,
-                "autoApproval", false,
-                "srs", srsTrace()
-        ));
-        KycRequest savedRequest = kycRequestRepository.save(kycRequest);
-        savedRequest.setEkycReferenceId("MHB-KYC-" + savedRequest.getId());
-
-        List<KycDocument> documents = List.of(
-                storeDocument(savedRequest, frontFile),
-                storeDocument(savedRequest, backFile),
-                storeDocument(savedRequest, selfieFile),
-                storeDocument(savedRequest, certificateFile),
-                storeDocument(savedRequest, copyrightAgreementFile)
-        );
-        kycDocumentRepository.saveAll(documents);
+        PreparedFile certificateFile = prepareCertificateFile(certificate);
+        KycDocument certificateDocument = storeDocument(kycRequest, certificateFile);
+        kycDocumentRepository.save(certificateDocument);
 
         TeacherKycStatus beforeStatus = teacherProfile.getKycStatus();
+        kycRequest.setStatus(KycRequestStatus.PENDING);
+        kycRequest.setCertificateStatus(CertificateVerificationStatus.PENDING_REVIEW);
+        kycRequest.setCertificateCode(certificateCode.trim());
+        kycRequest.setCertificateSubmittedAt(Instant.now());
+        kycRequest.setCopyrightAgreed(true);
+        kycRequest.setVerificationPayload(withCertificatePayload(kycRequest));
+
         teacherProfile.setKycStatus(TeacherKycStatus.PENDING);
         teacherProfile.setCanPublishCourse(false);
 
-        boolean adminNotificationCreated = createAdminNotifications(savedRequest, teacherProfile, user);
-        boolean auditLogged = createSubmissionAudit(savedRequest, user, beforeStatus, ipAddress, userAgent);
+        boolean adminNotificationCreated = createAdminNotifications(kycRequest, user);
+        boolean auditLogged = createCertificateSubmissionAudit(kycRequest, user, beforeStatus, ipAddress, userAgent);
+        List<KycDocument> documents = kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(kycRequest.getId());
 
-        return new KycSubmissionResponse(
+        return new KycCertificateSubmissionResponse(
                 teacherProfile.getId(),
                 teacherProfile.getKycStatus().name(),
                 teacherProfile.isCanPublishCourse(),
-                toRequestResponse(savedRequest, documents),
+                toRequestResponse(kycRequest, documents),
+                identityModuleStatus(teacherProfile, kycRequest),
+                certificateModuleStatus(teacherProfile, kycRequest),
                 adminNotificationCreated,
                 auditLogged,
                 srsTrace()
@@ -175,19 +218,22 @@ public class TeacherKycService {
                 ));
     }
 
-    private void validateSubmissionAllowed(AppUser user, TeacherProfile teacherProfile) {
+    private void validateIdentityAllowed(AppUser user, TeacherProfile teacherProfile, KycRequest latestRequest) {
         if (user.getUserStatus() != UserStatus.ACTIVE) {
             throw new BusinessException(
                     MessageCodes.MSG_ADM_002,
-                    "Teacher account is not allowed to submit KYC documents",
+                    "Teacher account is not allowed to start identity verification",
                     HttpStatus.FORBIDDEN
             );
         }
 
-        if (teacherProfile.getKycStatus() == TeacherKycStatus.PENDING) {
+        if (latestRequest != null
+                && latestRequest.getStatus() == KycRequestStatus.PENDING
+                && latestRequest.getIdentityStatus() == IdentityVerificationStatus.VERIFIED
+                && resolvedCertificateStatus(latestRequest) == CertificateVerificationStatus.PENDING_REVIEW) {
             throw new BusinessException(
                     MessageCodes.KYC_ALREADY_PENDING,
-                    "KYC request is already pending admin review",
+                    "Certificate review is already pending",
                     HttpStatus.CONFLICT
             );
         }
@@ -199,15 +245,33 @@ public class TeacherKycService {
                     HttpStatus.CONFLICT
             );
         }
+    }
 
-        if (!Set.of(TeacherKycStatus.NOT_SUBMITTED, TeacherKycStatus.REJECTED, TeacherKycStatus.CORRECTION_REQUIRED)
-                .contains(teacherProfile.getKycStatus())) {
+    private KycRequest validateCertificateSubmissionAllowed(AppUser user, TeacherProfile teacherProfile) {
+        KycRequest latestRequest = kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.MSG_KYC_002,
+                        "Identity verification must be completed before certificate submission"
+                ));
+        validateIdentityAllowed(user, teacherProfile, latestRequest);
+
+        if (latestRequest.getIdentityStatus() != IdentityVerificationStatus.VERIFIED) {
             throw new BusinessException(
-                    MessageCodes.KYC_SUBMISSION_NOT_ALLOWED,
-                    "Teacher current KYC status does not allow submission",
+                    MessageCodes.MSG_KYC_002,
+                    "Identity verification must be successful before certificate submission"
+            );
+        }
+
+        if (latestRequest.getStatus() == KycRequestStatus.PENDING
+                || resolvedCertificateStatus(latestRequest) == CertificateVerificationStatus.PENDING_REVIEW) {
+            throw new BusinessException(
+                    MessageCodes.KYC_ALREADY_PENDING,
+                    "Certificate is already pending admin review",
                     HttpStatus.CONFLICT
             );
         }
+
+        return latestRequest;
     }
 
     private void validateAgreement(boolean accepted) {
@@ -219,53 +283,42 @@ public class TeacherKycService {
         }
     }
 
-    private PreparedFile prepareFile(MultipartFile file, KycDocumentType documentType) {
+    private KycRequest findLatestRequest(TeacherProfile teacherProfile) {
+        return kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
+                .orElse(null);
+    }
+
+    private KycRequest findReusableRealtimeRequest(TeacherProfile teacherProfile, KycRequest latestRequest) {
+        return java.util.Optional.ofNullable(latestRequest)
+                .filter(request -> request.getStatus() == KycRequestStatus.DRAFT
+                        || request.getIdentityStatus() == IdentityVerificationStatus.FAILED)
+                .orElseGet(KycRequest::new);
+    }
+
+    private PreparedFile prepareCertificateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw invalidFile(documentType, "Required file is missing");
+            throw invalidFile("Certificate file is required");
         }
 
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
-            throw invalidFile(documentType, "File must not exceed 5MB");
+            throw invalidFile("File must not exceed 5MB");
         }
 
         String originalFileName = sanitizeFileName(file.getOriginalFilename());
         String extension = extensionOf(originalFileName);
         String mimeType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
-        boolean documentFile = documentType == KycDocumentType.CERTIFICATE || documentType == KycDocumentType.COPYRIGHT_AGREEMENT;
-        Set<String> allowedMimeTypes = documentFile ? DOCUMENT_MIME_TYPES : IMAGE_MIME_TYPES;
-        Set<String> allowedExtensions = documentFile ? DOCUMENT_EXTENSIONS : IMAGE_EXTENSIONS;
 
-        if (!allowedMimeTypes.contains(mimeType) && !allowedExtensions.contains(extension)) {
-            throw invalidFile(documentType, "File type must be JPG, PNG, or PDF where allowed");
+        if (!CERTIFICATE_MIME_TYPES.contains(mimeType) && !CERTIFICATE_EXTENSIONS.contains(extension)) {
+            throw invalidFile("Certificate must be JPG, PNG, or PDF");
         }
 
         try {
             byte[] bytes = file.getBytes();
             String hash = sha256(bytes);
 
-            return new PreparedFile(documentType, originalFileName, mimeType, file.getSize(), hash, bytes);
+            return new PreparedFile(KycDocumentType.CERTIFICATE, originalFileName, mimeType, file.getSize(), hash, bytes);
         } catch (IOException ex) {
-            throw invalidFile(documentType, "Could not read uploaded file");
-        }
-    }
-
-    private void validateDuplicateIdentityDocuments(
-            TeacherProfile teacherProfile,
-            PreparedFile frontFile,
-            PreparedFile backFile,
-            AppUser user,
-            String ipAddress,
-            String userAgent
-    ) {
-        if (frontFile.fileHash().equals(backFile.fileHash())
-                || kycDocumentRepository.existsIdentityHashForOtherTeacher(frontFile.fileHash(), teacherProfile.getId())
-                || kycDocumentRepository.existsIdentityHashForOtherTeacher(backFile.fileHash(), teacherProfile.getId())) {
-            createSecurityAudit(user, teacherProfile, frontFile.fileHash(), backFile.fileHash(), ipAddress, userAgent);
-            throw new BusinessException(
-                    MessageCodes.MSG_KYC_008,
-                    "Duplicate identity document was detected",
-                    HttpStatus.CONFLICT
-            );
+            throw invalidFile("Could not read uploaded certificate");
         }
     }
 
@@ -302,7 +355,7 @@ public class TeacherKycService {
         return document;
     }
 
-    private boolean createAdminNotifications(KycRequest request, TeacherProfile teacherProfile, AppUser user) {
+    private boolean createAdminNotifications(KycRequest request, AppUser user) {
         List<InternalAdminAccount> admins = internalAdminAccountRepository.findActiveAdminsByRoleCodes(ADMIN_NOTIFICATION_ROLE_CODES);
 
         if (admins.isEmpty()) {
@@ -312,8 +365,8 @@ public class TeacherKycService {
         List<Notification> notifications = admins.stream().map(admin -> {
             Notification notification = new Notification();
             notification.setRecipientAdmin(admin);
-            notification.setTitle("New teacher KYC request");
-            notification.setMessage("Teacher " + user.getFullName() + " submitted KYC request " + request.getId() + " for admin review.");
+            notification.setTitle("New teacher certificate review");
+            notification.setMessage("Teacher " + user.getFullName() + " submitted certificate for KYC request " + request.getId() + ".");
             notification.setNotificationType("KYC_REVIEW_REQUESTED");
             notification.setRead(false);
             return notification;
@@ -323,7 +376,35 @@ public class TeacherKycService {
         return true;
     }
 
-    private boolean createSubmissionAudit(
+    private boolean createIdentityAudit(
+            KycRequest request,
+            AppUser user,
+            String ipAddress,
+            String userAgent
+    ) {
+        AuditLog auditLog = new AuditLog();
+        auditLog.setActorType("USER");
+        auditLog.setActorUserId(user.getId());
+        auditLog.setActorRoleCode("TEACHER");
+        auditLog.setAction("KYC_IDENTITY_VERIFY");
+        auditLog.setTargetType("KYC_REQUEST");
+        auditLog.setTargetId(request.getId());
+        auditLog.setAfterValue(Map.of(
+                "identityStatus", request.getIdentityStatus().name(),
+                "provider", request.getEkycProvider()
+        ));
+        auditLog.setMetadata(Map.of(
+                "uc", "UC-22",
+                "module", "IDENTITY_VERIFICATION",
+                "provider", "VNPT_EKYC_WEB_SDK"
+        ));
+        auditLog.setIpAddress(ipAddress);
+        auditLog.setUserAgent(userAgent);
+        auditLogRepository.save(auditLog);
+        return true;
+    }
+
+    private boolean createCertificateSubmissionAudit(
             KycRequest request,
             AppUser user,
             TeacherKycStatus beforeStatus,
@@ -334,51 +415,25 @@ public class TeacherKycService {
         auditLog.setActorType("USER");
         auditLog.setActorUserId(user.getId());
         auditLog.setActorRoleCode("TEACHER");
-        auditLog.setAction("KYC_SUBMIT");
+        auditLog.setAction("KYC_CERTIFICATE_SUBMIT");
         auditLog.setTargetType("KYC_REQUEST");
         auditLog.setTargetId(request.getId());
         auditLog.setBeforeValue(Map.of("teacherKycStatus", beforeStatus.name()));
         auditLog.setAfterValue(Map.of(
                 "teacherKycStatus", TeacherKycStatus.PENDING.name(),
                 "requestStatus", request.getStatus().name(),
-                "documentTypes", List.of("ID_CARD_FRONT", "ID_CARD_BACK", "SELFIE", "CERTIFICATE", "COPYRIGHT_AGREEMENT")
+                "certificateStatus", request.getCertificateStatus().name()
         ));
         auditLog.setMetadata(Map.of(
                 "uc", "UC-22",
                 "br", List.of("BR-KYC-01", "BR-KYC-03", "BR-NOTIF-02", "BR-AUD-01"),
                 "msg", MessageCodes.MSG_KYC_003,
-                "providerAdapterScope", "MHB-12"
+                "module", "CERTIFICATE_ASYNC_REVIEW"
         ));
         auditLog.setIpAddress(ipAddress);
         auditLog.setUserAgent(userAgent);
         auditLogRepository.save(auditLog);
         return true;
-    }
-
-    private void createSecurityAudit(
-            AppUser user,
-            TeacherProfile teacherProfile,
-            String frontHash,
-            String backHash,
-            String ipAddress,
-            String userAgent
-    ) {
-        AuditLog auditLog = new AuditLog();
-        auditLog.setActorType("USER");
-        auditLog.setActorUserId(user.getId());
-        auditLog.setActorRoleCode("TEACHER");
-        auditLog.setAction("KYC_DUPLICATE_IDENTITY_DOCUMENT_BLOCKED");
-        auditLog.setTargetType("TEACHER_PROFILE");
-        auditLog.setTargetId(teacherProfile.getId());
-        auditLog.setMetadata(Map.of(
-                "uc", "UC-22",
-                "msg", MessageCodes.MSG_KYC_008,
-                "frontHash", frontHash,
-                "backHash", backHash
-        ));
-        auditLog.setIpAddress(ipAddress);
-        auditLog.setUserAgent(userAgent);
-        auditLogRepository.save(auditLog);
     }
 
     private KycRequestResponse toRequestResponse(KycRequest request) {
@@ -395,6 +450,14 @@ public class TeacherKycService {
                 request.getSubmittedAt(),
                 request.getEkycProvider(),
                 request.getEkycReferenceId(),
+                request.getProviderSessionId(),
+                request.getProviderTransactionId(),
+                request.getIdentityStatus().name(),
+                identityStatusLabel(request.getIdentityStatus()),
+                request.getIdentityVerifiedAt(),
+                resolvedCertificateStatus(request).name(),
+                certificateStatusLabel(resolvedCertificateStatus(request)),
+                request.getCertificateSubmittedAt(),
                 request.getRiskLevel() == null ? null : request.getRiskLevel().name(),
                 request.getCertificateCode(),
                 request.isCopyrightAgreed(),
@@ -415,18 +478,187 @@ public class TeacherKycService {
         );
     }
 
-    private BusinessException invalidFile(KycDocumentType documentType, String reason) {
+    private KycModuleStatusResponse identityModuleStatus(TeacherProfile teacherProfile, KycRequest latestRequest) {
+        if (latestRequest == null) {
+            return new KycModuleStatusResponse(
+                IdentityVerificationStatus.NOT_STARTED.name(),
+                identityStatusLabel(IdentityVerificationStatus.NOT_STARTED),
+                teacherProfile.getKycStatus() != TeacherKycStatus.APPROVED,
+                null,
+                "Bắt đầu VNPT eKYC để chụp CCCD và kiểm tra liveness khuôn mặt."
+        );
+        }
+
+        IdentityVerificationStatus status = latestRequest.getIdentityStatus();
+        return new KycModuleStatusResponse(
+                status.name(),
+                identityStatusLabel(status),
+                canInteractWithIdentityModule(teacherProfile, latestRequest),
+                latestRequest.getIdentityVerifiedAt(),
+                identityStatusDetail(status)
+        );
+    }
+
+    private KycModuleStatusResponse certificateModuleStatus(TeacherProfile teacherProfile, KycRequest latestRequest) {
+        if (latestRequest == null || latestRequest.getIdentityStatus() != IdentityVerificationStatus.VERIFIED) {
+            return new KycModuleStatusResponse(
+                    CertificateVerificationStatus.LOCKED.name(),
+                    certificateStatusLabel(CertificateVerificationStatus.LOCKED),
+                    false,
+                    null,
+                    "Hoàn tất xác thực danh tính trước khi nộp chứng chỉ."
+            );
+        }
+
+        CertificateVerificationStatus status = resolvedCertificateStatus(latestRequest);
+        boolean canInteract = teacherProfile.getKycStatus() != TeacherKycStatus.APPROVED
+                && (status == CertificateVerificationStatus.NOT_SUBMITTED
+                || status == CertificateVerificationStatus.REJECTED
+                || latestRequest.getStatus() == KycRequestStatus.REJECTED
+                || latestRequest.getStatus() == KycRequestStatus.CORRECTION_REQUIRED);
+
+        return new KycModuleStatusResponse(
+                status.name(),
+                certificateStatusLabel(status),
+                canInteract,
+                latestRequest.getCertificateSubmittedAt(),
+                certificateStatusDetail(status)
+        );
+    }
+
+    private CertificateVerificationStatus resolvedCertificateStatus(KycRequest request) {
+        return switch (request.getStatus()) {
+            case APPROVED -> CertificateVerificationStatus.APPROVED;
+            case REJECTED, CORRECTION_REQUIRED -> CertificateVerificationStatus.REJECTED;
+            case DRAFT, PENDING -> request.getCertificateStatus();
+        };
+    }
+
+    private boolean canInteractWithIdentityModule(TeacherProfile teacherProfile, KycRequest latestRequest) {
+        if (teacherProfile.getKycStatus() == TeacherKycStatus.APPROVED) {
+            return false;
+        }
+
+        if (latestRequest.getIdentityStatus() == IdentityVerificationStatus.VERIFIED
+                || latestRequest.getIdentityStatus() == IdentityVerificationStatus.PROCESSING) {
+            return false;
+        }
+
+        return latestRequest.getStatus() != KycRequestStatus.PENDING
+                || resolvedCertificateStatus(latestRequest) != CertificateVerificationStatus.PENDING_REVIEW;
+    }
+
+    private Map<String, Object> withCertificatePayload(KycRequest request) {
+        Map<String, Object> payload = new LinkedHashMap<>(request.getVerificationPayload());
+        payload.put("certificateStatus", CertificateVerificationStatus.PENDING_REVIEW.name());
+        payload.put("certificateCode", request.getCertificateCode());
+        payload.put("certificateReviewMode", "ASYNC_CERTIFICATE_REVIEW");
+        payload.put("registryVerification", "WAITING_FOR_MHB_12_MOCK_REGISTRY");
+        payload.put("copyrightAgreement", "ACCEPTED_BY_CHECKBOX");
+        payload.put("autoApproval", false);
+        return payload;
+    }
+
+    private boolean isSdkResultVerified(Map<String, Object> sdkResult) {
+        if (sdkResult == null || sdkResult.isEmpty()) {
+            return false;
+        }
+
+        List<ResultEntry> entries = flattenResult(sdkResult);
+        boolean hasExplicitInvalid = entries.stream().anyMatch(this::isExplicitInvalidValue);
+        boolean hasExplicitSuccess = entries.stream().anyMatch(this::isExplicitSuccessValue);
+        boolean hasVerificationData = entries.stream().anyMatch(entry -> {
+            String key = entry.key();
+            return key.contains("ocr")
+                    || key.contains("liveness")
+                    || key.contains("compare")
+                    || key.contains("matching")
+                    || key.contains("similarity")
+                    || key.contains("identity");
+        });
+
+        return !hasExplicitInvalid && (hasExplicitSuccess || hasVerificationData);
+    }
+
+    private List<ResultEntry> flattenResult(Map<String, Object> value) {
+        java.util.ArrayList<ResultEntry> entries = new java.util.ArrayList<>();
+        collectResultEntries(value, "", entries, 0);
+        return entries;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void collectResultEntries(Object current, String path, List<ResultEntry> entries, int depth) {
+        if (current == null || depth > 8) {
+            return;
+        }
+
+        if (current instanceof Map<?, ?> map) {
+            map.forEach((key, value) -> {
+                String nextPath = path.isBlank() ? String.valueOf(key).toLowerCase() : path + "." + String.valueOf(key).toLowerCase();
+                entries.add(new ResultEntry(nextPath, value));
+                collectResultEntries(value, nextPath, entries, depth + 1);
+            });
+            return;
+        }
+
+        if (current instanceof Iterable<?> iterable) {
+            for (Object item : iterable) {
+                collectResultEntries(item, path, entries, depth + 1);
+            }
+        }
+    }
+
+    private boolean isExplicitInvalidValue(ResultEntry entry) {
+        Object value = entry.value();
+        String key = entry.key();
+
+        if (key.contains("valid") && value instanceof Boolean booleanValue && !booleanValue) {
+            return true;
+        }
+
+        if (value instanceof String text) {
+            String normalized = text.toLowerCase();
+            return normalized.contains("khong hop le")
+                    || normalized.contains("không hợp lệ")
+                    || normalized.contains("invalid")
+                    || normalized.contains("failed")
+                    || normalized.contains("failure");
+        }
+
+        return false;
+    }
+
+    private boolean isExplicitSuccessValue(ResultEntry entry) {
+        Object value = entry.value();
+        String key = entry.key();
+
+        if ((key.contains("success") || key.contains("verified") || key.contains("valid")) && value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+
+        if (value instanceof String text) {
+            String normalized = text.toLowerCase();
+            return normalized.equals("valid")
+                    || normalized.equals("success")
+                    || normalized.equals("verified")
+                    || normalized.contains("hợp lệ");
+        }
+
+        return false;
+    }
+
+    private BusinessException invalidFile(String reason) {
         return new BusinessException(
                 MessageCodes.MSG_KYC_002,
-                documentType.name() + ": " + reason
+                "JLPT / J-Test / NAT-TEST Certificate: " + reason
         );
     }
 
     private String sanitizeFileName(String value) {
-        String cleanName = StringUtils.cleanPath(value == null ? "kyc-document" : value);
+        String cleanName = StringUtils.cleanPath(value == null ? "kyc-certificate" : value);
         String fileName = Path.of(cleanName).getFileName().toString().replaceAll("[^A-Za-z0-9._-]", "_");
 
-        return fileName.isBlank() ? "kyc-document" : fileName;
+        return fileName.isBlank() ? "kyc-certificate" : fileName;
     }
 
     private String extensionOf(String fileName) {
@@ -449,22 +681,65 @@ public class TeacherKycService {
         }
     }
 
+    private String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
     private String statusLabel(TeacherKycStatus status) {
         return switch (status) {
-            case NOT_SUBMITTED -> "Not Submitted";
-            case PENDING -> "Pending Admin Review";
-            case APPROVED -> "Approved";
-            case REJECTED -> "Rejected";
-            case CORRECTION_REQUIRED -> "Correction Required";
+            case NOT_SUBMITTED -> "Chưa nộp";
+            case PENDING -> "Chờ kiểm tra KYC";
+            case APPROVED -> "Đã duyệt";
+            case REJECTED -> "Bị từ chối";
+            case CORRECTION_REQUIRED -> "Yêu cầu bổ sung";
         };
     }
 
     private String requestStatusLabel(KycRequestStatus status) {
         return switch (status) {
-            case PENDING -> "Pending Admin Review";
-            case APPROVED -> "Approved";
-            case REJECTED -> "Rejected";
-            case CORRECTION_REQUIRED -> "Correction Required";
+            case DRAFT -> "Bản nháp xác thực danh tính";
+            case PENDING -> "Chờ kiểm tra KYC";
+            case APPROVED -> "Đã duyệt";
+            case REJECTED -> "Bị từ chối";
+            case CORRECTION_REQUIRED -> "Yêu cầu bổ sung";
+        };
+    }
+
+    private String identityStatusLabel(IdentityVerificationStatus status) {
+        return switch (status) {
+            case NOT_STARTED -> "Chưa xác thực danh tính";
+            case PROCESSING -> "Đang xác thực danh tính";
+            case VERIFIED -> "Xác thực danh tính thành công";
+            case FAILED -> "Xác thực danh tính thất bại";
+        };
+    }
+
+    private String identityStatusDetail(IdentityVerificationStatus status) {
+        return switch (status) {
+            case NOT_STARTED -> "Bắt đầu VNPT eKYC để chụp CCCD và kiểm tra liveness khuôn mặt.";
+            case PROCESSING -> "VNPT eKYC đang xử lý phiên xác thực realtime.";
+            case VERIFIED -> "CCCD và liveness khuôn mặt đã được xác thực qua VNPT eKYC.";
+            case FAILED -> "Kết quả VNPT eKYC không hợp lệ. Giáo viên có thể thực hiện lại ngay.";
+        };
+    }
+
+    private String certificateStatusLabel(CertificateVerificationStatus status) {
+        return switch (status) {
+            case LOCKED -> "Chưa mở khóa";
+            case NOT_SUBMITTED -> "Chưa nộp chứng chỉ";
+            case PENDING_REVIEW -> "Đang chờ kiểm tra chứng chỉ";
+            case APPROVED -> "Đã duyệt";
+            case REJECTED -> "Bị từ chối";
+        };
+    }
+
+    private String certificateStatusDetail(CertificateVerificationStatus status) {
+        return switch (status) {
+            case LOCKED -> "Hoàn tất xác thực danh tính trước khi nộp chứng chỉ.";
+            case NOT_SUBMITTED -> "Nộp JLPT / J-Test / NAT-TEST Certificate và mã chứng chỉ bắt buộc.";
+            case PENDING_REVIEW -> "Hồ sơ chứng chỉ đã vào hàng chờ kiểm tra/đối soát.";
+            case APPROVED -> "Chứng chỉ đã được Admin duyệt.";
+            case REJECTED -> "Chỉ cần nộp lại module chứng chỉ.";
         };
     }
 
@@ -473,7 +748,7 @@ public class TeacherKycService {
                 "uc", "UC-22",
                 "br", List.of("BR-KYC-01", "BR-KYC-03", "BR-KYC-05", "BR-NOTIF-02", "BR-AUD-01"),
                 "msg", List.of(MessageCodes.MSG_KYC_003, MessageCodes.MSG_KYC_002, MessageCodes.MSG_KYC_008),
-                "deferredToMhb12", List.of("VNPT eKYC adapter", "National ID registry adapter", "JLPT registry adapter")
+                "moduleFlow", List.of("VNPT realtime identity verification", "Async certificate review")
         );
     }
 
@@ -485,5 +760,8 @@ public class TeacherKycService {
             String fileHash,
             byte[] bytes
     ) {
+    }
+
+    private record ResultEntry(String key, Object value) {
     }
 }

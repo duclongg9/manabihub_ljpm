@@ -1,6 +1,7 @@
 export const ENDPOINTS = {
   teacherKyc: {
     status: '/v1/teacher/kyc/status',
-    submissions: '/v1/teacher/kyc/submissions',
+    identityVerifications: '/v1/teacher/kyc/identity-verifications',
+    certificateSubmissions: '/v1/teacher/kyc/certificate-submissions',
   },
 };

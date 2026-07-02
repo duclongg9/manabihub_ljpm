@@ -22,14 +22,30 @@ export interface KycDocumentResponse {
   createdAt: string;
 }
 
+export interface KycModuleStatusResponse {
+  status: string;
+  statusLabel: string;
+  canInteract: boolean;
+  completedAt?: string | null;
+  detail?: string | null;
+}
+
 export interface KycRequestResponse {
   requestId: string;
   status: string;
   statusLabel: string;
   submittedAt: string;
-  ekycProvider: string;
-  ekycReferenceId: string;
-  riskLevel: string;
+  ekycProvider?: string | null;
+  ekycReferenceId?: string | null;
+  providerSessionId?: string | null;
+  providerTransactionId?: string | null;
+  identityStatus: string;
+  identityStatusLabel: string;
+  identityVerifiedAt?: string | null;
+  certificateStatus: string;
+  certificateStatusLabel: string;
+  certificateSubmittedAt?: string | null;
+  riskLevel?: string | null;
   certificateCode?: string | null;
   copyrightAgreed: boolean;
   verificationPayload: Record<string, unknown>;
@@ -42,28 +58,44 @@ export interface KycStatusResponse {
   teacherKycStatus: string;
   teacherKycStatusLabel: string;
   canPublishCourse: boolean;
+  identityVerification: KycModuleStatusResponse;
+  certificateVerification: KycModuleStatusResponse;
   latestRequest?: KycRequestResponse | null;
   srsTrace: Record<string, unknown>;
 }
 
-export interface KycSubmissionResponse {
+export interface KycIdentityVerificationPayload {
+  providerSessionId?: string | null;
+  providerTransactionId?: string | null;
+  sdkResult: Record<string, unknown>;
+}
+
+export interface KycIdentityVerificationResponse {
+  teacherId: string;
+  teacherKycStatus: string;
+  request: KycRequestResponse;
+  identityVerification: KycModuleStatusResponse;
+  certificateVerification: KycModuleStatusResponse;
+  auditLogged: boolean;
+  srsTrace: Record<string, unknown>;
+}
+
+export interface KycCertificateSubmissionResponse {
   teacherId: string;
   teacherKycStatus: string;
   canPublishCourse: boolean;
   request: KycRequestResponse;
+  identityVerification: KycModuleStatusResponse;
+  certificateVerification: KycModuleStatusResponse;
   adminNotificationCreated: boolean;
   auditLogged: boolean;
   srsTrace: Record<string, unknown>;
 }
 
-export interface KycSubmissionPayload {
-  cccdFront: File;
-  cccdBack: File;
-  selfie: File;
+export interface KycCertificateSubmissionPayload {
   certificate: File;
-  copyrightAgreement: File;
+  certificateCode: string;
   copyrightAgreementAccepted: boolean;
-  certificateCode?: string;
 }
 
 export async function getTeacherKycStatus() {
@@ -74,25 +106,34 @@ export async function getTeacherKycStatus() {
   return response.data.data;
 }
 
-export async function submitTeacherKyc(payload: KycSubmissionPayload) {
+export async function verifyTeacherIdentity(payload: KycIdentityVerificationPayload) {
+  const response = await axiosClient.post<ApiEnvelope<KycIdentityVerificationResponse>>(
+    ENDPOINTS.teacherKyc.identityVerifications,
+    payload,
+    {
+      headers: demoTeacherHeaders(),
+    },
+  );
+
+  return response.data;
+}
+
+export async function submitTeacherCertificate(payload: KycCertificateSubmissionPayload) {
   const formData = new FormData();
-  formData.append('cccdFront', payload.cccdFront);
-  formData.append('cccdBack', payload.cccdBack);
-  formData.append('selfie', payload.selfie);
   formData.append('certificate', payload.certificate);
-  formData.append('copyrightAgreement', payload.copyrightAgreement);
+  formData.append('certificateCode', payload.certificateCode.trim());
   formData.append('copyrightAgreementAccepted', String(payload.copyrightAgreementAccepted));
 
-  if (payload.certificateCode?.trim()) {
-    formData.append('certificateCode', payload.certificateCode.trim());
-  }
-
-  const response = await axiosClient.post<ApiEnvelope<KycSubmissionResponse>>(ENDPOINTS.teacherKyc.submissions, formData, {
-    headers: {
-      ...demoTeacherHeaders(),
-      'Content-Type': 'multipart/form-data',
+  const response = await axiosClient.post<ApiEnvelope<KycCertificateSubmissionResponse>>(
+    ENDPOINTS.teacherKyc.certificateSubmissions,
+    formData,
+    {
+      headers: {
+        ...demoTeacherHeaders(),
+        'Content-Type': 'multipart/form-data',
+      },
     },
-  });
+  );
 
   return response.data;
 }

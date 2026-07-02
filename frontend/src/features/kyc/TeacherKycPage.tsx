@@ -9,200 +9,166 @@ import {
   Divider,
   FormControlLabel,
   LinearProgress,
-  List,
-  ListItem,
-  ListItemText,
   Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import GppMaybeIcon from '@mui/icons-material/GppMaybe';
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import GppGoodIcon from '@mui/icons-material/GppGood';
+import LockIcon from '@mui/icons-material/Lock';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SchoolIcon from '@mui/icons-material/School';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import {
   getTeacherKycStatus,
-  submitTeacherKyc,
+  submitTeacherCertificate,
+  verifyTeacherIdentity,
   type ApiEnvelope,
+  type KycCertificateSubmissionResponse,
+  type KycIdentityVerificationResponse,
+  type KycModuleStatusResponse,
   type KycStatusResponse,
-  type KycSubmissionResponse,
 } from './teacherKycApi';
+import { launchVnptIdentitySdk } from './vnptIdentitySdk';
 
-type FileFieldName = 'cccdFront' | 'cccdBack' | 'selfie' | 'certificate' | 'copyrightAgreement';
-
-interface FileFieldConfig {
-  name: FileFieldName;
-  label: string;
-  hint: string;
-  accept: string;
-  allowPdf: boolean;
-}
-
-type FileState = Record<FileFieldName, File | null>;
-type FileErrors = Partial<Record<FileFieldName | 'agreement', string>>;
+type CertificateErrors = Partial<Record<'certificate' | 'certificateCode' | 'agreement', string>>;
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const IMAGE_TYPES = new Set(['image/jpeg', 'image/png']);
-const DOCUMENT_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
-
-const fileFields: FileFieldConfig[] = [
-  {
-    name: 'cccdFront',
-    label: 'CCCD front',
-    hint: 'Front side identity document image, JPG or PNG, max 5MB.',
-    accept: 'image/jpeg,image/png',
-    allowPdf: false,
-  },
-  {
-    name: 'cccdBack',
-    label: 'CCCD back',
-    hint: 'Back side identity document image, JPG or PNG, max 5MB.',
-    accept: 'image/jpeg,image/png',
-    allowPdf: false,
-  },
-  {
-    name: 'selfie',
-    label: 'Selfie / liveness placeholder',
-    hint: 'Teacher selfie image for later liveness provider integration.',
-    accept: 'image/jpeg,image/png',
-    allowPdf: false,
-  },
-  {
-    name: 'certificate',
-    label: 'JLPT / professional certificate',
-    hint: 'Certificate image or PDF. Registry checks are deferred to MHB-12.',
-    accept: 'image/jpeg,image/png,application/pdf',
-    allowPdf: true,
-  },
-  {
-    name: 'copyrightAgreement',
-    label: 'Digital Copyright Liability Agreement',
-    hint: 'Signed agreement file, image or PDF.',
-    accept: 'image/jpeg,image/png,application/pdf',
-    allowPdf: true,
-  },
-];
-
-const emptyFiles: FileState = {
-  cccdFront: null,
-  cccdBack: null,
-  selfie: null,
-  certificate: null,
-  copyrightAgreement: null,
-};
+const CERTIFICATE_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
 
 export function TeacherKycPage() {
-  const [files, setFiles] = useState<FileState>(emptyFiles);
+  const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [certificateCode, setCertificateCode] = useState('');
   const [agreementAccepted, setAgreementAccepted] = useState(false);
-  const [errors, setErrors] = useState<FileErrors>({});
+  const [errors, setErrors] = useState<CertificateErrors>({});
   const [status, setStatus] = useState<KycStatusResponse | null>(null);
-  const [submissionEnvelope, setSubmissionEnvelope] = useState<ApiEnvelope<KycSubmissionResponse> | null>(null);
+  const [identityEnvelope, setIdentityEnvelope] = useState<ApiEnvelope<KycIdentityVerificationResponse> | null>(null);
+  const [certificateEnvelope, setCertificateEnvelope] = useState<ApiEnvelope<KycCertificateSubmissionResponse> | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [identityLaunching, setIdentityLaunching] = useState(false);
+  const [certificateSubmitting, setCertificateSubmitting] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-
-    getTeacherKycStatus()
-      .then((response) => {
-        if (mounted) {
-          setStatus(response);
-        }
-      })
-      .catch((error) => {
-        if (mounted) {
-          setPageError(readErrorMessage(error));
-        }
-      })
-      .finally(() => {
-        if (mounted) {
-          setLoadingStatus(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
+    refreshStatus().finally(() => setLoadingStatus(false));
   }, []);
 
-  const canSubmit = useMemo(() => {
-    if (!status) {
-      return true;
+  const identityStatus = status?.identityVerification ?? fallbackIdentityStatus();
+  const certificateStatus = status?.certificateVerification ?? fallbackCertificateStatus();
+  const latestRequest = certificateEnvelope?.data.request ?? identityEnvelope?.data.request ?? status?.latestRequest ?? null;
+  const identityVerified = identityStatus.status === 'VERIFIED';
+  const canStartIdentity =
+    !identityLaunching
+    && status?.teacherKycStatus !== 'APPROVED'
+    && certificateStatus.status !== 'PENDING_REVIEW'
+    && (identityStatus.canInteract || ['NOT_STARTED', 'FAILED'].includes(identityStatus.status));
+  const canSubmitCertificate = identityVerified && certificateStatus.canInteract && !certificateSubmitting;
+
+  async function refreshStatus() {
+    try {
+      const response = await getTeacherKycStatus();
+      setStatus(response);
+    } catch (error) {
+      setPageError(readErrorMessage(error));
     }
-
-    return ['NOT_SUBMITTED', 'REJECTED', 'CORRECTION_REQUIRED'].includes(status.teacherKycStatus);
-  }, [status]);
-
-  const submittedRequest = submissionEnvelope?.data.request ?? status?.latestRequest ?? null;
-
-  function handleFileChange(name: FileFieldName, event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-
-    setFiles((current) => ({ ...current, [name]: file }));
-    setErrors((current) => ({ ...current, [name]: undefined }));
-    setSubmissionEnvelope(null);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleStartIdentity() {
+    setPageError(null);
+    setIdentityEnvelope(null);
+    setIdentityLaunching(true);
+
+    try {
+      await launchVnptIdentitySdk(async (result) => {
+        try {
+          const response = await verifyTeacherIdentity(result);
+          setIdentityEnvelope(response);
+          await refreshStatus();
+        } catch (error) {
+          setPageError(readErrorMessage(error));
+        } finally {
+          setIdentityLaunching(false);
+        }
+      });
+    } catch (error) {
+      setPageError(readErrorMessage(error));
+      setIdentityLaunching(false);
+    }
+  }
+
+  function handleCertificateChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setCertificateFile(file);
+    setErrors((current) => ({ ...current, certificate: undefined }));
+    setCertificateEnvelope(null);
+  }
+
+  async function handleCertificateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPageError(null);
-    setSubmissionEnvelope(null);
+    setCertificateEnvelope(null);
 
-    const nextErrors = validateForm(files, agreementAccepted);
+    const nextErrors = validateCertificateForm(certificateFile, certificateCode, agreementAccepted);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
       return;
     }
 
-    setSubmitting(true);
+    setCertificateSubmitting(true);
 
     try {
-      const response = await submitTeacherKyc({
-        cccdFront: files.cccdFront as File,
-        cccdBack: files.cccdBack as File,
-        selfie: files.selfie as File,
-        certificate: files.certificate as File,
-        copyrightAgreement: files.copyrightAgreement as File,
-        copyrightAgreementAccepted: agreementAccepted,
+      const response = await submitTeacherCertificate({
+        certificate: certificateFile as File,
         certificateCode,
+        copyrightAgreementAccepted: agreementAccepted,
       });
-      const nextStatus = await getTeacherKycStatus();
-
-      setSubmissionEnvelope(response);
-      setStatus(nextStatus);
+      setCertificateEnvelope(response);
+      await refreshStatus();
     } catch (error) {
       setPageError(readErrorMessage(error));
     } finally {
-      setSubmitting(false);
+      setCertificateSubmitting(false);
     }
   }
 
+  const dashboardMessage = useMemo(() => {
+    if (identityStatus.status === 'FAILED') {
+      return 'VNPT eKYC chưa xác thực được danh tính. Giáo viên có thể thực hiện lại ngay, không cần chờ Admin mở lại.';
+    }
+
+    if (identityStatus.status === 'NOT_STARTED') {
+      return 'Bắt đầu bằng VNPT eKYC realtime: hệ thống sẽ mở hướng dẫn chụp CCCD và liveness khuôn mặt trong SDK.';
+    }
+
+    if (certificateStatus.status === 'PENDING_REVIEW') {
+      return 'Danh tính đã xác thực. Chứng chỉ đang chờ kiểm tra/đối soát; quyền tạo và xuất bản sản phẩm vẫn khóa cho đến khi KYC đạt.';
+    }
+
+    if (identityVerified) {
+      return 'Danh tính đã xác thực thành công. Hãy nộp JLPT / J-Test / NAT-TEST Certificate để hệ thống đối soát chứng chỉ.';
+    }
+
+    return 'Bắt đầu bằng VNPT eKYC realtime. Phần chứng chỉ chỉ mở sau khi xác thực danh tính thành công.';
+  }, [certificateStatus.status, identityStatus.status, identityVerified]);
+
   return (
     <Stack spacing={3}>
-      <Paper
-        elevation={0}
-        sx={{
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 2,
-          p: { xs: 2, md: 3 },
-        }}
-      >
+      <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: { xs: 2, md: 3 } }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' }, justifyContent: 'space-between' }}>
           <Box>
             <Typography sx={{ color: 'success.main', fontSize: 13, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               UC-22 Teacher Verification
             </Typography>
             <Typography component="h2" sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 800, mt: 1 }}>
-              Submit KYC Documents
+              Xác thực giáo viên
             </Typography>
-            <Typography sx={{ color: 'text.secondary', maxWidth: 800, mt: 1 }}>
-              Upload identity, selfie/liveness placeholder, JLPT or professional certificate, and copyright agreement. Product authoring remains
-              locked until admin approval.
+            <Typography sx={{ color: 'text.secondary', maxWidth: 860, mt: 1 }}>
+              Luồng KYC được tách thành từng module: VNPT eKYC xử lý danh tính realtime, còn chứng chỉ chuyên môn đi qua kiểm tra/đối soát riêng.
+              Nếu một bước lỗi, giáo viên chỉ làm lại đúng bước đó.
             </Typography>
           </Box>
           <StatusChip status={status?.teacherKycStatus ?? 'UNKNOWN'} label={status?.teacherKycStatusLabel ?? 'Loading'} />
@@ -211,150 +177,162 @@ export function TeacherKycPage() {
 
       {loadingStatus ? <LinearProgress color="success" /> : null}
       {pageError ? <Alert severity="error">{pageError}</Alert> : null}
-      {submissionEnvelope ? (
+      <Alert severity="info">{dashboardMessage}</Alert>
+      {identityEnvelope ? (
+        <Alert severity={identityEnvelope.data.identityVerification.status === 'VERIFIED' ? 'success' : 'warning'} icon={<VerifiedUserIcon />}>
+          {identityEnvelope.data.identityVerification.statusLabel}
+        </Alert>
+      ) : null}
+      {certificateEnvelope ? (
         <Alert severity="success" icon={<AssignmentTurnedInIcon />}>
-          {submissionEnvelope.message} Admin notification: {submissionEnvelope.data.adminNotificationCreated ? 'created' : 'not created'}.
-          Audit log: {submissionEnvelope.data.auditLogged ? 'recorded' : 'not recorded'}.
+          Chứng chỉ đã được ghi nhận và chuyển sang bước kiểm tra/đối soát.
         </Alert>
       ) : null}
 
-      <Box
-        sx={{
-          display: 'grid',
-          gap: 3,
-          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.6fr) minmax(320px, 0.9fr)' },
-          alignItems: 'start',
-        }}
-      >
-        <Card component="form" onSubmit={handleSubmit} variant="outlined">
-          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', mb: 2 }}>
-              <Box>
-                <Typography component="h3" sx={{ fontSize: 20, fontWeight: 800 }}>
-                  Required documents
-                </Typography>
-                <Typography sx={{ color: 'text.secondary', fontSize: 14, mt: 0.5 }}>
-                  JPG/PNG for identity and selfie, JPG/PNG/PDF for certificate and agreement. Max 5MB each.
-                </Typography>
-              </Box>
-              <Chip label={loadingStatus ? 'Checking status...' : canSubmit ? 'Ready for submission' : 'Submission locked'} />
+      <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.45fr) minmax(320px, 0.9fr)' }, alignItems: 'start' }}>
+        <Stack spacing={3}>
+          <ModuleCard
+            icon={<VerifiedUserIcon color="success" />}
+            index="Module 1"
+            status={identityStatus}
+            title="Xác thực danh tính"
+          >
+            <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
+              VNPT eKYC sẽ chụp CCCD và kiểm tra liveness khuôn mặt theo thời gian thực. Module này không dùng upload file CCCD/selfie tĩnh.
+            </Typography>
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Chuẩn bị CCCD gốc, cho phép camera, đặt giấy tờ vào đúng khung và làm theo hướng dẫn video/overlay của VNPT SDK.
+              Nếu SDK báo lỗi, đóng popup và bấm thực hiện lại ngay.
+            </Alert>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
+              <Button
+                color="success"
+                disabled={!canStartIdentity}
+                onClick={handleStartIdentity}
+                startIcon={identityStatus.status === 'FAILED' ? <RefreshIcon /> : <GppGoodIcon />}
+                variant="contained"
+              >
+                {identityLaunching ? 'Đang mở VNPT eKYC...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác thực danh tính'}
+              </Button>
             </Stack>
-
-            <Box
-              sx={{
-                display: 'grid',
-                gap: 2,
-                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
-              }}
-            >
-              {fileFields.map((field) => (
-                <FileUploadCard
-                  key={field.name}
-                  disabled={!canSubmit || submitting}
-                  error={errors[field.name]}
-                  field={field}
-                  file={files[field.name]}
-                  onChange={handleFileChange}
-                />
-              ))}
-            </Box>
-
-            <TextField
-              fullWidth
-              disabled={!canSubmit || submitting}
-              label="Certificate code (optional)"
-              margin="normal"
-              placeholder="JLPT or professional certificate code"
-              value={certificateCode}
-              onChange={(event) => setCertificateCode(event.target.value)}
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={agreementAccepted}
-                  disabled={!canSubmit || submitting}
-                  onChange={(event) => {
-                    setAgreementAccepted(event.target.checked);
-                    setErrors((current) => ({ ...current, agreement: undefined }));
-                  }}
-                />
-              }
-              label="I accept the Digital Copyright Liability Agreement for teacher-published content."
-              sx={{ alignItems: 'flex-start', mt: 1 }}
-            />
-            {errors.agreement ? (
-              <Typography sx={{ color: 'error.main', fontSize: 13, fontWeight: 700 }}>
-                {errors.agreement}
+            {latestRequest?.providerTransactionId ? (
+              <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 1.5 }}>
+                Transaction: {latestRequest.providerTransactionId}
               </Typography>
             ) : null}
+          </ModuleCard>
 
-            <Button
-              fullWidth
-              color="success"
-              disabled={!canSubmit || submitting}
-              size="large"
-              sx={{ mt: 2, py: 1.25, fontWeight: 800 }}
-              type="submit"
-              variant="contained"
-            >
-              {submitting ? 'Submitting KYC...' : 'Submit Verification'}
-            </Button>
-          </CardContent>
-        </Card>
+          <ModuleCard
+            icon={identityVerified ? <SchoolIcon color="success" /> : <LockIcon color="disabled" />}
+            index="Module 2"
+            status={certificateStatus}
+            title="JLPT / J-Test / NAT-TEST Certificate"
+          >
+            {!identityVerified ? (
+              <Alert severity="warning">Module này chỉ mở sau khi Module 1 xác thực danh tính thành công.</Alert>
+            ) : (
+              <Box component="form" onSubmit={handleCertificateSubmit}>
+                <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
+                  Giáo viên chỉ nộp chứng chỉ chuyên môn ở bước này. Nếu chứng chỉ cần bổ sung, chỉ cần nộp lại chứng chỉ, không phải xác thực lại danh tính.
+                </Typography>
+
+                <Paper elevation={0} sx={{ bgcolor: 'grey.50', border: '1px solid', borderColor: errors.certificate ? 'error.light' : 'divider', borderRadius: 2, mt: 2, p: 2 }}>
+                  <Stack spacing={1.25}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 800 }}>JLPT / J-Test / NAT-TEST Certificate</Typography>
+                    <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Ảnh hoặc PDF, tối đa 5MB.</Typography>
+                    <Button component="label" disabled={!canSubmitCertificate} startIcon={<UploadFileIcon />} variant="outlined">
+                      Tải chứng chỉ
+                      <input hidden accept="image/jpeg,image/png,application/pdf" type="file" onChange={handleCertificateChange} />
+                    </Button>
+                    {certificateFile ? (
+                      <Typography sx={{ color: 'success.main', fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>
+                        {certificateFile.name}
+                      </Typography>
+                    ) : null}
+                    {errors.certificate ? <FieldError>{errors.certificate}</FieldError> : null}
+                  </Stack>
+                </Paper>
+
+                <TextField
+                  fullWidth
+                  disabled={!canSubmitCertificate}
+                  error={Boolean(errors.certificateCode)}
+                  helperText={errors.certificateCode}
+                  label="Mã chứng chỉ (Hệ thống tự bóc tách hoặc nhập tay nếu ảnh mờ)"
+                  margin="normal"
+                  required
+                  value={certificateCode}
+                  onChange={(event) => {
+                    setCertificateCode(event.target.value);
+                    setErrors((current) => ({ ...current, certificateCode: undefined }));
+                  }}
+                />
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={agreementAccepted}
+                      disabled={!canSubmitCertificate}
+                      onChange={(event) => {
+                        setAgreementAccepted(event.target.checked);
+                        setErrors((current) => ({ ...current, agreement: undefined }));
+                      }}
+                    />
+                  }
+                  label="Tôi chấp nhận Digital Copyright Liability Agreement và điều khoản dịch vụ của nền tảng."
+                  sx={{ alignItems: 'flex-start', mt: 1 }}
+                />
+                {errors.agreement ? <FieldError>{errors.agreement}</FieldError> : null}
+
+                <Button
+                  color="success"
+                  disabled={!canSubmitCertificate}
+                  fullWidth
+                  size="large"
+                  sx={{ mt: 2, py: 1.25, fontWeight: 800 }}
+                  type="submit"
+                  variant="contained"
+                >
+                  {certificateSubmitting ? 'Đang nộp chứng chỉ...' : 'Nộp chứng chỉ'}
+                </Button>
+              </Box>
+            )}
+          </ModuleCard>
+        </Stack>
 
         <Card variant="outlined" sx={{ position: { lg: 'sticky' }, top: 16 }}>
           <CardContent sx={{ p: { xs: 2, md: 3 } }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <GppMaybeIcon color="success" />
+              <GppGoodIcon color="success" />
               <Typography component="h3" sx={{ fontSize: 20, fontWeight: 800 }}>
-                Status evidence
+                Bằng chứng trạng thái
               </Typography>
             </Stack>
 
             <Stack divider={<Divider flexItem />} spacing={1.5} sx={{ my: 2 }}>
-              <EvidenceRow label="KYC status" value={status?.teacherKycStatusLabel ?? 'Loading'} />
-              <EvidenceRow label="Authoring unlocked" value={status?.canPublishCourse ? 'Yes' : 'No'} />
-              <EvidenceRow label="Latest request" value={submittedRequest?.requestId ?? '-'} />
-              <EvidenceRow label="Provider status" value={submittedRequest?.ekycProvider ?? 'Manual review pending'} />
-              <EvidenceRow label="Risk level" value={submittedRequest?.riskLevel ?? '-'} />
+              <EvidenceRow label="Trạng thái KYC" value={status?.teacherKycStatusLabel ?? 'Đang tải'} />
+              <EvidenceRow label="Module danh tính" value={identityStatus.statusLabel} />
+              <EvidenceRow label="Module chứng chỉ" value={certificateStatus.statusLabel} />
+              <EvidenceRow label="Mở khóa authoring" value={status?.canPublishCourse ? 'Có' : 'Không'} />
+              <EvidenceRow label="Request mới nhất" value={latestRequest?.requestId ?? 'N/A'} />
+              <EvidenceRow label="Provider status" value={latestRequest?.ekycProvider ?? 'N/A'} />
+              <EvidenceRow label="Risk level" value={latestRequest?.riskLevel ?? 'N/A'} />
+              <EvidenceRow label="Mã chứng chỉ" value={latestRequest?.certificateCode ?? 'N/A'} />
             </Stack>
 
-            {submittedRequest ? (
-              <>
-                <Typography sx={{ fontSize: 15, fontWeight: 800, mt: 2 }}>
-                  Stored documents
-                </Typography>
-                <List dense disablePadding sx={{ mt: 1 }}>
-                  {submittedRequest.documents.map((document) => (
-                    <ListItem key={document.id} disableGutters divider>
-                      <ListItemText
-                        primary={
-                          <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800 }}>
-                            {document.documentType}
-                          </Typography>
-                        }
-                        secondary={
-                          <Typography sx={{ color: 'text.primary', overflowWrap: 'anywhere' }}>
-                            {document.fileName}
-                          </Typography>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </>
-            ) : null}
-
-            <Typography sx={{ fontSize: 15, fontWeight: 800, mt: 2 }}>
-              SRS traceability
-            </Typography>
-            <Typography sx={{ color: 'text.secondary', fontSize: 14, mt: 1 }}>
-              UC-22, BR-KYC, BR-RBAC, BR-AUD, MSG-KYC.
-            </Typography>
-            <Typography sx={{ color: 'text.secondary', fontSize: 14, mt: 1 }}>
-              VNPT, National ID, and JLPT registry adapters are deferred to MHB-12.
-            </Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 800, mt: 2 }}>File chứng chỉ đã lưu</Typography>
+            {latestRequest?.documents.length ? (
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                {latestRequest.documents.map((document) => (
+                  <Paper key={document.id} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1.5 }}>
+                    <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800 }}>{document.documentType}</Typography>
+                    <Typography sx={{ overflowWrap: 'anywhere' }}>{document.fileName}</Typography>
+                  </Paper>
+                ))}
+              </Stack>
+            ) : (
+              <Typography sx={{ color: 'text.secondary', fontSize: 14, mt: 1 }}>N/A</Typography>
+            )}
           </CardContent>
         </Card>
       </Box>
@@ -362,74 +340,65 @@ export function TeacherKycPage() {
   );
 }
 
-function FileUploadCard({
-  disabled,
-  error,
-  field,
-  file,
-  onChange,
+function ModuleCard({
+  children,
+  icon,
+  index,
+  status,
+  title,
 }: {
-  disabled: boolean;
-  error?: string;
-  field: FileFieldConfig;
-  file: File | null;
-  onChange: (name: FileFieldName, event: ChangeEvent<HTMLInputElement>) => void;
+  children: ReactNode;
+  icon: ReactNode;
+  index: string;
+  status: KycModuleStatusResponse;
+  title: string;
 }) {
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        border: '1px solid',
-        borderColor: error ? 'error.light' : 'divider',
-        borderRadius: 2,
-        bgcolor: 'grey.50',
-        p: 2,
-      }}
-    >
-      <Stack spacing={1.25}>
-        <Box>
-          <Typography sx={{ fontSize: 14, fontWeight: 800 }}>
-            {field.label}
-          </Typography>
-          <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>
-            {field.hint}
-          </Typography>
-        </Box>
-        <Button component="label" disabled={disabled} startIcon={<CloudUploadIcon />} variant="outlined">
-          Choose file
-          <input hidden accept={field.accept} type="file" onChange={(event) => onChange(field.name, event)} />
-        </Button>
-        {file ? (
-          <Typography sx={{ color: 'success.main', fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>
-            {file.name}
+    <Card variant="outlined">
+      <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', mb: 2 }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            {icon}
+            <Box>
+              <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                {index}
+              </Typography>
+              <Typography component="h3" sx={{ fontSize: 20, fontWeight: 800 }}>
+                {title}
+              </Typography>
+            </Box>
+          </Stack>
+          <StatusChip status={status.status} label={status.statusLabel} />
+        </Stack>
+        {status.detail ? (
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, mb: 2 }}>
+            {status.detail}
           </Typography>
         ) : null}
-        {error ? (
-          <Typography sx={{ color: 'error.main', fontSize: 13, fontWeight: 700 }}>
-            {error}
-          </Typography>
-        ) : null}
-      </Stack>
-    </Paper>
+        {children}
+      </CardContent>
+    </Card>
   );
 }
 
-function StatusChip({ status, label }: { status: string; label: string }) {
-  const color = statusChipColor(status);
+function FieldError({ children }: { children: string }) {
+  return <Typography sx={{ color: 'error.main', fontSize: 13, fontWeight: 700 }}>{children}</Typography>;
+}
 
-  return <Chip color={color} label={label} sx={{ fontWeight: 800 }} />;
+function StatusChip({ status, label }: { status: string; label: string }) {
+  return <Chip color={statusChipColor(status)} label={label} sx={{ fontWeight: 800 }} />;
 }
 
 function statusChipColor(status: string): 'default' | 'success' | 'warning' | 'error' {
-  if (status === 'APPROVED') {
+  if (['APPROVED', 'VERIFIED'].includes(status)) {
     return 'success';
   }
 
-  if (status === 'PENDING') {
+  if (['PENDING', 'PENDING_REVIEW', 'PROCESSING'].includes(status)) {
     return 'warning';
   }
 
-  if (status === 'REJECTED' || status === 'CORRECTION_REQUIRED') {
+  if (['REJECTED', 'CORRECTION_REQUIRED', 'FAILED'].includes(status)) {
     return 'error';
   }
 
@@ -442,40 +411,51 @@ function EvidenceRow({ label, value }: { label: string; value: string }) {
       <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
         {label}
       </Typography>
-      <Typography sx={{ fontSize: 15, fontWeight: 800, overflowWrap: 'anywhere' }}>
-        {value}
-      </Typography>
+      <Typography sx={{ fontSize: 15, fontWeight: 800, overflowWrap: 'anywhere' }}>{value}</Typography>
     </Box>
   );
 }
 
-function validateForm(files: FileState, agreementAccepted: boolean) {
-  const nextErrors: FileErrors = {};
+function validateCertificateForm(certificateFile: File | null, certificateCode: string, agreementAccepted: boolean) {
+  const nextErrors: CertificateErrors = {};
 
-  for (const field of fileFields) {
-    const file = files[field.name];
+  if (!certificateFile) {
+    nextErrors.certificate = 'Bắt buộc tải JLPT / J-Test / NAT-TEST Certificate.';
+  } else if (certificateFile.size > MAX_FILE_SIZE) {
+    nextErrors.certificate = 'Chứng chỉ không được vượt quá 5MB.';
+  } else if (certificateFile.type && !CERTIFICATE_TYPES.has(certificateFile.type)) {
+    nextErrors.certificate = 'Chỉ chấp nhận JPG, PNG hoặc PDF.';
+  }
 
-    if (!file) {
-      nextErrors[field.name] = `${field.label} is required.`;
-      continue;
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      nextErrors[field.name] = 'File must not exceed 5MB.';
-      continue;
-    }
-
-    const allowedTypes = field.allowPdf ? DOCUMENT_TYPES : IMAGE_TYPES;
-    if (file.type && !allowedTypes.has(file.type)) {
-      nextErrors[field.name] = field.allowPdf ? 'Use JPG, PNG, or PDF.' : 'Use JPG or PNG.';
-    }
+  if (!certificateCode.trim()) {
+    nextErrors.certificateCode = 'Bắt buộc nhập mã chứng chỉ để đối soát registry.';
   }
 
   if (!agreementAccepted) {
-    nextErrors.agreement = 'Digital Copyright Liability Agreement must be accepted.';
+    nextErrors.agreement = 'Bạn cần chấp nhận Digital Copyright Liability Agreement.';
   }
 
   return nextErrors;
+}
+
+function fallbackIdentityStatus(): KycModuleStatusResponse {
+  return {
+    status: 'NOT_STARTED',
+    statusLabel: 'Chưa xác thực danh tính',
+    canInteract: false,
+    completedAt: null,
+    detail: 'Đang tải trạng thái xác thực danh tính.',
+  };
+}
+
+function fallbackCertificateStatus(): KycModuleStatusResponse {
+  return {
+    status: 'LOCKED',
+    statusLabel: 'Chưa mở khóa',
+    canInteract: false,
+    completedAt: null,
+    detail: 'Hoàn tất xác thực danh tính trước khi nộp chứng chỉ.',
+  };
 }
 
 function readErrorMessage(error: unknown) {

@@ -3,15 +3,15 @@ package com.manabihub.kyc.dto;
 import java.util.Map;
 import java.util.UUID;
 
-public record KycStatusResponse(
+public record KycCertificateSubmissionResponse(
         UUID teacherId,
-        UUID userId,
         String teacherKycStatus,
-        String teacherKycStatusLabel,
         boolean canPublishCourse,
+        KycRequestResponse request,
         KycModuleStatusResponse identityVerification,
         KycModuleStatusResponse certificateVerification,
-        KycRequestResponse latestRequest,
+        boolean adminNotificationCreated,
+        boolean auditLogged,
         Map<String, Object> srsTrace
 ) {
 }

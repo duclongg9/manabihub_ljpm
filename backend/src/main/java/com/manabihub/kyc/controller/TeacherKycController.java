@@ -2,8 +2,10 @@ package com.manabihub.kyc.controller;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
+import com.manabihub.kyc.dto.KycCertificateSubmissionResponse;
+import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
+import com.manabihub.kyc.dto.KycIdentityVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
-import com.manabihub.kyc.dto.KycSubmissionResponse;
 import com.manabihub.kyc.service.TeacherKycService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -39,34 +42,46 @@ public class TeacherKycController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @PostMapping(value = "/submissions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ApiResponse<KycSubmissionResponse>> submit(
+    @PostMapping(value = "/identity-verifications", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<KycIdentityVerificationResponse>> verifyIdentity(
             @RequestHeader(value = "X-Demo-User-Id", required = false) UUID userId,
-            @RequestPart("cccdFront") MultipartFile cccdFront,
-            @RequestPart("cccdBack") MultipartFile cccdBack,
-            @RequestPart("selfie") MultipartFile selfie,
-            @RequestPart("certificate") MultipartFile certificate,
-            @RequestPart("copyrightAgreement") MultipartFile copyrightAgreement,
-            @RequestParam("copyrightAgreementAccepted") boolean copyrightAgreementAccepted,
-            @RequestParam(value = "certificateCode", required = false) String certificateCode,
+            @RequestBody KycIdentityVerificationRequest payload,
             HttpServletRequest request
     ) {
-        KycSubmissionResponse response = teacherKycService.submit(
+        KycIdentityVerificationResponse response = teacherKycService.verifyIdentity(
                 resolveUserId(userId),
-                cccdFront,
-                cccdBack,
-                selfie,
+                payload,
+                request.getRemoteAddr(),
+                request.getHeader("User-Agent")
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.MSG_KYC_003,
+                "Identity verification result was recorded.",
+                response
+        ));
+    }
+
+    @PostMapping(value = "/certificate-submissions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<KycCertificateSubmissionResponse>> submitCertificate(
+            @RequestHeader(value = "X-Demo-User-Id", required = false) UUID userId,
+            @RequestPart("certificate") MultipartFile certificate,
+            @RequestParam("copyrightAgreementAccepted") boolean copyrightAgreementAccepted,
+            @RequestParam("certificateCode") String certificateCode,
+            HttpServletRequest request
+    ) {
+        KycCertificateSubmissionResponse response = teacherKycService.submitCertificate(
+                resolveUserId(userId),
                 certificate,
-                copyrightAgreement,
-                copyrightAgreementAccepted,
                 certificateCode,
+                copyrightAgreementAccepted,
                 request.getRemoteAddr(),
                 request.getHeader("User-Agent")
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
                 MessageCodes.MSG_KYC_003,
-                "KYC documents submitted successfully. Status is Pending Admin Review.",
+                "Certificate submitted successfully. KYC status is pending review.",
                 response
         ));
     }
