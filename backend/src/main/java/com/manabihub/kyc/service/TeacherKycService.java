@@ -29,6 +29,8 @@ import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.NotificationRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.mock.domain.MockNationalIdRegistryRecord;
+import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -41,8 +43,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +69,7 @@ public class TeacherKycService {
     private final InternalAdminAccountRepository internalAdminAccountRepository;
     private final NotificationRepository notificationRepository;
     private final AuditLogRepository auditLogRepository;
+    private final MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
     private final Path storageRoot;
 
     public TeacherKycService(
@@ -73,6 +79,7 @@ public class TeacherKycService {
             InternalAdminAccountRepository internalAdminAccountRepository,
             NotificationRepository notificationRepository,
             AuditLogRepository auditLogRepository,
+            MockNationalIdRegistryRepository mockNationalIdRegistryRepository,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
         this.teacherProfileRepository = teacherProfileRepository;
@@ -81,6 +88,7 @@ public class TeacherKycService {
         this.internalAdminAccountRepository = internalAdminAccountRepository;
         this.notificationRepository = notificationRepository;
         this.auditLogRepository = auditLogRepository;
+        this.mockNationalIdRegistryRepository = mockNationalIdRegistryRepository;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
     }
 
@@ -125,6 +133,48 @@ public class TeacherKycService {
         KycRequest kycRequest = findReusableRealtimeRequest(teacherProfile, latestRequest);
         VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
         boolean verified = sdkDecision.verified();
+        List<String> failureReasons = new ArrayList<>(sdkDecision.failureReasons());
+
+        if (verified && sdkDecision.identityOcr() != null) {
+            Map<String, String> ocr = sdkDecision.identityOcr();
+            String idNumber = ocr.get("idNumber");
+            String ocrFullName = ocr.get("fullName");
+            String ocrDob = ocr.get("dateOfBirth");
+
+            if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(user.getFullName()))) {
+                verified = false;
+                failureReasons.add("Họ và tên trên CCCD không khớp với thông tin đăng ký tài khoản");
+            } else {
+                MockNationalIdRegistryRecord mockRecord = mockNationalIdRegistryRepository.findByIdNumberAndActiveTrue(idNumber).orElse(null);
+                if (mockRecord == null) {
+                    verified = false;
+                    failureReasons.add("Thông tin CCCD không tồn tại trong cơ sở dữ liệu quốc gia (Mock)");
+                } else {
+                    if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.getFullName()))) {
+                        verified = false;
+                        failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia");
+                    }
+                    if (StringUtils.hasText(ocrDob)) {
+                        try {
+                            LocalDate dob;
+                            if (ocrDob.length() == 8 && !ocrDob.contains("/")) {
+                                dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("ddMMyyyy"));
+                            } else {
+                                dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                            }
+                            if (!dob.equals(mockRecord.getDateOfBirth())) {
+                                verified = false;
+                                failureReasons.add("Ngày sinh không khớp với cơ sở dữ liệu quốc gia");
+                            }
+                        } catch (Exception e) {
+                            verified = false;
+                            failureReasons.add("Ngày sinh trên CCCD không hợp lệ");
+                        }
+                    }
+                }
+            }
+        }
+
         Instant now = Instant.now();
 
         kycRequest.setStatus(KycRequestStatus.DRAFT);
@@ -140,7 +190,7 @@ public class TeacherKycService {
                 "providerResult", request.sdkResult() == null ? Map.of() : request.sdkResult(),
                 "providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED",
                 "identityOcr", sdkDecision.identityOcr(),
-                "failureReasons", sdkDecision.failureReasons(),
+                "failureReasons", failureReasons,
                 "certificateAsyncReviewRequired", true,
                 "autoApproval", false,
                 "srs", srsTrace()
@@ -724,8 +774,18 @@ public class TeacherKycService {
         Object value = entry.value();
         String key = entry.key();
 
-        if (isValidationKey(key) && value instanceof Boolean booleanValue && !booleanValue) {
-            return true;
+        if (isValidationKey(key) && value instanceof Boolean booleanValue) {
+            String normalizedKey = normalizeKey(key);
+            boolean isNegativeKey = normalizedKey.contains("fake") 
+                    || normalizedKey.contains("spoof")
+                    || normalizedKey.contains("multiple")
+                    || normalizedKey.contains("warning")
+                    || normalizedKey.contains("swapping");
+            if (isNegativeKey) {
+                if (booleanValue) return true; // Fake is true -> Invalid
+            } else {
+                if (!booleanValue) return true; // Valid is false -> Invalid
+            }
         }
 
         if (value instanceof String text) {
