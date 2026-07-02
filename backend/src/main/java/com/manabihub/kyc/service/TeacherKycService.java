@@ -123,7 +123,8 @@ public class TeacherKycService {
         validateIdentityAllowed(user, teacherProfile, latestRequest);
 
         KycRequest kycRequest = findReusableRealtimeRequest(teacherProfile, latestRequest);
-        boolean verified = isSdkResultVerified(request.sdkResult());
+        VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
+        boolean verified = sdkDecision.verified();
         Instant now = Instant.now();
 
         kycRequest.setStatus(KycRequestStatus.DRAFT);
@@ -138,6 +139,8 @@ public class TeacherKycService {
                 "identityProvider", VNPT_PROVIDER,
                 "providerResult", request.sdkResult() == null ? Map.of() : request.sdkResult(),
                 "providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED",
+                "identityOcr", sdkDecision.identityOcr(),
+                "failureReasons", sdkDecision.failureReasons(),
                 "certificateAsyncReviewRequired", true,
                 "autoApproval", false,
                 "srs", srsTrace()
@@ -663,25 +666,30 @@ public class TeacherKycService {
         return payload;
     }
 
-    private boolean isSdkResultVerified(Map<String, Object> sdkResult) {
+    private VnptSdkDecision evaluateSdkResult(Map<String, Object> sdkResult) {
         if (sdkResult == null || sdkResult.isEmpty()) {
-            return false;
+            return new VnptSdkDecision(false, Map.of(), List.of("VNPT SDK did not return a result payload"));
         }
 
         List<ResultEntry> entries = flattenResult(sdkResult);
         boolean hasExplicitInvalid = entries.stream().anyMatch(this::isExplicitInvalidValue);
-        boolean hasExplicitSuccess = entries.stream().anyMatch(this::isExplicitSuccessValue);
-        boolean hasVerificationData = entries.stream().anyMatch(entry -> {
-            String key = entry.key();
-            return key.contains("ocr")
-                    || key.contains("liveness")
-                    || key.contains("compare")
-                    || key.contains("matching")
-                    || key.contains("similarity")
-                    || key.contains("identity");
-        });
+        Map<String, String> identityOcr = extractIdentityOcr(entries);
+        boolean hasRequiredOcr = StringUtils.hasText(identityOcr.get("idNumber"))
+                && StringUtils.hasText(identityOcr.get("fullName"));
+        boolean hasFaceVerification = hasAcceptedFaceVerification(entries);
 
-        return !hasExplicitInvalid && (hasExplicitSuccess || hasVerificationData);
+        java.util.ArrayList<String> failureReasons = new java.util.ArrayList<>();
+        if (hasExplicitInvalid) {
+            failureReasons.add("VNPT validation returned invalid document, mismatch, failed, or null result");
+        }
+        if (!hasRequiredOcr) {
+            failureReasons.add("VNPT OCR did not return both CCCD number and full name");
+        }
+        if (!hasFaceVerification) {
+            failureReasons.add("VNPT liveness/face compare result was not successful");
+        }
+
+        return new VnptSdkDecision(failureReasons.isEmpty(), identityOcr, failureReasons);
     }
 
     private List<ResultEntry> flattenResult(Map<String, Object> value) {
@@ -716,39 +724,163 @@ public class TeacherKycService {
         Object value = entry.value();
         String key = entry.key();
 
-        if (key.contains("valid") && value instanceof Boolean booleanValue && !booleanValue) {
+        if (isValidationKey(key) && value instanceof Boolean booleanValue && !booleanValue) {
             return true;
         }
 
         if (value instanceof String text) {
-            String normalized = text.toLowerCase();
+            String normalized = normalizeSearchText(text);
             return normalized.contains("khong hop le")
-                    || normalized.contains("không hợp lệ")
+                    || normalized.contains("khong cung loai")
+                    || normalized.contains("khong trung khop")
+                    || normalized.contains("khong khop")
+                    || normalized.contains("khong thanh cong")
+                    || normalized.contains("that bai")
                     || normalized.contains("invalid")
+                    || normalized.contains("not valid")
+                    || normalized.contains("not same")
+                    || normalized.contains("not match")
+                    || normalized.contains("mismatch")
                     || normalized.contains("failed")
-                    || normalized.contains("failure");
+                    || normalized.contains("failure")
+                    || normalized.contains("null%");
         }
 
         return false;
+    }
+
+    private boolean hasAcceptedFaceVerification(List<ResultEntry> entries) {
+        boolean hasFaceSignal = entries.stream().anyMatch(entry -> isFaceVerificationKey(entry.key()));
+        if (!hasFaceSignal) {
+            return false;
+        }
+
+        return entries.stream()
+                .filter(entry -> isFaceVerificationKey(entry.key()))
+                .anyMatch(this::isExplicitSuccessValue);
     }
 
     private boolean isExplicitSuccessValue(ResultEntry entry) {
         Object value = entry.value();
         String key = entry.key();
 
-        if ((key.contains("success") || key.contains("verified") || key.contains("valid")) && value instanceof Boolean booleanValue) {
+        if (isValidationKey(key) && value instanceof Boolean booleanValue) {
             return booleanValue;
         }
 
+        if (value instanceof Number numberValue && isFaceVerificationKey(key)) {
+            return numberValue.doubleValue() >= 80.0D;
+        }
+
         if (value instanceof String text) {
-            String normalized = text.toLowerCase();
+            String normalized = normalizeSearchText(text);
+            if (isFaceVerificationKey(key) && normalized.matches(".*\\b(8\\d|9\\d|100)(\\.\\d+)?\\s*%?.*")) {
+                return true;
+            }
+
             return normalized.equals("valid")
                     || normalized.equals("success")
                     || normalized.equals("verified")
-                    || normalized.contains("hợp lệ");
+                    || normalized.equals("matched")
+                    || normalized.equals("match")
+                    || normalized.equals("pass")
+                    || normalized.contains("hop le")
+                    || normalized.contains("thanh cong");
         }
 
         return false;
+    }
+
+    private Map<String, String> extractIdentityOcr(List<ResultEntry> entries) {
+        Map<String, String> identityOcr = new LinkedHashMap<>();
+        putIfPresent(identityOcr, "idNumber", findEntryValue(entries, "idnumber", "idno", "identitynumber", "documentnumber", "cardnumber", "socccd", "cccd", "soid", "id"));
+        putIfPresent(identityOcr, "fullName", findEntryValue(entries, "fullname", "hoten", "name", "customername"));
+        putIfPresent(identityOcr, "dateOfBirth", findEntryValue(entries, "dateofbirth", "birthdate", "birthday", "dob", "ngaysinh"));
+        putIfPresent(identityOcr, "gender", findEntryValue(entries, "gender", "sex", "gioitinh"));
+        putIfPresent(identityOcr, "address", findEntryValue(entries, "address", "residentaddress", "permanentaddress", "noithuongtru", "thuongtru"));
+        return identityOcr;
+    }
+
+    private void putIfPresent(Map<String, String> target, String key, String value) {
+        if (StringUtils.hasText(value)) {
+            target.put(key, value);
+        }
+    }
+
+    private String findEntryValue(List<ResultEntry> entries, String... aliases) {
+        Set<String> normalizedAliases = java.util.Arrays.stream(aliases)
+                .map(this::normalizeKey)
+                .collect(java.util.stream.Collectors.toSet());
+
+        return entries.stream()
+                .filter(entry -> normalizedAliases.contains(normalizeKey(lastPathSegment(entry.key()))))
+                .map(entry -> displayScalar(entry.value()))
+                .filter(StringUtils::hasText)
+                .findFirst()
+                .orElseGet(() -> entries.stream()
+                        .filter(entry -> normalizedAliases.stream().anyMatch(alias -> normalizeKey(entry.key()).endsWith(alias)))
+                        .map(entry -> displayScalar(entry.value()))
+                        .filter(StringUtils::hasText)
+                        .findFirst()
+                        .orElse(null));
+    }
+
+    private String displayScalar(Object value) {
+        if (value instanceof String text) {
+            String trimmed = text.trim();
+            return trimmed.length() > 240 ? null : trimmed;
+        }
+
+        if (value instanceof Number number) {
+            return String.valueOf(number);
+        }
+
+        return null;
+    }
+
+    private String lastPathSegment(String path) {
+        int lastDot = path.lastIndexOf('.');
+        return lastDot < 0 ? path : path.substring(lastDot + 1);
+    }
+
+    private boolean isValidationKey(String key) {
+        String normalizedKey = normalizeKey(key);
+        return normalizedKey.contains("success")
+                || normalizedKey.contains("verified")
+                || normalizedKey.contains("valid")
+                || normalizedKey.contains("validation")
+                || normalizedKey.contains("result")
+                || normalizedKey.contains("status")
+                || normalizedKey.contains("same")
+                || normalizedKey.contains("match")
+                || normalizedKey.contains("compare")
+                || normalizedKey.contains("liveness");
+    }
+
+    private boolean isFaceVerificationKey(String key) {
+        String normalizedKey = normalizeKey(key);
+        return normalizedKey.contains("face")
+                || normalizedKey.contains("liveness")
+                || normalizedKey.contains("live")
+                || normalizedKey.contains("compare")
+                || normalizedKey.contains("comparison")
+                || normalizedKey.contains("matching")
+                || normalizedKey.contains("similarity")
+                || normalizedKey.contains("portrait")
+                || normalizedKey.contains("selfie");
+    }
+
+    private String normalizeKey(String value) {
+        return java.text.Normalizer.normalize(value == null ? "" : value, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^A-Za-z0-9]", "")
+                .toLowerCase();
+    }
+
+    private String normalizeSearchText(String value) {
+        return java.text.Normalizer.normalize(value == null ? "" : value, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase();
     }
 
     private BusinessException invalidFile(String reason) {
@@ -867,5 +999,12 @@ public class TeacherKycService {
     }
 
     private record ResultEntry(String key, Object value) {
+    }
+
+    private record VnptSdkDecision(
+            boolean verified,
+            Map<String, String> identityOcr,
+            List<String> failureReasons
+    ) {
     }
 }

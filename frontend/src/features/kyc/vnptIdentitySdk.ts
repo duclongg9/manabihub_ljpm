@@ -10,6 +10,7 @@ declare global {
     SDK?: {
       launch: (config: Record<string, unknown>) => void;
     };
+    __MANABIHUB_LAST_VNPT_CONFIG__?: Record<string, unknown>;
   }
 }
 
@@ -43,8 +44,20 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
     throw new Error(`Thiếu cấu hình VNPT eKYC: ${missingConfig.map((item) => item.label).join(', ')}`);
   }
 
-  const handleResult: VnptSdkCallback = async (sdkResult) => {
+  const handleDocumentResult: VnptSdkCallback = (sdkResult) => {
     const normalizedResult = normalizeSdkResult(sdkResult);
+    saveDebugResult('vnpt_ekyc_last_document_result', normalizedResult);
+  };
+
+  let finalResultHandled = false;
+  const handleFinalResult: VnptSdkCallback = async (sdkResult) => {
+    if (finalResultHandled) {
+      return;
+    }
+
+    finalResultHandled = true;
+    const normalizedResult = normalizeSdkResult(sdkResult);
+    saveDebugResult('vnpt_ekyc_last_result', normalizedResult);
 
     await onResult({
       providerSessionId: findFirstValue(normalizedResult, ['session', 'sessionid', 'session_id']),
@@ -53,26 +66,43 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
     });
   };
 
-  // Config follows VNPT reference: dist/index.html from web-sdk-version-3.2.1.0
-  // Only pass what VNPT documents — extra flags break the SDK UI
-  window.SDK.launch({
+  // Config follows VNPT eKYC Web SDK 3.2.1 docs.
+  const dataConfig = {
     BACKEND_URL: env.backendUrl,
     TOKEN_KEY: env.tokenKey,
     TOKEN_ID: env.tokenId,
     ACCESS_TOKEN: env.accessToken,
-    CALL_BACK_END_FLOW: handleResult,
+    CALL_BACK: handleFinalResult,
+    CALL_BACK_END_FLOW: handleFinalResult,
+    CALL_BACK_DOCUMENT_RESULT: handleDocumentResult,
     HAS_BACKGROUND_IMAGE: true,
-    MAX_SIZE_IMAGE: 5,
-    LIST_TYPE_DOCUMENT: [-1, 4, 5, 6, 7, 9],
-    SDK_FLOW: 'DOCUMENT_TO_FACE',
-    ENABLE_API_LIVENESS_FACE: true,
-    ENABLE_API_COMPARE_FACE: true,
-    ENABLE_API_OCR_DOCUMENT: true,
     HAS_RESULT_SCREEN: true,
+    SHOW_STEP: true,
+    MAX_SIZE_IMAGE: 1,
+    DEFAULT_LANGUAGE: 'vi',
+    LIST_TYPE_DOCUMENT: [9],
+    DOCUMENT_TYPE_START: 9,
+    HAS_QR_SCAN: false,
+    SDK_FLOW: 'DOCUMENT_TO_FACE',
+    FLOW_TAKEN: 'DOCUMENT_TO_FACE',
+    USE_METHOD: 'PHOTO',
+    ENABLE_API_UPLOAD_IMAGE: true,
+    ENABLE_API_OCR_DOCUMENT: true,
+    ENABLE_API_LIVENESS_DOCUMENT: true,
+    ENABLE_API_LIVENESS_FACE: true,
+    ENABLE_API_MASKED_FACE: true,
+    ENABLE_API_COMPARE_FACE: true,
+    CHECK_LIVENESS_CARD: true,
+    CHECK_LIVENESS_FACE: true,
+    CHECK_MASKED_FACE: true,
+    COMPARE_FACE: true,
     SHOW_TAB_RESULT_INFORMATION: true,
     SHOW_TAB_RESULT_VALIDATION: true,
     SHOW_TAB_RESULT_QRCODE: true,
-  });
+  };
+
+  window.__MANABIHUB_LAST_VNPT_CONFIG__ = safeDebugConfig(dataConfig);
+  window.SDK.launch(dataConfig);
 }
 
 function getVnptEnv() {
@@ -176,6 +206,40 @@ function flattenEntries(source: unknown) {
 
 function hasValue(value: unknown) {
   return value !== null && value !== undefined && String(value).trim().length > 0;
+}
+
+function saveDebugResult(key: string, value: Record<string, unknown>) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Debug storage is best-effort only; KYC flow must not fail because of browser storage.
+  }
+}
+
+function safeDebugConfig(config: Record<string, unknown>) {
+  return {
+    BACKEND_URL: config.BACKEND_URL,
+    TOKEN_ID_EXISTS: Boolean(config.TOKEN_ID),
+    TOKEN_KEY_EXISTS: Boolean(config.TOKEN_KEY),
+    ACCESS_TOKEN_EXISTS: Boolean(config.ACCESS_TOKEN),
+    ACCESS_TOKEN_HAS_BEARER_PREFIX: String(config.ACCESS_TOKEN ?? '').toLowerCase().startsWith('bearer '),
+    SDK_FLOW: config.SDK_FLOW,
+    FLOW_TAKEN: config.FLOW_TAKEN,
+    USE_METHOD: config.USE_METHOD,
+    DOCUMENT_TYPE_START: config.DOCUMENT_TYPE_START,
+    HAS_QR_SCAN: config.HAS_QR_SCAN,
+    LIST_TYPE_DOCUMENT: config.LIST_TYPE_DOCUMENT,
+    CHECK_LIVENESS_CARD: config.CHECK_LIVENESS_CARD,
+    CHECK_LIVENESS_FACE: config.CHECK_LIVENESS_FACE,
+    CHECK_MASKED_FACE: config.CHECK_MASKED_FACE,
+    COMPARE_FACE: config.COMPARE_FACE,
+    ENABLE_API_UPLOAD_IMAGE: config.ENABLE_API_UPLOAD_IMAGE,
+    ENABLE_API_OCR_DOCUMENT: config.ENABLE_API_OCR_DOCUMENT,
+    ENABLE_API_LIVENESS_DOCUMENT: config.ENABLE_API_LIVENESS_DOCUMENT,
+    ENABLE_API_LIVENESS_FACE: config.ENABLE_API_LIVENESS_FACE,
+    ENABLE_API_MASKED_FACE: config.ENABLE_API_MASKED_FACE,
+    ENABLE_API_COMPARE_FACE: config.ENABLE_API_COMPARE_FACE,
+  };
 }
 
 function splitCsv(value: string | undefined) {

@@ -52,6 +52,12 @@ type IdentitySummary = {
   address?: string;
   hasData: boolean;
 };
+type IdentityDiagnostics = {
+  providerStatus?: string;
+  failureReasons: string[];
+  validationHints: string[];
+  hasData: boolean;
+};
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const CERTIFICATE_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
@@ -114,6 +120,7 @@ function TeacherKycPageContent() {
   const latestRequest = restartEnvelope?.data.request ?? certificateEnvelope?.data.request ?? identityEnvelope?.data.request ?? status?.latestRequest ?? null;
   const identityVerified = identityStatus.status === 'VERIFIED';
   const identitySummary = useMemo(() => extractIdentitySummary(latestRequest?.verificationPayload), [latestRequest?.verificationPayload]);
+  const identityDiagnostics = useMemo(() => extractIdentityDiagnostics(latestRequest?.verificationPayload), [latestRequest?.verificationPayload]);
   
   const showRestartVerification = Boolean(status && ['REJECTED', 'CORRECTION_REQUIRED'].includes(status.teacherKycStatus));
   const canRestartVerification = showRestartVerification && !restartSubmitting && !identityLaunching && !certificateSubmitting;
@@ -310,6 +317,7 @@ function TeacherKycPageContent() {
               {identityLaunching ? 'Đang mở VNPT eKYC...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác thực danh tính'}
             </Button>
           </Stack>
+          {identityStatus.status === 'FAILED' ? <IdentityFailureDiagnosticsCard diagnostics={identityDiagnostics} /> : null}
           {identityVerified ? <IdentityOcrSummaryCard summary={identitySummary} /> : null}
           {latestRequest?.providerTransactionId ? (
             <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 1.5 }}>
@@ -537,6 +545,46 @@ function IdentityOcrSummaryCard({ summary }: { summary: IdentitySummary }) {
   );
 }
 
+function IdentityFailureDiagnosticsCard({ diagnostics }: { diagnostics: IdentityDiagnostics }) {
+  if (!diagnostics.hasData) {
+    return (
+      <Alert severity="warning" sx={{ mt: 2 }}>
+        VNPT eKYC chưa trả dữ liệu OCR hợp lệ. Hãy đóng popup và thực hiện lại; nếu dashboard VNPT vẫn không ghi nhận request, kiểm tra Network tab để chắc chắn browser đang gọi đúng domain VNPT.
+      </Alert>
+    );
+  }
+
+  return (
+    <Paper elevation={0} sx={{ bgcolor: 'rgba(211, 47, 47, 0.04)', border: '1px solid', borderColor: 'error.light', borderRadius: 2, mt: 2, p: 2 }}>
+      <Stack spacing={1.25}>
+        <Typography sx={{ color: 'error.dark', fontSize: 14, fontWeight: 800 }}>
+          Lý do VNPT chưa trả OCR hợp lệ
+        </Typography>
+        {diagnostics.providerStatus ? <SummaryField label="Provider status" value={diagnostics.providerStatus} /> : null}
+        {diagnostics.failureReasons.length > 0 ? (
+          <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+            {diagnostics.failureReasons.map((reason) => (
+              <Typography component="li" key={reason} sx={{ color: 'error.dark', fontSize: 14 }}>
+                {reason}
+              </Typography>
+            ))}
+          </Box>
+        ) : null}
+        {diagnostics.validationHints.length > 0 ? (
+          <Box>
+            <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Raw validation từ SDK
+            </Typography>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
+              {diagnostics.validationHints.join(' | ')}
+            </Typography>
+          </Box>
+        ) : null}
+      </Stack>
+    </Paper>
+  );
+}
+
 function SummaryField({ label, value, wide = false }: { label: string; value?: string; wide?: boolean }) {
   return (
     <Box sx={{ minWidth: 0, gridColumn: { sm: wide ? '1 / -1' : 'auto' } }}>
@@ -602,6 +650,26 @@ function extractIdentitySummary(payload?: Record<string, unknown> | null): Ident
   };
 }
 
+function extractIdentityDiagnostics(payload?: Record<string, unknown> | null): IdentityDiagnostics {
+  const entries = flattenPayloadEntries(payload);
+  const providerStatus = findPayloadValue(entries, ['providerStatus']);
+  const failureReasons = extractStringList(findRawPayloadValue(entries, ['failureReasons'])).map(localizeIdentityFailureReason);
+  const validationHints = uniqueStrings(
+    entries
+      .map((entry) => toDisplayValue(entry.value))
+      .filter((value): value is string => Boolean(value))
+      .filter((value) => isVnptValidationHint(value))
+      .map((value) => value.trim()),
+  ).slice(0, 6);
+
+  return {
+    providerStatus,
+    failureReasons,
+    validationHints,
+    hasData: Boolean(providerStatus) || failureReasons.length > 0 || validationHints.length > 0,
+  };
+}
+
 function flattenPayloadEntries(value: unknown) {
   const entries: Array<{ path: string; key: string; value: unknown }> = [];
 
@@ -628,6 +696,11 @@ function flattenPayloadEntries(value: unknown) {
   return entries;
 }
 
+function findRawPayloadValue(entries: Array<{ path: string; key: string; value: unknown }>, aliases: string[]) {
+  const normalizedAliases = aliases.map(normalizePayloadKey);
+  return entries.find((entry) => normalizedAliases.includes(normalizePayloadKey(entry.key)))?.value;
+}
+
 function findPayloadValue(entries: Array<{ path: string; key: string; value: unknown }>, aliases: string[]) {
   const normalizedAliases = aliases.map(normalizePayloadKey);
   const exact = entries.find((entry) => normalizedAliases.includes(normalizePayloadKey(entry.key)));
@@ -637,6 +710,54 @@ function findPayloadValue(entries: Array<{ path: string; key: string; value: unk
   });
 
   return toDisplayValue(relaxed?.value);
+}
+
+function extractStringList(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map(toDisplayValue).filter((item): item is string => Boolean(item));
+  }
+
+  const scalar = toDisplayValue(value);
+  return scalar ? [scalar] : [];
+}
+
+function localizeIdentityFailureReason(reason: string) {
+  const normalized = normalizePayloadKey(reason);
+
+  if (normalized.includes('invaliddocument') || normalized.includes('mismatch') || normalized.includes('nullresult')) {
+    return 'VNPT trả về giấy tờ không hợp lệ hoặc mặt trước/sau không cùng loại.';
+  }
+
+  if (normalized.includes('ocr') && normalized.includes('cccd')) {
+    return 'VNPT chưa bóc được đủ số CCCD và họ tên từ ảnh.';
+  }
+
+  if (normalized.includes('liveness') || normalized.includes('facecompare')) {
+    return 'VNPT chưa xác nhận được liveness hoặc so khớp khuôn mặt.';
+  }
+
+  if (normalized.includes('didnotreturn') && normalized.includes('payload')) {
+    return 'SDK chưa trả payload kết quả về ManabiHub.';
+  }
+
+  return reason;
+}
+
+function isVnptValidationHint(value: string) {
+  const normalized = normalizePayloadKey(value);
+  return normalized.includes('khonghople')
+    || normalized.includes('khongcungloai')
+    || normalized.includes('khongkhop')
+    || normalized.includes('thatbai')
+    || normalized.includes('invalid')
+    || normalized.includes('mismatch')
+    || normalized.includes('failed')
+    || normalized.includes('failure')
+    || normalized.includes('null');
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values));
 }
 
 function normalizePayloadKey(value: string) {
