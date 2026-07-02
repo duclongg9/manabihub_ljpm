@@ -150,7 +150,8 @@ function TeacherKycPageContent() {
           } catch (error) {
             setPageError(readErrorMessage(error));
           } finally {
-            setIdentityLaunching(false);
+            // Keep the modal open so the user can see the VNPT result screen
+            // The user will close it manually via the X button
           }
         });
       } catch (error) {
