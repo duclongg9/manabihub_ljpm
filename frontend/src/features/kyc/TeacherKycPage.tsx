@@ -450,9 +450,10 @@ function TeacherKycPageContent() {
               width: '100%', 
               position: 'relative',
               '& video': {
+                objectFit: 'cover',
+                width: '100% !important',
+                height: '100% !important',
                 maxWidth: 'none !important',
-                maxHeight: 'none !important',
-                minHeight: '100% !important',
               }
             }}
           />
