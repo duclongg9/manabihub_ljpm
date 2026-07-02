@@ -10,6 +10,9 @@ import {
   LinearProgress,
   Paper,
   Stack,
+  Step,
+  StepLabel,
+  Stepper,
   TextField,
   Typography,
 } from '@mui/material';
@@ -21,7 +24,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SchoolIcon from '@mui/icons-material/School';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import React, { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import {
   getTeacherKycStatus,
   restartTeacherVerification,
@@ -49,7 +52,41 @@ type IdentitySummary = {
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const CERTIFICATE_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
 
+class TeacherKycErrorBoundary extends React.Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          Đã xảy ra lỗi giao diện khi tải màn hình này (UI Crash). Vui lòng thử tải lại trang hoặc liên hệ hỗ trợ.
+          <br />
+          <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+            {this.state.error?.message}
+          </Typography>
+        </Alert>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function TeacherKycPage() {
+  return (
+    <TeacherKycErrorBoundary>
+      <TeacherKycPageContent />
+    </TeacherKycErrorBoundary>
+  );
+}
+
+function TeacherKycPageContent() {
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [certificateCode, setCertificateCode] = useState('');
   const [agreementAccepted, setAgreementAccepted] = useState(false);
@@ -73,7 +110,10 @@ export function TeacherKycPage() {
   const latestRequest = restartEnvelope?.data.request ?? certificateEnvelope?.data.request ?? identityEnvelope?.data.request ?? status?.latestRequest ?? null;
   const identityVerified = identityStatus.status === 'VERIFIED';
   const identitySummary = useMemo(() => extractIdentitySummary(latestRequest?.verificationPayload), [latestRequest?.verificationPayload]);
-  const canRestartVerification = Boolean(status && status.teacherKycStatus !== 'APPROVED' && !restartSubmitting && !identityLaunching && !certificateSubmitting);
+  
+  const showRestartVerification = Boolean(status && ['REJECTED', 'CORRECTION_REQUIRED'].includes(status.teacherKycStatus));
+  const canRestartVerification = showRestartVerification && !restartSubmitting && !identityLaunching && !certificateSubmitting;
+  
   const canStartIdentity =
     !identityLaunching
     && status?.teacherKycStatus !== 'APPROVED'
@@ -171,25 +211,13 @@ export function TeacherKycPage() {
     }
   }
 
-  const dashboardMessage = useMemo(() => {
-    if (identityStatus.status === 'FAILED') {
-      return 'VNPT eKYC chưa xác thực được danh tính. Giáo viên có thể thực hiện lại ngay, không bị khóa chờ mở lại.';
-    }
+  const activeStep = useMemo(() => {
+    if (certificateStatus.status === 'PENDING_REVIEW' || certificateStatus.status === 'APPROVED') return 2;
+    if (identityVerified) return 1;
+    return 0;
+  }, [identityVerified, certificateStatus.status]);
 
-    if (identityStatus.status === 'NOT_STARTED') {
-      return 'Bắt đầu bằng VNPT eKYC realtime: hệ thống sẽ mở hướng dẫn chụp CCCD và liveness khuôn mặt trong SDK.';
-    }
-
-    if (certificateStatus.status === 'PENDING_REVIEW') {
-      return 'Danh tính đã xác thực. Chứng chỉ đang chờ đối soát chính chủ với CCCD; nếu không khớp, giáo viên cần xác thực lại từ đầu.';
-    }
-
-    if (identityVerified) {
-      return 'Danh tính đã xác thực thành công. Hãy nộp chứng chỉ để hệ thống đối soát mã chứng chỉ với thông tin chính chủ trên CCCD.';
-    }
-
-    return 'Bắt đầu bằng VNPT eKYC realtime. Chỉ khi CCCD và chứng chỉ khớp chính chủ thì tài khoản mới được mở khóa Teacher.';
-  }, [certificateStatus.status, identityStatus.status, identityVerified]);
+  const steps = ['Xác thực danh tính', 'Nộp chứng chỉ', 'Hoàn tất'];
 
   return (
     <Stack spacing={3}>
@@ -209,22 +237,33 @@ export function TeacherKycPage() {
           </Box>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' } }}>
             <StatusChip status={status?.teacherKycStatus ?? 'UNKNOWN'} label={status?.teacherKycStatusLabel ?? 'Loading'} />
-            <Button
-              color="inherit"
-              disabled={!canRestartVerification}
-              onClick={handleRestartVerification}
-              startIcon={<RestartAltIcon />}
-              variant="outlined"
-            >
-              {restartSubmitting ? 'Đang tạo lượt mới...' : 'Xác thực lại từ đầu'}
-            </Button>
+            {showRestartVerification && (
+              <Button
+                color="inherit"
+                disabled={!canRestartVerification}
+                onClick={handleRestartVerification}
+                startIcon={<RestartAltIcon />}
+                variant="outlined"
+              >
+                {restartSubmitting ? 'Đang tạo lượt mới...' : 'Xác thực lại từ đầu'}
+              </Button>
+            )}
           </Stack>
         </Stack>
       </Paper>
 
       {loadingStatus ? <LinearProgress color="success" /> : null}
       {pageError ? <Alert severity="error">{pageError}</Alert> : null}
-      <Alert severity="info">{dashboardMessage}</Alert>
+
+      <Box sx={{ py: 2 }}>
+        <Stepper activeStep={activeStep} alternativeLabel>
+          {steps.map((label) => (
+            <Step key={label}>
+              <StepLabel>{label}</StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      </Box>
       {identityEnvelope ? (
         <Alert severity={identityEnvelope.data.identityVerification.status === 'VERIFIED' ? 'success' : 'warning'} icon={<VerifiedUserIcon />}>
           {identityEnvelope.data.identityVerification.statusLabel}
@@ -248,9 +287,6 @@ export function TeacherKycPage() {
           status={identityStatus}
           title="Xác thực danh tính"
         >
-          <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-            VNPT eKYC sẽ chụp CCCD và kiểm tra liveness khuôn mặt theo thời gian thực. Module này không dùng upload file CCCD/selfie tĩnh.
-          </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
             Chuẩn bị CCCD gốc, cho phép camera, đặt giấy tờ vào đúng khung và làm theo hướng dẫn video/overlay của VNPT SDK.
             Nếu SDK báo lỗi, đóng popup và bấm thực hiện lại ngay.
@@ -265,6 +301,7 @@ export function TeacherKycPage() {
             >
               {identityLaunching ? 'Đang mở VNPT eKYC...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác thực danh tính'}
             </Button>
+            <div id="ekyc_sdk_intergrated" />
           </Stack>
           {identityVerified ? <IdentityOcrSummaryCard summary={identitySummary} /> : null}
           {latestRequest?.providerTransactionId ? (
