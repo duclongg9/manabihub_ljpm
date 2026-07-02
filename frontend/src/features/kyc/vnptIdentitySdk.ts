@@ -65,6 +65,8 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
     MAX_SIZE_IMAGE: 5,
     LIST_TYPE_DOCUMENT: [-1, 4, 5, 6, 7, 9],
     SDK_FLOW: 'DOCUMENT_TO_FACE',
+    ENABLE_API_LIVENESS_FACE: true,
+    ENABLE_API_COMPARE_FACE: true,
   });
 }
 
