@@ -636,10 +636,11 @@ function validateCertificateForm(certificateFile: File | null, certificateCode: 
 
 function extractIdentitySummary(payload?: Record<string, unknown> | null): IdentitySummary {
   const entries = flattenPayloadEntries(payload);
+  const rawDob = findPayloadValue(entries, ['dateOfBirth', 'birthDate', 'birthday', 'dob', 'ngaySinh']);
   const summary = {
     fullName: findPayloadValue(entries, ['fullName', 'full_name', 'hoTen', 'ho_ten', 'customerName', 'name']),
     idNumber: findPayloadValue(entries, ['idNumber', 'idNo', 'identityNumber', 'documentNumber', 'cardNumber', 'soCccd', 'cccd', 'id']),
-    dateOfBirth: findPayloadValue(entries, ['dateOfBirth', 'birthDate', 'birthday', 'dob', 'ngaySinh']),
+    dateOfBirth: formatDateOfBirth(rawDob),
     gender: findPayloadValue(entries, ['gender', 'sex', 'gioiTinh']),
     address: findPayloadValue(entries, ['address', 'residentAddress', 'permanentAddress', 'noiThuongTru', 'thuongTru']),
   };
@@ -648,6 +649,26 @@ function extractIdentitySummary(payload?: Record<string, unknown> | null): Ident
     ...summary,
     hasData: Object.values(summary).some(Boolean),
   };
+}
+
+/** Normalize raw OCR date formats to dd/MM/yyyy for display */
+function formatDateOfBirth(raw?: string | null): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+
+  // Format: ddMMyyyy (8 digits, no separator) → dd/MM/yyyy
+  if (/^\d{8}$/.test(trimmed)) {
+    return `${trimmed.slice(0, 2)}/${trimmed.slice(2, 4)}/${trimmed.slice(4)}`;
+  }
+
+  // Format: yyyy-MM-dd → dd/MM/yyyy
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  }
+
+  // Already dd/MM/yyyy or other format → keep as-is
+  return trimmed;
 }
 
 function extractIdentityDiagnostics(payload?: Record<string, unknown> | null): IdentityDiagnostics {

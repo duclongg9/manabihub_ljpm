@@ -29,8 +29,11 @@ import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.NotificationRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.mock.domain.MockJlptRegistryRecord;
 import com.manabihub.mock.domain.MockNationalIdRegistryRecord;
+import com.manabihub.mock.repository.MockJlptRegistryRepository;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
+import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -62,6 +65,7 @@ public class TeacherKycService {
     private static final Set<String> CERTIFICATE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "pdf");
     private static final List<String> ADMIN_NOTIFICATION_ROLE_CODES = List.of("COURSE_MANAGER", "SYSTEM_ADMIN");
     private static final String VNPT_PROVIDER = "VNPT_EKYC_WEB_SDK";
+    private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
 
     private final TeacherProfileRepository teacherProfileRepository;
     private final KycRequestRepository kycRequestRepository;
@@ -70,6 +74,8 @@ public class TeacherKycService {
     private final NotificationRepository notificationRepository;
     private final AuditLogRepository auditLogRepository;
     private final MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
+    private final MockJlptRegistryRepository mockJlptRegistryRepository;
+    private final EntityManager entityManager;
     private final Path storageRoot;
 
     public TeacherKycService(
@@ -80,6 +86,8 @@ public class TeacherKycService {
             NotificationRepository notificationRepository,
             AuditLogRepository auditLogRepository,
             MockNationalIdRegistryRepository mockNationalIdRegistryRepository,
+            MockJlptRegistryRepository mockJlptRegistryRepository,
+            EntityManager entityManager,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
         this.teacherProfileRepository = teacherProfileRepository;
@@ -89,6 +97,8 @@ public class TeacherKycService {
         this.notificationRepository = notificationRepository;
         this.auditLogRepository = auditLogRepository;
         this.mockNationalIdRegistryRepository = mockNationalIdRegistryRepository;
+        this.mockJlptRegistryRepository = mockJlptRegistryRepository;
+        this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
     }
 
@@ -290,17 +300,22 @@ public class TeacherKycService {
         kycDocumentRepository.save(certificateDocument);
 
         TeacherKycStatus beforeStatus = teacherProfile.getKycStatus();
-        kycRequest.setStatus(KycRequestStatus.PENDING);
-        kycRequest.setCertificateStatus(CertificateVerificationStatus.PENDING_REVIEW);
         kycRequest.setCertificateCode(certificateCode.trim());
         kycRequest.setCertificateSubmittedAt(Instant.now());
         kycRequest.setCopyrightAgreed(true);
-        kycRequest.setVerificationPayload(withCertificatePayload(kycRequest));
 
-        teacherProfile.setKycStatus(TeacherKycStatus.PENDING);
-        teacherProfile.setCanPublishCourse(false);
+        // Attempt auto-approve: lookup JLPT registry and cross-match with CCCD OCR data
+        boolean autoApproved = attemptJlptAutoApprove(kycRequest, teacherProfile, user);
 
-        boolean adminNotificationCreated = createAdminNotifications(kycRequest, user);
+        if (!autoApproved) {
+            kycRequest.setStatus(KycRequestStatus.PENDING);
+            kycRequest.setCertificateStatus(CertificateVerificationStatus.PENDING_REVIEW);
+            kycRequest.setVerificationPayload(withCertificatePayload(kycRequest, false, null));
+            teacherProfile.setKycStatus(TeacherKycStatus.PENDING);
+            teacherProfile.setCanPublishCourse(false);
+        }
+
+        boolean adminNotificationCreated = !autoApproved && createAdminNotifications(kycRequest, user);
         boolean auditLogged = createCertificateSubmissionAudit(kycRequest, user, beforeStatus, ipAddress, userAgent);
         List<KycDocument> documents = kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(kycRequest.getId());
 
@@ -705,15 +720,132 @@ public class TeacherKycService {
                 || resolvedCertificateStatus(latestRequest) != CertificateVerificationStatus.PENDING_REVIEW;
     }
 
-    private Map<String, Object> withCertificatePayload(KycRequest request) {
+    private Map<String, Object> withCertificatePayload(KycRequest request, boolean autoApproved, String autoApproveDetail) {
         Map<String, Object> payload = new LinkedHashMap<>(request.getVerificationPayload());
-        payload.put("certificateStatus", CertificateVerificationStatus.PENDING_REVIEW.name());
+        payload.put("certificateStatus", request.getCertificateStatus().name());
         payload.put("certificateCode", request.getCertificateCode());
-        payload.put("certificateReviewMode", "ASYNC_CERTIFICATE_REVIEW");
-        payload.put("registryVerification", "WAITING_FOR_MHB_12_MOCK_REGISTRY");
         payload.put("copyrightAgreement", "ACCEPTED_BY_CHECKBOX");
-        payload.put("autoApproval", false);
+        payload.put("autoApproval", autoApproved);
+        if (autoApproved) {
+            payload.put("certificateReviewMode", "AUTO_APPROVED_VIA_JLPT_REGISTRY");
+            payload.put("registryVerification", "MATCHED");
+            payload.put("autoApproveDetail", autoApproveDetail);
+        } else {
+            payload.put("certificateReviewMode", "ASYNC_CERTIFICATE_REVIEW");
+            payload.put("registryVerification", "WAITING_FOR_ADMIN_REVIEW");
+        }
         return payload;
+    }
+
+    /**
+     * Attempts to auto-approve the JLPT certificate by:
+     * 1. Looking up the certificate code in the mock JLPT registry
+     * 2. Cross-matching fullName and dateOfBirth from the JLPT registry against CCCD OCR data
+     * 3. If both match → auto-approve KYC and grant TEACHER role
+     */
+    private boolean attemptJlptAutoApprove(KycRequest kycRequest, TeacherProfile teacherProfile, AppUser user) {
+        String code = kycRequest.getCertificateCode();
+        if (!StringUtils.hasText(code)) {
+            return false;
+        }
+
+        MockJlptRegistryRecord jlptRecord = mockJlptRegistryRepository
+                .findByRegistrationNumberAndActiveTrue(code.trim())
+                .orElse(null);
+
+        if (jlptRecord == null) {
+            return false;
+        }
+
+        // Extract identity OCR from the verification payload (saved during identity verification step)
+        Map<String, String> identityOcr = extractOcrFromPayload(kycRequest.getVerificationPayload());
+        String ocrFullName = identityOcr.get("fullName");
+        String ocrDob = identityOcr.get("dateOfBirth");
+
+        if (!StringUtils.hasText(ocrFullName)) {
+            return false;
+        }
+
+        // Cross-match: JLPT registry fullName vs CCCD OCR fullName
+        if (!normalizeSearchText(jlptRecord.getFullName()).equals(normalizeSearchText(ocrFullName))) {
+            return false;
+        }
+
+        // Cross-match: JLPT registry dateOfBirth vs CCCD OCR dateOfBirth
+        if (StringUtils.hasText(ocrDob)) {
+            try {
+                LocalDate ocrDate = parseOcrDate(ocrDob);
+                if (!ocrDate.equals(jlptRecord.getDateOfBirth())) {
+                    return false;
+                }
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        // All checks passed → auto-approve
+        String detail = String.format(
+                "JLPT %s registry match: %s (DOB: %s) — certificate %s, score %d, status %s",
+                jlptRecord.getTestLevel(),
+                jlptRecord.getFullName(),
+                jlptRecord.getDateOfBirth(),
+                jlptRecord.getRegistrationNumber(),
+                jlptRecord.getTotalScore(),
+                jlptRecord.getPassStatus()
+        );
+
+        kycRequest.setStatus(KycRequestStatus.APPROVED);
+        kycRequest.setCertificateStatus(CertificateVerificationStatus.APPROVED);
+        kycRequest.setVerificationPayload(withCertificatePayload(kycRequest, true, detail));
+
+        teacherProfile.setKycStatus(TeacherKycStatus.APPROVED);
+        teacherProfile.setCanPublishCourse(true);
+
+        // Grant TEACHER role if not already present
+        grantTeacherRoleIfAbsent(user.getId());
+
+        return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, String> extractOcrFromPayload(Map<String, Object> payload) {
+        if (payload == null) {
+            return Map.of();
+        }
+        Object ocrObj = payload.get("identityOcr");
+        if (ocrObj instanceof Map<?, ?> ocrMap) {
+            Map<String, String> result = new LinkedHashMap<>();
+            ocrMap.forEach((k, v) -> {
+                if (k instanceof String key && v != null) {
+                    result.put(key, String.valueOf(v));
+                }
+            });
+            return result;
+        }
+        return Map.of();
+    }
+
+    private LocalDate parseOcrDate(String ocrDob) {
+        if (ocrDob.length() == 8 && !ocrDob.contains("/")) {
+            return LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("ddMMyyyy"));
+        }
+        return LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+    }
+
+    private void grantTeacherRoleIfAbsent(UUID userId) {
+        Long count = (Long) entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
+        ).setParameter("userId", userId)
+         .setParameter("roleId", TEACHER_ROLE_ID)
+         .getSingleResult();
+
+        if (count == 0) {
+            entityManager.createNativeQuery(
+                    "INSERT INTO user_roles (user_id, role_id) VALUES (:userId, :roleId)"
+            ).setParameter("userId", userId)
+             .setParameter("roleId", TEACHER_ROLE_ID)
+             .executeUpdate();
+        }
     }
 
     private VnptSdkDecision evaluateSdkResult(Map<String, Object> sdkResult) {
