@@ -1,7 +1,9 @@
 package com.manabihub;
 
+import com.manabihub.kyc.service.TeacherKycService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 @SpringBootTest(properties = {
     "spring.autoconfigure.exclude=" +
@@ -10,6 +12,9 @@ import org.springframework.boot.test.context.SpringBootTest;
     "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
 })
 class ManabiHubApplicationTests {
+
+    @MockBean
+    private TeacherKycService teacherKycService;
 
     @Test
     void contextLoads() {

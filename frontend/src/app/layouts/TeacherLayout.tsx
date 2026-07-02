@@ -1,14 +1,22 @@
-import { Outlet } from 'react-router-dom';
+import { AppBar, Box, Button, Container, Toolbar, Typography } from '@mui/material';
+import { Link as RouterLink, Outlet } from 'react-router-dom';
 
 export function TeacherLayout() {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <header className="bg-green-600 text-white shadow px-4 py-3">
-        <h1 className="text-xl font-bold">ManabiHub - Teacher Dashboard</h1>
-      </header>
-      <main className="flex-grow p-4">
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <AppBar elevation={0} position="static">
+        <Toolbar>
+          <Typography component="h1" sx={{ flexGrow: 1, fontSize: 20, fontWeight: 800 }}>
+            ManabiHub Teacher
+          </Typography>
+          <Button color="inherit" component={RouterLink} to="/teacher/kyc">
+            KYC
+          </Button>
+        </Toolbar>
+      </AppBar>
+      <Container component="main" maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <Outlet />
-      </main>
-    </div>
+      </Container>
+    </Box>
   );
 }

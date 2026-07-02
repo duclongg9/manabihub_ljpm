@@ -1,6 +1,10 @@
 spring:
   application:
     name: manabihub-backend
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 28MB
   profiles:
     active: local
   jpa:

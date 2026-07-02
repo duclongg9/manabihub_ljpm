@@ -63,6 +63,14 @@ public final class MessageCodes {
     public static final String KYC_APPROVED = "KYC_APPROVED";
     public static final String KYC_REJECTED = "KYC_REJECTED";
     public static final String KYC_NOT_APPROVED = "KYC_NOT_APPROVED";
+    public static final String KYC_TEACHER_NOT_FOUND = "KYC_TEACHER_NOT_FOUND";
+    public static final String KYC_ALREADY_PENDING = "KYC_ALREADY_PENDING";
+    public static final String KYC_ALREADY_APPROVED = "KYC_ALREADY_APPROVED";
+    public static final String KYC_SUBMISSION_NOT_ALLOWED = "KYC_SUBMISSION_NOT_ALLOWED";
+    public static final String MSG_KYC_002 = "MSG-KYC-002";
+    public static final String MSG_KYC_003 = "MSG-KYC-003";
+    public static final String MSG_KYC_008 = "MSG-KYC-008";
+    public static final String MSG_ADM_002 = "MSG-ADM-002";
 
     // ──────────────────────────────────────────────
     // COURSE — course management
