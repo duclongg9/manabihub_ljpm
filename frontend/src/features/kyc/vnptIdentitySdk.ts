@@ -1,5 +1,9 @@
 type VnptSdkCallback = (result: unknown) => Promise<void> | void;
-const DEFAULT_VNPT_SDK_SCRIPT_URLS = ['/web-sdk-version-3.2.1.0.js'];
+const DEFAULT_VNPT_SDK_SCRIPT_URLS = [
+  '/web-sdk-version-3.2.1.0.js',
+  '/lib/VNPTQRBrowserApp.js',
+  '/lib/VNPTBrowserSDKAppV4.1.0.js',
+];
 
 declare global {
   interface Window {
@@ -49,44 +53,17 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
     });
   };
 
+  // Config follows VNPT reference: dist/index.html from web-sdk-version-3.2.1.0
+  // Only pass what VNPT documents — extra flags break the SDK UI
   window.SDK.launch({
     BACKEND_URL: env.backendUrl,
     TOKEN_KEY: env.tokenKey,
     TOKEN_ID: env.tokenId,
     ACCESS_TOKEN: env.accessToken,
-
-    HAS_RESULT_SCREEN: true,
+    CALL_BACK_END_FLOW: handleResult,
     HAS_BACKGROUND_IMAGE: true,
     MAX_SIZE_IMAGE: 5,
-    LIST_TYPE_DOCUMENT: [9],
-    DOCUMENT_TYPE_START: 9,
-    DEFAULT_LANGUAGE: 'vi',
-    SHOW_STEP: true,
-    HAS_QR_SCAN: false,
-    SHOW_TAB_RESULT_INFORMATION: true,
-    SHOW_TAB_RESULT_VALIDATION: true,
-
-    SDK_FLOW: 'DOCUMENT_TO_FACE',
-    FLOW_TAKEN: 'DOCUMENT_TO_FACE',
-    USE_METHOD: 'BOTH',
-    USE_WEBCAM: true,
-    USE_UPLOAD: true,
-
-    ENABLE_API_UPLOAD_IMAGE: true,
-    ENABLE_API_OCR_DOCUMENT: true,
-    ENABLE_API_LIVENESS_DOCUMENT: true,
-    ENABLE_API_LIVENESS_FACE: true,
-    ENABLE_API_MASKED_FACE: true,
-    ENABLE_API_COMPARE_FACE: true,
-
-    CHECK_LIVENESS_CARD: true,
-    CHECK_LIVENESS_FACE: true,
-    CHECK_MASKED_FACE: true,
-    COMPARE_FACE: true,
-
-    CALL_BACK: handleResult,
-    CALL_BACK_END_FLOW: handleResult,
-    CALL_BACK_DOCUMENT_RESULT: handleResult,
+    LIST_TYPE_DOCUMENT: [-1, 4, 5, 6, 7, 9],
   });
 }
 
