@@ -442,17 +442,17 @@ function TeacherKycPageContent() {
         >
           <CloseIcon />
         </IconButton>
-        <DialogContent sx={{ p: 0 }}>
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
           <Box
             id="ekyc_sdk_intergrated"
             sx={{ 
+              flexGrow: 1, 
               width: '100%', 
-              height: '100%', 
               position: 'relative',
               '& video': {
-                objectFit: 'cover',
-                height: '100% !important',
                 maxWidth: 'none !important',
+                maxHeight: 'none !important',
+                minHeight: '100% !important',
               }
             }}
           />
