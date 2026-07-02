@@ -1,8 +1,8 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { PublicLayout } from './layouts/PublicLayout';
-import { StudentLayout } from './layouts/StudentLayout';
-import { TeacherLayout } from './layouts/TeacherLayout';
-import { AdminLayout } from './layouts/AdminLayout';
+import { PublicLayout } from '../shared/layouts/PublicLayout';
+import { StudentLayout } from '../shared/layouts/StudentLayout';
+import { TeacherLayout } from '../shared/layouts/TeacherLayout';
+import { AdminLayout } from '../shared/layouts/AdminLayout';
 import { TeacherKycPage } from '../features/kyc/TeacherKycPage';
 
 export const router = createBrowserRouter([
