@@ -445,7 +445,16 @@ function TeacherKycPageContent() {
         <DialogContent sx={{ p: 0 }}>
           <Box
             id="ekyc_sdk_intergrated"
-            sx={{ width: '100%', height: '100%', position: 'relative' }}
+            sx={{ 
+              width: '100%', 
+              height: '100%', 
+              position: 'relative',
+              '& video': {
+                objectFit: 'cover',
+                height: '100% !important',
+                maxWidth: 'none !important',
+              }
+            }}
           />
         </DialogContent>
       </Dialog>
