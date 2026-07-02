@@ -69,8 +69,6 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
     SDK_FLOW: 'DOCUMENT_TO_FACE',
     FLOW_TAKEN: 'DOCUMENT_TO_FACE',
     USE_METHOD: 'BOTH',
-    USE_WEBCAM: true,
-    USE_UPLOAD: false,
 
     ENABLE_API_UPLOAD_IMAGE: true,
     ENABLE_API_OCR_DOCUMENT: true,

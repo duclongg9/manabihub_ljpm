@@ -6,6 +6,8 @@ import {
   CardContent,
   Checkbox,
   Chip,
+  Dialog,
+  DialogContent,
   FormControlLabel,
   LinearProgress,
   Paper,
@@ -135,22 +137,25 @@ function TeacherKycPageContent() {
     setIdentityEnvelope(null);
     setIdentityLaunching(true);
 
-    try {
-      await launchVnptIdentitySdk(async (result) => {
-        try {
-          const response = await verifyTeacherIdentity(result);
-          setIdentityEnvelope(response);
-          await refreshStatus();
-        } catch (error) {
-          setPageError(readErrorMessage(error));
-        } finally {
-          setIdentityLaunching(false);
-        }
-      });
-    } catch (error) {
-      setPageError(readErrorMessage(error));
-      setIdentityLaunching(false);
-    }
+    // Wait for the Dialog to mount its DOM elements before launching SDK
+    setTimeout(async () => {
+      try {
+        await launchVnptIdentitySdk(async (result) => {
+          try {
+            const response = await verifyTeacherIdentity(result);
+            setIdentityEnvelope(response);
+            await refreshStatus();
+          } catch (error) {
+            setPageError(readErrorMessage(error));
+          } finally {
+            setIdentityLaunching(false);
+          }
+        });
+      } catch (error) {
+        setPageError(readErrorMessage(error));
+        setIdentityLaunching(false);
+      }
+    }, 100);
   }
 
   async function handleRestartVerification() {
@@ -419,20 +424,19 @@ function TeacherKycPageContent() {
         )}
       </Stack>
 
-      <Box
-        id="ekyc_sdk_intergrated"
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          zIndex: identityLaunching ? 9999 : -1,
-          opacity: identityLaunching ? 1 : 0,
-          bgcolor: '#0F2B3B', // VNPT dark theme background
-          pointerEvents: identityLaunching ? 'auto' : 'none',
-        }}
-      />
+      <Dialog 
+        open={identityLaunching} 
+        maxWidth="md" 
+        fullWidth 
+        sx={{ '& .MuiDialog-paper': { bgcolor: '#0F2B3B', height: '90vh', p: 0, m: 2 } }}
+      >
+        <DialogContent sx={{ p: 0 }}>
+          <Box
+            id="ekyc_sdk_intergrated"
+            sx={{ width: '100%', height: '100%', position: 'relative' }}
+          />
+        </DialogContent>
+      </Dialog>
     </Stack>
   );
 }
