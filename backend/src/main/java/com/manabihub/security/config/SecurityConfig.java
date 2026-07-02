@@ -26,7 +26,8 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
-                    "/api/v1/demo/**"  // TODO: Remove before production release
+                    "/api/v1/demo/**",  // TODO: Remove before production release
+                    "/api/v1/notifications/**" // Temporary for testing
                 ).permitAll()
                 .anyRequest().authenticated()
             )

@@ -19,4 +19,6 @@ public interface NotificationService {
 
     void createNotification(UUID recipientUserId, String recipientEmail,
                             String title, String message, String type);
+
+    void sendTestEmailOnly(String recipientEmail, String title, String message, String type);
 }

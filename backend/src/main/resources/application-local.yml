@@ -31,5 +31,23 @@ spring:
           google:
             issuer-uri: https://accounts.google.com
 
+  config:
+    import: optional:classpath:application-secrets.yml
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:your_email@gmail.com}
+    password: ${MAIL_PASSWORD:your_app_password_here}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        transport:
+          protocol: smtp
+
 server:
   port: 8081

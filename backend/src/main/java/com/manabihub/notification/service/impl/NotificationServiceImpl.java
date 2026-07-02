@@ -114,6 +114,14 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+    @Override
+    public void sendTestEmailOnly(String recipientEmail, String title, String message, String type) {
+        if (recipientEmail != null && !recipientEmail.isBlank()) {
+            String emailBody = buildEmailBody(title, message, type);
+            emailService.sendEmail(recipientEmail, "[ManabiHub] " + title, emailBody);
+        }
+    }
+
     private NotificationResponse toResponse(Notification entity) {
         return NotificationResponse.builder()
                 .id(entity.getId())

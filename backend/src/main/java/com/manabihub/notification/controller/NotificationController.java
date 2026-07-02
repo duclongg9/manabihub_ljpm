@@ -68,16 +68,14 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(Map.of("updatedCount", count)));
     }
 
-    @PostMapping("/test-email")
+    @GetMapping("/test-email")
     public ResponseEntity<ApiResponse<String>> testEmail(
-            @RequestHeader("X-User-Id") UUID userId,
             @RequestParam String targetEmail) {
 
-        notificationService.createNotification(
-                userId,
+        notificationService.sendTestEmailOnly(
                 targetEmail,
-                "Chúc mừng! Tính năng gửi Mail đã hoạt động!",
-                "Đây là email tự động gửi từ máy chủ Spring Boot ManabiHub. Nếu bạn nhận được thư này nghĩa là kết nối SMTP đã được cấu hình thành công! Bạn có thể chuyển sang bước tiếp theo.",
+                "Welcome to ManabiHub",
+                "Đây là email tự động gửi từ máy chủ ManabiHub. Nếu bạn nhận được thư này bạn là gay! Bạn có thể chuyển sang bước tiếp theo.",
                 "SYSTEM"
         );
 
