@@ -301,7 +301,6 @@ function TeacherKycPageContent() {
             >
               {identityLaunching ? 'Đang mở VNPT eKYC...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác thực danh tính'}
             </Button>
-            <div id="ekyc_sdk_intergrated" />
           </Stack>
           {identityVerified ? <IdentityOcrSummaryCard summary={identitySummary} /> : null}
           {latestRequest?.providerTransactionId ? (
@@ -419,6 +418,21 @@ function TeacherKycPageContent() {
           </Box>
         )}
       </Stack>
+
+      <Box
+        id="ekyc_sdk_intergrated"
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: identityLaunching ? 9999 : -1,
+          opacity: identityLaunching ? 1 : 0,
+          bgcolor: '#0F2B3B', // VNPT dark theme background
+          pointerEvents: identityLaunching ? 'auto' : 'none',
+        }}
+      />
     </Stack>
   );
 }
