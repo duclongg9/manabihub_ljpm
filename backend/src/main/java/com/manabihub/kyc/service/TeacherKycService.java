@@ -6,12 +6,10 @@ import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.AuditLog;
 import com.manabihub.kyc.domain.CertificateVerificationStatus;
 import com.manabihub.kyc.domain.IdentityVerificationStatus;
-import com.manabihub.kyc.domain.InternalAdminAccount;
 import com.manabihub.kyc.domain.KycDocument;
 import com.manabihub.kyc.domain.KycDocumentType;
 import com.manabihub.kyc.domain.KycRequest;
 import com.manabihub.kyc.domain.KycRequestStatus;
-import com.manabihub.kyc.domain.Notification;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.domain.UserStatus;
@@ -24,10 +22,8 @@ import com.manabihub.kyc.dto.KycRequestResponse;
 import com.manabihub.kyc.dto.KycRestartVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
 import com.manabihub.kyc.repository.AuditLogRepository;
-import com.manabihub.kyc.repository.InternalAdminAccountRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
-import com.manabihub.kyc.repository.NotificationRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.mock.domain.MockJlptRegistryRecord;
 import com.manabihub.mock.domain.MockNationalIdRegistryRecord;
@@ -63,15 +59,12 @@ public class TeacherKycService {
     private static final long MAX_FILE_SIZE_BYTES = 5L * 1024L * 1024L;
     private static final Set<String> CERTIFICATE_MIME_TYPES = Set.of("image/jpeg", "image/png", "application/pdf");
     private static final Set<String> CERTIFICATE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "pdf");
-    private static final List<String> ADMIN_NOTIFICATION_ROLE_CODES = List.of("COURSE_MANAGER", "SYSTEM_ADMIN");
     private static final String VNPT_PROVIDER = "VNPT_EKYC_WEB_SDK";
     private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
 
     private final TeacherProfileRepository teacherProfileRepository;
     private final KycRequestRepository kycRequestRepository;
     private final KycDocumentRepository kycDocumentRepository;
-    private final InternalAdminAccountRepository internalAdminAccountRepository;
-    private final NotificationRepository notificationRepository;
     private final AuditLogRepository auditLogRepository;
     private final MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
     private final MockJlptRegistryRepository mockJlptRegistryRepository;
@@ -82,8 +75,6 @@ public class TeacherKycService {
             TeacherProfileRepository teacherProfileRepository,
             KycRequestRepository kycRequestRepository,
             KycDocumentRepository kycDocumentRepository,
-            InternalAdminAccountRepository internalAdminAccountRepository,
-            NotificationRepository notificationRepository,
             AuditLogRepository auditLogRepository,
             MockNationalIdRegistryRepository mockNationalIdRegistryRepository,
             MockJlptRegistryRepository mockJlptRegistryRepository,
@@ -93,8 +84,6 @@ public class TeacherKycService {
         this.teacherProfileRepository = teacherProfileRepository;
         this.kycRequestRepository = kycRequestRepository;
         this.kycDocumentRepository = kycDocumentRepository;
-        this.internalAdminAccountRepository = internalAdminAccountRepository;
-        this.notificationRepository = notificationRepository;
         this.auditLogRepository = auditLogRepository;
         this.mockNationalIdRegistryRepository = mockNationalIdRegistryRepository;
         this.mockJlptRegistryRepository = mockJlptRegistryRepository;
@@ -151,35 +140,30 @@ public class TeacherKycService {
             String ocrFullName = ocr.get("fullName");
             String ocrDob = ocr.get("dateOfBirth");
 
-            if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(user.getFullName()))) {
+            MockNationalIdRegistryRecord mockRecord = mockNationalIdRegistryRepository.findByIdNumberAndActiveTrue(idNumber).orElse(null);
+            if (mockRecord == null) {
                 verified = false;
-                failureReasons.add("Họ và tên trên CCCD không khớp với thông tin đăng ký tài khoản");
+                failureReasons.add("Thông tin CCCD không tồn tại trong cơ sở dữ liệu quốc gia (Mock)");
             } else {
-                MockNationalIdRegistryRecord mockRecord = mockNationalIdRegistryRepository.findByIdNumberAndActiveTrue(idNumber).orElse(null);
-                if (mockRecord == null) {
+                if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.getFullName()))) {
                     verified = false;
-                    failureReasons.add("Thông tin CCCD không tồn tại trong cơ sở dữ liệu quốc gia (Mock)");
-                } else {
-                    if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.getFullName()))) {
-                        verified = false;
-                        failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia");
-                    }
-                    if (StringUtils.hasText(ocrDob)) {
-                        try {
-                            LocalDate dob;
-                            if (ocrDob.length() == 8 && !ocrDob.contains("/")) {
-                                dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("ddMMyyyy"));
-                            } else {
-                                dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-                            }
-                            if (!dob.equals(mockRecord.getDateOfBirth())) {
-                                verified = false;
-                                failureReasons.add("Ngày sinh không khớp với cơ sở dữ liệu quốc gia");
-                            }
-                        } catch (Exception e) {
-                            verified = false;
-                            failureReasons.add("Ngày sinh trên CCCD không hợp lệ");
+                    failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia");
+                }
+                if (StringUtils.hasText(ocrDob)) {
+                    try {
+                        LocalDate dob;
+                        if (ocrDob.length() == 8 && !ocrDob.contains("/")) {
+                            dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("ddMMyyyy"));
+                        } else {
+                            dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
                         }
+                        if (!dob.equals(mockRecord.getDateOfBirth())) {
+                            verified = false;
+                            failureReasons.add("Ngày sinh không khớp với cơ sở dữ liệu quốc gia");
+                        }
+                    } catch (Exception e) {
+                        verified = false;
+                        failureReasons.add("Ngày sinh trên CCCD không hợp lệ");
                     }
                 }
             }
@@ -304,18 +288,9 @@ public class TeacherKycService {
         kycRequest.setCertificateSubmittedAt(Instant.now());
         kycRequest.setCopyrightAgreed(true);
 
-        // Attempt auto-approve: lookup JLPT registry and cross-match with CCCD OCR data
-        boolean autoApproved = attemptJlptAutoApprove(kycRequest, teacherProfile, user);
+        // Strict auto-approve: lookup JLPT registry, cross-match with CCCD OCR data, throw exception if fails
+        verifyAndApproveJlptRegistry(kycRequest, teacherProfile, user);
 
-        if (!autoApproved) {
-            kycRequest.setStatus(KycRequestStatus.PENDING);
-            kycRequest.setCertificateStatus(CertificateVerificationStatus.PENDING_REVIEW);
-            kycRequest.setVerificationPayload(withCertificatePayload(kycRequest, false, null));
-            teacherProfile.setKycStatus(TeacherKycStatus.PENDING);
-            teacherProfile.setCanPublishCourse(false);
-        }
-
-        boolean adminNotificationCreated = !autoApproved && createAdminNotifications(kycRequest, user);
         boolean auditLogged = createCertificateSubmissionAudit(kycRequest, user, beforeStatus, ipAddress, userAgent);
         List<KycDocument> documents = kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(kycRequest.getId());
 
@@ -326,7 +301,7 @@ public class TeacherKycService {
                 toRequestResponse(kycRequest, documents),
                 identityModuleStatus(teacherProfile, kycRequest),
                 certificateModuleStatus(teacherProfile, kycRequest),
-                adminNotificationCreated,
+                false, // adminNotificationCreated is now false since there is no manual review
                 auditLogged,
                 srsTrace()
         );
@@ -486,26 +461,7 @@ public class TeacherKycService {
         return document;
     }
 
-    private boolean createAdminNotifications(KycRequest request, AppUser user) {
-        List<InternalAdminAccount> admins = internalAdminAccountRepository.findActiveAdminsByRoleCodes(ADMIN_NOTIFICATION_ROLE_CODES);
 
-        if (admins.isEmpty()) {
-            return false;
-        }
-
-        List<Notification> notifications = admins.stream().map(admin -> {
-            Notification notification = new Notification();
-            notification.setRecipientAdmin(admin);
-            notification.setTitle("New teacher certificate review");
-            notification.setMessage("Teacher " + user.getFullName() + " submitted certificate for KYC request " + request.getId() + ".");
-            notification.setNotificationType("KYC_REVIEW_REQUESTED");
-            notification.setRead(false);
-            return notification;
-        }).toList();
-
-        notificationRepository.saveAll(notifications);
-        return true;
-    }
 
     private boolean createIdentityAudit(
             KycRequest request,
@@ -726,27 +682,25 @@ public class TeacherKycService {
         payload.put("certificateCode", request.getCertificateCode());
         payload.put("copyrightAgreement", "ACCEPTED_BY_CHECKBOX");
         payload.put("autoApproval", autoApproved);
-        if (autoApproved) {
-            payload.put("certificateReviewMode", "AUTO_APPROVED_VIA_JLPT_REGISTRY");
-            payload.put("registryVerification", "MATCHED");
+        payload.put("certificateReviewMode", "AUTO_APPROVED_VIA_JLPT_REGISTRY");
+        payload.put("registryVerification", "MATCHED");
+        if (autoApproveDetail != null) {
             payload.put("autoApproveDetail", autoApproveDetail);
-        } else {
-            payload.put("certificateReviewMode", "ASYNC_CERTIFICATE_REVIEW");
-            payload.put("registryVerification", "WAITING_FOR_ADMIN_REVIEW");
         }
         return payload;
     }
 
     /**
-     * Attempts to auto-approve the JLPT certificate by:
+     * Verifies the JLPT certificate by:
      * 1. Looking up the certificate code in the mock JLPT registry
      * 2. Cross-matching fullName and dateOfBirth from the JLPT registry against CCCD OCR data
      * 3. If both match → auto-approve KYC and grant TEACHER role
+     * 4. If any fails → throw exception to abort submission
      */
-    private boolean attemptJlptAutoApprove(KycRequest kycRequest, TeacherProfile teacherProfile, AppUser user) {
+    private void verifyAndApproveJlptRegistry(KycRequest kycRequest, TeacherProfile teacherProfile, AppUser user) {
         String code = kycRequest.getCertificateCode();
         if (!StringUtils.hasText(code)) {
-            return false;
+            throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "Mã chứng chỉ là bắt buộc", HttpStatus.BAD_REQUEST);
         }
 
         MockJlptRegistryRecord jlptRecord = mockJlptRegistryRepository
@@ -754,7 +708,7 @@ public class TeacherKycService {
                 .orElse(null);
 
         if (jlptRecord == null) {
-            return false;
+            throw new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Mã chứng chỉ không tồn tại trên hệ thống, vui lòng kiểm tra lại", HttpStatus.NOT_FOUND);
         }
 
         // Extract identity OCR from the verification payload (saved during identity verification step)
@@ -763,24 +717,26 @@ public class TeacherKycService {
         String ocrDob = identityOcr.get("dateOfBirth");
 
         if (!StringUtils.hasText(ocrFullName)) {
-            return false;
+            throw new BusinessException(MessageCodes.MSG_KYC_006, "Không tìm thấy thông tin định danh (Họ Tên) từ CCCD để đối soát chứng chỉ", HttpStatus.BAD_REQUEST);
         }
 
         // Cross-match: JLPT registry fullName vs CCCD OCR fullName
         if (!normalizeSearchText(jlptRecord.getFullName()).equals(normalizeSearchText(ocrFullName))) {
-            return false;
+            throw new BusinessException(MessageCodes.MSG_KYC_006, "Họ và tên trên chứng chỉ JLPT không khớp với thông tin định danh CCCD", HttpStatus.BAD_REQUEST);
         }
 
         // Cross-match: JLPT registry dateOfBirth vs CCCD OCR dateOfBirth
-        if (StringUtils.hasText(ocrDob)) {
-            try {
-                LocalDate ocrDate = parseOcrDate(ocrDob);
-                if (!ocrDate.equals(jlptRecord.getDateOfBirth())) {
-                    return false;
-                }
-            } catch (Exception e) {
-                return false;
+        if (!StringUtils.hasText(ocrDob)) {
+            throw new BusinessException(MessageCodes.MSG_KYC_006, "Không tìm thấy thông tin định danh (Ngày sinh) từ CCCD để đối soát chứng chỉ", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            LocalDate ocrDate = parseOcrDate(ocrDob);
+            if (!ocrDate.equals(jlptRecord.getDateOfBirth())) {
+                throw new BusinessException(MessageCodes.MSG_KYC_006, "Ngày sinh trên chứng chỉ JLPT không khớp với thông tin định danh CCCD", HttpStatus.BAD_REQUEST);
             }
+        } catch (Exception e) {
+            throw new BusinessException(MessageCodes.MSG_KYC_006, "Ngày sinh trên CCCD không hợp lệ hoặc không thể đối soát", HttpStatus.BAD_REQUEST);
         }
 
         // All checks passed → auto-approve
@@ -803,11 +759,8 @@ public class TeacherKycService {
 
         // Grant TEACHER role if not already present
         grantTeacherRoleIfAbsent(user.getId());
-
-        return true;
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, String> extractOcrFromPayload(Map<String, Object> payload) {
         if (payload == null) {
             return Map.of();
@@ -880,7 +833,6 @@ public class TeacherKycService {
         return entries;
     }
 
-    @SuppressWarnings("unchecked")
     private void collectResultEntries(Object current, String path, List<ResultEntry> entries, int depth) {
         if (current == null || depth > 8) {
             return;

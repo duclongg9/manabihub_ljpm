@@ -69,7 +69,9 @@ public final class MessageCodes {
     public static final String KYC_SUBMISSION_NOT_ALLOWED = "KYC_SUBMISSION_NOT_ALLOWED";
     public static final String MSG_KYC_002 = "MSG-KYC-002";
     public static final String MSG_KYC_003 = "MSG-KYC-003";
+    public static final String MSG_KYC_006 = "MSG-KYC-006";
     public static final String MSG_KYC_008 = "MSG-KYC-008";
+    public static final String MSG_KYC_009 = "MSG-KYC-009";
     public static final String MSG_ADM_002 = "MSG-ADM-002";
 
     // ──────────────────────────────────────────────
