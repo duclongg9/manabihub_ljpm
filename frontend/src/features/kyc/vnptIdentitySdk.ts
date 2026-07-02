@@ -62,7 +62,7 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
     DOCUMENT_TYPE_START: 9,
     DEFAULT_LANGUAGE: 'vi',
     SHOW_STEP: true,
-    HAS_QR_SCAN: true,
+    HAS_QR_SCAN: false,
     SHOW_TAB_RESULT_INFORMATION: true,
     SHOW_TAB_RESULT_VALIDATION: true,
 
