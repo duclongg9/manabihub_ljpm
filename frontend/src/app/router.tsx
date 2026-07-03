@@ -3,6 +3,7 @@ import { PublicLayout } from '../shared/layouts/PublicLayout';
 import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
 import { AdminLayout } from '../shared/layouts/AdminLayout';
+import { NotificationsPage } from '../features/notifications/pages/NotificationsPage';
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +28,10 @@ export const router = createBrowserRouter([
         index: true,
         element: <div>Student Dashboard Placeholder</div>,
       },
+      {
+        path: 'notifications',
+        element: <NotificationsPage />,
+      },
     ],
   },
   {
@@ -36,6 +41,10 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <div>Teacher Dashboard Placeholder</div>,
+      },
+      {
+        path: 'notifications',
+        element: <NotificationsPage />,
       },
     ],
   },
@@ -47,6 +56,11 @@ export const router = createBrowserRouter([
         index: true,
         element: <div>Admin Dashboard Placeholder</div>,
       },
+      {
+        path: 'notifications',
+        element: <NotificationsPage />,
+      },
     ],
   },
 ]);
+

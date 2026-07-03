@@ -37,19 +37,19 @@ public class NotificationServiceImpl implements NotificationService {
 
         if (hasType && hasReadFilter) {
             page = notificationRepository
-                    .findAllByRecipientUserIdAndNotificationTypeAndIsReadOrderByCreatedAtDesc(
+                    .findAllByUserIdAndTypeAndIsReadOrderByCreatedAtDesc(
                             userId, type, isRead, pageable);
         } else if (hasType) {
             page = notificationRepository
-                    .findAllByRecipientUserIdAndNotificationTypeOrderByCreatedAtDesc(
+                    .findAllByUserIdAndNotificationTypeOrderByCreatedAtDesc(
                             userId, type, pageable);
         } else if (hasReadFilter) {
             page = notificationRepository
-                    .findAllByRecipientUserIdAndIsReadOrderByCreatedAtDesc(
+                    .findAllByUserIdAndIsReadOrderByCreatedAtDesc(
                             userId, isRead, pageable);
         } else {
             page = notificationRepository
-                    .findAllByRecipientUserIdOrderByCreatedAtDesc(userId, pageable);
+                    .findAllByUserIdOrderByCreatedAtDesc(userId, pageable);
         }
 
         return page.map(this::toResponse);
@@ -57,7 +57,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public long countUnread(UUID userId) {
-        return notificationRepository.countByRecipientUserIdAndIsReadFalse(userId);
+        return notificationRepository.countUnreadByUserId(userId);
     }
 
     @Override
@@ -70,7 +70,7 @@ public class NotificationServiceImpl implements NotificationService {
                         HttpStatus.NOT_FOUND
                 ));
 
-        if (!userId.equals(notification.getRecipientUserId())) {
+        if (!userId.equals(notification.getRecipientUserId()) && !userId.equals(notification.getRecipientAdminId())) {
             throw new BusinessException(
                     MessageCodes.AUTH_FORBIDDEN,
                     "You do not have permission to access this notification",
@@ -90,7 +90,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public int markAllAsRead(UUID userId) {
-        return notificationRepository.markAllAsReadByRecipientUserId(userId, Instant.now());
+        return notificationRepository.markAllAsReadByUserId(userId, Instant.now());
     }
 
     @Override

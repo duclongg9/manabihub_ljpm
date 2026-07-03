@@ -9,12 +9,14 @@ export const ROUTES = {
     DASHBOARD: '/student/dashboard',
     MY_COURSES: '/student/courses',
     PAYMENTS: '/student/payments',
+    NOTIFICATIONS: '/student/notifications',
   },
   TEACHER: {
     DASHBOARD: '/teacher/dashboard',
     COURSES: '/teacher/courses',
     KYC: '/teacher/kyc',
     WALLET: '/teacher/wallet',
+    NOTIFICATIONS: '/teacher/notifications',
   },
   ADMIN: {
     DASHBOARD: '/admin/dashboard',
@@ -23,5 +25,6 @@ export const ROUTES = {
     COURSE_APPROVAL: '/admin/courses/approvals',
     KYC_REVIEW: '/admin/kyc/review',
     FINANCE: '/admin/finance',
+    NOTIFICATIONS: '/admin/notifications',
   },
 };

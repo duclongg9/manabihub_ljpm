@@ -15,22 +15,23 @@ import java.util.UUID;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
 
-    Page<Notification> findAllByRecipientUserIdOrderByCreatedAtDesc(
-            UUID recipientUserId, Pageable pageable);
+    @Query("SELECT n FROM Notification n WHERE (n.recipientUserId = :userId OR n.recipientAdminId = :userId) ORDER BY n.createdAt DESC")
+    Page<Notification> findAllByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId, Pageable pageable);
 
-    Page<Notification> findAllByRecipientUserIdAndIsReadOrderByCreatedAtDesc(
-            UUID recipientUserId, boolean isRead, Pageable pageable);
+    @Query("SELECT n FROM Notification n WHERE (n.recipientUserId = :userId OR n.recipientAdminId = :userId) AND n.isRead = :isRead ORDER BY n.createdAt DESC")
+    Page<Notification> findAllByUserIdAndIsReadOrderByCreatedAtDesc(@Param("userId") UUID userId, @Param("isRead") boolean isRead, Pageable pageable);
 
-    Page<Notification> findAllByRecipientUserIdAndNotificationTypeOrderByCreatedAtDesc(
-            UUID recipientUserId, String notificationType, Pageable pageable);
+    @Query("SELECT n FROM Notification n WHERE (n.recipientUserId = :userId OR n.recipientAdminId = :userId) AND n.notificationType = :notificationType ORDER BY n.createdAt DESC")
+    Page<Notification> findAllByUserIdAndNotificationTypeOrderByCreatedAtDesc(@Param("userId") UUID userId, @Param("notificationType") String notificationType, Pageable pageable);
 
-    Page<Notification> findAllByRecipientUserIdAndNotificationTypeAndIsReadOrderByCreatedAtDesc(
-            UUID recipientUserId, String notificationType, boolean isRead, Pageable pageable);
+    @Query("SELECT n FROM Notification n WHERE (n.recipientUserId = :userId OR n.recipientAdminId = :userId) AND n.notificationType = :notificationType AND n.isRead = :isRead ORDER BY n.createdAt DESC")
+    Page<Notification> findAllByUserIdAndTypeAndIsReadOrderByCreatedAtDesc(@Param("userId") UUID userId, @Param("notificationType") String notificationType, @Param("isRead") boolean isRead, Pageable pageable);
 
-    long countByRecipientUserIdAndIsReadFalse(UUID recipientUserId);
+    @Query("SELECT COUNT(n) FROM Notification n WHERE (n.recipientUserId = :userId OR n.recipientAdminId = :userId) AND n.isRead = false")
+    long countUnreadByUserId(@Param("userId") UUID userId);
 
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true, n.readAt = :now " +
-           "WHERE n.recipientUserId = :userId AND n.isRead = false")
-    int markAllAsReadByRecipientUserId(@Param("userId") UUID userId, @Param("now") Instant now);
+           "WHERE (n.recipientUserId = :userId OR n.recipientAdminId = :userId) AND n.isRead = false")
+    int markAllAsReadByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
 }
