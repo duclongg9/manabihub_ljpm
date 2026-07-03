@@ -1,12 +1,16 @@
-import React from 'react';
-import { Box, Typography, Chip, IconButton, Paper } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Typography, Chip, IconButton, Paper, Collapse, Button } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import CheckIcon from '@mui/icons-material/Check';
 import { NOTIFICATION_TYPES } from '../types';
 import type { NotificationResponse } from '../types';
 
 interface NotificationItemProps {
   notification: NotificationResponse;
   onMarkAsRead: (id: string) => void;
+  onMarkAsUnread: (id: string) => void;
 }
 
 function getRelativeTime(dateStr: string): string {
@@ -29,18 +33,33 @@ function getTypeIcon(type: string): string {
   return NOTIFICATION_TYPES[type]?.icon ?? '🔔';
 }
 
-export const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onMarkAsRead }) => {
+export const NotificationItem: React.FC<NotificationItemProps> = ({ 
+  notification, 
+  onMarkAsRead,
+  onMarkAsUnread
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const typeConfig = NOTIFICATION_TYPES[notification.notificationType];
   const isUnread = !notification.read;
+
+  const handleToggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent bubbling if needed
+    if (!isExpanded && isUnread) {
+      onMarkAsRead(notification.id);
+    }
+    setIsExpanded(!isExpanded);
+  };
+
+  const handleMarkAsUnread = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onMarkAsUnread(notification.id);
+    setIsExpanded(false); // Optionally close when marked as unread
+  };
 
   return (
     <Paper
       elevation={0}
-      onClick={() => {
-        if (isUnread) {
-          onMarkAsRead(notification.id);
-        }
-      }}
+      onClick={handleToggleExpand}
       sx={{
         p: 2.5,
         mb: 1.5,
@@ -48,7 +67,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({ notification
         border: '1px solid',
         borderColor: isUnread ? 'primary.light' : 'divider',
         bgcolor: isUnread ? 'rgba(79, 70, 229, 0.03)' : 'background.paper',
-        cursor: isUnread ? 'pointer' : 'default',
+        cursor: 'pointer',
         transition: 'all 0.2s ease',
         '&:hover': {
           borderColor: isUnread ? 'primary.main' : '#C5CAD3',
@@ -118,22 +137,26 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({ notification
             )}
           </Box>
 
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'text.secondary',
-              lineHeight: 1.6,
-              mb: 1,
-              display: '-webkit-box',
-              WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: 2,
-              overflow: 'hidden',
-            }}
-          >
-            {notification.message}
-          </Typography>
+          {/* Collapsed view message snippet */}
+          {!isExpanded && (
+            <Typography
+              variant="body2"
+              sx={{
+                color: 'text.secondary',
+                lineHeight: 1.6,
+                mb: 1,
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 2,
+                overflow: 'hidden',
+              }}
+            >
+              {notification.message}
+            </Typography>
+          )}
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {/* Tags and Time */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: isExpanded ? 1 : 0 }}>
             {typeConfig && (
               <Chip
                 label={typeConfig.label}
@@ -152,11 +175,84 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({ notification
               {getRelativeTime(notification.createdAt)}
             </Typography>
           </Box>
+
+          {/* Expanded Content Area */}
+          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                bgcolor: '#F9FAFB',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6, mb: 2 }}>
+                {notification.message}
+              </Typography>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                {notification.actionUrl && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    component="a"
+                    href={notification.actionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    endIcon={<OpenInNewIcon sx={{ fontSize: 16 }} />}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderRadius: '8px',
+                      px: 2,
+                      py: 0.5,
+                      boxShadow: 'none',
+                      '&:hover': { boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)' }
+                    }}
+                  >
+                    Xem chi tiết
+                  </Button>
+                )}
+                
+                {!isUnread && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleMarkAsUnread}
+                    startIcon={<CheckIcon sx={{ fontSize: 16 }} />}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      color: 'text.secondary',
+                      borderColor: 'divider',
+                      borderRadius: '8px',
+                      px: 2,
+                      py: 0.5,
+                      '&:hover': { 
+                        bgcolor: 'background.paper', 
+                        color: 'text.primary',
+                        borderColor: 'text.secondary'
+                      }
+                    }}
+                  >
+                    Đánh dấu là chưa đọc
+                  </Button>
+                )}
+              </Box>
+            </Box>
+          </Collapse>
         </Box>
 
         {/* Expand icon */}
-        <IconButton size="small" sx={{ color: 'text.disabled', mt: 0.5 }}>
-          <KeyboardArrowDownIcon fontSize="small" />
+        <IconButton 
+          size="small" 
+          onClick={handleToggleExpand}
+          sx={{ color: 'text.disabled', mt: 0.5 }}
+        >
+          {isExpanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
         </IconButton>
       </Box>
     </Paper>

@@ -89,6 +89,33 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public NotificationResponse markAsUnread(UUID notificationId, UUID userId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.NOTIFICATION_NOT_FOUND,
+                        "Notification not found",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        if (!userId.equals(notification.getRecipientUserId()) && !userId.equals(notification.getRecipientAdminId())) {
+            throw new BusinessException(
+                    MessageCodes.AUTH_FORBIDDEN,
+                    "You do not have permission to access this notification",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+
+        if (notification.isRead()) {
+            notification.setRead(false);
+            notification.setReadAt(null);
+            notificationRepository.save(notification);
+        }
+
+        return toResponse(notification);
+    }
+
+    @Override
+    @Transactional
     public int markAllAsRead(UUID userId) {
         return notificationRepository.markAllAsReadByUserId(userId, Instant.now());
     }
@@ -128,6 +155,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .title(entity.getTitle())
                 .message(entity.getMessage())
                 .notificationType(entity.getNotificationType())
+                .actionUrl(entity.getActionUrl())
                 .read(entity.isRead())
                 .createdAt(entity.getCreatedAt())
                 .readAt(entity.getReadAt())

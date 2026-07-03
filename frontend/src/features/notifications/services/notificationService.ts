@@ -51,6 +51,15 @@ export const notificationService = {
     return data.data;
   },
 
+  async markAsUnread(notificationId: string): Promise<NotificationResponse> {
+    const { data } = await axiosClient.patch<ApiResponse<NotificationResponse>>(
+      `${BASE_URL}/${notificationId}/unread`,
+      null,
+      { headers: authHeaders() }
+    );
+    return data.data;
+  },
+
   async markAllAsRead(): Promise<number> {
     const { data } = await axiosClient.patch<ApiResponse<{ updatedCount: number }>>(
       `${BASE_URL}/read-all`,

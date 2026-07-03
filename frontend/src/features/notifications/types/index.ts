@@ -3,6 +3,7 @@ export interface NotificationResponse {
   title: string;
   message: string;
   notificationType: string;
+  actionUrl?: string;
   read: boolean;
   createdAt: string;
   readAt: string | null;

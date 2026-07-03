@@ -11,7 +11,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import { NotificationFilter } from '../components/NotificationFilter';
 import { NotificationItem } from '../components/NotificationItem';
-import { useNotifications, useUnreadCount, useMarkAsRead, useMarkAllAsRead } from '../hooks/useNotifications';
+import { useNotifications, useUnreadCount, useMarkAsRead, useMarkAsUnread, useMarkAllAsRead } from '../hooks/useNotifications';
 import type { ReadFilter } from '../types';
 
 export const NotificationsPage: React.FC = () => {
@@ -31,10 +31,15 @@ export const NotificationsPage: React.FC = () => {
   const { data: notificationsPage, isLoading, isError, error } = useNotifications(queryParams);
   const { data: unreadCount } = useUnreadCount();
   const markAsRead = useMarkAsRead();
+  const markAsUnread = useMarkAsUnread();
   const markAllAsRead = useMarkAllAsRead();
 
   const handleMarkAsRead = (id: string) => {
     markAsRead.mutate(id);
+  };
+
+  const handleMarkAsUnread = (id: string) => {
+    markAsUnread.mutate(id);
   };
 
   const handleMarkAllAsRead = () => {
@@ -150,6 +155,7 @@ export const NotificationsPage: React.FC = () => {
                     key={notification.id}
                     notification={notification}
                     onMarkAsRead={handleMarkAsRead}
+                    onMarkAsUnread={handleMarkAsUnread}
                   />
                 ))}
               </Box>

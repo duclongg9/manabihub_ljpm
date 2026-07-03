@@ -62,6 +62,16 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @PatchMapping("/{id}/unread")
+    public ResponseEntity<ApiResponse<NotificationResponse>> markAsUnread(
+            @PathVariable UUID id,
+            @RequestHeader("X-User-Id") UUID userId) {
+
+        NotificationResponse response = notificationService.markAsUnread(id, userId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @PatchMapping("/read-all")
     public ResponseEntity<ApiResponse<Map<String, Integer>>> markAllAsRead(
             @RequestHeader("X-User-Id") UUID userId) {

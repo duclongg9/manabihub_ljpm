@@ -15,6 +15,8 @@ public interface NotificationService {
 
     NotificationResponse markAsRead(UUID notificationId, UUID userId);
 
+    NotificationResponse markAsUnread(UUID notificationId, UUID userId);
+
     int markAllAsRead(UUID userId);
 
     void createNotification(UUID recipientUserId, String recipientEmail,
