@@ -3,6 +3,8 @@ import { PublicLayout } from './layouts/PublicLayout';
 import { StudentLayout } from './layouts/StudentLayout';
 import { TeacherLayout } from './layouts/TeacherLayout';
 import { AdminLayout } from './layouts/AdminLayout';
+import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
+import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
 
 export const router = createBrowserRouter([
   {
@@ -46,6 +48,14 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <div>Admin Dashboard Placeholder</div>,
+      },
+      {
+        path: 'kyc',
+        element: <KycQueuePage />,
+      },
+      {
+        path: 'kyc/:id',
+        element: <KycDetailPage />,
       },
     ],
   },
