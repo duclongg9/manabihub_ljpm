@@ -25,10 +25,10 @@ import com.manabihub.kyc.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
-import com.manabihub.mock.domain.MockJlptRegistryRecord;
-import com.manabihub.mock.domain.MockNationalIdRegistryRecord;
-import com.manabihub.mock.repository.MockJlptRegistryRepository;
-import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
+import com.manabihub.kyc.port.JlptRecordDto;
+import com.manabihub.kyc.port.JlptRegistryPort;
+import com.manabihub.kyc.port.NationalIdRecordDto;
+import com.manabihub.kyc.port.NationalIdRegistryPort;
 import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -66,8 +66,8 @@ public class TeacherKycService {
     private final KycRequestRepository kycRequestRepository;
     private final KycDocumentRepository kycDocumentRepository;
     private final AuditLogRepository auditLogRepository;
-    private final MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
-    private final MockJlptRegistryRepository mockJlptRegistryRepository;
+    private final NationalIdRegistryPort nationalIdRegistryPort;
+    private final JlptRegistryPort jlptRegistryPort;
     private final EntityManager entityManager;
     private final Path storageRoot;
 
@@ -76,8 +76,8 @@ public class TeacherKycService {
             KycRequestRepository kycRequestRepository,
             KycDocumentRepository kycDocumentRepository,
             AuditLogRepository auditLogRepository,
-            MockNationalIdRegistryRepository mockNationalIdRegistryRepository,
-            MockJlptRegistryRepository mockJlptRegistryRepository,
+            NationalIdRegistryPort nationalIdRegistryPort,
+            JlptRegistryPort jlptRegistryPort,
             EntityManager entityManager,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
@@ -85,8 +85,8 @@ public class TeacherKycService {
         this.kycRequestRepository = kycRequestRepository;
         this.kycDocumentRepository = kycDocumentRepository;
         this.auditLogRepository = auditLogRepository;
-        this.mockNationalIdRegistryRepository = mockNationalIdRegistryRepository;
-        this.mockJlptRegistryRepository = mockJlptRegistryRepository;
+        this.nationalIdRegistryPort = nationalIdRegistryPort;
+        this.jlptRegistryPort = jlptRegistryPort;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
     }
@@ -140,12 +140,12 @@ public class TeacherKycService {
             String ocrFullName = ocr.get("fullName");
             String ocrDob = ocr.get("dateOfBirth");
 
-            MockNationalIdRegistryRecord mockRecord = mockNationalIdRegistryRepository.findByIdNumberAndActiveTrue(idNumber).orElse(null);
+            NationalIdRecordDto mockRecord = nationalIdRegistryPort.findActiveByIdNumber(idNumber).orElse(null);
             if (mockRecord == null) {
                 verified = false;
                 failureReasons.add("Thông tin CCCD không tồn tại trong cơ sở dữ liệu quốc gia (Mock)");
             } else {
-                if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.getFullName()))) {
+                if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.fullName()))) {
                     verified = false;
                     failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia");
                 }
@@ -157,7 +157,7 @@ public class TeacherKycService {
                         } else {
                             dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
                         }
-                        if (!dob.equals(mockRecord.getDateOfBirth())) {
+                        if (!dob.equals(mockRecord.dateOfBirth())) {
                             verified = false;
                             failureReasons.add("Ngày sinh không khớp với cơ sở dữ liệu quốc gia");
                         }
@@ -703,8 +703,8 @@ public class TeacherKycService {
             throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "Mã chứng chỉ là bắt buộc", HttpStatus.BAD_REQUEST);
         }
 
-        MockJlptRegistryRecord jlptRecord = mockJlptRegistryRepository
-                .findByRegistrationNumberAndActiveTrue(code.trim())
+        JlptRecordDto jlptRecord = jlptRegistryPort
+                .findActiveByRegistrationNumber(code.trim())
                 .orElse(null);
 
         if (jlptRecord == null) {
@@ -721,7 +721,7 @@ public class TeacherKycService {
         }
 
         // Cross-match: JLPT registry fullName vs CCCD OCR fullName
-        if (!normalizeSearchText(jlptRecord.getFullName()).equals(normalizeSearchText(ocrFullName))) {
+        if (!normalizeSearchText(jlptRecord.fullName()).equals(normalizeSearchText(ocrFullName))) {
             throw new BusinessException(MessageCodes.MSG_KYC_006, "Họ và tên trên chứng chỉ JLPT không khớp với thông tin định danh CCCD", HttpStatus.BAD_REQUEST);
         }
 
@@ -732,7 +732,7 @@ public class TeacherKycService {
 
         try {
             LocalDate ocrDate = parseOcrDate(ocrDob);
-            if (!ocrDate.equals(jlptRecord.getDateOfBirth())) {
+            if (!ocrDate.equals(jlptRecord.dateOfBirth())) {
                 throw new BusinessException(MessageCodes.MSG_KYC_006, "Ngày sinh trên chứng chỉ JLPT không khớp với thông tin định danh CCCD", HttpStatus.BAD_REQUEST);
             }
         } catch (Exception e) {
@@ -742,12 +742,12 @@ public class TeacherKycService {
         // All checks passed → auto-approve
         String detail = String.format(
                 "JLPT %s registry match: %s (DOB: %s) — certificate %s, score %d, status %s",
-                jlptRecord.getTestLevel(),
-                jlptRecord.getFullName(),
-                jlptRecord.getDateOfBirth(),
-                jlptRecord.getRegistrationNumber(),
-                jlptRecord.getTotalScore(),
-                jlptRecord.getPassStatus()
+                jlptRecord.testLevel(),
+                jlptRecord.fullName(),
+                jlptRecord.dateOfBirth(),
+                jlptRecord.registrationNumber(),
+                jlptRecord.totalScore(),
+                jlptRecord.passStatus()
         );
 
         kycRequest.setStatus(KycRequestStatus.APPROVED);
