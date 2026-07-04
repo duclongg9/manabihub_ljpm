@@ -3,7 +3,7 @@ import { PublicLayout } from '../shared/layouts/PublicLayout';
 import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
 import { AdminLayout } from '../shared/layouts/AdminLayout';
-import { TeacherKycPage } from '../features/kyc/TeacherKycPage';
+import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
 
 export const router = createBrowserRouter([
   {
@@ -36,11 +36,11 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <TeacherKycPage />,
+        element: <TeacherKycRoute />,
       },
       {
         path: 'kyc',
-        element: <TeacherKycPage />,
+        element: <TeacherKycRoute />,
       },
     ],
   },
