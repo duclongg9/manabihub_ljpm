@@ -6,22 +6,22 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 
 export const TEACHER_MENU = [
   {
-    title: 'Dashboard',
+    title: 'Tổng quan',
     path: ROUTES.TEACHER.DASHBOARD,
     icon: DashboardIcon,
   },
   {
-    title: 'My Courses',
+    title: 'Khóa học của tôi',
     path: ROUTES.TEACHER.COURSES,
     icon: MenuBookIcon,
   },
   {
-    title: 'KYC Verification',
+    title: 'Xác minh giáo viên',
     path: ROUTES.TEACHER.KYC,
     icon: VerifiedUserIcon,
   },
   {
-    title: 'Wallet & Payouts',
+    title: 'Ví & Thanh toán',
     path: ROUTES.TEACHER.WALLET,
     icon: AccountBalanceWalletIcon,
   },
