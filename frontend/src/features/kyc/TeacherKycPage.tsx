@@ -70,6 +70,8 @@ type IdentityDiagnostics = {
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const CERTIFICATE_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+const IDENTITY_LAUNCH_COOLDOWN_MS = 60 * 1000;
+const IDENTITY_LAUNCH_COOLDOWN_STORAGE_KEY = 'manabihub_kyc_identity_launch_cooldown_until';
 
 class TeacherKycErrorBoundary extends React.Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -120,11 +122,25 @@ function TeacherKycPageContent() {
   const [restartSubmitting, setRestartSubmitting] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [identityLaunchKey, setIdentityLaunchKey] = useState(0);
+  const [identityCooldownUntil, setIdentityCooldownUntil] = useState(readIdentityCooldownUntil);
+  const [identityCooldownNow, setIdentityCooldownNow] = useState(() => Date.now());
   const identityLaunchTokenRef = useRef(0);
 
   useEffect(() => {
     void refreshStatus({ showLoading: true });
   }, []);
+
+  useEffect(() => {
+    if (identityCooldownUntil <= Date.now()) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setIdentityCooldownNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [identityCooldownUntil]);
 
   const statusLoadFailed = !loadingStatus && Boolean(pageError) && !status;
   const identityStatus = status?.identityVerification ?? fallbackIdentityStatus(statusLoadFailed);
@@ -138,9 +154,12 @@ function TeacherKycPageContent() {
   const canRestartVerification = showRestartVerification && !restartSubmitting && !identityLaunching && !certificateSubmitting;
   
   const hasNetworkError = Boolean(pageError);
+  const identityCooldownRemainingSeconds = Math.max(0, Math.ceil((identityCooldownUntil - identityCooldownNow) / 1000));
+  const identityLaunchOnCooldown = identityCooldownRemainingSeconds > 0;
   const canStartIdentity =
     !identityLaunching
     && !hasNetworkError
+    && !identityLaunchOnCooldown
     && status?.teacherKycStatus !== 'APPROVED'
     && certificateStatus.status !== 'PENDING_REVIEW'
     && (identityStatus.canInteract || ['NOT_STARTED', 'FAILED'].includes(identityStatus.status));
@@ -169,6 +188,17 @@ function TeacherKycPageContent() {
     document.getElementById('ekyc_sdk_intergrated')?.replaceChildren();
   }
 
+  function startIdentityLaunchCooldown() {
+    const cooldownUntil = Date.now() + IDENTITY_LAUNCH_COOLDOWN_MS;
+    setIdentityCooldownUntil(cooldownUntil);
+    setIdentityCooldownNow(Date.now());
+    try {
+      localStorage.setItem(IDENTITY_LAUNCH_COOLDOWN_STORAGE_KEY, String(cooldownUntil));
+    } catch {
+      // Cooldown storage is best-effort; in-memory state still protects the current tab.
+    }
+  }
+
   function handleCloseIdentityDialog() {
     identityLaunchTokenRef.current += 1;
     setIdentityLaunching(false);
@@ -178,9 +208,14 @@ function TeacherKycPageContent() {
   }
 
   async function handleStartIdentity() {
+    if (identityLaunchOnCooldown) {
+      return;
+    }
+
     const launchToken = identityLaunchTokenRef.current + 1;
     identityLaunchTokenRef.current = launchToken;
 
+    startIdentityLaunchCooldown();
     setPageError(null);
     setIdentityEnvelope(null);
     setIdentityLaunchKey((current) => current + 1);
@@ -285,6 +320,13 @@ function TeacherKycPageContent() {
   }, [identityVerified, certificateStatus.status]);
 
   const steps = ['Xác minh danh tính', 'Cung cấp chứng chỉ', 'Hoàn tất'];
+  const identityActionLabel = identityLaunching
+    ? 'Đang mở xác thực...'
+    : identityLaunchOnCooldown
+      ? `Thử lại sau ${identityCooldownRemainingSeconds}s`
+      : identityStatus.status === 'FAILED'
+        ? 'Thực hiện lại'
+        : 'Bắt đầu xác minh danh tính';
 
   return (
     <Stack spacing={3}>
@@ -404,7 +446,7 @@ function TeacherKycPageContent() {
             <Button
               disabled={!canStartIdentity}
               onClick={handleStartIdentity}
-              startIcon={identityStatus.status === 'FAILED' ? <RefreshIcon /> : <GppGoodIcon />}
+              startIcon={identityStatus.status === 'FAILED' || identityLaunchOnCooldown ? <RefreshIcon /> : <GppGoodIcon />}
               variant="contained"
               sx={{
                 bgcolor: 'primary.main',
@@ -412,9 +454,14 @@ function TeacherKycPageContent() {
                 '&.Mui-disabled': { bgcolor: 'action.disabledBackground', color: 'action.disabled' },
               }}
             >
-              {identityLaunching ? 'Đang mở xác thực...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác minh danh tính'}
+              {identityActionLabel}
             </Button>
           </Stack>
+          {identityLaunchOnCooldown && (
+            <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 1.25 }}>
+              Tạm khóa thao tác để tránh gửi quá nhiều yêu cầu VNPT trong thời gian ngắn.
+            </Typography>
+          )}
           {identityStatus.status === 'FAILED' && !statusLoadFailed && <IdentityFailureDiagnosticsCard diagnostics={identityDiagnostics} />}
           {identityVerified && <IdentityOcrSummaryCard summary={identitySummary} />}
         </ModuleCard>
@@ -982,6 +1029,16 @@ async function waitForVnptContainer() {
   }
 
   throw new Error('Không tìm thấy vùng hiển thị VNPT eKYC. Vui lòng thử lại.');
+}
+
+function readIdentityCooldownUntil() {
+  try {
+    const rawValue = localStorage.getItem(IDENTITY_LAUNCH_COOLDOWN_STORAGE_KEY);
+    const parsedValue = rawValue ? Number(rawValue) : 0;
+    return Number.isFinite(parsedValue) && parsedValue > Date.now() ? parsedValue : 0;
+  } catch {
+    return 0;
+  }
 }
 
 function fallbackIdentityStatus(loadFailed: boolean): KycModuleStatusResponse {
