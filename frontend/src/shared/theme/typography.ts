@@ -1,5 +1,6 @@
 export const typography = {
   fontFamily: [
+    '"Be Vietnam Pro"',
     'Inter',
     '-apple-system',
     'BlinkMacSystemFont',
@@ -12,12 +13,14 @@ export const typography = {
   h1: {
     fontSize: '2.5rem',
     fontWeight: 700,
-    lineHeight: 1.2,
+    lineHeight: 1.18,
+    letterSpacing: '0.005em',
   },
   h2: {
     fontSize: '2rem',
-    fontWeight: 700,
-    lineHeight: 1.3,
+    fontWeight: 600,
+    lineHeight: 1.25,
+    letterSpacing: '0.005em',
   },
   h3: {
     fontSize: '1.75rem',
@@ -41,14 +44,14 @@ export const typography = {
   },
   body1: {
     fontSize: '1rem',
-    lineHeight: 1.5,
+    lineHeight: 1.6,
   },
   body2: {
     fontSize: '0.875rem',
-    lineHeight: 1.5,
+    lineHeight: 1.55,
   },
   button: {
     textTransform: 'none' as const,
-    fontWeight: 600,
+    fontWeight: 500,
   },
 };
