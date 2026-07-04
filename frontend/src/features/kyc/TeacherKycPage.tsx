@@ -121,11 +121,12 @@ function TeacherKycPageContent() {
   const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
-    refreshStatus().finally(() => setLoadingStatus(false));
+    void refreshStatus({ showLoading: true });
   }, []);
 
-  const identityStatus = status?.identityVerification ?? fallbackIdentityStatus();
-  const certificateStatus = status?.certificateVerification ?? fallbackCertificateStatus();
+  const statusLoadFailed = !loadingStatus && Boolean(pageError) && !status;
+  const identityStatus = status?.identityVerification ?? fallbackIdentityStatus(statusLoadFailed);
+  const certificateStatus = status?.certificateVerification ?? fallbackCertificateStatus(statusLoadFailed);
   const latestRequest = restartEnvelope?.data.request ?? certificateEnvelope?.data.request ?? identityEnvelope?.data.request ?? status?.latestRequest ?? null;
   const identityVerified = identityStatus.status === 'VERIFIED';
   const identitySummary = useMemo(() => extractIdentitySummary(latestRequest?.verificationPayload), [latestRequest?.verificationPayload]);
@@ -142,14 +143,22 @@ function TeacherKycPageContent() {
     && certificateStatus.status !== 'PENDING_REVIEW'
     && (identityStatus.canInteract || ['NOT_STARTED', 'FAILED'].includes(identityStatus.status));
   const canSubmitCertificate = identityVerified && certificateStatus.canInteract && !certificateSubmitting;
+  const pageStatus = status?.teacherKycStatus ?? (statusLoadFailed ? 'FAILED' : 'UNKNOWN');
+  const pageStatusLabel = status?.teacherKycStatusLabel ?? (statusLoadFailed ? 'Không tải được' : 'Đang tải...');
 
-  async function refreshStatus() {
+  async function refreshStatus(options: { showLoading?: boolean } = {}) {
+    if (options.showLoading) {
+      setLoadingStatus(true);
+    }
+
     try {
       setPageError(null);
       const response = await getTeacherKycStatus();
       setStatus(response);
     } catch (error) {
       setPageError(readErrorMessage(error));
+    } finally {
+      setLoadingStatus(false);
     }
   }
 
@@ -279,7 +288,7 @@ function TeacherKycPageContent() {
             </Typography>
           </Box>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' }, flexShrink: 0 }}>
-            <StatusChip status={status?.teacherKycStatus ?? 'UNKNOWN'} label={status?.teacherKycStatusLabel ?? 'Đang tải...'} />
+            <StatusChip status={pageStatus} label={pageStatusLabel} />
             {showRestartVerification && (
               <Button
                 disabled={!canRestartVerification}
@@ -310,7 +319,7 @@ function TeacherKycPageContent() {
         <Alert
           severity="error"
           action={
-            <Button color="inherit" size="small" onClick={() => { setPageError(null); refreshStatus(); }}>
+            <Button color="inherit" size="small" onClick={() => { void refreshStatus({ showLoading: true }); }}>
               Thử lại
             </Button>
           }
@@ -930,7 +939,17 @@ function toDisplayValue(value: unknown) {
   return undefined;
 }
 
-function fallbackIdentityStatus(): KycModuleStatusResponse {
+function fallbackIdentityStatus(loadFailed: boolean): KycModuleStatusResponse {
+  if (loadFailed) {
+    return {
+      status: 'FAILED',
+      statusLabel: 'Không tải được',
+      canInteract: false,
+      completedAt: null,
+      detail: 'Không tải được trạng thái xác minh danh tính. Vui lòng thử lại sau khi backend sẵn sàng.',
+    };
+  }
+
   return {
     status: 'NOT_STARTED',
     statusLabel: 'Chưa xác minh danh tính',
@@ -940,7 +959,17 @@ function fallbackIdentityStatus(): KycModuleStatusResponse {
   };
 }
 
-function fallbackCertificateStatus(): KycModuleStatusResponse {
+function fallbackCertificateStatus(loadFailed: boolean): KycModuleStatusResponse {
+  if (loadFailed) {
+    return {
+      status: 'FAILED',
+      statusLabel: 'Không tải được',
+      canInteract: false,
+      completedAt: null,
+      detail: 'Không tải được trạng thái chứng chỉ. Vui lòng kiểm tra kết nối và thử lại.',
+    };
+  }
+
   return {
     status: 'LOCKED',
     statusLabel: 'Chưa mở khóa',
