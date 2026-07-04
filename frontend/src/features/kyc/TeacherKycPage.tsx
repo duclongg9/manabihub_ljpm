@@ -121,11 +121,12 @@ function TeacherKycPageContent() {
   const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
-    refreshStatus().finally(() => setLoadingStatus(false));
+    void refreshStatus({ showLoading: true });
   }, []);
 
-  const identityStatus = status?.identityVerification ?? fallbackIdentityStatus();
-  const certificateStatus = status?.certificateVerification ?? fallbackCertificateStatus();
+  const statusLoadFailed = !loadingStatus && Boolean(pageError) && !status;
+  const identityStatus = status?.identityVerification ?? fallbackIdentityStatus(statusLoadFailed);
+  const certificateStatus = status?.certificateVerification ?? fallbackCertificateStatus(statusLoadFailed);
   const latestRequest = restartEnvelope?.data.request ?? certificateEnvelope?.data.request ?? identityEnvelope?.data.request ?? status?.latestRequest ?? null;
   const identityVerified = identityStatus.status === 'VERIFIED';
   const identitySummary = useMemo(() => extractIdentitySummary(latestRequest?.verificationPayload), [latestRequest?.verificationPayload]);
@@ -142,14 +143,23 @@ function TeacherKycPageContent() {
     && certificateStatus.status !== 'PENDING_REVIEW'
     && (identityStatus.canInteract || ['NOT_STARTED', 'FAILED'].includes(identityStatus.status));
   const canSubmitCertificate = identityVerified && certificateStatus.canInteract && !certificateSubmitting;
+  const shouldShowStatusChips = !statusLoadFailed;
+  const pageStatus = status?.teacherKycStatus ?? 'UNKNOWN';
+  const pageStatusLabel = status?.teacherKycStatusLabel ?? 'Đang tải...';
 
-  async function refreshStatus() {
+  async function refreshStatus(options: { showLoading?: boolean } = {}) {
+    if (options.showLoading) {
+      setLoadingStatus(true);
+    }
+
     try {
       setPageError(null);
       const response = await getTeacherKycStatus();
       setStatus(response);
     } catch (error) {
       setPageError(readErrorMessage(error));
+    } finally {
+      setLoadingStatus(false);
     }
   }
 
@@ -270,16 +280,16 @@ function TeacherKycPageContent() {
       >
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' }, justifyContent: 'space-between' }}>
           <Box>
-            <Typography component="h2" sx={{ fontSize: { xs: 24, md: 30 }, fontWeight: 800, mt: 0.5 }}>
+            <Typography component="h2" sx={{ color: 'text.primary', fontSize: { xs: 24, md: 30 }, fontWeight: 700, letterSpacing: '0.005em', mt: 0.5 }}>
               Xác minh giáo viên
             </Typography>
-            <Typography sx={{ color: 'text.secondary', maxWidth: 720, mt: 1, fontSize: 15, lineHeight: 1.6 }}>
+            <Typography sx={{ color: 'text.secondary', maxWidth: 720, mt: 1, fontSize: 15, lineHeight: 1.65 }}>
               Để trở thành giáo viên, vui lòng hoàn tất 2 bước: Xác minh danh tính và Cung cấp chứng chỉ chuyên môn.
               Quá trình này giúp bảo vệ tài khoản và chứng thực chuyên môn của bạn trên hệ thống.
             </Typography>
           </Box>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' }, flexShrink: 0 }}>
-            <StatusChip status={status?.teacherKycStatus ?? 'UNKNOWN'} label={status?.teacherKycStatusLabel ?? 'Đang tải...'} />
+            {shouldShowStatusChips && <StatusChip status={pageStatus} label={pageStatusLabel} />}
             {showRestartVerification && (
               <Button
                 disabled={!canRestartVerification}
@@ -310,7 +320,7 @@ function TeacherKycPageContent() {
         <Alert
           severity="error"
           action={
-            <Button color="inherit" size="small" onClick={() => { setPageError(null); refreshStatus(); }}>
+            <Button color="inherit" size="small" onClick={() => { void refreshStatus({ showLoading: true }); }}>
               Thử lại
             </Button>
           }
@@ -359,6 +369,7 @@ function TeacherKycPageContent() {
         <ModuleCard
           icon={identityVerified ? <VerifiedUserIcon sx={{ color: 'primary.main' }} /> : <BadgeIcon sx={{ color: 'primary.main' }} />}
           index="Bước 1"
+          hideStatus={!shouldShowStatusChips}
           status={identityStatus}
           title="Xác minh danh tính"
         >
@@ -383,7 +394,7 @@ function TeacherKycPageContent() {
               {identityLaunching ? 'Đang mở xác thực...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác minh danh tính'}
             </Button>
           </Stack>
-          {identityStatus.status === 'FAILED' && <IdentityFailureDiagnosticsCard diagnostics={identityDiagnostics} />}
+          {identityStatus.status === 'FAILED' && !statusLoadFailed && <IdentityFailureDiagnosticsCard diagnostics={identityDiagnostics} />}
           {identityVerified && <IdentityOcrSummaryCard summary={identitySummary} />}
         </ModuleCard>
 
@@ -402,10 +413,10 @@ function TeacherKycPageContent() {
               <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                 <LockIcon color="disabled" />
                 <Box>
-                  <Typography sx={{ color: 'text.disabled', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  <Typography sx={{ color: 'text.disabled', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                     Bước 2
                   </Typography>
-                  <Typography component="h3" sx={{ fontSize: 18, fontWeight: 700, color: 'text.disabled' }}>
+                  <Typography component="h3" sx={{ fontSize: 18, fontWeight: 600, color: 'text.disabled' }}>
                     Cung cấp chứng chỉ chuyên môn (Khóa)
                   </Typography>
                 </Box>
@@ -421,6 +432,7 @@ function TeacherKycPageContent() {
               <ModuleCard
                 icon={<SchoolIcon sx={{ color: 'primary.main' }} />}
                 index="Bước 2"
+                hideStatus={!shouldShowStatusChips}
                 status={certificateStatus}
                 title="Cung cấp chứng chỉ chuyên môn"
               >
@@ -431,7 +443,7 @@ function TeacherKycPageContent() {
 
                 <Paper elevation={0} sx={{ bgcolor: KYC_COLORS.surfaceMuted, border: '1px solid', borderColor: errors.certificate ? 'error.light' : KYC_COLORS.primaryBorder, borderRadius: 2, mt: 2, p: 2 }}>
                   <Stack spacing={1.25}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 800 }}>Chứng chỉ chuyên môn</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Chứng chỉ chuyên môn</Typography>
                     <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Ảnh hoặc PDF, tối đa 5MB.</Typography>
                     <Button
                       component="label"
@@ -479,10 +491,10 @@ function TeacherKycPageContent() {
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                       <AssignmentTurnedInIcon sx={{ color: 'primary.main' }} />
                       <Box>
-                        <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                        <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                           Cam kết bản quyền
                         </Typography>
-                        <Typography component="h3" sx={{ fontSize: 20, fontWeight: 800 }}>
+                        <Typography component="h3" sx={{ fontSize: 20, fontWeight: 700, letterSpacing: '0.004em' }}>
                           Thỏa thuận trách nhiệm bản quyền nội dung số
                         </Typography>
                       </Box>
@@ -516,7 +528,7 @@ function TeacherKycPageContent() {
                 size="large"
                 sx={{
                   py: 1.5,
-                  fontWeight: 800,
+                  fontWeight: 600,
                   bgcolor: 'primary.main',
                   '&:hover': { bgcolor: 'primary.dark' },
                   '&.Mui-disabled': { bgcolor: 'action.disabledBackground', color: 'action.disabled' },
@@ -600,12 +612,14 @@ function TeacherKycPageContent() {
 
 function ModuleCard({
   children,
+  hideStatus = false,
   icon,
   index,
   status,
   title,
 }: {
   children: ReactNode;
+  hideStatus?: boolean;
   icon: ReactNode;
   index: string;
   status: KycModuleStatusResponse;
@@ -618,18 +632,18 @@ function ModuleCard({
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
             {icon}
             <Box>
-              <Typography sx={{ color: 'primary.main', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <Typography sx={{ color: 'primary.main', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 {index}
               </Typography>
-              <Typography component="h3" sx={{ fontSize: 20, fontWeight: 800 }}>
+              <Typography component="h3" sx={{ color: 'text.primary', fontSize: 20, fontWeight: 700, letterSpacing: '0.004em' }}>
                 {title}
               </Typography>
             </Box>
           </Stack>
-          <StatusChip status={status.status} label={status.statusLabel} />
+          {!hideStatus && <StatusChip status={status.status} label={status.statusLabel} />}
         </Stack>
         {status.detail && (
-          <Typography sx={{ color: 'text.secondary', fontSize: 14, mb: 2 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6, mb: 2 }}>
             {status.detail}
           </Typography>
         )}
@@ -640,18 +654,18 @@ function ModuleCard({
 }
 
 function FieldError({ children }: { children: string }) {
-  return <Typography sx={{ color: 'error.main', fontSize: 13, fontWeight: 700 }}>{children}</Typography>;
+  return <Typography sx={{ color: 'error.main', fontSize: 13, fontWeight: 600 }}>{children}</Typography>;
 }
 
 function StatusChip({ status, label }: { status: string; label: string }) {
-  return <Chip color={statusChipColor(status)} label={label} sx={{ fontWeight: 800, borderRadius: 1.5 }} />;
+  return <Chip color={statusChipColor(status)} label={label} sx={{ borderRadius: 1.5, fontWeight: 500 }} />;
 }
 
 function IdentityOcrSummaryCard({ summary }: { summary: IdentitySummary }) {
   return (
     <Paper elevation={0} sx={{ bgcolor: KYC_COLORS.surfaceMuted, border: '1px solid', borderColor: KYC_COLORS.primaryBorder, borderRadius: 2, mt: 2, p: 2 }}>
       <Stack spacing={1.5}>
-        <Typography sx={{ fontSize: 14, fontWeight: 800 }}>Thông tin đã xác minh từ CCCD</Typography>
+        <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Thông tin đã xác minh từ CCCD</Typography>
         {summary.hasData ? (
           <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' } }}>
             <SummaryField label="Họ và tên" value={summary.fullName} />
@@ -683,7 +697,7 @@ function IdentityFailureDiagnosticsCard({ diagnostics }: { diagnostics: Identity
   return (
     <Paper elevation={0} sx={{ bgcolor: 'rgba(211, 47, 47, 0.04)', border: '1px solid', borderColor: 'error.light', borderRadius: 2, mt: 2, p: 2 }}>
       <Stack spacing={1.25}>
-        <Typography sx={{ color: 'error.dark', fontSize: 14, fontWeight: 800 }}>
+        <Typography sx={{ color: 'error.dark', fontSize: 14, fontWeight: 600 }}>
           Nguyên nhân chưa xác minh thành công
         </Typography>
         {diagnostics.providerStatus && <SummaryField label="Trạng thái" value={diagnostics.providerStatus} />}
@@ -699,7 +713,7 @@ function IdentityFailureDiagnosticsCard({ diagnostics }: { diagnostics: Identity
         {diagnostics.validationHints.length > 0 && (
           <Collapse in>
             <Box>
-              <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 Chi tiết kỹ thuật
               </Typography>
               <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
@@ -716,10 +730,10 @@ function IdentityFailureDiagnosticsCard({ diagnostics }: { diagnostics: Identity
 function SummaryField({ label, value, wide = false }: { label: string; value?: string; wide?: boolean }) {
   return (
     <Box sx={{ minWidth: 0, gridColumn: { sm: wide ? '1 / -1' : 'auto' } }}>
-      <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+      <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
         {label}
       </Typography>
-      <Typography sx={{ fontSize: 15, fontWeight: 800, overflowWrap: 'anywhere' }}>{value || 'N/A'}</Typography>
+      <Typography sx={{ color: 'text.primary', fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{value || 'N/A'}</Typography>
     </Box>
   );
 }
@@ -930,7 +944,17 @@ function toDisplayValue(value: unknown) {
   return undefined;
 }
 
-function fallbackIdentityStatus(): KycModuleStatusResponse {
+function fallbackIdentityStatus(loadFailed: boolean): KycModuleStatusResponse {
+  if (loadFailed) {
+    return {
+      status: 'UNAVAILABLE',
+      statusLabel: 'Không tải được',
+      canInteract: false,
+      completedAt: null,
+      detail: 'Không tải được trạng thái xác minh danh tính. Vui lòng thử lại sau khi backend sẵn sàng.',
+    };
+  }
+
   return {
     status: 'NOT_STARTED',
     statusLabel: 'Chưa xác minh danh tính',
@@ -940,7 +964,17 @@ function fallbackIdentityStatus(): KycModuleStatusResponse {
   };
 }
 
-function fallbackCertificateStatus(): KycModuleStatusResponse {
+function fallbackCertificateStatus(loadFailed: boolean): KycModuleStatusResponse {
+  if (loadFailed) {
+    return {
+      status: 'UNAVAILABLE',
+      statusLabel: 'Không tải được',
+      canInteract: false,
+      completedAt: null,
+      detail: 'Không tải được trạng thái chứng chỉ. Vui lòng kiểm tra kết nối và thử lại.',
+    };
+  }
+
   return {
     status: 'LOCKED',
     statusLabel: 'Chưa mở khóa',
