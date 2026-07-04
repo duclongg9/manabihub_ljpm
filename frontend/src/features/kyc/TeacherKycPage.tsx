@@ -30,7 +30,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SchoolIcon from '@mui/icons-material/School';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import React, { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import {
   getTeacherKycStatus,
   restartTeacherVerification,
@@ -43,7 +43,7 @@ import {
   type KycRestartVerificationResponse,
   type KycStatusResponse,
 } from './teacherKycApi';
-import { launchVnptIdentitySdk } from './vnptIdentitySdk';
+import { launchVnptIdentitySdk, resetVnptIdentitySdkRuntime } from './vnptIdentitySdk';
 
 const KYC_COLORS = {
   primaryTint: '#EEF2FF',
@@ -119,6 +119,8 @@ function TeacherKycPageContent() {
   const [certificateSubmitting, setCertificateSubmitting] = useState(false);
   const [restartSubmitting, setRestartSubmitting] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [identityLaunchKey, setIdentityLaunchKey] = useState(0);
+  const identityLaunchTokenRef = useRef(0);
 
   useEffect(() => {
     void refreshStatus({ showLoading: true });
@@ -168,22 +170,37 @@ function TeacherKycPageContent() {
   }
 
   function handleCloseIdentityDialog() {
+    identityLaunchTokenRef.current += 1;
     setIdentityLaunching(false);
     clearVnptSdkContainer();
+    resetVnptIdentitySdkRuntime();
     void refreshStatus();
   }
 
   async function handleStartIdentity() {
+    const launchToken = identityLaunchTokenRef.current + 1;
+    identityLaunchTokenRef.current = launchToken;
+
     setPageError(null);
     setIdentityEnvelope(null);
+    setIdentityLaunchKey((current) => current + 1);
     clearVnptSdkContainer();
+    resetVnptIdentitySdkRuntime();
     setIdentityLaunching(true);
 
-    // Wait for the Dialog to mount its DOM elements before launching SDK
-    setTimeout(async () => {
+    window.setTimeout(async () => {
       try {
+        await waitForVnptContainer();
+        if (identityLaunchTokenRef.current !== launchToken) {
+          return;
+        }
+
         clearVnptSdkContainer();
         await launchVnptIdentitySdk(async (result) => {
+          if (identityLaunchTokenRef.current !== launchToken) {
+            return;
+          }
+
           try {
             const response = await verifyTeacherIdentity(result);
             setIdentityEnvelope(response);
@@ -193,10 +210,14 @@ function TeacherKycPageContent() {
           }
         });
       } catch (error) {
+        if (identityLaunchTokenRef.current !== launchToken) {
+          return;
+        }
+
         setPageError(readErrorMessage(error));
         setIdentityLaunching(false);
       }
-    }, 100);
+    }, 150);
   }
 
   async function handleRestartVerification() {
@@ -545,10 +566,10 @@ function TeacherKycPageContent() {
 
       {/* VNPT SDK dialog */}
       <Dialog 
+        key={identityLaunchKey}
         open={identityLaunching} 
         maxWidth="md" 
         fullWidth 
-        keepMounted
         onClose={(_, reason) => {
           if (reason !== 'backdropClick') {
             handleCloseIdentityDialog();
@@ -561,6 +582,7 @@ function TeacherKycPageContent() {
             p: 0,
             m: 2,
             position: 'relative',
+            overflow: 'visible',
             borderRadius: 2,
           },
         }}
@@ -571,20 +593,23 @@ function TeacherKycPageContent() {
           onClick={handleCloseIdentityDialog}
           sx={{
             position: 'absolute',
-            top: 8,
-            right: 8,
+            top: { xs: 10, sm: -18 },
+            right: { xs: 10, sm: -18 },
             zIndex: 9999,
             color: 'white',
-            bgcolor: 'rgba(0,0,0,0.5)',
-            '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
-            width: 40,
-            height: 40,
+            bgcolor: '#111827',
+            border: '2px solid rgba(255,255,255,0.9)',
+            boxShadow: 4,
+            '&:hover': { bgcolor: '#0F172A' },
+            width: 44,
+            height: 44,
           }}
         >
           <CloseIcon />
         </IconButton>
-        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <DialogContent sx={{ borderRadius: 'inherit', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 0 }}>
           <Box
+            key={`vnpt-sdk-${identityLaunchKey}`}
             id="ekyc_sdk_intergrated"
             sx={{ 
               flexGrow: 1, 
@@ -942,6 +967,21 @@ function toDisplayValue(value: unknown) {
   }
 
   return undefined;
+}
+
+async function waitForVnptContainer() {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const container = document.getElementById('ekyc_sdk_intergrated');
+    if (container?.isConnected) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  }
+
+  throw new Error('Không tìm thấy vùng hiển thị VNPT eKYC. Vui lòng thử lại.');
 }
 
 function fallbackIdentityStatus(loadFailed: boolean): KycModuleStatusResponse {
