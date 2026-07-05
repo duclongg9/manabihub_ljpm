@@ -6,11 +6,12 @@ import {
   CardContent,
   Checkbox,
   Chip,
+  CircularProgress,
+  Collapse,
   Dialog,
   DialogContent,
   FormControlLabel,
   IconButton,
-  LinearProgress,
   Paper,
   Stack,
   Step,
@@ -20,6 +21,7 @@ import {
   Typography,
 } from '@mui/material';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import BadgeIcon from '@mui/icons-material/Badge';
 import CloseIcon from '@mui/icons-material/Close';
 import GppGoodIcon from '@mui/icons-material/GppGood';
 import LockIcon from '@mui/icons-material/Lock';
@@ -42,6 +44,13 @@ import {
   type KycStatusResponse,
 } from './teacherKycApi';
 import { launchVnptIdentitySdk } from './vnptIdentitySdk';
+
+const KYC_COLORS = {
+  primaryTint: '#EEF2FF',
+  primaryBorder: '#C7D2FE',
+  surfaceMuted: '#F8FAFC',
+  sdkShell: '#0F172A',
+};
 
 type CertificateErrors = Partial<Record<'certificate' | 'certificateCode' | 'agreement', string>>;
 type IdentitySummary = {
@@ -76,7 +85,7 @@ class TeacherKycErrorBoundary extends React.Component<{ children: ReactNode }, {
     if (this.state.hasError) {
       return (
         <Alert severity="error" sx={{ mt: 2 }}>
-          Đã xảy ra lỗi giao diện khi tải màn hình này (UI Crash). Vui lòng thử tải lại trang hoặc liên hệ hỗ trợ.
+          Đã xảy ra lỗi giao diện khi tải màn hình này. Vui lòng thử tải lại trang hoặc liên hệ hỗ trợ.
           <br />
           <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
             {this.state.error?.message}
@@ -112,11 +121,12 @@ function TeacherKycPageContent() {
   const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
-    refreshStatus().finally(() => setLoadingStatus(false));
+    void refreshStatus({ showLoading: true });
   }, []);
 
-  const identityStatus = status?.identityVerification ?? fallbackIdentityStatus();
-  const certificateStatus = status?.certificateVerification ?? fallbackCertificateStatus();
+  const statusLoadFailed = !loadingStatus && Boolean(pageError) && !status;
+  const identityStatus = status?.identityVerification ?? fallbackIdentityStatus(statusLoadFailed);
+  const certificateStatus = status?.certificateVerification ?? fallbackCertificateStatus(statusLoadFailed);
   const latestRequest = restartEnvelope?.data.request ?? certificateEnvelope?.data.request ?? identityEnvelope?.data.request ?? status?.latestRequest ?? null;
   const identityVerified = identityStatus.status === 'VERIFIED';
   const identitySummary = useMemo(() => extractIdentitySummary(latestRequest?.verificationPayload), [latestRequest?.verificationPayload]);
@@ -125,30 +135,54 @@ function TeacherKycPageContent() {
   const showRestartVerification = Boolean(status && ['REJECTED', 'CORRECTION_REQUIRED'].includes(status.teacherKycStatus));
   const canRestartVerification = showRestartVerification && !restartSubmitting && !identityLaunching && !certificateSubmitting;
   
+  const hasNetworkError = Boolean(pageError);
   const canStartIdentity =
     !identityLaunching
+    && !hasNetworkError
     && status?.teacherKycStatus !== 'APPROVED'
     && certificateStatus.status !== 'PENDING_REVIEW'
     && (identityStatus.canInteract || ['NOT_STARTED', 'FAILED'].includes(identityStatus.status));
   const canSubmitCertificate = identityVerified && certificateStatus.canInteract && !certificateSubmitting;
+  const shouldShowStatusChips = !statusLoadFailed;
+  const pageStatus = status?.teacherKycStatus ?? 'UNKNOWN';
+  const pageStatusLabel = status?.teacherKycStatusLabel ?? 'Đang tải...';
 
-  async function refreshStatus() {
+  async function refreshStatus(options: { showLoading?: boolean } = {}) {
+    if (options.showLoading) {
+      setLoadingStatus(true);
+    }
+
     try {
+      setPageError(null);
       const response = await getTeacherKycStatus();
       setStatus(response);
     } catch (error) {
       setPageError(readErrorMessage(error));
+    } finally {
+      setLoadingStatus(false);
     }
+  }
+
+  function clearVnptSdkContainer() {
+    document.getElementById('ekyc_sdk_intergrated')?.replaceChildren();
+  }
+
+  function handleCloseIdentityDialog() {
+    setIdentityLaunching(false);
+    clearVnptSdkContainer();
+    void refreshStatus();
   }
 
   async function handleStartIdentity() {
     setPageError(null);
     setIdentityEnvelope(null);
+    clearVnptSdkContainer();
     setIdentityLaunching(true);
 
     // Wait for the Dialog to mount its DOM elements before launching SDK
     setTimeout(async () => {
       try {
+        clearVnptSdkContainer();
         await launchVnptIdentitySdk(async (result) => {
           try {
             const response = await verifyTeacherIdentity(result);
@@ -156,9 +190,6 @@ function TeacherKycPageContent() {
             await refreshStatus();
           } catch (error) {
             setPageError(readErrorMessage(error));
-          } finally {
-            // Keep the modal open so the user can see the VNPT result screen
-            // The user will close it manually via the X button
           }
         });
       } catch (error) {
@@ -232,33 +263,44 @@ function TeacherKycPageContent() {
     return 0;
   }, [identityVerified, certificateStatus.status]);
 
-  const steps = ['Xác thực danh tính', 'Nộp chứng chỉ', 'Hoàn tất'];
+  const steps = ['Xác minh danh tính', 'Cung cấp chứng chỉ', 'Hoàn tất'];
 
   return (
     <Stack spacing={3}>
-      <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: { xs: 2, md: 3 } }}>
+      {/* Page header */}
+      <Paper
+        elevation={0}
+        sx={{
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 3,
+          p: { xs: 2.5, md: 3.5 },
+        }}
+      >
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' }, justifyContent: 'space-between' }}>
           <Box>
-            <Typography sx={{ color: 'success.main', fontSize: 13, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              UC-22 Teacher Verification
+            <Typography component="h2" sx={{ color: 'text.primary', fontSize: { xs: 24, md: 30 }, fontWeight: 700, letterSpacing: '0.005em', mt: 0.5 }}>
+              Xác minh giáo viên
             </Typography>
-            <Typography component="h2" sx={{ fontSize: { xs: 28, md: 34 }, fontWeight: 800, mt: 1 }}>
-              Xác thực giáo viên
-            </Typography>
-            <Typography sx={{ color: 'text.secondary', maxWidth: 860, mt: 1 }}>
-              Luồng KYC được tách thành từng module: VNPT eKYC xử lý danh tính realtime, còn chứng chỉ chuyên môn được đối soát với thông tin chính chủ trên CCCD.
-              Nếu danh tính hoặc chứng chỉ không khớp, giáo viên có thể xác thực lại từ đầu bằng một lượt sạch.
+            <Typography sx={{ color: 'text.secondary', maxWidth: 720, mt: 1, fontSize: 15, lineHeight: 1.65 }}>
+              Để trở thành giáo viên, vui lòng hoàn tất 2 bước: Xác minh danh tính và Cung cấp chứng chỉ chuyên môn.
+              Quá trình này giúp bảo vệ tài khoản và chứng thực chuyên môn của bạn trên hệ thống.
             </Typography>
           </Box>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' } }}>
-            <StatusChip status={status?.teacherKycStatus ?? 'UNKNOWN'} label={status?.teacherKycStatusLabel ?? 'Loading'} />
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' }, flexShrink: 0 }}>
+            {shouldShowStatusChips && <StatusChip status={pageStatus} label={pageStatusLabel} />}
             {showRestartVerification && (
               <Button
-                color="inherit"
                 disabled={!canRestartVerification}
                 onClick={handleRestartVerification}
                 startIcon={<RestartAltIcon />}
                 variant="outlined"
+                sx={{
+                  borderColor: 'primary.main',
+                  color: 'primary.main',
+                  '&:hover': { borderColor: 'primary.dark', bgcolor: KYC_COLORS.primaryTint },
+                }}
               >
                 {restartSubmitting ? 'Đang tạo lượt mới...' : 'Xác thực lại từ đầu'}
               </Button>
@@ -267,11 +309,36 @@ function TeacherKycPageContent() {
         </Stack>
       </Paper>
 
-      {loadingStatus ? <LinearProgress color="success" /> : null}
-      {pageError ? <Alert severity="error">{pageError}</Alert> : null}
+      {/* Loading and error states */}
+      {loadingStatus && !pageError && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+          <CircularProgress color="primary" size={32} />
+          <Typography sx={{ ml: 2, color: 'text.secondary' }}>Đang tải thông tin xác minh...</Typography>
+        </Box>
+      )}
+      {pageError && (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => { void refreshStatus({ showLoading: true }); }}>
+              Thử lại
+            </Button>
+          }
+        >
+          {pageError === 'Network Error' ? 'Lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.' : pageError}
+        </Alert>
+      )}
 
-      <Box sx={{ py: 2 }}>
-        <Stepper activeStep={activeStep} alternativeLabel>
+      {/* Progress stepper */}
+      <Box sx={{ py: 1 }}>
+        <Stepper
+          activeStep={activeStep}
+          alternativeLabel
+          sx={{
+            '& .MuiStepIcon-root.Mui-active': { color: 'primary.main' },
+            '& .MuiStepIcon-root.Mui-completed': { color: 'primary.main' },
+          }}
+        >
           {steps.map((label) => (
             <Step key={label}>
               <StepLabel>{label}</StepLabel>
@@ -279,91 +346,121 @@ function TeacherKycPageContent() {
           ))}
         </Stepper>
       </Box>
-      {identityEnvelope ? (
+
+      {/* Contextual alerts */}
+      {identityEnvelope && (
         <Alert severity={identityEnvelope.data.identityVerification.status === 'VERIFIED' ? 'success' : 'warning'} icon={<VerifiedUserIcon />}>
           {identityEnvelope.data.identityVerification.statusLabel}
         </Alert>
-      ) : null}
-      {certificateEnvelope ? (
+      )}
+      {certificateEnvelope && (
         <Alert severity="success" icon={<AssignmentTurnedInIcon />}>
-          Chứng chỉ đã được ghi nhận và chuyển sang bước kiểm tra/đối soát.
+          Chứng chỉ đã được ghi nhận và chuyển sang bước kiểm tra.
         </Alert>
-      ) : null}
-      {restartEnvelope ? (
+      )}
+      {restartEnvelope && (
         <Alert severity="success" icon={<RestartAltIcon />}>
-          Đã tạo lượt xác thực mới. Dữ liệu test cũ không còn được dùng cho màn hình hiện tại.
+          Đã tạo lượt xác thực mới. Bạn có thể bắt đầu lại từ Bước 1.
         </Alert>
-      ) : null}
+      )}
 
+      {/* Identity step */}
       <Stack spacing={3}>
         <ModuleCard
-          icon={<VerifiedUserIcon color="success" />}
-          index="Module 1"
+          icon={identityVerified ? <VerifiedUserIcon sx={{ color: 'primary.main' }} /> : <BadgeIcon sx={{ color: 'primary.main' }} />}
+          index="Bước 1"
+          hideStatus={!shouldShowStatusChips}
           status={identityStatus}
-          title="Xác thực danh tính"
+          title="Xác minh danh tính"
         >
-          <Alert severity="info" sx={{ mt: 2 }}>
-            Chuẩn bị CCCD gốc, cho phép camera, đặt giấy tờ vào đúng khung và làm theo hướng dẫn video/overlay của VNPT SDK.
-            Nếu SDK báo lỗi, đóng popup và bấm thực hiện lại ngay.
-          </Alert>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, mt: 1, lineHeight: 1.6 }}>
+            Chuẩn bị CCCD gốc, cho phép camera và làm theo hướng dẫn trên màn hình.
+          </Typography>
+          <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 1, fontStyle: 'italic' }}>
+            Lưu ý: Màn hình chụp ảnh bảo mật sẽ hiển thị ở chế độ nền tối. Vui lòng chuẩn bị CCCD và ngồi ở nơi đủ ánh sáng.
+          </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
             <Button
-              color="success"
               disabled={!canStartIdentity}
               onClick={handleStartIdentity}
               startIcon={identityStatus.status === 'FAILED' ? <RefreshIcon /> : <GppGoodIcon />}
               variant="contained"
+              sx={{
+                bgcolor: 'primary.main',
+                '&:hover': { bgcolor: 'primary.dark' },
+                '&.Mui-disabled': { bgcolor: 'action.disabledBackground', color: 'action.disabled' },
+              }}
             >
-              {identityLaunching ? 'Đang mở VNPT eKYC...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác thực danh tính'}
+              {identityLaunching ? 'Đang mở xác thực...' : identityStatus.status === 'FAILED' ? 'Thực hiện lại' : 'Bắt đầu xác minh danh tính'}
             </Button>
           </Stack>
-          {identityStatus.status === 'FAILED' ? <IdentityFailureDiagnosticsCard diagnostics={identityDiagnostics} /> : null}
-          {identityVerified ? <IdentityOcrSummaryCard summary={identitySummary} /> : null}
-          {latestRequest?.providerTransactionId ? (
-            <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 1.5 }}>
-              Transaction: {latestRequest.providerTransactionId}
-            </Typography>
-          ) : null}
+          {identityStatus.status === 'FAILED' && !statusLoadFailed && <IdentityFailureDiagnosticsCard diagnostics={identityDiagnostics} />}
+          {identityVerified && <IdentityOcrSummaryCard summary={identitySummary} />}
         </ModuleCard>
 
+        {/* Certificate step */}
         {!identityVerified ? (
-          <ModuleCard
-            icon={<LockIcon color="disabled" />}
-            index="Module 2"
-            status={certificateStatus}
-            title="JLPT / J-Test / NAT-TEST Certificate"
+          /* Collapsed/locked Module 2 */
+          <Card
+            variant="outlined"
+            sx={{
+              opacity: 0.6,
+              borderStyle: 'dashed',
+              borderColor: 'grey.300',
+            }}
           >
-            <Alert severity="warning">Module này chỉ mở sau khi Module 1 xác thực danh tính thành công.</Alert>
-          </ModuleCard>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 }, '&:last-child': { pb: 2 } }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <LockIcon color="disabled" />
+                <Box>
+                  <Typography sx={{ color: 'text.disabled', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Bước 2
+                  </Typography>
+                  <Typography component="h3" sx={{ fontSize: 18, fontWeight: 600, color: 'text.disabled' }}>
+                    Cung cấp chứng chỉ chuyên môn (Khóa)
+                  </Typography>
+                </Box>
+              </Stack>
+              <Typography sx={{ color: 'text.disabled', fontSize: 13, mt: 1 }}>
+                Hoàn tất xác minh danh tính trước khi nộp chứng chỉ.
+              </Typography>
+            </CardContent>
+          </Card>
         ) : (
           <Box component="form" onSubmit={handleCertificateSubmit}>
             <Stack spacing={3}>
               <ModuleCard
-                icon={<SchoolIcon color="success" />}
-                index="Module 2"
+                icon={<SchoolIcon sx={{ color: 'primary.main' }} />}
+                index="Bước 2"
+                hideStatus={!shouldShowStatusChips}
                 status={certificateStatus}
-                title="JLPT / J-Test / NAT-TEST Certificate"
+                title="Cung cấp chứng chỉ chuyên môn"
               >
                 <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-                  Giáo viên nộp chứng chỉ chuyên môn và mã chứng chỉ bắt buộc ở bước này.
-                  Hệ thống sẽ dùng mã này để đối soát registry với thông tin chính chủ đã bóc tách từ CCCD.
-                  Nếu chứng chỉ không khớp chính chủ, giáo viên cần bấm "Xác thực lại từ đầu".
+                  Vui lòng tải lên chứng chỉ (JLPT / J-Test / NAT-TEST) và nhập mã chứng chỉ.
+                  Hệ thống sẽ tự động kiểm tra tính hợp lệ dựa trên thông tin đã xác minh ở Bước 1.
                 </Typography>
 
-                <Paper elevation={0} sx={{ bgcolor: 'grey.50', border: '1px solid', borderColor: errors.certificate ? 'error.light' : 'divider', borderRadius: 2, mt: 2, p: 2 }}>
+                <Paper elevation={0} sx={{ bgcolor: KYC_COLORS.surfaceMuted, border: '1px solid', borderColor: errors.certificate ? 'error.light' : KYC_COLORS.primaryBorder, borderRadius: 2, mt: 2, p: 2 }}>
                   <Stack spacing={1.25}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 800 }}>JLPT / J-Test / NAT-TEST Certificate</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Chứng chỉ chuyên môn</Typography>
                     <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Ảnh hoặc PDF, tối đa 5MB.</Typography>
-                    <Button component="label" disabled={!canSubmitCertificate} startIcon={<UploadFileIcon />} variant="outlined">
+                    <Button
+                      component="label"
+                      disabled={!canSubmitCertificate}
+                      startIcon={<UploadFileIcon />}
+                      variant="outlined"
+                      sx={{ borderColor: 'primary.main', color: 'primary.main', '&:hover': { borderColor: 'primary.dark', bgcolor: KYC_COLORS.primaryTint } }}
+                    >
                       Tải chứng chỉ
                       <input hidden accept="image/jpeg,image/png,application/pdf" type="file" onChange={handleCertificateChange} />
                     </Button>
-                    {certificateFile ? (
-                      <Typography sx={{ color: 'success.main', fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>
+                    {certificateFile && (
+                      <Typography sx={{ color: 'primary.main', fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>
                         {certificateFile.name}
                       </Typography>
-                    ) : null}
-                    {errors.certificate ? <FieldError>{errors.certificate}</FieldError> : null}
+                    )}
+                    {errors.certificate && <FieldError>{errors.certificate}</FieldError>}
                   </Stack>
                 </Paper>
 
@@ -372,10 +469,15 @@ function TeacherKycPageContent() {
                   disabled={!canSubmitCertificate}
                   error={Boolean(errors.certificateCode)}
                   helperText={errors.certificateCode}
-                  label="Mã chứng chỉ (Hệ thống tự bóc tách hoặc nhập tay nếu ảnh mờ)"
+                  label="Mã chứng chỉ"
+                  placeholder="Nhập mã số ghi trên chứng chỉ"
                   margin="normal"
                   required
                   value={certificateCode}
+                  sx={{
+                    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
+                    '& .MuiInputLabel-root.Mui-focused': { color: 'primary.main' },
+                  }}
                   onChange={(event) => {
                     setCertificateCode(event.target.value);
                     setErrors((current) => ({ ...current, certificateCode: undefined }));
@@ -387,18 +489,18 @@ function TeacherKycPageContent() {
                 <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                   <Stack spacing={1.5}>
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                      <AssignmentTurnedInIcon color="success" />
+                      <AssignmentTurnedInIcon sx={{ color: 'primary.main' }} />
                       <Box>
-                        <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                          Role Agreement
+                        <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                          Cam kết bản quyền
                         </Typography>
-                        <Typography component="h3" sx={{ fontSize: 20, fontWeight: 800 }}>
-                          Digital Copyright Liability Agreement
+                        <Typography component="h3" sx={{ fontSize: 20, fontWeight: 700, letterSpacing: '0.004em' }}>
+                          Thỏa thuận trách nhiệm bản quyền nội dung số
                         </Typography>
                       </Box>
                     </Stack>
                     <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-                      Cam kết này áp dụng cho toàn bộ vai trò Teacher và các sản phẩm giáo viên tạo trên nền tảng, không phải file upload riêng của chứng chỉ.
+                      Cam kết này áp dụng cho toàn bộ vai trò Giáo viên và các sản phẩm bạn tạo trên nền tảng.
                     </Typography>
                     <FormControlLabel
                       control={
@@ -409,22 +511,28 @@ function TeacherKycPageContent() {
                             setAgreementAccepted(event.target.checked);
                             setErrors((current) => ({ ...current, agreement: undefined }));
                           }}
+                          sx={{ '&.Mui-checked': { color: 'primary.main' } }}
                         />
                       }
-                      label="Tôi chấp nhận Digital Copyright Liability Agreement và điều khoản dịch vụ của nền tảng."
+                      label="Tôi chấp nhận Thỏa thuận trách nhiệm bản quyền nội dung số và điều khoản dịch vụ của nền tảng."
                       sx={{ alignItems: 'flex-start' }}
                     />
-                    {errors.agreement ? <FieldError>{errors.agreement}</FieldError> : null}
+                    {errors.agreement && <FieldError>{errors.agreement}</FieldError>}
                   </Stack>
                 </CardContent>
               </Card>
 
               <Button
-                color="success"
                 disabled={!canSubmitCertificate}
                 fullWidth
                 size="large"
-                sx={{ py: 1.25, fontWeight: 800 }}
+                sx={{
+                  py: 1.5,
+                  fontWeight: 600,
+                  bgcolor: 'primary.main',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                  '&.Mui-disabled': { bgcolor: 'action.disabledBackground', color: 'action.disabled' },
+                }}
                 type="submit"
                 variant="contained"
               >
@@ -435,35 +543,63 @@ function TeacherKycPageContent() {
         )}
       </Stack>
 
+      {/* VNPT SDK dialog */}
       <Dialog 
         open={identityLaunching} 
         maxWidth="md" 
         fullWidth 
         keepMounted
-        sx={{ '& .MuiDialog-paper': { bgcolor: '#0F2B3B', height: '90vh', p: 0, m: 2, position: 'relative' } }}
+        onClose={(_, reason) => {
+          if (reason !== 'backdropClick') {
+            handleCloseIdentityDialog();
+          }
+        }}
+        sx={{
+          '& .MuiDialog-paper': {
+            bgcolor: KYC_COLORS.sdkShell,
+            height: '90vh',
+            p: 0,
+            m: 2,
+            position: 'relative',
+            borderRadius: 2,
+          },
+        }}
       >
+        {/* Keep the close button above SDK controls. */}
         <IconButton
-          onClick={() => {
-            setIdentityLaunching(false);
-            window.location.reload();
+          aria-label="Đóng xác minh VNPT"
+          onClick={handleCloseIdentityDialog}
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            zIndex: 9999,
+            color: 'white',
+            bgcolor: 'rgba(0,0,0,0.5)',
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+            width: 40,
+            height: 40,
           }}
-          sx={{ position: 'absolute', top: 8, right: 8, zIndex: 10000, color: 'white' }}
         >
           <CloseIcon />
         </IconButton>
-        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box
             id="ekyc_sdk_intergrated"
             sx={{ 
               flexGrow: 1, 
               width: '100%', 
               position: 'relative',
+              /* Push SDK language dropdown away from close button */
+              '& select, & [class*="language"], & [class*="lang"]': {
+                marginRight: '48px !important',
+              },
               '& video': {
                 objectFit: 'cover',
                 width: '100% !important',
                 height: '100% !important',
                 maxWidth: 'none !important',
-              }
+              },
             }}
           />
         </DialogContent>
@@ -472,41 +608,45 @@ function TeacherKycPageContent() {
   );
 }
 
+/* Reusable components */
+
 function ModuleCard({
   children,
+  hideStatus = false,
   icon,
   index,
   status,
   title,
 }: {
   children: ReactNode;
+  hideStatus?: boolean;
   icon: ReactNode;
   index: string;
   status: KycModuleStatusResponse;
   title: string;
 }) {
   return (
-    <Card variant="outlined">
+    <Card variant="outlined" sx={{ borderColor: KYC_COLORS.primaryBorder, borderRadius: 2 }}>
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', mb: 2 }}>
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
             {icon}
             <Box>
-              <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <Typography sx={{ color: 'primary.main', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 {index}
               </Typography>
-              <Typography component="h3" sx={{ fontSize: 20, fontWeight: 800 }}>
+              <Typography component="h3" sx={{ color: 'text.primary', fontSize: 20, fontWeight: 700, letterSpacing: '0.004em' }}>
                 {title}
               </Typography>
             </Box>
           </Stack>
-          <StatusChip status={status.status} label={status.statusLabel} />
+          {!hideStatus && <StatusChip status={status.status} label={status.statusLabel} />}
         </Stack>
-        {status.detail ? (
-          <Typography sx={{ color: 'text.secondary', fontSize: 14, mb: 2 }}>
+        {status.detail && (
+          <Typography sx={{ color: 'text.secondary', fontSize: 14, lineHeight: 1.6, mb: 2 }}>
             {status.detail}
           </Typography>
-        ) : null}
+        )}
         {children}
       </CardContent>
     </Card>
@@ -514,18 +654,18 @@ function ModuleCard({
 }
 
 function FieldError({ children }: { children: string }) {
-  return <Typography sx={{ color: 'error.main', fontSize: 13, fontWeight: 700 }}>{children}</Typography>;
+  return <Typography sx={{ color: 'error.main', fontSize: 13, fontWeight: 600 }}>{children}</Typography>;
 }
 
 function StatusChip({ status, label }: { status: string; label: string }) {
-  return <Chip color={statusChipColor(status)} label={label} sx={{ fontWeight: 800 }} />;
+  return <Chip color={statusChipColor(status)} label={label} sx={{ borderRadius: 1.5, fontWeight: 500 }} />;
 }
 
 function IdentityOcrSummaryCard({ summary }: { summary: IdentitySummary }) {
   return (
-    <Paper elevation={0} sx={{ bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider', borderRadius: 2, mt: 2, p: 2 }}>
+    <Paper elevation={0} sx={{ bgcolor: KYC_COLORS.surfaceMuted, border: '1px solid', borderColor: KYC_COLORS.primaryBorder, borderRadius: 2, mt: 2, p: 2 }}>
       <Stack spacing={1.5}>
-        <Typography sx={{ fontSize: 14, fontWeight: 800 }}>Thông tin CCCD VNPT OCR</Typography>
+        <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Thông tin đã xác minh từ CCCD</Typography>
         {summary.hasData ? (
           <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' } }}>
             <SummaryField label="Họ và tên" value={summary.fullName} />
@@ -536,8 +676,8 @@ function IdentityOcrSummaryCard({ summary }: { summary: IdentitySummary }) {
           </Box>
         ) : (
           <Alert severity="warning">
-            VNPT eKYC đã trả trạng thái thành công nhưng payload hiện tại chưa có dữ liệu OCR đọc được.
-            Giáo viên có thể bấm "Xác thực lại từ đầu" nếu thông tin nhận diện không chắc chắn.
+            Hệ thống chưa nhận được đủ dữ liệu từ giấy tờ tùy thân.
+            Bạn có thể bấm "Xác thực lại từ đầu" để thử lại.
           </Alert>
         )}
       </Stack>
@@ -549,7 +689,7 @@ function IdentityFailureDiagnosticsCard({ diagnostics }: { diagnostics: Identity
   if (!diagnostics.hasData) {
     return (
       <Alert severity="warning" sx={{ mt: 2 }}>
-        VNPT eKYC chưa trả dữ liệu OCR hợp lệ. Hãy đóng popup và thực hiện lại; nếu dashboard VNPT vẫn không ghi nhận request, kiểm tra Network tab để chắc chắn browser đang gọi đúng domain VNPT.
+        Hệ thống chưa nhận được kết quả xác minh. Vui lòng đóng cửa sổ và thực hiện lại.
       </Alert>
     );
   }
@@ -557,11 +697,11 @@ function IdentityFailureDiagnosticsCard({ diagnostics }: { diagnostics: Identity
   return (
     <Paper elevation={0} sx={{ bgcolor: 'rgba(211, 47, 47, 0.04)', border: '1px solid', borderColor: 'error.light', borderRadius: 2, mt: 2, p: 2 }}>
       <Stack spacing={1.25}>
-        <Typography sx={{ color: 'error.dark', fontSize: 14, fontWeight: 800 }}>
-          Lý do VNPT chưa trả OCR hợp lệ
+        <Typography sx={{ color: 'error.dark', fontSize: 14, fontWeight: 600 }}>
+          Nguyên nhân chưa xác minh thành công
         </Typography>
-        {diagnostics.providerStatus ? <SummaryField label="Provider status" value={diagnostics.providerStatus} /> : null}
-        {diagnostics.failureReasons.length > 0 ? (
+        {diagnostics.providerStatus && <SummaryField label="Trạng thái" value={diagnostics.providerStatus} />}
+        {diagnostics.failureReasons.length > 0 && (
           <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
             {diagnostics.failureReasons.map((reason) => (
               <Typography component="li" key={reason} sx={{ color: 'error.dark', fontSize: 14 }}>
@@ -569,17 +709,19 @@ function IdentityFailureDiagnosticsCard({ diagnostics }: { diagnostics: Identity
               </Typography>
             ))}
           </Box>
-        ) : null}
-        {diagnostics.validationHints.length > 0 ? (
-          <Box>
-            <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Raw validation từ SDK
-            </Typography>
-            <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-              {diagnostics.validationHints.join(' | ')}
-            </Typography>
-          </Box>
-        ) : null}
+        )}
+        {diagnostics.validationHints.length > 0 && (
+          <Collapse in>
+            <Box>
+              <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Chi tiết kỹ thuật
+              </Typography>
+              <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
+                {diagnostics.validationHints.join(' | ')}
+              </Typography>
+            </Box>
+          </Collapse>
+        )}
       </Stack>
     </Paper>
   );
@@ -588,10 +730,10 @@ function IdentityFailureDiagnosticsCard({ diagnostics }: { diagnostics: Identity
 function SummaryField({ label, value, wide = false }: { label: string; value?: string; wide?: boolean }) {
   return (
     <Box sx={{ minWidth: 0, gridColumn: { sm: wide ? '1 / -1' : 'auto' } }}>
-      <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+      <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
         {label}
       </Typography>
-      <Typography sx={{ fontSize: 15, fontWeight: 800, overflowWrap: 'anywhere' }}>{value || 'N/A'}</Typography>
+      <Typography sx={{ color: 'text.primary', fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{value || 'N/A'}</Typography>
     </Box>
   );
 }
@@ -616,19 +758,19 @@ function validateCertificateForm(certificateFile: File | null, certificateCode: 
   const nextErrors: CertificateErrors = {};
 
   if (!certificateFile) {
-    nextErrors.certificate = 'Bắt buộc tải JLPT / J-Test / NAT-TEST Certificate.';
+    nextErrors.certificate = 'Vui lòng tải lên chứng chỉ chuyên môn (JLPT / J-Test / NAT-TEST).';
   } else if (certificateFile.size > MAX_FILE_SIZE) {
     nextErrors.certificate = 'Chứng chỉ không được vượt quá 5MB.';
   } else if (certificateFile.type && !CERTIFICATE_TYPES.has(certificateFile.type)) {
-    nextErrors.certificate = 'Chỉ chấp nhận JPG, PNG hoặc PDF.';
+    nextErrors.certificate = 'Chỉ chấp nhận định dạng JPG, PNG hoặc PDF.';
   }
 
   if (!certificateCode.trim()) {
-    nextErrors.certificateCode = 'Bắt buộc nhập mã chứng chỉ để đối soát registry.';
+    nextErrors.certificateCode = 'Vui lòng nhập mã chứng chỉ.';
   }
 
   if (!agreementAccepted) {
-    nextErrors.agreement = 'Bạn cần chấp nhận Digital Copyright Liability Agreement.';
+    nextErrors.agreement = 'Vui lòng đọc và chấp nhận Thỏa thuận bản quyền nội dung số.';
   }
 
   return nextErrors;
@@ -746,19 +888,19 @@ function localizeIdentityFailureReason(reason: string) {
   const normalized = normalizePayloadKey(reason);
 
   if (normalized.includes('invaliddocument') || normalized.includes('mismatch') || normalized.includes('nullresult')) {
-    return 'VNPT trả về giấy tờ không hợp lệ hoặc mặt trước/sau không cùng loại.';
+    return 'Giấy tờ không hợp lệ hoặc mặt trước/sau không cùng loại.';
   }
 
   if (normalized.includes('ocr') && normalized.includes('cccd')) {
-    return 'VNPT chưa bóc được đủ số CCCD và họ tên từ ảnh.';
+    return 'Chưa đọc được đầy đủ số CCCD và họ tên từ ảnh.';
   }
 
   if (normalized.includes('liveness') || normalized.includes('facecompare')) {
-    return 'VNPT chưa xác nhận được liveness hoặc so khớp khuôn mặt.';
+    return 'Chưa xác nhận được khuôn mặt khớp với ảnh trên giấy tờ.';
   }
 
   if (normalized.includes('didnotreturn') && normalized.includes('payload')) {
-    return 'SDK chưa trả payload kết quả về ManabiHub.';
+    return 'Hệ thống chưa nhận được kết quả xác minh.';
   }
 
   return reason;
@@ -802,23 +944,43 @@ function toDisplayValue(value: unknown) {
   return undefined;
 }
 
-function fallbackIdentityStatus(): KycModuleStatusResponse {
+function fallbackIdentityStatus(loadFailed: boolean): KycModuleStatusResponse {
+  if (loadFailed) {
+    return {
+      status: 'UNAVAILABLE',
+      statusLabel: 'Không tải được',
+      canInteract: false,
+      completedAt: null,
+      detail: 'Không tải được trạng thái xác minh danh tính. Vui lòng thử lại sau khi backend sẵn sàng.',
+    };
+  }
+
   return {
     status: 'NOT_STARTED',
-    statusLabel: 'Chưa xác thực danh tính',
+    statusLabel: 'Chưa xác minh danh tính',
     canInteract: false,
     completedAt: null,
-    detail: 'Đang tải trạng thái xác thực danh tính.',
+    detail: 'Đang tải thông tin...',
   };
 }
 
-function fallbackCertificateStatus(): KycModuleStatusResponse {
+function fallbackCertificateStatus(loadFailed: boolean): KycModuleStatusResponse {
+  if (loadFailed) {
+    return {
+      status: 'UNAVAILABLE',
+      statusLabel: 'Không tải được',
+      canInteract: false,
+      completedAt: null,
+      detail: 'Không tải được trạng thái chứng chỉ. Vui lòng kiểm tra kết nối và thử lại.',
+    };
+  }
+
   return {
     status: 'LOCKED',
     statusLabel: 'Chưa mở khóa',
     canInteract: false,
     completedAt: null,
-    detail: 'Hoàn tất xác thực danh tính trước khi nộp chứng chỉ.',
+    detail: 'Hoàn tất xác minh danh tính trước khi nộp chứng chỉ.',
   };
 }
 
@@ -828,8 +990,8 @@ function readErrorMessage(error: unknown) {
     const messageCode = response?.data?.messageCode;
     const message = response?.data?.message;
 
-    return [messageCode, message].filter(Boolean).join(': ') || 'Request failed.';
+    return [messageCode, message].filter(Boolean).join(': ') || 'Đã xảy ra lỗi. Vui lòng thử lại.';
   }
 
-  return error instanceof Error ? error.message : 'Request failed.';
+  return error instanceof Error ? error.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
 }

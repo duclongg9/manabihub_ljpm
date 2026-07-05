@@ -7,6 +7,7 @@ import { TeacherKycPage } from '../features/kyc/TeacherKycPage';
 import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
 import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
 
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -38,11 +39,11 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <TeacherKycPage />,
+        element: <TeacherKycRoute />,
       },
       {
         path: 'kyc',
-        element: <TeacherKycPage />,
+        element: <TeacherKycRoute />,
       },
     ],
   },
