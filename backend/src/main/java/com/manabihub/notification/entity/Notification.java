@@ -1,8 +1,8 @@
 package com.manabihub.notification.entity;
 
-import com.manabihub.identity.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -18,21 +18,29 @@ public class Notification {
     @Id
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "recipient_user_id")
+    private UUID recipientUserId;
+
+    @Column(name = "recipient_admin_id")
+    private UUID recipientAdminId;
 
     @Column(nullable = false)
     private String title;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
-    private String content;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String message;
+
+    @Column(name = "notification_type")
+    private String notificationType;
 
     @Column(name = "is_read", nullable = false)
     private Boolean isRead;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "read_at")
+    private LocalDateTime readAt;
 
     @PrePersist
     protected void onCreate() {

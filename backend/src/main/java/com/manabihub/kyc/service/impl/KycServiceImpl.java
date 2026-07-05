@@ -11,6 +11,13 @@ import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.service.KycService;
 
+import com.manabihub.audit.entity.AuditLog;
+import com.manabihub.audit.repository.AuditLogRepository;
+import com.manabihub.notification.entity.Notification;
+import com.manabihub.notification.repository.NotificationRepository;
+// removed UserRepository
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -30,16 +38,12 @@ public class KycServiceImpl implements KycService {
     private final InternalAdminAccountRepository adminAccountRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final KycDocumentRepository kycDocumentRepository;
-
-    // We leave out AuditLogRepository and NotificationRepository if they don't map cleanly yet, 
-    // but assuming they do based on the imports from before, I'll remove them temporarily 
-    // to avoid compilation issues on AuditLog/Notification domain objects that might differ.
-    // Wait, let's keep them if they compile.
-    // Let's just use the minimum required for UC-28 logic.
+    private final AuditLogRepository auditLogRepository;
+    private final NotificationRepository notificationRepository;
+    private final ObjectMapper objectMapper;
 
     private void checkCourseManagerAccess(UUID adminId) {
-        List<InternalAdminAccount> authorizedAdmins = adminAccountRepository.findActiveAdminsByRoleCodes(List.of("COURSE_MANAGER", "SYSTEM_ADMIN"));
-        boolean hasAccess = authorizedAdmins.stream().anyMatch(a -> a.getId().equals(adminId));
+        boolean hasAccess = adminAccountRepository.existsByAdminIdAndRoleCodes(adminId, List.of("COURSE_MANAGER", "SYSTEM_ADMIN"));
         if (!hasAccess) {
             throw new BusinessException(
                     MessageCodes.ADMIN_PERMISSION_DENIED,
@@ -127,6 +131,44 @@ public class KycServiceImpl implements KycService {
         }
 
         KycRequest savedRequest = kycRequestRepository.save(kycRequest);
+
+        // Create Audit Log
+        try {
+            AuditLog log = AuditLog.builder()
+                    .actorType("INTERNAL_ADMIN")
+                    .actorAdminId(adminId)
+                    .actorRoleCode("COURSE_MANAGER")
+                    .action("KYC_REVIEW")
+                    .targetType("KYC_REQUEST")
+                    .targetId(kycRequest.getId())
+                    .beforeValue(Map.of("status", KycRequestStatus.PENDING.name()))
+                    .afterValue(Map.of("status", targetStatus.name()))
+                    .metadata(Map.of("decisionNote", request.getDecisionNote() != null ? request.getDecisionNote() : ""))
+                    .build();
+            auditLogRepository.save(log);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // Create Notification
+        String title = "Kết quả kiểm duyệt hồ sơ KYC";
+        String message = "";
+        if (targetStatus == KycRequestStatus.APPROVED) {
+            message = "Chúc mừng! Hồ sơ KYC của bạn đã được phê duyệt. Bạn đã có thể xuất bản khóa học.";
+        } else if (targetStatus == KycRequestStatus.REJECTED) {
+            message = "Rất tiếc, hồ sơ KYC của bạn đã bị từ chối. Lý do: " + request.getDecisionNote();
+        } else if (targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
+            message = "Hồ sơ KYC của bạn cần được chỉnh sửa. Lý do: " + request.getDecisionNote();
+        }
+
+        Notification notification = Notification.builder()
+                .recipientUserId(kycRequest.getTeacherProfile().getUser().getId())
+                .title(title)
+                .message(message)
+                .notificationType("KYC_RESULT")
+                .isRead(false)
+                .build();
+        notificationRepository.save(notification);
 
         return mapToResponse(savedRequest);
     }

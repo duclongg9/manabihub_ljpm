@@ -8,6 +8,8 @@ import com.manabihub.kyc.service.KycService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,21 +18,15 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/admin/kyc-requests")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class AdminKycController {
 
     private final KycService kycService;
 
-    // Seeded Course Manager UUID used as default fallback for local dev/testing
-    private static final String DEFAULT_MANAGER_ID = "c0000000-0000-0000-0000-000000000002";
-
     @GetMapping
     public ResponseEntity<ApiResponse<List<KycRequestResponse>>> getPendingKycQueue(
-            @RequestHeader(value = "X-Admin-Id", required = false) String adminIdHeader
+            @RequestHeader(value = "X-Demo-Admin-Id", required = false) UUID adminId
     ) {
-        UUID adminId = (adminIdHeader == null || adminIdHeader.isEmpty())
-                ? UUID.fromString(DEFAULT_MANAGER_ID)
-                : UUID.fromString(adminIdHeader);
+        if (adminId == null) adminId = UUID.fromString("c0000000-0000-0000-0000-000000000002");
 
         List<KycRequestResponse> queue = kycService.getPendingKycQueue(adminId);
         return ResponseEntity.ok(ApiResponse.success(
@@ -43,11 +39,9 @@ public class AdminKycController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<KycRequestResponse>> getKycDetail(
             @PathVariable UUID id,
-            @RequestHeader(value = "X-Admin-Id", required = false) String adminIdHeader
+            @RequestHeader(value = "X-Demo-Admin-Id", required = false) UUID adminId
     ) {
-        UUID adminId = (adminIdHeader == null || adminIdHeader.isEmpty())
-                ? UUID.fromString(DEFAULT_MANAGER_ID)
-                : UUID.fromString(adminIdHeader);
+        if (adminId == null) adminId = UUID.fromString("c0000000-0000-0000-0000-000000000002");
 
         KycRequestResponse detail = kycService.getKycDetail(id, adminId);
         return ResponseEntity.ok(ApiResponse.success(
@@ -61,11 +55,9 @@ public class AdminKycController {
     public ResponseEntity<ApiResponse<KycRequestResponse>> reviewKyc(
             @PathVariable UUID id,
             @Valid @RequestBody KycReviewRequest reviewRequest,
-            @RequestHeader(value = "X-Admin-Id", required = false) String adminIdHeader
+            @RequestHeader(value = "X-Demo-Admin-Id", required = false) UUID adminId
     ) {
-        UUID adminId = (adminIdHeader == null || adminIdHeader.isEmpty())
-                ? UUID.fromString(DEFAULT_MANAGER_ID)
-                : UUID.fromString(adminIdHeader);
+        if (adminId == null) adminId = UUID.fromString("c0000000-0000-0000-0000-000000000002");
 
         KycRequestResponse updated = kycService.reviewKyc(id, reviewRequest, adminId);
         return ResponseEntity.ok(ApiResponse.success(

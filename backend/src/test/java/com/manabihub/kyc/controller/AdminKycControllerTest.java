@@ -25,9 +25,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 @WebMvcTest(AdminKycController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@AutoConfigureMockMvc
 class AdminKycControllerTest {
 
     @Autowired
@@ -55,7 +56,8 @@ class AdminKycControllerTest {
     void testGetPendingKycQueue() throws Exception {
         when(kycService.getPendingKycQueue(any())).thenReturn(List.of(mockResponse));
 
-        mockMvc.perform(get("/api/v1/admin/kyc-requests"))
+        mockMvc.perform(get("/api/v1/admin/kyc-requests")
+                        .with(jwt().jwt(j -> j.subject("c0000000-0000-0000-0000-000000000002"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
                 .andExpect(jsonPath("$.messageCode", is("COMMON_SUCCESS")))
@@ -67,7 +69,8 @@ class AdminKycControllerTest {
     void testGetKycDetail() throws Exception {
         when(kycService.getKycDetail(eq(seededKycId), any())).thenReturn(mockResponse);
 
-        mockMvc.perform(get("/api/v1/admin/kyc-requests/" + seededKycId))
+        mockMvc.perform(get("/api/v1/admin/kyc-requests/" + seededKycId)
+                        .with(jwt().jwt(j -> j.subject("c0000000-0000-0000-0000-000000000002"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
                 .andExpect(jsonPath("$.data.displayName", is("Eleanor Pena")))
@@ -88,6 +91,7 @@ class AdminKycControllerTest {
         when(kycService.reviewKyc(eq(seededKycId), any(KycReviewRequest.class), any())).thenReturn(approvedResponse);
 
         mockMvc.perform(post("/api/v1/admin/kyc-requests/" + seededKycId + "/review")
+                        .with(jwt().jwt(j -> j.subject("c0000000-0000-0000-0000-000000000002")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reviewRequest)))
                 .andExpect(status().isOk())
@@ -111,6 +115,7 @@ class AdminKycControllerTest {
                 ));
 
         mockMvc.perform(post("/api/v1/admin/kyc-requests/" + seededKycId + "/review")
+                        .with(jwt().jwt(j -> j.subject("c0000000-0000-0000-0000-000000000002")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reviewRequest)))
                 .andExpect(status().isBadRequest());

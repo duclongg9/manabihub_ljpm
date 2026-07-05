@@ -5,6 +5,11 @@ import com.manabihub.kyc.domain.*;
 import com.manabihub.kyc.dto.request.KycReviewRequest;
 import com.manabihub.kyc.dto.response.KycRequestResponse;
 import com.manabihub.kyc.repository.*;
+import com.manabihub.audit.repository.AuditLogRepository;
+import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.identity.repository.UserRepository;
+import com.manabihub.identity.entity.User;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +42,18 @@ class KycServiceImplTest {
 
     @Mock
     private KycDocumentRepository kycDocumentRepository;
+
+    @Mock
+    private AuditLogRepository auditLogRepository;
+
+    @Mock
+    private NotificationRepository notificationRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private KycServiceImpl kycService;
@@ -76,7 +93,7 @@ class KycServiceImplTest {
     @Test
     void testReviewKyc_WhenNotAuthorized_ShouldThrowException() {
         UUID randomAdminId = UUID.randomUUID();
-        when(adminAccountRepository.findActiveAdminsByRoleCodes(anyList())).thenReturn(List.of(courseManager));
+        when(adminAccountRepository.existsByAdminIdAndRoleCodes(any(UUID.class), anyList())).thenReturn(false);
 
         KycReviewRequest request = new KycReviewRequest(KycRequestStatus.APPROVED, "OK");
 
@@ -91,7 +108,7 @@ class KycServiceImplTest {
 
     @Test
     void testReviewKyc_WhenRejectWithoutNote_ShouldThrowException() {
-        when(adminAccountRepository.findActiveAdminsByRoleCodes(anyList())).thenReturn(List.of(courseManager));
+        when(adminAccountRepository.existsByAdminIdAndRoleCodes(eq(courseManager.getId()), anyList())).thenReturn(true);
         when(kycRequestRepository.findById(kycId)).thenReturn(Optional.of(pendingKycRequest));
         when(adminAccountRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
 
@@ -107,12 +124,14 @@ class KycServiceImplTest {
     }
 
     @Test
-    void testReviewKyc_WhenApprove_ShouldSaveAllEntitiesAndUpgradeStatus() {
-        when(adminAccountRepository.findActiveAdminsByRoleCodes(anyList())).thenReturn(List.of(courseManager));
+    void testReviewKyc_WhenApprove_ShouldSaveAllEntitiesAndUpgradeStatus() throws Exception {
+        when(adminAccountRepository.existsByAdminIdAndRoleCodes(eq(courseManager.getId()), anyList())).thenReturn(true);
         when(adminAccountRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
         when(kycRequestRepository.findById(kycId)).thenReturn(Optional.of(pendingKycRequest));
         when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(i -> i.getArguments()[0]);
         when(kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(any())).thenReturn(List.of());
+        
+        // removed userRepository mocks
 
         KycReviewRequest request = new KycReviewRequest(KycRequestStatus.APPROVED, "Looks good");
 
@@ -128,7 +147,7 @@ class KycServiceImplTest {
 
     @Test
     void testReviewKyc_WhenStatusNotPending_ShouldThrowConflict() {
-        when(adminAccountRepository.findActiveAdminsByRoleCodes(anyList())).thenReturn(List.of(courseManager));
+        when(adminAccountRepository.existsByAdminIdAndRoleCodes(eq(courseManager.getId()), anyList())).thenReturn(true);
         
         KycRequest approvedRequest = new KycRequest();
         approvedRequest.setId(kycId);

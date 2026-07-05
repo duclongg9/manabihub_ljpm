@@ -35,7 +35,7 @@ public class SecurityConfig {
                     "/api/v1/demo/**",  // TODO: Remove before production release
                     "/api/v1/mock/**",  // TODO: Remove before production release
                     "/api/v1/teacher/kyc/**",  // TODO: Protect with authenticated TEACHER role when JWT is implemented
-                    "/api/v1/admin/kyc-requests/**"  // Permitted for development
+                    "/api/v1/admin/kyc-requests/**" // TODO: Protect with authenticated ADMIN role when JWT is implemented
                 ).permitAll()
                 .anyRequest().authenticated()
             )
