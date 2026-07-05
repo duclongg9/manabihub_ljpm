@@ -1,8 +1,8 @@
 package com.manabihub.kyc.dto.response;
 
-import com.manabihub.kyc.enums.KycStatus;
+import com.manabihub.kyc.domain.KycRequestStatus;
 import lombok.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -15,7 +15,7 @@ public class KycRequestResponse {
     private UUID teacherId;
     private String teacherEmail;
     private String teacherFullName;
-    private KycStatus status;
+    private KycRequestStatus status;
     private String displayName;
     private String idCardFrontUrl;
     private String idCardBackUrl;
@@ -26,8 +26,8 @@ public class KycRequestResponse {
     private String vnptResponseDetails;
     private String riskLevel;
     private String decisionNote;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
     private String processedByEmail;
-    private LocalDateTime processedAt;
+    private Instant processedAt;
 }

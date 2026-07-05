@@ -1,6 +1,6 @@
 package com.manabihub.kyc.dto.request;
 
-import com.manabihub.kyc.enums.KycStatus;
+import com.manabihub.kyc.domain.KycRequestStatus;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -12,7 +12,7 @@ import lombok.*;
 public class KycReviewRequest {
 
     @NotNull(message = "Decision status is required")
-    private KycStatus status;
+    private KycRequestStatus status;
 
     private String decisionNote;
 }

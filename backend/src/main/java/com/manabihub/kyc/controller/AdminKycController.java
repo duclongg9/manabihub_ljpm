@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/admin/kyc")
+@RequestMapping("/api/v1/admin/kyc-requests")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*", allowedHeaders = "*")
 public class AdminKycController {
@@ -22,7 +22,7 @@ public class AdminKycController {
     private final KycService kycService;
 
     // Seeded Course Manager UUID used as default fallback for local dev/testing
-    private static final String DEFAULT_MANAGER_ID = "e0000000-0000-0000-0000-000000000000";
+    private static final String DEFAULT_MANAGER_ID = "c0000000-0000-0000-0000-000000000002";
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<KycRequestResponse>>> getPendingKycQueue(
