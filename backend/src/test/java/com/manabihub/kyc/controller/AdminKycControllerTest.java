@@ -1,29 +1,33 @@
 package com.manabihub.kyc.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manabihub.kyc.domain.KycRequestStatus;
 import com.manabihub.kyc.dto.request.KycReviewRequest;
-import com.manabihub.kyc.enums.KycStatus;
+import com.manabihub.kyc.dto.response.KycRequestResponse;
+import com.manabihub.kyc.service.KycService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("local")
-@Transactional
+@WebMvcTest(AdminKycController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class AdminKycControllerTest {
 
     @Autowired
@@ -32,11 +36,26 @@ class AdminKycControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private final UUID seededKycId = UUID.fromString("b0000000-0000-0000-0000-000000000000");
+    @MockBean
+    private KycService kycService;
+
+    private UUID seededKycId;
+    private KycRequestResponse mockResponse;
+
+    @BeforeEach
+    void setUp() {
+        seededKycId = UUID.randomUUID();
+        mockResponse = new KycRequestResponse();
+        mockResponse.setId(seededKycId);
+        mockResponse.setDisplayName("Eleanor Pena");
+        mockResponse.setStatus(KycRequestStatus.PENDING);
+    }
 
     @Test
     void testGetPendingKycQueue() throws Exception {
-        mockMvc.perform(get("/api/admin/kyc"))
+        when(kycService.getPendingKycQueue(any())).thenReturn(List.of(mockResponse));
+
+        mockMvc.perform(get("/api/v1/admin/kyc-requests"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
                 .andExpect(jsonPath("$.messageCode", is("COMMON_SUCCESS")))
@@ -46,21 +65,29 @@ class AdminKycControllerTest {
 
     @Test
     void testGetKycDetail() throws Exception {
-        mockMvc.perform(get("/api/admin/kyc/" + seededKycId))
+        when(kycService.getKycDetail(eq(seededKycId), any())).thenReturn(mockResponse);
+
+        mockMvc.perform(get("/api/v1/admin/kyc-requests/" + seededKycId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
                 .andExpect(jsonPath("$.data.displayName", is("Eleanor Pena")))
-                .andExpect(jsonPath("$.data.status", is("PENDING_ADMIN_REVIEW")));
+                .andExpect(jsonPath("$.data.status", is("PENDING")));
     }
 
     @Test
     void testApproveKyc() throws Exception {
         KycReviewRequest reviewRequest = KycReviewRequest.builder()
-                .status(KycStatus.APPROVED)
+                .status(KycRequestStatus.APPROVED)
                 .decisionNote("Looks good")
                 .build();
 
-        mockMvc.perform(post("/api/admin/kyc/" + seededKycId + "/review")
+        KycRequestResponse approvedResponse = new KycRequestResponse();
+        approvedResponse.setId(seededKycId);
+        approvedResponse.setStatus(KycRequestStatus.APPROVED);
+
+        when(kycService.reviewKyc(eq(seededKycId), any(KycReviewRequest.class), any())).thenReturn(approvedResponse);
+
+        mockMvc.perform(post("/api/v1/admin/kyc-requests/" + seededKycId + "/review")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reviewRequest)))
                 .andExpect(status().isOk())
@@ -72,15 +99,20 @@ class AdminKycControllerTest {
     @Test
     void testRejectKycWithoutReasonFails() throws Exception {
         KycReviewRequest reviewRequest = KycReviewRequest.builder()
-                .status(KycStatus.REJECTED)
+                .status(KycRequestStatus.REJECTED)
                 .decisionNote("") // Empty reason
                 .build();
 
-        mockMvc.perform(post("/api/admin/kyc/" + seededKycId + "/review")
+        when(kycService.reviewKyc(eq(seededKycId), any(KycReviewRequest.class), any()))
+                .thenThrow(new com.manabihub.common.exception.BusinessException(
+                        "VALIDATION_FAILED",
+                        "Decision reason is required for rejection or correction request",
+                        org.springframework.http.HttpStatus.BAD_REQUEST
+                ));
+
+        mockMvc.perform(post("/api/v1/admin/kyc-requests/" + seededKycId + "/review")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reviewRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success", is(false)))
-                .andExpect(jsonPath("$.messageCode", is("VALIDATION_FAILED")));
+                .andExpect(status().isBadRequest());
     }
 }

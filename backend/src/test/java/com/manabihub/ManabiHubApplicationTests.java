@@ -6,10 +6,12 @@ import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import com.manabihub.identity.repository.UserRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
-import com.manabihub.audit.repository.AuditLogRepository;
-import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.kyc.repository.AuditLogRepository;
+import com.manabihub.kyc.repository.NotificationRepository;
+import com.manabihub.kyc.repository.InternalAdminAccountRepository;
+import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.kyc.repository.KycDocumentRepository;
 
 @SpringBootTest(properties = {
     "spring.autoconfigure.exclude=" +
@@ -19,11 +21,18 @@ import com.manabihub.notification.repository.NotificationRepository;
 })
 class ManabiHubApplicationTests {
 
-    @MockBean
-    private UserRepository userRepository;
 
     @MockBean
     private KycRequestRepository kycRequestRepository;
+
+    @MockBean
+    private InternalAdminAccountRepository internalAdminAccountRepository;
+
+    @MockBean
+    private TeacherProfileRepository teacherProfileRepository;
+
+    @MockBean
+    private KycDocumentRepository kycDocumentRepository;
 
     @MockBean
     private AuditLogRepository auditLogRepository;

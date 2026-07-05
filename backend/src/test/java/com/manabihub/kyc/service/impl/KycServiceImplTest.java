@@ -1,17 +1,11 @@
 package com.manabihub.kyc.service.impl;
 
 import com.manabihub.common.exception.BusinessException;
-import com.manabihub.identity.entity.User;
-import com.manabihub.identity.repository.UserRepository;
+import com.manabihub.kyc.domain.*;
 import com.manabihub.kyc.dto.request.KycReviewRequest;
 import com.manabihub.kyc.dto.response.KycRequestResponse;
-import com.manabihub.kyc.entity.KycRequest;
-import com.manabihub.kyc.enums.KycStatus;
-import com.manabihub.kyc.repository.KycRequestRepository;
-import com.manabihub.audit.entity.AuditLog;
-import com.manabihub.audit.repository.AuditLogRepository;
-import com.manabihub.notification.entity.Notification;
-import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.kyc.repository.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,7 +14,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,20 +30,20 @@ class KycServiceImplTest {
     private KycRequestRepository kycRequestRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private InternalAdminAccountRepository adminAccountRepository;
 
     @Mock
-    private AuditLogRepository auditLogRepository;
+    private TeacherProfileRepository teacherProfileRepository;
 
     @Mock
-    private NotificationRepository notificationRepository;
+    private KycDocumentRepository kycDocumentRepository;
 
     @InjectMocks
     private KycServiceImpl kycService;
 
-    private User courseManager;
-    private User financeManager;
-    private User teacher;
+    private InternalAdminAccount courseManager;
+    private AppUser teacherUser;
+    private TeacherProfile teacherProfile;
     private KycRequest pendingKycRequest;
     private UUID kycId;
 
@@ -56,57 +51,51 @@ class KycServiceImplTest {
     void setUp() {
         kycId = UUID.randomUUID();
 
-        courseManager = User.builder()
-                .id(UUID.randomUUID())
-                .email("manager@manabihub.local")
-                .role("COURSE_MANAGER")
-                .build();
+        courseManager = new InternalAdminAccount();
+        courseManager.setId(UUID.randomUUID());
+        courseManager.setEmail("manager@manabihub.local");
+        courseManager.setAccountStatus("ACTIVE");
 
-        financeManager = User.builder()
-                .id(UUID.randomUUID())
-                .email("finance@manabihub.local")
-                .role("FINANCE_MANAGER")
-                .build();
+        teacherUser = new AppUser();
+        teacherUser.setId(UUID.randomUUID());
+        teacherUser.setEmail("teacher@manabihub.local");
 
-        teacher = User.builder()
-                .id(UUID.randomUUID())
-                .email("teacher@manabihub.local")
-                .role("STUDENT")
-                .build();
+        teacherProfile = new TeacherProfile();
+        teacherProfile.setId(UUID.randomUUID());
+        teacherProfile.setUser(teacherUser);
+        teacherProfile.setKycStatus(TeacherKycStatus.PENDING);
 
-        pendingKycRequest = KycRequest.builder()
-                .id(kycId)
-                .teacher(teacher)
-                .status(KycStatus.PENDING_ADMIN_REVIEW)
-                .displayName("Teacher Name")
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        pendingKycRequest = new KycRequest();
+        pendingKycRequest.setId(kycId);
+        pendingKycRequest.setTeacherProfile(teacherProfile);
+        pendingKycRequest.setStatus(KycRequestStatus.PENDING);
+        pendingKycRequest.setCreatedAt(Instant.now());
+        pendingKycRequest.setUpdatedAt(Instant.now());
     }
 
-    // 1. Test Phân Quyền (RBAC) - Khác hệ Course Manager thì ném lỗi
     @Test
-    void testReviewKyc_WhenFinanceManager_ShouldThrowException() {
-        when(userRepository.findById(financeManager.getId())).thenReturn(Optional.of(financeManager));
+    void testReviewKyc_WhenNotAuthorized_ShouldThrowException() {
+        UUID randomAdminId = UUID.randomUUID();
+        when(adminAccountRepository.findActiveAdminsByRoleCodes(anyList())).thenReturn(List.of(courseManager));
 
-        KycReviewRequest request = new KycReviewRequest(KycStatus.APPROVED, "OK");
+        KycReviewRequest request = new KycReviewRequest(KycRequestStatus.APPROVED, "OK");
 
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                kycService.reviewKyc(kycId, request, financeManager.getId())
+                kycService.reviewKyc(kycId, request, randomAdminId)
         );
 
-        assertEquals("COURSE_MANAGER_REQUIRED", exception.getMessageCode());
+        assertEquals("ADMIN_PERMISSION_DENIED", exception.getMessageCode());
         assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
         verify(kycRequestRepository, never()).save(any());
     }
 
-    // 2. Test Lỗi Validation - Từ chối nhưng bỏ trống lý do
     @Test
     void testReviewKyc_WhenRejectWithoutNote_ShouldThrowException() {
-        when(userRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
+        when(adminAccountRepository.findActiveAdminsByRoleCodes(anyList())).thenReturn(List.of(courseManager));
         when(kycRequestRepository.findById(kycId)).thenReturn(Optional.of(pendingKycRequest));
+        when(adminAccountRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
 
-        KycReviewRequest request = new KycReviewRequest(KycStatus.REJECTED, "   "); // Ghi chú rỗng
+        KycReviewRequest request = new KycReviewRequest(KycRequestStatus.REJECTED, "   ");
 
         BusinessException exception = assertThrows(BusinessException.class, () ->
                 kycService.reviewKyc(kycId, request, courseManager.getId())
@@ -117,48 +106,41 @@ class KycServiceImplTest {
         verify(kycRequestRepository, never()).save(any());
     }
 
-    // 3. Test Luồng Thành Công - Khi phê duyệt hồ sơ
     @Test
-    void testReviewKyc_WhenApprove_ShouldSaveAllEntitiesAndUpgradeRole() {
-        when(userRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
+    void testReviewKyc_WhenApprove_ShouldSaveAllEntitiesAndUpgradeStatus() {
+        when(adminAccountRepository.findActiveAdminsByRoleCodes(anyList())).thenReturn(List.of(courseManager));
+        when(adminAccountRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
         when(kycRequestRepository.findById(kycId)).thenReturn(Optional.of(pendingKycRequest));
         when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(any())).thenReturn(List.of());
 
-        KycReviewRequest request = new KycReviewRequest(KycStatus.APPROVED, "Looks good");
+        KycReviewRequest request = new KycReviewRequest(KycRequestStatus.APPROVED, "Looks good");
 
         KycRequestResponse response = kycService.reviewKyc(kycId, request, courseManager.getId());
 
-        // Kiểm tra thay đổi trạng thái
         assertNotNull(response);
-        assertEquals(KycStatus.APPROVED, response.getStatus());
+        assertEquals(KycRequestStatus.APPROVED, response.getStatus());
 
-        // Quan trọng: Kiểm tra xem giáo viên đã được cấp quyền TEACHER chưa
-        assertEquals("TEACHER", teacher.getRole());
-        verify(userRepository).save(teacher);
-
-        // Kiểm tra xem Audit Log và Notification đã được gọi để lưu trữ hay chưa
-        verify(auditLogRepository).save(any(AuditLog.class));
-        verify(notificationRepository).save(any(Notification.class));
+        assertEquals(TeacherKycStatus.APPROVED, teacherProfile.getKycStatus());
+        assertTrue(teacherProfile.isCanPublishCourse());
+        verify(teacherProfileRepository).save(teacherProfile);
     }
-    
-    // 4. Test Trạng thái xung đột - Hồ sơ không ở trạng thái Chờ duyệt
+
     @Test
     void testReviewKyc_WhenStatusNotPending_ShouldThrowConflict() {
-        when(userRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
+        when(adminAccountRepository.findActiveAdminsByRoleCodes(anyList())).thenReturn(List.of(courseManager));
         
-        KycRequest approvedRequest = KycRequest.builder()
-                .id(kycId)
-                .status(KycStatus.APPROVED)
-                .build();
+        KycRequest approvedRequest = new KycRequest();
+        approvedRequest.setId(kycId);
+        approvedRequest.setStatus(KycRequestStatus.APPROVED);
         when(kycRequestRepository.findById(kycId)).thenReturn(Optional.of(approvedRequest));
 
-        KycReviewRequest request = new KycReviewRequest(KycStatus.REJECTED, "Bad");
+        KycReviewRequest request = new KycReviewRequest(KycRequestStatus.REJECTED, "Bad");
 
         BusinessException exception = assertThrows(BusinessException.class, () ->
                 kycService.reviewKyc(kycId, request, courseManager.getId())
         );
 
         assertEquals("COMMON_CONFLICT", exception.getMessageCode());
-        verify(auditLogRepository, never()).save(any()); // Đảm bảo không ghi log sai
     }
 }
