@@ -4,6 +4,8 @@ import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
 import { AdminLayout } from '../shared/layouts/AdminLayout';
 import { TeacherKycPage } from '../features/kyc/TeacherKycPage';
+import StudentProfilePage from "../features/profile/StudentProfilePage";
+import TeacherProfilePage from "../features/profile/TeacherProfilePage";
 
 export const router = createBrowserRouter([
   {
@@ -28,6 +30,10 @@ export const router = createBrowserRouter([
         index: true,
         element: <div>Student Dashboard Placeholder</div>,
       },
+      {
+        path: "profile",
+        element: <StudentProfilePage />,
+      },
     ],
   },
   {
@@ -42,6 +48,10 @@ export const router = createBrowserRouter([
         path: 'kyc',
         element: <TeacherKycPage />,
       },
+      {
+        path: "profile",
+        element: <TeacherProfilePage />,
+      },
     ],
   },
   {
@@ -54,4 +64,5 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
 ]);

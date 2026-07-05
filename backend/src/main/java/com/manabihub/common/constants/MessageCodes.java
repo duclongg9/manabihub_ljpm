@@ -33,6 +33,7 @@ public final class MessageCodes {
     public static final String COMMON_NOT_FOUND = "COMMON_NOT_FOUND";
     public static final String COMMON_CONFLICT = "COMMON_CONFLICT";
     public static final String COMMON_INTERNAL_ERROR = "COMMON_INTERNAL_ERROR";
+    public static final String MSG_COM_004 = "MSG-COM-004";
 
     // ──────────────────────────────────────────────
     // VALIDATION — input validation errors
@@ -48,12 +49,14 @@ public final class MessageCodes {
     public static final String AUTH_TOKEN_INVALID = "AUTH_TOKEN_INVALID";
     public static final String AUTH_LOGIN_SUCCESS = "AUTH_LOGIN_SUCCESS";
     public static final String AUTH_LOGOUT_SUCCESS = "AUTH_LOGOUT_SUCCESS";
+    public static final String MSG_AUTH_009 = "MSG-AUTH-009";
 
     // ──────────────────────────────────────────────
     // PROFILE — user profile management
     // ──────────────────────────────────────────────
-    public static final String PROFILE_NOT_FOUND = "PROFILE_NOT_FOUND";
-    public static final String PROFILE_UPDATED = "PROFILE_UPDATED";
+    public static final String MSG_PRO_001 = "MSG-PRO-001";
+    public static final String MSG_PRO_002 = "MSG-PRO-002";
+
 
     // ──────────────────────────────────────────────
     // KYC — know your customer / teacher verification
@@ -159,4 +162,5 @@ public final class MessageCodes {
     // ──────────────────────────────────────────────
     public static final String SYSTEM_MAINTENANCE = "SYSTEM_MAINTENANCE";
     public static final String SYSTEM_RATE_LIMITED = "SYSTEM_RATE_LIMITED";
+
 }
