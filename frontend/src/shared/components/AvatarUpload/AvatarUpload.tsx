@@ -1,9 +1,5 @@
 import CameraAltOutlinedIcon from "@mui/icons-material/CameraAltOutlined";
-import {
-    Avatar,
-    Box,
-    Button,
-} from "@mui/material";
+import {Avatar, Box, Button,} from "@mui/material";
 
 interface AvatarUploadProps {
 
@@ -59,7 +55,7 @@ export default function AvatarUpload({
             <Button
                 component="label"
                 variant="outlined"
-                startIcon={<CameraAltOutlinedIcon />}
+                startIcon={<CameraAltOutlinedIcon/>}
                 sx={{
                     mt: 2,
                 }}

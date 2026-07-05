@@ -1,5 +1,5 @@
-import { axiosClient } from "../../shared/api/axiosClient";
-import { ENDPOINTS } from "../../shared/api/endpoints";
+import {axiosClient} from "../../shared/api/axiosClient";
+import {ENDPOINTS} from "../../shared/api/endpoints";
 
 import type {
     ApiEnvelope,

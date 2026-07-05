@@ -6,18 +6,17 @@ import com.manabihub.identity.dto.request.UpdateTeacherProfileRequest;
 import com.manabihub.identity.dto.response.TeacherProfileResponse;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.mapper.TeacherProfileMapper;
+import com.manabihub.identity.repository.IdentityTeacherProfileRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.repository.UserRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.identity.service.TeacherProfileService;
+import com.manabihub.kyc.domain.AppUser;
+import com.manabihub.kyc.domain.TeacherProfile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.manabihub.identity.repository.IdentityTeacherProfileRepository;
-import com.manabihub.kyc.domain.AppUser;
-import com.manabihub.kyc.domain.TeacherProfile;
-
 
 import java.util.UUID;
 
@@ -41,7 +40,6 @@ public class TeacherProfileServiceImpl implements TeacherProfileService {
     public TeacherProfileResponse getMyProfile() {
 
         UUID userId = currentUserService.getCurrentUserId();
-        System.out.println("Current User ID = " + userId);
 
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(

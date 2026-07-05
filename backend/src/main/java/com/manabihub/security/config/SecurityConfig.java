@@ -23,36 +23,37 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors(Customizer.withDefaults())
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/actuator/health",
-                    "/v3/api-docs/**",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/api/v1/demo/**",  // TODO: Remove before production release
-                    "/api/v1/mock/**",  // TODO: Remove before production release
-                    "/api/v1/teacher/kyc/**", // TODO: Protect with authenticated TEACHER role when JWT is implemented
+                .cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/api/v1/demo/**",  // TODO: Remove before production release
+                                "/api/v1/mock/**",  // TODO: Remove before production release
+                                "/api/v1/teacher/kyc/**", // TODO: Protect with authenticated TEACHER role when JWT is implemented
 
-                        // UC04
-                        "/api/v1/student/profile/**",
-                        "/api/v1/teacher/profile/**"
+                                // Temporary configuration for Iteration 1.
+                                // Authentication module (JWT + RBAC) has not been integrated yet.
+                                // These endpoints will be protected with authenticated roles after
+                                // Security module completion.
+                                "/api/v1/student/profile/**",
+                                "/api/v1/teacher/profile/**"
 
-
-
-                ).permitAll()
-                .anyRequest().authenticated()
-            )
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                        ).permitAll()
+                        .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
 
         return http.build();
     }
 
     /**
      * Placeholder JwtDecoder to allow application to bootstrap.
-     * 
+     * <p>
      * TODO: Replace this with a real JwtDecoder bean configured with target Identity Provider (e.g. Keycloak, Auth0, or custom JWT engine).
      */
     @Bean

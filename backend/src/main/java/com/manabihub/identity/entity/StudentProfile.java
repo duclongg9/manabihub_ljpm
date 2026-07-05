@@ -1,5 +1,6 @@
 package com.manabihub.identity.entity;
 
+import com.manabihub.kyc.domain.AppUser;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -7,7 +8,6 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
-import com.manabihub.kyc.domain.AppUser;
 
 
 @Getter

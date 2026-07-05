@@ -15,10 +15,9 @@ public class UpdateUserProfileRequest {
     private String fullName;
 
     @Pattern(
-            regexp = "^(0|\\+84)[0-9]{9}$",
-            message = "Invalid phone number"
+            regexp = "^(0\\d{9}|\\+84\\d{9})$",
+            message = "MSG-PRO-002"
     )
-    @Size (max = 10, min = 10)
     private String phoneNumber;
 
     private String avatarUrl;

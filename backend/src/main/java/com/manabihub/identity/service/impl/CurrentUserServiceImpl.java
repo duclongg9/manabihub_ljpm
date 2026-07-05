@@ -7,7 +7,7 @@ import java.util.UUID;
 
 /**
  * Demo implementation for Iteration 1.
- *
+ * <p>
  * TODO:
  * Replace this implementation with Spring Security after
  * Google OAuth + JWT authentication is completed.
@@ -17,7 +17,7 @@ public class CurrentUserServiceImpl implements CurrentUserService {
 
     /**
      * Demo Student UUID.
-     *
+     * <p>
      * This UUID must exist in the Flyway seed data.
      */
     private static final UUID DEMO_USER_ID =
