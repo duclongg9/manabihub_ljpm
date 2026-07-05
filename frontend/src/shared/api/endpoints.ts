@@ -1,8 +1,8 @@
 export const ENDPOINTS = {
   ADMIN_KYC: {
-    QUEUE: '/admin/kyc',
-    DETAIL: (id: string) => `/admin/kyc/${id}`,
-    REVIEW: (id: string) => `/admin/kyc/${id}/review`,
+    QUEUE: '/v1/admin/kyc-requests',
+    DETAIL: (id: string) => `/v1/admin/kyc-requests/${id}`,
+    REVIEW: (id: string) => `/v1/admin/kyc-requests/${id}/review`,
   },
   teacherKyc: {
     status: '/v1/teacher/kyc/status',

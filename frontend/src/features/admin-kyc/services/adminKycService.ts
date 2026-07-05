@@ -6,7 +6,7 @@ export interface KycRequestResponse {
   teacherId: string;
   teacherEmail: string;
   teacherFullName: string;
-  status: 'DRAFT' | 'PENDING_ADMIN_REVIEW' | 'APPROVED' | 'REJECTED' | 'RESUBMISSION_REQUIRED';
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED';
   displayName: string;
   idCardFrontUrl: string;
   idCardBackUrl: string;
@@ -32,16 +32,16 @@ export interface ApiResponse<T> {
 }
 
 export interface KycReviewRequest {
-  status: 'APPROVED' | 'REJECTED' | 'RESUBMISSION_REQUIRED';
+  status: 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED';
   decisionNote?: string;
 }
 
 // Map database statuses to human-friendly labels
 export const KYC_STATUS_LABELS: Record<string, string> = {
-  PENDING_ADMIN_REVIEW: 'Chờ duyệt',
+  PENDING: 'Chờ duyệt',
   APPROVED: 'Đã duyệt',
   REJECTED: 'Từ chối',
-  RESUBMISSION_REQUIRED: 'Yêu cầu sửa đổi',
+  CORRECTION_REQUIRED: 'Yêu cầu sửa đổi',
   DRAFT: 'Bản nháp',
 };
 

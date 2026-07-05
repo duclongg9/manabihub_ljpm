@@ -21,7 +21,7 @@ export const ROUTES = {
     SYSTEM_SETTINGS: '/admin/settings',
     USERS: '/admin/users',
     COURSE_APPROVAL: '/admin/courses/approvals',
-    KYC_REVIEW: '/admin/kyc/review',
+    KYC_REVIEW: '/admin/kyc',
     FINANCE: '/admin/finance',
   },
 };

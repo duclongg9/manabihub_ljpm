@@ -27,12 +27,12 @@ export function KycDetailPage() {
       });
   }, [id]);
 
-  const handleReview = async (status: 'APPROVED' | 'REJECTED' | 'RESUBMISSION_REQUIRED') => {
+  const handleReview = async (status: 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED') => {
     if (!id || !detail) return;
     setNoteError(null);
 
     // Validate that decision note is required for Reject and Request Correction
-    if (status === 'REJECTED' || status === 'RESUBMISSION_REQUIRED') {
+    if (status === 'REJECTED' || status === 'CORRECTION_REQUIRED') {
       if (!decisionNote.trim()) {
         setNoteError('Vui lòng nhập lý do (thông tin bắt buộc).');
         return;
@@ -113,7 +113,7 @@ export function KycDetailPage() {
                 Email gốc: {detail.teacherEmail}
               </span>
               <span className={`text-xs font-bold px-2.5 py-0.5 rounded border ${
-                detail.status === 'PENDING_ADMIN_REVIEW'
+                detail.status === 'PENDING'
                   ? 'bg-amber-50 text-amber-700 border-amber-200'
                   : detail.status === 'APPROVED'
                   ? 'bg-green-50 text-green-700 border-green-200'
@@ -209,7 +209,7 @@ export function KycDetailPage() {
               <div className="mt-3 flex items-start gap-2 bg-green-50/50 border border-green-100 rounded-lg p-4">
                 <input
                   type="checkbox"
-                  checked={detail.copyrightAccepted}
+                  checked={true}
                   disabled
                   className="mt-1 h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                 />
@@ -276,7 +276,7 @@ export function KycDetailPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">Bảng phê duyệt</h3>
 
-            {detail.status !== 'PENDING_ADMIN_REVIEW' ? (
+            {detail.status !== 'PENDING' ? (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-sm text-gray-500">
                 <p className="font-medium text-gray-700">Yêu cầu đã được xử lý</p>
                 <p className="text-xs text-gray-400 mt-1">
@@ -328,7 +328,7 @@ export function KycDetailPage() {
                   </button>
 
                   <button
-                    onClick={() => handleReview('RESUBMISSION_REQUIRED')}
+                    onClick={() => handleReview('CORRECTION_REQUIRED')}
                     disabled={submitting}
                     className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm shadow-sm transition hover:shadow-md disabled:opacity-50"
                   >
