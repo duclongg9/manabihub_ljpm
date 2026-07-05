@@ -3,7 +3,7 @@ import { PublicLayout } from '../shared/layouts/PublicLayout';
 import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
 import { AdminLayout } from '../shared/layouts/AdminLayout';
-import { TeacherKycPage } from '../features/kyc/TeacherKycPage';
+import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
 import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
 import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
 
