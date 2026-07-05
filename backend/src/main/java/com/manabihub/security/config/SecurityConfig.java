@@ -34,7 +34,14 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/api/v1/demo/**",  // TODO: Remove before production release
                     "/api/v1/mock/**",  // TODO: Remove before production release
-                    "/api/v1/teacher/kyc/**"  // TODO: Protect with authenticated TEACHER role when JWT is implemented
+                    "/api/v1/teacher/kyc/**", // TODO: Protect with authenticated TEACHER role when JWT is implemented
+
+                        // UC04
+                        "/api/v1/student/profile/**",
+                        "/api/v1/teacher/profile/**"
+
+
+
                 ).permitAll()
                 .anyRequest().authenticated()
             )
