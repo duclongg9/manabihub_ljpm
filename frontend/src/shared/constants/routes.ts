@@ -9,12 +9,16 @@ export const ROUTES = {
     DASHBOARD: '/student/dashboard',
     MY_COURSES: '/student/courses',
     PAYMENTS: '/student/payments',
+    // UC04
+    PROFILE: '/student/profile',
   },
   TEACHER: {
     DASHBOARD: '/teacher/dashboard',
     COURSES: '/teacher/courses',
     KYC: '/teacher/kyc',
     WALLET: '/teacher/wallet',
+    // UC04
+    PROFILE: '/teacher/profile',
   },
   ADMIN: {
     DASHBOARD: '/admin/dashboard',
