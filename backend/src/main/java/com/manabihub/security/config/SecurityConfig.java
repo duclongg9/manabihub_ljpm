@@ -32,7 +32,9 @@ import javax.crypto.spec.SecretKeySpec;
 
 @Configuration
 @EnableWebSecurity
-// [CODE NOTE - UC-03]: @EnableMethodSecurity cho phép dùng @PreAuthorize. Đáp ứng tiêu chí "Every sensitive admin API must be protected server-side by RBAC."
+// [CODE NOTE - UC-03]: @EnableMethodSecurity cho phép dùng @PreAuthorize. Đáp
+// ứng tiêu chí "Every sensitive admin API must be protected server-side by
+// RBAC."
 @EnableMethodSecurity // Allows @PreAuthorize
 public class SecurityConfig {
 
@@ -46,41 +48,38 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   CustomOAuth2UserService customOAuth2UserService,
-                                                   OAuth2AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler,
-                                                   OAuth2AuthenticationFailureHandler oauth2AuthenticationFailureHandler) throws Exception {
+            CustomOAuth2UserService customOAuth2UserService,
+            OAuth2AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler,
+            OAuth2AuthenticationFailureHandler oauth2AuthenticationFailureHandler) throws Exception {
         http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf.disable())
-            .exceptionHandling(e -> e.authenticationEntryPoint(
-                new org.springframework.security.web.authentication.HttpStatusEntryPoint(org.springframework.http.HttpStatus.UNAUTHORIZED)
-            ))
-            // OAuth2 Login flow requires a temporary session for state/nonce verification
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/actuator/health",
-                    "/v3/api-docs/**",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/api/v1/demo/**",
-                    // [CODE NOTE - UC-03]: Mở public endpoint login cho Admin Portal để client có thể gọi.
-                    "/api/admin/auth/login", // Expose admin login endpoint
-                    "/oauth2/**",
-                    "/login/oauth2/**"
-                ).permitAll()
-                .anyRequest().authenticated()
-            )
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(
-                    jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())
-            ))
-            .oauth2Login(oauth2 -> oauth2
-                    .userInfoEndpoint(userInfo -> userInfo
-                            .userService(customOAuth2UserService)
-                    )
-                    .successHandler(oauth2AuthenticationSuccessHandler)
-                    .failureHandler(oauth2AuthenticationFailureHandler)
-            );
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+                .exceptionHandling(e -> e.authenticationEntryPoint(
+                        new org.springframework.security.web.authentication.HttpStatusEntryPoint(
+                                org.springframework.http.HttpStatus.UNAUTHORIZED)))
+                // OAuth2 Login flow requires a temporary session for state/nonce verification
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/api/v1/demo/**",
+                                // [CODE NOTE - UC-03]: Mở public endpoint login cho Admin Portal để client có
+                                // thể gọi.
+                                "/api/admin/auth/login", // Expose admin login endpoint
+                                "/oauth2/**",
+                                "/login/oauth2/**")
+                        .permitAll()
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(
+                        jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService))
+                        .successHandler(oauth2AuthenticationSuccessHandler)
+                        .failureHandler(oauth2AuthenticationFailureHandler));
 
         return http.build();
     }

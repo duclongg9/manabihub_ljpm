@@ -25,7 +25,7 @@ export function StudentOnboardingPage() {
   const [phone, setPhone] = useState('');
   const [goal, setGoal] = useState('n3');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  
+
   // Validation errors
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
 
@@ -121,13 +121,13 @@ export function StudentOnboardingPage() {
 
                 <Stack spacing={3}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <Avatar 
-                      src={avatarPreview || undefined} 
+                    <Avatar
+                      src={avatarPreview || undefined}
                       sx={{ width: 80, height: 80, bgcolor: '#eff6ff', color: '#3b82f6', border: avatarPreview ? '2px solid #e5e7eb' : 'none' }}
                     >
                       {!avatarPreview && <PersonIcon sx={{ fontSize: 40 }} />}
                     </Avatar>
-                    
+
                     <Box>
                       <input
                         accept="image/*"

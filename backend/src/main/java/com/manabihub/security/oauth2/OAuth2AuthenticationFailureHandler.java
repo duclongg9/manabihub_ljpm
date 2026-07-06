@@ -14,19 +14,21 @@ import java.io.IOException;
 @Slf4j
 @Component
 // [CODE NOTE]: Trình xử lý sự kiện khi Đăng nhập Google (OAuth2) THẤT BẠI.
-// Ví dụ: người dùng hủy cấp quyền, hoặc cấu hình sai. Nó sẽ đá người dùng về lại Frontend báo lỗi.
+// Ví dụ: người dùng hủy cấp quyền, hoặc cấu hình sai. Nó sẽ đá người dùng về
+// lại Frontend báo lỗi.
 public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
     @Value("${app.frontend.login-url:http://localhost:5173/login}")
     private String frontendLoginUrl;
 
     @Override
-    // [CODE NOTE]: Hàm onAuthenticationFailure() sẽ tạo URL điều hướng về trang Login ở Frontend (cổng 5173).
+    // [CODE NOTE]: Hàm onAuthenticationFailure() sẽ tạo URL điều hướng về trang
+    // Login ở Frontend (cổng 5173).
     // Gắn thêm tham số ?error=... vào cuối URL.
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
-                                        AuthenticationException exception) throws IOException, ServletException {
+            AuthenticationException exception) throws IOException, ServletException {
         log.error("OAuth2 Authentication failed: {}", exception.getMessage());
-        
+
         // Redirect to frontend login page with error parameter
         String targetUrl = frontendLoginUrl + "?error=" + exception.getMessage();
         getRedirectStrategy().sendRedirect(request, response, targetUrl);

@@ -35,7 +35,7 @@ export function PublicLoginPage() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#0f172a', fontFamily: '"Inter", "Roboto", sans-serif' }}>
-      
+
       {/* Left Panel - Branding */}
       <Box
         sx={{
@@ -53,7 +53,7 @@ export function PublicLoginPage() {
         <Box sx={{ position: 'absolute', inset: 0 }}>
           <img src={getAsset('hero.png')} alt="Japan Study" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </Box>
-        
+
         <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', p: 8, width: '100%' }}>
           <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none' }}>
             <Box sx={{ width: 40, height: 40, bgcolor: '#3b82f6', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.39)' }}>
@@ -63,7 +63,7 @@ export function PublicLoginPage() {
               ManabiHub
             </Typography>
           </Box>
-          
+
           <Box sx={{ maxWidth: 500, mb: 4, animation: `${fadeIn} 1s ease-out` }}>
             <Typography variant="h2" sx={{ fontWeight: 800, color: 'white', mb: 3, lineHeight: 1.1, fontSize: '3.5rem' }}>
               Hành trình chinh phục tiếng Nhật bắt đầu từ đây
