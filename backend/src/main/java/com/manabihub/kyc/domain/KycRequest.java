@@ -88,6 +88,12 @@ public class KycRequest {
     @Column(name = "verification_payload", columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> verificationPayload = Map.of();
 
+    @Column(name = "reviewed_by")
+    private UUID reviewedBy;
+
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

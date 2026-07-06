@@ -1,17 +1,17 @@
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
-import DashboardIcon from '@mui/icons-material/Dashboard';
+import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PeopleIcon from '@mui/icons-material/People';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import WalletIcon from '@mui/icons-material/Wallet';
 import RuleIcon from '@mui/icons-material/Rule';
 
 export const ADMIN_MENU = [
   {
     title: 'Dashboard',
     path: ROUTES.ADMIN.DASHBOARD,
-    icon: DashboardIcon,
+    icon: SpaceDashboardIcon,
     roles: [ROLES.SYSTEM_ADMIN, ROLES.COURSE_MANAGER, ROLES.FINANCE_MANAGER],
   },
   {
@@ -41,7 +41,7 @@ export const ADMIN_MENU = [
   {
     title: 'Finance & Payouts',
     path: ROUTES.ADMIN.FINANCE,
-    icon: AccountBalanceIcon,
+    icon: WalletIcon,
     roles: [ROLES.FINANCE_MANAGER],
   },
 ];
