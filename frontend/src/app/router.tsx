@@ -4,8 +4,15 @@ import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
 import { AdminLayout } from '../shared/layouts/AdminLayout';
 import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
+import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
+import { PublicLoginPage } from './pages/PublicLoginPage';
 
 export const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: <PublicLoginPage />,
+  },
   {
     path: '/',
     element: <PublicLayout />,
@@ -15,12 +22,16 @@ export const router = createBrowserRouter([
         element: <div>Home Page Placeholder</div>,
       },
       {
-        path: 'courses',
-        element: <div>Course Catalog Placeholder</div>,
+        path: 'auth/callback',
+        element: <AuthCallbackPage />,
       },
       {
-        path: 'login',
-        element: <div>Login Page Placeholder</div>,
+        path: 'onboarding/student',
+        element: <StudentOnboardingPage />,
+      },
+      {
+        path: 'courses',
+        element: <div>Course Catalog Placeholder</div>,
       },
       {
         path: 'register',

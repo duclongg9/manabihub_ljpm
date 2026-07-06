@@ -5,4 +5,5 @@ export const ENDPOINTS = {
     restartVerification: '/v1/teacher/kyc/restart-verification',
     certificateSubmissions: '/v1/teacher/kyc/certificate-submissions',
   },
+  ADMIN_LOGIN: '/admin/auth/login',
 };

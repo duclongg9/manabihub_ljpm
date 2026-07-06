@@ -1,5 +1,8 @@
 package com.manabihub;
 
+import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.identity.repository.RoleRepository;
+import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.kyc.service.TeacherKycService;
 import com.manabihub.mock.repository.MockJlptRegistryRepository;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
@@ -17,6 +20,15 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private TeacherKycService teacherKycService;
+
+    @MockBean
+    private AppUserRepository appUserRepository;
+
+    @MockBean
+    private RoleRepository roleRepository;
+
+    @MockBean
+    private StudentProfileRepository studentProfileRepository;
 
     @MockBean
     private MockNationalIdRegistryRepository mockNationalIdRegistryRepository;

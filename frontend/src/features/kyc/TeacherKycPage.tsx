@@ -581,7 +581,7 @@ function TeacherKycPageContent() {
             height: 40,
           }}
         >
-          <CloseIcon />
+          <CloseIcon size={20} />
         </IconButton>
         <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box
