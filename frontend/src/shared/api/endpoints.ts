@@ -6,10 +6,4 @@ export const ENDPOINTS = {
     certificateSubmissions: '/v1/teacher/kyc/certificate-submissions',
   },
   ADMIN_LOGIN: '/admin/auth/login',
-  teacherKyc: {
-    status: '/v1/teacher/kyc/status',
-    identityVerifications: '/v1/teacher/kyc/identity-verifications',
-    restartVerification: '/v1/teacher/kyc/restart-verification',
-    certificateSubmissions: '/v1/teacher/kyc/certificate-submissions',
-  },
 };
