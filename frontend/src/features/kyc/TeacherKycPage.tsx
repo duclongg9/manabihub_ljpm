@@ -20,9 +20,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
-import BadgeIcon from '@mui/icons-material/Badge';
-import CloseIcon from '@mui/icons-material/Close';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import PermContactCalendarIcon from '@mui/icons-material/PermContactCalendar';
 import GppGoodIcon from '@mui/icons-material/GppGood';
 import LockIcon from '@mui/icons-material/Lock';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -417,7 +416,7 @@ function TeacherKycPageContent() {
         </Alert>
       )}
       {certificateEnvelope && (
-        <Alert severity="success" icon={<AssignmentTurnedInIcon />}>
+        <Alert severity="success" icon={<FactCheckIcon />}>
           Chứng chỉ đã được ghi nhận và chuyển sang bước kiểm tra.
         </Alert>
       )}
@@ -430,7 +429,7 @@ function TeacherKycPageContent() {
       {/* Identity step */}
       <Stack spacing={3}>
         <ModuleCard
-          icon={identityVerified ? <VerifiedUserIcon sx={{ color: 'primary.main' }} /> : <BadgeIcon sx={{ color: 'primary.main' }} />}
+          icon={identityVerified ? <VerifiedUserIcon sx={{ color: 'primary.main' }} /> : <PermContactCalendarIcon sx={{ color: 'primary.main' }} />}
           index="Bước 1"
           hideStatus={!shouldShowStatusChips}
           status={identityStatus}
@@ -557,7 +556,7 @@ function TeacherKycPageContent() {
                 <CardContent sx={{ p: { xs: 2, md: 3 } }}>
                   <Stack spacing={1.5}>
                     <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                      <AssignmentTurnedInIcon sx={{ color: 'primary.main' }} />
+                      <FactCheckIcon sx={{ color: 'primary.main' }} />
                       <Box>
                         <Typography sx={{ color: 'text.secondary', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                           Cam kết bản quyền
@@ -652,7 +651,7 @@ function TeacherKycPageContent() {
             height: 44,
           }}
         >
-          <CloseIcon />
+          <X size={20} />
         </IconButton>
         <DialogContent sx={{ borderRadius: 'inherit', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 0 }}>
           <Box

@@ -1,9 +1,10 @@
-package com.manabihub.kyc.repository;
+package com.manabihub.notification.repository;
 
-import com.manabihub.kyc.domain.Notification;
+import com.manabihub.notification.entity.Notification;
 import org.springframework.data.jpa.repository.JpaRepository;
-
+import org.springframework.stereotype.Repository;
 import java.util.UUID;
 
+@Repository
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
 }

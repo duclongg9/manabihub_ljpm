@@ -12,6 +12,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.List;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
 /**
  * Demo-only controller for verifying the API response convention.
@@ -34,6 +44,34 @@ public class DemoController {
         Map<String, String> data = Map.of(
                 "greeting", "Hello from ManabiHub!",
                 "status", "API response convention is working"
+        );
+        return ResponseEntity.ok(ApiResponse.success(data));
+    }
+
+    /**
+     * Demo login for Admin KYC local testing.
+     */
+    @PostMapping("/login-admin")
+    public ResponseEntity<ApiResponse<Map<String, String>>> demoLoginAdmin(HttpServletRequest request) {
+        Jwt jwt = Jwt.withTokenValue("mock-session-token")
+                .header("alg", "none")
+                .claim("sub", "c0000000-0000-0000-0000-000000000002")
+                .claim("role", "COURSE_MANAGER")
+                .claim("email", "manager@manabihub.local")
+                .build();
+
+        JwtAuthenticationToken auth = new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_COURSE_MANAGER")));
+        
+        SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(auth);
+        SecurityContextHolder.setContext(securityContext);
+
+        HttpSession session = request.getSession(true);
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
+
+        Map<String, String> data = Map.of(
+                "status", "Mock session created",
+                "adminId", "c0000000-0000-0000-0000-000000000002"
         );
         return ResponseEntity.ok(ApiResponse.success(data));
     }

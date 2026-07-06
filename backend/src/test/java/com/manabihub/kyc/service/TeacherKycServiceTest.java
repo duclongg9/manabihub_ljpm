@@ -8,7 +8,7 @@ import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.dto.KycStatusResponse;
 import com.manabihub.kyc.port.JlptRegistryPort;
 import com.manabihub.kyc.port.NationalIdRegistryPort;
-import com.manabihub.kyc.repository.AuditLogRepository;
+import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
