@@ -1,8 +1,10 @@
 package com.manabihub;
 
 import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.service.TeacherKycService;
 import com.manabihub.mock.repository.MockJlptRegistryRepository;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
@@ -23,6 +25,12 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private AppUserRepository appUserRepository;
+
+    @MockBean
+    private InternalAdminAccountRepository internalAdminAccountRepository;
+
+    @MockBean
+    private AuditLogRepository auditLogRepository;
 
     @MockBean
     private RoleRepository roleRepository;

@@ -29,7 +29,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SchoolIcon from '@mui/icons-material/School';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import { X as CloseIcon } from 'lucide-react';
+import { X } from 'lucide-react';
 import React, { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import {
   getTeacherKycStatus,
@@ -581,7 +581,7 @@ function TeacherKycPageContent() {
             height: 40,
           }}
         >
-          <CloseIcon size={20} />
+          <X size={20} />
         </IconButton>
         <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box
