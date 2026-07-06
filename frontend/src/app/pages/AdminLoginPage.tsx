@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, TextField, Button, Alert, InputAdornment, IconButton, keyframes } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
@@ -123,7 +123,7 @@ export function AdminLoginPage() {
 
           <Box sx={{ textAlign: 'center', mb: 5 }}>
             <Box sx={{ width: 64, height: 64, margin: '0 auto 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: `${pulseGlow} 2s infinite` }}>
-              <AdminPanelSettingsIcon sx={{ fontSize: 32, color: '#2563eb' }} />
+              <ManageAccountsIcon sx={{ fontSize: 32, color: '#2563eb' }} />
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#0f172a', mb: 1.5, letterSpacing: '-0.5px' }}>
               Chào mừng trở lại
@@ -150,9 +150,11 @@ export function AdminLoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><EmailOutlinedIcon sx={{ color: '#94a3b8' }} /></InputAdornment>,
-                sx: { borderRadius: 3, bgcolor: '#f8fafc', '&:hover': { bgcolor: '#f1f5f9' }, '&.Mui-focused': { bgcolor: '#ffffff', boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)' } }
+              slotProps={{
+                input: {
+                  startAdornment: <InputAdornment position="start"><EmailOutlinedIcon sx={{ color: '#94a3b8' }} /></InputAdornment>,
+                  sx: { borderRadius: 3, bgcolor: '#f8fafc', '&:hover': { bgcolor: '#f1f5f9' }, '&.Mui-focused': { bgcolor: '#ffffff', boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)' } }
+                }
               }}
               sx={{ mb: 3 }}
             />
@@ -165,16 +167,18 @@ export function AdminLoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading}
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><LockOutlinedIcon sx={{ color: '#94a3b8' }} /></InputAdornment>,
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" disabled={loading}>
-                      {showPassword ? <VisibilityOff sx={{ color: '#94a3b8' }} /> : <Visibility sx={{ color: '#94a3b8' }} />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-                sx: { borderRadius: 3, bgcolor: '#f8fafc', '&:hover': { bgcolor: '#f1f5f9' }, '&.Mui-focused': { bgcolor: '#ffffff', boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)' } }
+              slotProps={{
+                input: {
+                  startAdornment: <InputAdornment position="start"><LockOutlinedIcon sx={{ color: '#94a3b8' }} /></InputAdornment>,
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" disabled={loading}>
+                        {showPassword ? <VisibilityOff sx={{ color: '#94a3b8' }} /> : <Visibility sx={{ color: '#94a3b8' }} />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                  sx: { borderRadius: 3, bgcolor: '#f8fafc', '&:hover': { bgcolor: '#f1f5f9' }, '&.Mui-focused': { bgcolor: '#ffffff', boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)' } }
+                }
               }}
               sx={{ mb: 4 }}
             />
