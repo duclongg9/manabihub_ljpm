@@ -51,7 +51,7 @@ public class SecurityConfig {
     @Bean
     public JwtDecoder jwtDecoder() {
         return token -> {
-            throw new JwtException("JWT validation is not implemented yet. JWT Token: " + token);
+            throw new JwtException("JWT validation is not implemented yet.");
         };
     }
 

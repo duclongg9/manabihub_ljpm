@@ -1,14 +1,14 @@
 import { ROUTES } from '../constants/routes';
-import DashboardIcon from '@mui/icons-material/Dashboard';
+import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import WalletIcon from '@mui/icons-material/Wallet';
 
 export const TEACHER_MENU = [
   {
     title: 'Tổng quan',
     path: ROUTES.TEACHER.DASHBOARD,
-    icon: DashboardIcon,
+    icon: SpaceDashboardIcon,
   },
   {
     title: 'Khóa học của tôi',
@@ -23,6 +23,6 @@ export const TEACHER_MENU = [
   {
     title: 'Ví & Thanh toán',
     path: ROUTES.TEACHER.WALLET,
-    icon: AccountBalanceWalletIcon,
+    icon: WalletIcon,
   },
 ];
