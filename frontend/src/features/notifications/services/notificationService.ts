@@ -3,12 +3,6 @@ import type { NotificationResponse, NotificationQueryParams, PageResponse } from
 import type { ApiResponse } from '../../../shared/types/api';
 
 const BASE_URL = '/v1/notifications';
-
-// TODO: [UC-21 Tech Debt] Replace mock Bearer token with real OAuth2/JWT token
-// from authentication system (e.g., Keycloak, Firebase Auth) before production.
-// Current implementation sends user UUID as Bearer token for local development only.
-// This works because backend SecurityConfig has a mock JwtDecoder gated by
-// @ConditionalOnProperty("manabihub.security.mock-jwt").
 const getTempUserId = () => {
   if (typeof window !== 'undefined') {
     if (window.location.pathname.includes('/student')) {

@@ -35,21 +35,17 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/api/v1/demo/**",  // TODO: Remove before production release
-                                "/api/v1/mock/**",  // TODO: Remove before production release
-                                "/api/v1/teacher/kyc/**"  // TODO: Protect with authenticated TEACHER role when JWT is implemented
+                                "/api/v1/demo/**", // TODO: Remove before production release
+                                "/api/v1/mock/**", // TODO: Remove before production release
+                                "/api/v1/teacher/kyc/**" // TODO: Protect with authenticated TEACHER role when JWT is
+                                                         // implemented
                         ).permitAll()
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
 
         return http.build();
     }
 
-    // TODO: [UC-21 Tech Debt] This mock decoder accepts any UUID as a valid JWT.
-    // It is gated by @ConditionalOnProperty so it ONLY activates when
-    // manabihub.security.mock-jwt=true (set in application-local.yml).
-    // Replace with real JWT validation (e.g., Keycloak, Spring Auth Server) before production.
     @Bean
     @ConditionalOnProperty(name = "manabihub.security.mock-jwt", havingValue = "true")
     public JwtDecoder mockJwtDecoder() {
@@ -72,7 +68,8 @@ public class SecurityConfig {
     @ConditionalOnMissingBean(JwtDecoder.class)
     public JwtDecoder defaultJwtDecoder() {
         return token -> {
-            throw new JwtException("JWT validation is not implemented yet or mock-jwt is disabled. JWT Token: " + token);
+            throw new JwtException(
+                    "JWT validation is not implemented yet or mock-jwt is disabled. JWT Token: " + token);
         };
     }
 
@@ -81,8 +78,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "http://127.0.0.1:5173"
-        ));
+                "http://127.0.0.1:5173"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Location"));
