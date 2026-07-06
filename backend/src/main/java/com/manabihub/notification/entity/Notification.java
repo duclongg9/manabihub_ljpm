@@ -15,7 +15,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.Instant;
 import java.util.UUID;
 
-@Entity(name = "SysNotification")
+@Entity
 @Table(name = "notifications")
 @Data
 @Builder
