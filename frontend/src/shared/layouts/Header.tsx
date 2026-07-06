@@ -18,7 +18,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, showMenuIcon = fals
             <MenuIcon />
           </IconButton>
         )}
-        
+
         <Typography variant="h6" component={Link} to="/" sx={{ flexGrow: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 700 }}>
           ManabiHub
         </Typography>

@@ -23,11 +23,11 @@ public class EmailServiceImpl implements EmailService {
         try {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            
+
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(body, true);
-            
+
             javaMailSender.send(message);
             log.info("Email sent successfully to {}", to);
         } catch (MessagingException e) {

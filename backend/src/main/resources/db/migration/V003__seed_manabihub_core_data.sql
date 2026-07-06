@@ -139,11 +139,11 @@ INSERT INTO user_roles (user_id, role_id) VALUES
 
 -- Student profile
 INSERT INTO student_profiles (id, user_id, display_name, jlpt_goal) VALUES
-    ('e0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'Học viên Demo', 'N3');
+    ('e0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'Há»c viÃªn Demo', 'N3');
 
 -- Teacher profile (APPROVED, can publish)
 INSERT INTO teacher_profiles (id, user_id, display_name, bio, kyc_status, can_publish_course) VALUES
-    ('e0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'Giáo viên Demo', 'Giáo viên tiếng Nhật với 5 năm kinh nghiệm giảng dạy JLPT N3-N1.', 'APPROVED', TRUE);
+    ('e0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'GiÃ¡o viÃªn Demo', 'GiÃ¡o viÃªn tiáº¿ng Nháº­t vá»›i 5 nÄƒm kinh nghiá»‡m giáº£ng dáº¡y JLPT N3-N1.', 'APPROVED', TRUE);
 
 
 -- ============================================================================
@@ -155,9 +155,9 @@ INSERT INTO teacher_profiles (id, user_id, display_name, bio, kyc_status, can_pu
 INSERT INTO courses (id, teacher_id, title, slug, description, level_code, price, currency, status, ai_supported, published_at) VALUES
     ('f0000000-0000-0000-0000-000000000001',
      'e0000000-0000-0000-0000-000000000002',
-     'JLPT N3 作文マスター - Writing Practice',
+     'JLPT N3 ä½œæ–‡ãƒžã‚¹ã‚¿ãƒ¼ - Writing Practice',
      'jlpt-n3-writing-practice',
-     'Khóa học luyện viết tiếng Nhật JLPT N3 với hỗ trợ AI suggestion. Bao gồm bài tập viết thực tế và feedback từ giáo viên.',
+     'KhÃ³a há»c luyá»‡n viáº¿t tiáº¿ng Nháº­t JLPT N3 vá»›i há»— trá»£ AI suggestion. Bao gá»“m bÃ i táº­p viáº¿t thá»±c táº¿ vÃ  feedback tá»« giÃ¡o viÃªn.',
      'N3',
      250000.00,
      'VND',
@@ -169,15 +169,15 @@ INSERT INTO courses (id, teacher_id, title, slug, description, level_code, price
 INSERT INTO course_modules (id, course_id, title, description, order_index) VALUES
     ('f1000000-0000-0000-0000-000000000001',
      'f0000000-0000-0000-0000-000000000001',
-     'Module 1: 基本文法の復習 (Basic Grammar Review)',
-     'Ôn tập ngữ pháp cơ bản N3 và luyện viết câu đơn giản.',
+     'Module 1: åŸºæœ¬æ–‡æ³•ã®å¾©ç¿’ (Basic Grammar Review)',
+     'Ã”n táº­p ngá»¯ phÃ¡p cÆ¡ báº£n N3 vÃ  luyá»‡n viáº¿t cÃ¢u Ä‘Æ¡n giáº£n.',
      1);
 
 -- Writing lesson
 INSERT INTO lessons (id, module_id, title, lesson_type, order_index, is_preview) VALUES
     ('f2000000-0000-0000-0000-000000000001',
      'f1000000-0000-0000-0000-000000000001',
-     'Bài 1: Viết đoạn văn tự giới thiệu (自己紹介)',
+     'BÃ i 1: Viáº¿t Ä‘oáº¡n vÄƒn tá»± giá»›i thiá»‡u (è‡ªå·±ç´¹ä»‹)',
      'WRITING',
      1,
      FALSE);
@@ -188,8 +188,8 @@ INSERT INTO lesson_blocks (id, lesson_id, block_type, content, order_index) VALU
      'f2000000-0000-0000-0000-000000000001',
      'WRITING_PROMPT',
      '{
-        "prompt": "自己紹介の文章を200字以上で書いてください。名前、出身、趣味、日本語を勉強する理由を含めてください。",
-        "prompt_vi": "Hãy viết một bài tự giới thiệu bằng tiếng Nhật (tối thiểu 200 chữ). Bao gồm: tên, quê quán, sở thích, lý do học tiếng Nhật.",
+        "prompt": "è‡ªå·±ç´¹ä»‹ã®æ–‡ç« ã‚’200å­—ä»¥ä¸Šã§æ›¸ã„ã¦ãã ã•ã„ã€‚åå‰ã€å‡ºèº«ã€è¶£å‘³ã€æ—¥æœ¬èªžã‚’å‹‰å¼·ã™ã‚‹ç†ç”±ã‚’å«ã‚ã¦ãã ã•ã„ã€‚",
+        "prompt_vi": "HÃ£y viáº¿t má»™t bÃ i tá»± giá»›i thiá»‡u báº±ng tiáº¿ng Nháº­t (tá»‘i thiá»ƒu 200 chá»¯). Bao gá»“m: tÃªn, quÃª quÃ¡n, sá»Ÿ thÃ­ch, lÃ½ do há»c tiáº¿ng Nháº­t.",
         "min_length": 200,
         "max_length": 1000,
         "rubric": {
@@ -220,7 +220,7 @@ INSERT INTO writing_submissions (id, enrollment_id, lesson_id, student_id, conte
      'f4000000-0000-0000-0000-000000000001',
      'f2000000-0000-0000-0000-000000000001',
      'e0000000-0000-0000-0000-000000000001',
-     '初めまして。私はグエン・ヴァン・アンと申します。ベトナムのホーチミン市から来ました。今、大学で情報技術を勉強しています。趣味は読書とゲームをすることです。日本語を勉強する理由は、将来日本のIT会社で働きたいからです。毎日、漢字と文法を練習しています。日本の文化にも興味があります。特に、日本の食べ物が大好きです。よろしくお願いします。',
+     'åˆã‚ã¾ã—ã¦ã€‚ç§ã¯ã‚°ã‚¨ãƒ³ãƒ»ãƒ´ã‚¡ãƒ³ãƒ»ã‚¢ãƒ³ã¨ç”³ã—ã¾ã™ã€‚ãƒ™ãƒˆãƒŠãƒ ã®ãƒ›ãƒ¼ãƒãƒŸãƒ³å¸‚ã‹ã‚‰æ¥ã¾ã—ãŸã€‚ä»Šã€å¤§å­¦ã§æƒ…å ±æŠ€è¡“ã‚’å‹‰å¼·ã—ã¦ã„ã¾ã™ã€‚è¶£å‘³ã¯èª­æ›¸ã¨ã‚²ãƒ¼ãƒ ã‚’ã™ã‚‹ã“ã¨ã§ã™ã€‚æ—¥æœ¬èªžã‚’å‹‰å¼·ã™ã‚‹ç†ç”±ã¯ã€å°†æ¥æ—¥æœ¬ã®ITä¼šç¤¾ã§åƒããŸã„ã‹ã‚‰ã§ã™ã€‚æ¯Žæ—¥ã€æ¼¢å­—ã¨æ–‡æ³•ã‚’ç·´ç¿’ã—ã¦ã„ã¾ã™ã€‚æ—¥æœ¬ã®æ–‡åŒ–ã«ã‚‚èˆˆå‘³ãŒã‚ã‚Šã¾ã™ã€‚ç‰¹ã«ã€æ—¥æœ¬ã®é£Ÿã¹ç‰©ãŒå¤§å¥½ãã§ã™ã€‚ã‚ˆã‚ã—ããŠé¡˜ã„ã—ã¾ã™ã€‚',
      'TEACHER_FEEDBACK_READY');
 
 
@@ -249,31 +249,31 @@ INSERT INTO ai_writing_suggestions (
     '[
         {
             "location": {"start": 72, "end": 85},
-            "original": "趣味は読書とゲームをすることです",
-            "suggestion": "趣味は読書をすることとゲームをすることです",
-            "explanation": "When listing hobbies with する verbs, each item should have its own する for clarity.",
+            "original": "è¶£å‘³ã¯èª­æ›¸ã¨ã‚²ãƒ¼ãƒ ã‚’ã™ã‚‹ã“ã¨ã§ã™",
+            "suggestion": "è¶£å‘³ã¯èª­æ›¸ã‚’ã™ã‚‹ã“ã¨ã¨ã‚²ãƒ¼ãƒ ã‚’ã™ã‚‹ã“ã¨ã§ã™",
+            "explanation": "When listing hobbies with ã™ã‚‹ verbs, each item should have its own ã™ã‚‹ for clarity.",
             "severity": "MINOR"
         },
         {
             "location": {"start": 120, "end": 140},
-            "original": "毎日、漢字と文法を練習しています",
-            "suggestion": "毎日、漢字と文法の練習をしています",
-            "explanation": "Using の練習をする is more natural than directly using を練習する in this context.",
+            "original": "æ¯Žæ—¥ã€æ¼¢å­—ã¨æ–‡æ³•ã‚’ç·´ç¿’ã—ã¦ã„ã¾ã™",
+            "suggestion": "æ¯Žæ—¥ã€æ¼¢å­—ã¨æ–‡æ³•ã®ç·´ç¿’ã‚’ã—ã¦ã„ã¾ã™",
+            "explanation": "Using ã®ç·´ç¿’ã‚’ã™ã‚‹ is more natural than directly using ã‚’ç·´ç¿’ã™ã‚‹ in this context.",
             "severity": "SUGGESTION"
         }
     ]'::jsonb,
     -- vocabulary_suggestions
     '[
         {
-            "original": "情報技術",
-            "suggestion": "IT（情報技術）",
-            "explanation": "In casual Japanese writing, IT is commonly used. Consider adding 情報技術 in parentheses for clarity.",
+            "original": "æƒ…å ±æŠ€è¡“",
+            "suggestion": "ITï¼ˆæƒ…å ±æŠ€è¡“ï¼‰",
+            "explanation": "In casual Japanese writing, IT is commonly used. Consider adding æƒ…å ±æŠ€è¡“ in parentheses for clarity.",
             "severity": "SUGGESTION"
         },
         {
-            "original": "食べ物",
-            "suggestion": "料理",
-            "explanation": "料理 (cuisine/cooking) may be more specific than 食べ物 (food) when expressing cultural interest.",
+            "original": "é£Ÿã¹ç‰©",
+            "suggestion": "æ–™ç†",
+            "explanation": "æ–™ç† (cuisine/cooking) may be more specific than é£Ÿã¹ç‰© (food) when expressing cultural interest.",
             "severity": "MINOR"
         }
     ]'::jsonb,
@@ -281,19 +281,19 @@ INSERT INTO ai_writing_suggestions (
     '[
         {
             "aspect": "paragraph_flow",
-            "suggestion": "Consider grouping related topics together. Current order: introduction → studies → hobbies → Japanese study reason → daily routine → culture. Suggested: introduction → studies → Japanese study reason → daily routine → hobbies → culture → closing.",
+            "suggestion": "Consider grouping related topics together. Current order: introduction â†’ studies â†’ hobbies â†’ Japanese study reason â†’ daily routine â†’ culture. Suggested: introduction â†’ studies â†’ Japanese study reason â†’ daily routine â†’ hobbies â†’ culture â†’ closing.",
             "severity": "SUGGESTION"
         },
         {
             "aspect": "transitions",
-            "suggestion": "Add transition phrases like また (also), さらに (furthermore), or それから (and then) between topics for smoother flow.",
+            "suggestion": "Add transition phrases like ã¾ãŸ (also), ã•ã‚‰ã« (furthermore), or ãã‚Œã‹ã‚‰ (and then) between topics for smoother flow.",
             "severity": "MINOR"
         }
     ]'::jsonb,
     -- revision_guidance (preliminary suggestion, not official feedback)
-    'Overall, this is a well-structured self-introduction that covers all required topics. The grammar is mostly correct at the N3 level. Consider: (1) improving topic transitions with connecting phrases, (2) reorganizing paragraph flow for better logical progression, and (3) expanding on your interest in Japanese culture with specific examples. These are preliminary AI suggestions only — please wait for your teacher''s official feedback.',
+    'Overall, this is a well-structured self-introduction that covers all required topics. The grammar is mostly correct at the N3 level. Consider: (1) improving topic transitions with connecting phrases, (2) reorganizing paragraph flow for better logical progression, and (3) expanding on your interest in Japanese culture with specific examples. These are preliminary AI suggestions only â€” please wait for your teacher''s official feedback.',
     'MEDIUM',
-    -- is_official MUST be FALSE — AI is suggestion-only, never official
+    -- is_official MUST be FALSE â€” AI is suggestion-only, never official
     FALSE
 );
 
@@ -311,14 +311,14 @@ INSERT INTO teacher_writing_feedback (
     'f5000000-0000-0000-0000-000000000001',
     'e0000000-0000-0000-0000-000000000002',
     7.50,
-    'Bài viết tốt! Em đã bao gồm đầy đủ các nội dung yêu cầu. Ngữ pháp N3 sử dụng chính xác. Cần cải thiện thêm phần liên kết giữa các ý và mở rộng phần lý do học tiếng Nhật. Hãy thử dùng thêm các mẫu ngữ pháp N3 như ～ために、～ようにする để nâng cao chất lượng bài viết.',
+    'BÃ i viáº¿t tá»‘t! Em Ä‘Ã£ bao gá»“m Ä‘áº§y Ä‘á»§ cÃ¡c ná»™i dung yÃªu cáº§u. Ngá»¯ phÃ¡p N3 sá»­ dá»¥ng chÃ­nh xÃ¡c. Cáº§n cáº£i thiá»‡n thÃªm pháº§n liÃªn káº¿t giá»¯a cÃ¡c Ã½ vÃ  má»Ÿ rá»™ng pháº§n lÃ½ do há»c tiáº¿ng Nháº­t. HÃ£y thá»­ dÃ¹ng thÃªm cÃ¡c máº«u ngá»¯ phÃ¡p N3 nhÆ° ï½žãŸã‚ã«ã€ï½žã‚ˆã†ã«ã™ã‚‹ Ä‘á»ƒ nÃ¢ng cao cháº¥t lÆ°á»£ng bÃ i viáº¿t.',
     '{
-        "grammar": {"score": 8.0, "max": 10, "weight": 30, "comment": "Good use of N3 grammar. Minor issues with する verb listing."},
+        "grammar": {"score": 8.0, "max": 10, "weight": 30, "comment": "Good use of N3 grammar. Minor issues with ã™ã‚‹ verb listing."},
         "vocabulary": {"score": 7.0, "max": 10, "weight": 25, "comment": "Adequate vocabulary. Could use more varied expressions."},
         "structure": {"score": 7.0, "max": 10, "weight": 25, "comment": "All topics covered but transitions between ideas need improvement."},
         "content": {"score": 8.0, "max": 10, "weight": 20, "comment": "Complete and relevant content. Good personal details included."}
     }'::jsonb,
-    -- is_official MUST be TRUE — only teacher feedback is official
+    -- is_official MUST be TRUE â€” only teacher feedback is official
     TRUE
 );
 

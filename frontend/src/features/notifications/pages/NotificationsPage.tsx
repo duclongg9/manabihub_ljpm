@@ -65,11 +65,11 @@ export const NotificationsPage: React.FC = () => {
           <NotificationsIcon sx={{ fontSize: 28, color: 'text.primary' }} />
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-              Thông báo
+              ThÃ´ng bÃ¡o
             </Typography>
             {unreadCount !== undefined && unreadCount > 0 && (
               <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 500 }}>
-                {unreadCount} thông báo chưa đọc
+                {unreadCount} thÃ´ng bÃ¡o chÆ°a Ä‘á»c
               </Typography>
             )}
           </Box>
@@ -92,7 +92,7 @@ export const NotificationsPage: React.FC = () => {
             },
           }}
         >
-          Đánh dấu tất cả đã đọc
+          ÄÃ¡nh dáº¥u táº¥t cáº£ Ä‘Ã£ Ä‘á»c
         </Button>
       </Box>
 
@@ -121,7 +121,7 @@ export const NotificationsPage: React.FC = () => {
 
       {isError && (
         <Alert severity="error" sx={{ borderRadius: 2 }}>
-          Không thể tải thông báo. Vui lòng thử lại sau.
+          KhÃ´ng thá»ƒ táº£i thÃ´ng bÃ¡o. Vui lÃ²ng thá»­ láº¡i sau.
           {error instanceof Error && `: ${error.message}`}
         </Alert>
       )}
@@ -141,10 +141,10 @@ export const NotificationsPage: React.FC = () => {
             >
               <NotificationsIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
               <Typography variant="h6" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-                Không có thông báo nào
+                KhÃ´ng cÃ³ thÃ´ng bÃ¡o nÃ o
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.disabled', mt: 0.5 }}>
-                Bạn sẽ nhận thông báo khi có cập nhật mới
+                Báº¡n sáº½ nháº­n thÃ´ng bÃ¡o khi cÃ³ cáº­p nháº­t má»›i
               </Typography>
             </Box>
           ) : (

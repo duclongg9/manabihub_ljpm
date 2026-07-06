@@ -17,6 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 @Slf4j
 @Service
@@ -120,28 +124,33 @@ public class NotificationServiceImpl implements NotificationService {
         return notificationRepository.markAllAsReadByUserId(userId, Instant.now());
     }
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @Override
     @Transactional
     public void createNotificationForRole(String roleCode, String title, String message, String type, String actionUrl) {
-        // TODO: (BR-NOTIF-01) Query UserRepository to get all user UUIDs for the given roleCode
-        // List<UUID> userIds = userRepository.findAllIdsByRoleCode(roleCode);
-        // 
-        // List<Notification> notifications = userIds.stream().map(userId -> {
-        //     Notification n = new Notification();
-        //     n.setId(UUID.randomUUID());
-        //     n.setRecipientUserId(userId);
-        //     n.setTitle(title);
-        //     n.setMessage(message);
-        //     n.setNotificationType(type);
-        //     n.setActionUrl(actionUrl);
-        //     n.setRead(false);
-        //     n.setCreatedAt(Instant.now());
-        //     return n;
-        // }).toList();
-        // 
-        // notificationRepository.saveAll(notifications); // Batch Insert
-        
-        log.info("Placeholder logic for createNotificationForRole executed for role: {}", roleCode);
+        String sql = "SELECT ur.user_id FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE r.code = :roleCode";
+
+        @SuppressWarnings("unchecked")
+        List<UUID> userIds = entityManager.createNativeQuery(sql, UUID.class)
+                .setParameter("roleCode", roleCode)
+                .getResultList();
+
+        List<Notification> notifications = userIds.stream().map(userId -> {
+            return Notification.builder()
+                    .recipientUserId(userId)
+                    .title(title)
+                    .message(message)
+                    .notificationType(type)
+                    .actionUrl(actionUrl)
+                    .isRead(false)
+                    .createdAt(Instant.now())
+                    .build();
+        }).toList();
+
+        notificationRepository.saveAll(notifications);
+        log.info("Broadcasted notification to {} users with role {}", userIds.size(), roleCode);
     }
 
     @Override
@@ -156,7 +165,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .build();
 
         notificationRepository.saveAndFlush(notification);
-        log.info("Notification created for user {} — type={}, title={}",
+        log.info("Notification created for user {} â€” type={}, title={}",
                 recipientUserId, type, title);
 
         if (recipientEmail != null && !recipientEmail.isBlank()) {
@@ -190,14 +199,14 @@ public class NotificationServiceImpl implements NotificationService {
         return """
                 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                     <div style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); padding: 20px; border-radius: 10px 10px 0 0;">
-                        <h1 style="color: white; margin: 0; font-size: 24px;">🔔 ManabiHub</h1>
+                        <h1 style="color: white; margin: 0; font-size: 24px;">ðŸ”” ManabiHub</h1>
                     </div>
                     <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
                         <span style="display: inline-block; background: #e8f0fe; color: #1967d2; padding: 4px 12px; border-radius: 12px; font-size: 12px; margin-bottom: 16px;">%s</span>
                         <h2 style="color: #333; margin: 0 0 12px 0;">%s</h2>
                         <p style="color: #555; line-height: 1.6;">%s</p>
                         <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
-                        <p style="color: #999; font-size: 12px;">Đây là email tự động từ hệ thống ManabiHub. Vui lòng không trả lời email này.</p>
+                        <p style="color: #999; font-size: 12px;">ÄÃ¢y lÃ  email tá»± Ä‘á»™ng tá»« há»‡ thá»‘ng ManabiHub. Vui lÃ²ng khÃ´ng tráº£ lá»i email nÃ y.</p>
                     </div>
                 </div>
                 """.formatted(type != null ? type : "SYSTEM", title, message);

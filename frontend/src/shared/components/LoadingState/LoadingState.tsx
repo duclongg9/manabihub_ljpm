@@ -6,9 +6,9 @@ interface LoadingStateProps {
   fullHeight?: boolean;
 }
 
-export const LoadingState: React.FC<LoadingStateProps> = ({ 
-  message = 'Loading...', 
-  fullHeight = false 
+export const LoadingState: React.FC<LoadingStateProps> = ({
+  message = 'Loading...',
+  fullHeight = false
 }) => {
   return (
     <Box

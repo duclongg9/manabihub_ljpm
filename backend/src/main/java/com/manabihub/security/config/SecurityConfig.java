@@ -11,6 +11,9 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.web.SecurityFilterChain;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -35,7 +38,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtDecoder jwtDecoder() {
+    @ConditionalOnProperty(name = "manabihub.security.mock-jwt", havingValue = "true")
+    public JwtDecoder mockJwtDecoder() {
         return token -> {
             // MOCK JWT DECODER FOR DEVELOPMENT/TESTING
             // Allows the frontend to send a UUID as a Bearer token
@@ -48,6 +52,14 @@ public class SecurityConfig {
             } catch (Exception e) {
                 throw new JwtException("Invalid mock token: " + token);
             }
+        };
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(JwtDecoder.class)
+    public JwtDecoder defaultJwtDecoder() {
+        return token -> {
+            throw new JwtException("JWT validation is not implemented yet or mock-jwt is disabled. JWT Token: " + token);
         };
     }
 }

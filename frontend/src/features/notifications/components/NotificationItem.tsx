@@ -21,20 +21,20 @@ function getRelativeTime(dateStr: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMinutes < 1) return 'Vừa xong';
-  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
-  if (diffHours < 24) return `${diffHours} giờ trước`;
-  if (diffDays < 30) return `${diffDays} ngày trước`;
+  if (diffMinutes < 1) return 'Vá»«a xong';
+  if (diffMinutes < 60) return `${diffMinutes} phÃºt trÆ°á»›c`;
+  if (diffHours < 24) return `${diffHours} giá» trÆ°á»›c`;
+  if (diffDays < 30) return `${diffDays} ngÃ y trÆ°á»›c`;
   return date.toLocaleDateString('vi-VN');
 }
 
 // Map notification type to an icon component
 function getTypeIcon(type: string): string {
-  return NOTIFICATION_TYPES[type]?.icon ?? '🔔';
+  return NOTIFICATION_TYPES[type]?.icon ?? 'ðŸ””';
 }
 
-export const NotificationItem: React.FC<NotificationItemProps> = ({ 
-  notification, 
+export const NotificationItem: React.FC<NotificationItemProps> = ({
+  notification,
   onMarkAsRead,
   onMarkAsUnread
 }) => {
@@ -120,10 +120,10 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
             >
               {notification.title}
             </Typography>
-            {/* QUAN TRỌNG badge for certain types */}
+            {/* QUAN TRá»ŒNG badge for certain types */}
             {(notification.notificationType === 'PAYMENT' || notification.notificationType === 'REFUND') && (
               <Chip
-                label="QUAN TRỌNG"
+                label="QUAN TRá»ŒNG"
                 size="small"
                 sx={{
                   height: 20,
@@ -191,7 +191,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
               <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6, mb: 2 }}>
                 {notification.message}
               </Typography>
-              
+
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 {notification.actionUrl && (
                   <Button
@@ -213,10 +213,10 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
                       '&:hover': { boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)' }
                     }}
                   >
-                    Xem chi tiết
+                    Xem chi tiáº¿t
                   </Button>
                 )}
-                
+
                 {!isUnread && (
                   <Button
                     size="small"
@@ -231,14 +231,14 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
                       borderRadius: '8px',
                       px: 2,
                       py: 0.5,
-                      '&:hover': { 
-                        bgcolor: 'background.paper', 
+                      '&:hover': {
+                        bgcolor: 'background.paper',
                         color: 'text.primary',
                         borderColor: 'text.secondary'
                       }
                     }}
                   >
-                    Đánh dấu là chưa đọc
+                    ÄÃ¡nh dáº¥u lÃ  chÆ°a Ä‘á»c
                   </Button>
                 )}
               </Box>
@@ -247,8 +247,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         </Box>
 
         {/* Expand icon */}
-        <IconButton 
-          size="small" 
+        <IconButton
+          size="small"
           onClick={handleToggleExpand}
           sx={{ color: 'text.disabled', mt: 0.5 }}
         >
