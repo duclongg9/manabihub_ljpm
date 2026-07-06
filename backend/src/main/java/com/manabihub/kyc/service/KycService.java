@@ -11,5 +11,5 @@ public interface KycService {
 
     KycRequestResponse getKycDetail(UUID id, UUID adminId);
 
-    KycRequestResponse reviewKyc(UUID id, KycReviewRequest request, UUID adminId);
+    KycRequestResponse reviewKyc(UUID id, KycReviewRequest request, UUID adminId, String adminRole, String adminEmail);
 }

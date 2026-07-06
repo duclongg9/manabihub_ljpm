@@ -24,10 +24,9 @@ public class AdminKycController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<KycRequestResponse>>> getPendingKycQueue(
-            @RequestHeader(value = "X-Demo-Admin-Id", required = false) UUID adminId
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        if (adminId == null) adminId = UUID.fromString("c0000000-0000-0000-0000-000000000002");
-
+        UUID adminId = UUID.fromString(jwt.getSubject());
         List<KycRequestResponse> queue = kycService.getPendingKycQueue(adminId);
         return ResponseEntity.ok(ApiResponse.success(
                 MessageCodes.COMMON_SUCCESS,
@@ -39,10 +38,9 @@ public class AdminKycController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<KycRequestResponse>> getKycDetail(
             @PathVariable UUID id,
-            @RequestHeader(value = "X-Demo-Admin-Id", required = false) UUID adminId
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        if (adminId == null) adminId = UUID.fromString("c0000000-0000-0000-0000-000000000002");
-
+        UUID adminId = UUID.fromString(jwt.getSubject());
         KycRequestResponse detail = kycService.getKycDetail(id, adminId);
         return ResponseEntity.ok(ApiResponse.success(
                 MessageCodes.COMMON_SUCCESS,
@@ -55,11 +53,16 @@ public class AdminKycController {
     public ResponseEntity<ApiResponse<KycRequestResponse>> reviewKyc(
             @PathVariable UUID id,
             @Valid @RequestBody KycReviewRequest reviewRequest,
-            @RequestHeader(value = "X-Demo-Admin-Id", required = false) UUID adminId
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        if (adminId == null) adminId = UUID.fromString("c0000000-0000-0000-0000-000000000002");
-
-        KycRequestResponse updated = kycService.reviewKyc(id, reviewRequest, adminId);
+        UUID adminId = UUID.fromString(jwt.getSubject());
+        String adminEmail = jwt.getClaimAsString("email");
+        String adminRole = jwt.getClaimAsString("role");
+        if (adminRole == null) {
+            adminRole = "SYSTEM_ADMIN"; // Fallback for testing if missing
+        }
+        
+        KycRequestResponse updated = kycService.reviewKyc(id, reviewRequest, adminId, adminRole, adminEmail);
         return ResponseEntity.ok(ApiResponse.success(
                 MessageCodes.ADMIN_ACTION_SUCCESS,
                 "Reviewed KYC successfully",

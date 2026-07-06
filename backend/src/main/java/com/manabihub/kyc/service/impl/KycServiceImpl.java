@@ -78,7 +78,7 @@ public class KycServiceImpl implements KycService {
 
     @Override
     @Transactional
-    public KycRequestResponse reviewKyc(UUID id, KycReviewRequest request, UUID adminId) {
+    public KycRequestResponse reviewKyc(UUID id, KycReviewRequest request, UUID adminId, String adminRole, String adminEmail) {
         checkCourseManagerAccess(adminId);
 
         KycRequest kycRequest = kycRequestRepository.findById(id)
@@ -101,6 +101,14 @@ public class KycServiceImpl implements KycService {
 
         // Validate decision note for Reject or Request Correction
         KycRequestStatus targetStatus = request.getStatus();
+        if (targetStatus == KycRequestStatus.DRAFT || targetStatus == KycRequestStatus.PENDING) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Cannot review KYC with DRAFT or PENDING status",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
         if (targetStatus == KycRequestStatus.REJECTED || targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
             if (request.getDecisionNote() == null || request.getDecisionNote().trim().isEmpty()) {
                 throw new BusinessException(
@@ -114,6 +122,8 @@ public class KycServiceImpl implements KycService {
         // Apply changes
         kycRequest.setStatus(targetStatus);
         kycRequest.setDecisionReason(request.getDecisionNote());
+        kycRequest.setReviewedBy(adminId);
+        kycRequest.setReviewedAt(Instant.now());
 
         if (targetStatus == KycRequestStatus.APPROVED) {
             TeacherProfile teacher = kycRequest.getTeacherProfile();
@@ -133,22 +143,18 @@ public class KycServiceImpl implements KycService {
         KycRequest savedRequest = kycRequestRepository.save(kycRequest);
 
         // Create Audit Log
-        try {
-            AuditLog log = AuditLog.builder()
-                    .actorType("INTERNAL_ADMIN")
-                    .actorAdminId(adminId)
-                    .actorRoleCode("COURSE_MANAGER")
-                    .action("KYC_REVIEW")
-                    .targetType("KYC_REQUEST")
-                    .targetId(kycRequest.getId())
-                    .beforeValue(Map.of("status", KycRequestStatus.PENDING.name()))
-                    .afterValue(Map.of("status", targetStatus.name()))
-                    .metadata(Map.of("decisionNote", request.getDecisionNote() != null ? request.getDecisionNote() : ""))
-                    .build();
-            auditLogRepository.save(log);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        AuditLog log = AuditLog.builder()
+                .actorType("INTERNAL_ADMIN")
+                .actorAdminId(adminId)
+                .actorRoleCode(adminRole)
+                .action("KYC_REVIEW")
+                .targetType("KYC_REQUEST")
+                .targetId(kycRequest.getId())
+                .beforeValue(Map.of("status", KycRequestStatus.PENDING.name()))
+                .afterValue(Map.of("status", targetStatus.name()))
+                .metadata(Map.of("decisionNote", request.getDecisionNote() != null ? request.getDecisionNote() : ""))
+                .build();
+        auditLogRepository.save(log);
 
         // Create Notification
         String title = "Kết quả kiểm duyệt hồ sơ KYC";
@@ -182,11 +188,32 @@ public class KycServiceImpl implements KycService {
         AppUser user = teacher.getUser();
 
         List<KycDocument> documents = kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(request.getId());
-        
+
         String frontUrl = getDocUrl(documents, KycDocumentType.ID_CARD_FRONT);
         String backUrl = getDocUrl(documents, KycDocumentType.ID_CARD_BACK);
         String certUrl = getDocUrl(documents, KycDocumentType.CERTIFICATE);
         String selfieUrl = getDocUrl(documents, KycDocumentType.SELFIE);
+
+        String vnptVerificationStatus = null;
+        String vnptResponseDetails = null;
+        if (request.getVerificationPayload() != null) {
+            vnptVerificationStatus = (String) request.getVerificationPayload().get("providerStatus");
+            try {
+                Object providerResult = request.getVerificationPayload().get("providerResult");
+                if (providerResult != null) {
+                    vnptResponseDetails = objectMapper.writeValueAsString(providerResult);
+                }
+            } catch (Exception e) {
+                vnptResponseDetails = "{}";
+            }
+        }
+
+        String processedByEmail = null;
+        if (request.getReviewedBy() != null) {
+            processedByEmail = adminAccountRepository.findById(request.getReviewedBy())
+                    .map(InternalAdminAccount::getEmail)
+                    .orElse(null);
+        }
 
         return KycRequestResponse.builder()
                 .id(request.getId())
@@ -200,10 +227,14 @@ public class KycServiceImpl implements KycService {
                 .certificateUrl(certUrl)
                 .selfieUrl(selfieUrl)
                 .copyrightAccepted(request.isCopyrightAgreed())
+                .vnptVerificationStatus(vnptVerificationStatus)
+                .vnptResponseDetails(vnptResponseDetails)
                 .riskLevel(request.getRiskLevel() != null ? request.getRiskLevel().name() : null)
                 .decisionNote(request.getDecisionReason())
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
+                .processedByEmail(processedByEmail)
+                .processedAt(request.getReviewedAt())
                 .build();
     }
 

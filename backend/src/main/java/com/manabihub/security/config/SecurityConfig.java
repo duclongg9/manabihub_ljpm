@@ -25,7 +25,7 @@ public class SecurityConfig {
         http
             .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/actuator/health",
@@ -34,8 +34,7 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/api/v1/demo/**",  // TODO: Remove before production release
                     "/api/v1/mock/**",  // TODO: Remove before production release
-                    "/api/v1/teacher/kyc/**",  // TODO: Protect with authenticated TEACHER role when JWT is implemented
-                    "/api/v1/admin/kyc-requests/**" // TODO: Protect with authenticated ADMIN role when JWT is implemented
+                    "/api/v1/teacher/kyc/**"  // TODO: Protect with authenticated TEACHER role when JWT is implemented
                 ).permitAll()
                 .anyRequest().authenticated()
             )

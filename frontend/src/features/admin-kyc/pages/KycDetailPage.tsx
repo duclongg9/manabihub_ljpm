@@ -229,7 +229,7 @@ export function KycDetailPage() {
           {/* VNPT eKYC Results */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">Kết quả đối soát VNPT</h3>
-            
+
             <div className="space-y-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-500 font-medium">Trạng thái eKYC:</span>

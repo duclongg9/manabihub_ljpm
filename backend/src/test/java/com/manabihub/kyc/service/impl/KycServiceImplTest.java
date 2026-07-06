@@ -98,7 +98,7 @@ class KycServiceImplTest {
         KycReviewRequest request = new KycReviewRequest(KycRequestStatus.APPROVED, "OK");
 
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                kycService.reviewKyc(kycId, request, randomAdminId)
+                kycService.reviewKyc(kycId, request, randomAdminId, "SYSTEM_ADMIN", "admin@manabihub.local")
         );
 
         assertEquals("ADMIN_PERMISSION_DENIED", exception.getMessageCode());
@@ -115,7 +115,24 @@ class KycServiceImplTest {
         KycReviewRequest request = new KycReviewRequest(KycRequestStatus.REJECTED, "   ");
 
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                kycService.reviewKyc(kycId, request, courseManager.getId())
+                kycService.reviewKyc(kycId, request, courseManager.getId(), "COURSE_MANAGER", "manager@manabihub.local")
+        );
+
+        assertEquals("VALIDATION_FAILED", exception.getMessageCode());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getHttpStatus());
+        verify(kycRequestRepository, never()).save(any());
+    }
+
+    @Test
+    void testReviewKyc_WhenInvalidStatus_ShouldThrowException() {
+        when(adminAccountRepository.existsByAdminIdAndRoleCodes(eq(courseManager.getId()), anyList())).thenReturn(true);
+        when(kycRequestRepository.findById(kycId)).thenReturn(Optional.of(pendingKycRequest));
+        when(adminAccountRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
+
+        KycReviewRequest request = new KycReviewRequest(KycRequestStatus.DRAFT, "Drafting");
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                kycService.reviewKyc(kycId, request, courseManager.getId(), "COURSE_MANAGER", "manager@manabihub.local")
         );
 
         assertEquals("VALIDATION_FAILED", exception.getMessageCode());
@@ -130,12 +147,12 @@ class KycServiceImplTest {
         when(kycRequestRepository.findById(kycId)).thenReturn(Optional.of(pendingKycRequest));
         when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(i -> i.getArguments()[0]);
         when(kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(any())).thenReturn(List.of());
-        
+
         // removed userRepository mocks
 
         KycReviewRequest request = new KycReviewRequest(KycRequestStatus.APPROVED, "Looks good");
 
-        KycRequestResponse response = kycService.reviewKyc(kycId, request, courseManager.getId());
+        KycRequestResponse response = kycService.reviewKyc(kycId, request, courseManager.getId(), "COURSE_MANAGER", "manager@manabihub.local");
 
         assertNotNull(response);
         assertEquals(KycRequestStatus.APPROVED, response.getStatus());
@@ -148,7 +165,7 @@ class KycServiceImplTest {
     @Test
     void testReviewKyc_WhenStatusNotPending_ShouldThrowConflict() {
         when(adminAccountRepository.existsByAdminIdAndRoleCodes(eq(courseManager.getId()), anyList())).thenReturn(true);
-        
+
         KycRequest approvedRequest = new KycRequest();
         approvedRequest.setId(kycId);
         approvedRequest.setStatus(KycRequestStatus.APPROVED);
@@ -157,7 +174,7 @@ class KycServiceImplTest {
         KycReviewRequest request = new KycReviewRequest(KycRequestStatus.REJECTED, "Bad");
 
         BusinessException exception = assertThrows(BusinessException.class, () ->
-                kycService.reviewKyc(kycId, request, courseManager.getId())
+                kycService.reviewKyc(kycId, request, courseManager.getId(), "COURSE_MANAGER", "manager@manabihub.local")
         );
 
         assertEquals("COMMON_CONFLICT", exception.getMessageCode());
