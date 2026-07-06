@@ -3,9 +3,20 @@ import { PublicLayout } from '../shared/layouts/PublicLayout';
 import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
 import { AdminLayout } from '../shared/layouts/AdminLayout';
-import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
+import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
+import { PublicLoginPage } from './pages/PublicLoginPage';
+import { AdminLoginPage } from './pages/AdminLoginPage';
 
 export const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: <PublicLoginPage />,
+  },
+  {
+    path: '/admin/login',
+    element: <AdminLoginPage />,
+  },
   {
     path: '/',
     element: <PublicLayout />,
@@ -15,8 +26,12 @@ export const router = createBrowserRouter([
         element: <div>Home Page Placeholder</div>,
       },
       {
-        path: 'login',
-        element: <div>Login Page Placeholder</div>,
+        path: 'auth/callback',
+        element: <AuthCallbackPage />,
+      },
+      {
+        path: 'onboarding/student',
+        element: <StudentOnboardingPage />,
       },
     ],
   },
@@ -36,11 +51,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <TeacherKycRoute />,
-      },
-      {
-        path: 'kyc',
-        element: <TeacherKycRoute />,
+        element: <div>Teacher Dashboard Placeholder</div>,
       },
     ],
   },

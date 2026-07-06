@@ -24,12 +24,17 @@ spring:
       client:
         registration:
           google:
-            client-id: dummy-client-id
-            client-secret: dummy-client-secret
-            scope: openid, profile, email
+            client-id: ${GOOGLE_CLIENT_ID:your-client-id-here}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-client-secret-here}
+            scope:  profile, email
         provider:
           google:
             issuer-uri: https://accounts.google.com
 
 server:
   port: 8081
+
+app:
+  frontend:
+    onboarding-url: http://localhost:5173/onboarding/student
+    success-url: http://localhost:5173/auth/callback
