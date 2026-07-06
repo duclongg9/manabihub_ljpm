@@ -122,6 +122,30 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public void createNotificationForRole(String roleCode, String title, String message, String type, String actionUrl) {
+        // TODO: (BR-NOTIF-01) Query UserRepository to get all user UUIDs for the given roleCode
+        // List<UUID> userIds = userRepository.findAllIdsByRoleCode(roleCode);
+        // 
+        // List<Notification> notifications = userIds.stream().map(userId -> {
+        //     Notification n = new Notification();
+        //     n.setId(UUID.randomUUID());
+        //     n.setRecipientUserId(userId);
+        //     n.setTitle(title);
+        //     n.setMessage(message);
+        //     n.setNotificationType(type);
+        //     n.setActionUrl(actionUrl);
+        //     n.setRead(false);
+        //     n.setCreatedAt(Instant.now());
+        //     return n;
+        // }).toList();
+        // 
+        // notificationRepository.saveAll(notifications); // Batch Insert
+        
+        log.info("Placeholder logic for createNotificationForRole executed for role: {}", roleCode);
+    }
+
+    @Override
+    @Transactional
     public void createNotification(UUID recipientUserId, String recipientEmail,
                                    String title, String message, String type) {
         Notification notification = Notification.builder()

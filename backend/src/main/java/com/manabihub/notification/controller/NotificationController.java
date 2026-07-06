@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,12 +34,13 @@ public class NotificationController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<NotificationResponse>>> listNotifications(
-            @RequestHeader("X-User-Id") UUID userId,
+            @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) Boolean isRead,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
+        UUID userId = UUID.fromString(jwt.getSubject());
         Page<NotificationResponse> result = notificationService.listMyNotifications(
                 userId, type, isRead, PageRequest.of(page, size));
 
@@ -45,8 +49,9 @@ public class NotificationController {
 
     @GetMapping("/unread-count")
     public ResponseEntity<ApiResponse<Map<String, Long>>> getUnreadCount(
-            @RequestHeader("X-User-Id") UUID userId) {
+            @AuthenticationPrincipal Jwt jwt) {
 
+        UUID userId = UUID.fromString(jwt.getSubject());
         long count = notificationService.countUnread(userId);
 
         return ResponseEntity.ok(ApiResponse.success(Map.of("unreadCount", count)));
@@ -55,8 +60,9 @@ public class NotificationController {
     @PatchMapping("/{id}/read")
     public ResponseEntity<ApiResponse<NotificationResponse>> markAsRead(
             @PathVariable UUID id,
-            @RequestHeader("X-User-Id") UUID userId) {
+            @AuthenticationPrincipal Jwt jwt) {
 
+        UUID userId = UUID.fromString(jwt.getSubject());
         NotificationResponse response = notificationService.markAsRead(id, userId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -65,8 +71,9 @@ public class NotificationController {
     @PatchMapping("/{id}/unread")
     public ResponseEntity<ApiResponse<NotificationResponse>> markAsUnread(
             @PathVariable UUID id,
-            @RequestHeader("X-User-Id") UUID userId) {
+            @AuthenticationPrincipal Jwt jwt) {
 
+        UUID userId = UUID.fromString(jwt.getSubject());
         NotificationResponse response = notificationService.markAsUnread(id, userId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -74,24 +81,11 @@ public class NotificationController {
 
     @PatchMapping("/read-all")
     public ResponseEntity<ApiResponse<Map<String, Integer>>> markAllAsRead(
-            @RequestHeader("X-User-Id") UUID userId) {
+            @AuthenticationPrincipal Jwt jwt) {
 
+        UUID userId = UUID.fromString(jwt.getSubject());
         int count = notificationService.markAllAsRead(userId);
 
         return ResponseEntity.ok(ApiResponse.success(Map.of("updatedCount", count)));
-    }
-
-    @GetMapping("/test-email")
-    public ResponseEntity<ApiResponse<String>> testEmail(
-            @RequestParam String targetEmail) {
-
-        notificationService.sendTestEmailOnly(
-                targetEmail,
-                "Welcome to ManabiHub",
-                "Đây là email tự động gửi từ máy chủ ManabiHub. Nếu bạn nhận được thư này bạn là gay! Bạn có thể chuyển sang bước tiếp theo.",
-                "SYSTEM"
-        );
-
-        return ResponseEntity.ok(ApiResponse.success("Đã gửi yêu cầu gửi mail thành công!"));
     }
 }

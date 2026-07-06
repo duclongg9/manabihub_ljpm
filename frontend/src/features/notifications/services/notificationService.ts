@@ -17,7 +17,7 @@ const getTempUserId = () => {
 };
 
 const authHeaders = () => ({
-  'X-User-Id': getTempUserId(),
+  'Authorization': `Bearer ${getTempUserId()}`,
 });
 
 export const notificationService = {
