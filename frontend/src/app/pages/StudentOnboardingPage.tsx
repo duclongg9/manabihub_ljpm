@@ -5,11 +5,11 @@ import {
   Avatar, Container, InputAdornment,
   FormControl, InputLabel, Select, FormHelperText
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -140,7 +140,7 @@ export function StudentOnboardingPage() {
                         <Button
                           variant="outlined"
                           component="span"
-                          startIcon={<CloudUploadIcon />}
+                          startIcon={<UploadFileIcon />}
                           sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, borderColor: 'grey.300', color: 'grey.700' }}
                         >
                           Tải ảnh lên
@@ -233,7 +233,7 @@ export function StudentOnboardingPage() {
             {/* STEP 1: FINISH */}
             {activeStep === 1 && (
               <Box sx={{ textAlign: 'center', py: 6 }}>
-                <CheckCircleIcon sx={{ fontSize: 80, color: '#22c55e', mb: 3 }} />
+                <TaskAltIcon sx={{ fontSize: 80, color: '#22c55e', mb: 3 }} />
                 <Typography variant="h4" sx={{ fontWeight: 800, mb: 2, color: 'grey.900' }}>
                   Hoàn tất thiết lập!
                 </Typography>

@@ -1,5 +1,4 @@
-import React from 'react';
-import { Box, Typography, Button, Stack, Avatar, AvatarGroup, keyframes, Fade } from '@mui/material';
+import { Box, Typography, Button, Stack, Avatar, AvatarGroup, keyframes } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { Link } from 'react-router-dom';
