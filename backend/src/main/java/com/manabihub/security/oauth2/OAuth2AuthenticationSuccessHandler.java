@@ -27,57 +27,56 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private final JwtEncoder jwtEncoder;
-    private final StudentProfileRepository studentProfileRepository;
+        private final JwtEncoder jwtEncoder;
+        private final StudentProfileRepository studentProfileRepository;
 
-    @Value("${app.frontend.onboarding-url:http://localhost:5173/onboarding/student}")
-    private String frontendOnboardingUrl;
+        @Value("${app.frontend.onboarding-url:http://localhost:5173/onboarding/student}")
+        private String frontendOnboardingUrl;
 
-    @Value("${app.frontend.success-url:http://localhost:5173/auth/callback}")
-    private String frontendSuccessUrl;
+        @Value("${app.frontend.success-url:http://localhost:5173/auth/callback}")
+        private String frontendSuccessUrl;
 
-    @Override
-    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
-                                        Authentication authentication) throws IOException, ServletException {
-        
-        CustomOAuth2User oauth2User = (CustomOAuth2User) authentication.getPrincipal();
-        AppUser appUser = oauth2User.getAppUser();
+        @Override
+        public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+                        Authentication authentication) throws IOException, ServletException {
 
-        // 1. Generate JWT
-        String token = generateJwtToken(appUser);
+                CustomOAuth2User oauth2User = (CustomOAuth2User) authentication.getPrincipal();
+                AppUser appUser = oauth2User.getAppUser();
 
-        // 2. Check onboarding status based on StudentProfile existence
-        boolean isOnboardingCompleted = studentProfileRepository.existsByUserId(appUser.getId());
+                // 1. Generate JWT
+                String token = generateJwtToken(appUser);
 
-        // 3. Redirect to appropriate URL
-        String targetUrl = isOnboardingCompleted ? 
-                frontendSuccessUrl + "?token=" + token : 
-                frontendOnboardingUrl + "?token=" + token;
-                
-        log.info("OAuth2 login successful for {}. Redirecting to {}", appUser.getEmail(), targetUrl);
-        getRedirectStrategy().sendRedirect(request, response, targetUrl);
-    }
+                // 2. Check onboarding status based on StudentProfile existence
+                boolean isOnboardingCompleted = studentProfileRepository.existsByUserId(appUser.getId());
 
-    private String generateJwtToken(AppUser appUser) {
-        Instant now = Instant.now();
-        
-        // Match the algorithm used in SecurityConfig (HS256)
-        JwsHeader jwsHeader = JwsHeader.with(MacAlgorithm.HS256).build();
+                // 3. Redirect to appropriate URL
+                String targetUrl = isOnboardingCompleted ? frontendSuccessUrl + "?token=" + token
+                                : frontendOnboardingUrl + "?token=" + token;
 
-        String roles = appUser.getRoles().stream()
-                .map(role -> role.getCode().name())
-                .collect(Collectors.joining(" "));
+                log.info("OAuth2 login successful for {}. Redirecting to {}", appUser.getEmail(), targetUrl);
+                getRedirectStrategy().sendRedirect(request, response, targetUrl);
+        }
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .issuer("self")
-                .issuedAt(now)
-                .expiresAt(now.plus(24, ChronoUnit.HOURS))
-                .subject(appUser.getId().toString())
-                .claim("email", appUser.getEmail())
-                .claim("role", roles)
-                .claim("type", "PUBLIC_USER")
-                .build();
+        private String generateJwtToken(AppUser appUser) {
+                Instant now = Instant.now();
 
-        return this.jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
-    }
+                // Match the algorithm used in SecurityConfig (HS256)
+                JwsHeader jwsHeader = JwsHeader.with(MacAlgorithm.HS256).build();
+
+                String roles = appUser.getRoles().stream()
+                                .map(role -> role.getCode().name())
+                                .collect(Collectors.joining(" "));
+
+                JwtClaimsSet claims = JwtClaimsSet.builder()
+                                .issuer("self")
+                                .issuedAt(now)
+                                .expiresAt(now.plus(24, ChronoUnit.HOURS))
+                                .subject(appUser.getId().toString())
+                                .claim("email", appUser.getEmail())
+                                .claim("role", roles)
+                                .claim("type", "PUBLIC_USER")
+                                .build();
+
+                return this.jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
+        }
 }

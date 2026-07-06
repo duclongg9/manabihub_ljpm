@@ -60,13 +60,7 @@ if (-not $isJava21) {
 }
 
 
-try {
-    $null = Get-Command mvn -ErrorAction Stop
-} catch {
-    Write-Host "ERROR: Maven (mvn) not found in PATH. Please install Maven and add it to your PATH." -ForegroundColor Red
-    exit 1
-}
-
 Write-Host "Starting Spring Boot backend..." -ForegroundColor Cyan
 Set-Location -Path "backend"
-mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+$mvnCommand = if (Test-Path ".\mvnw.cmd") { ".\mvnw.cmd" } else { "mvn" }
+& $mvnCommand spring-boot:run "-Dspring-boot.run.profiles=local"
