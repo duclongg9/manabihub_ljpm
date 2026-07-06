@@ -21,16 +21,16 @@ function getRelativeTime(dateStr: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMinutes < 1) return 'Vá»«a xong';
-  if (diffMinutes < 60) return `${diffMinutes} phÃºt trÆ°á»›c`;
-  if (diffHours < 24) return `${diffHours} giá» trÆ°á»›c`;
-  if (diffDays < 30) return `${diffDays} ngÃ y trÆ°á»›c`;
+  if (diffMinutes < 1) return 'Vừa xong';
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  if (diffDays < 30) return `${diffDays} ngày trước`;
   return date.toLocaleDateString('vi-VN');
 }
 
 // Map notification type to an icon component
 function getTypeIcon(type: string): string {
-  return NOTIFICATION_TYPES[type]?.icon ?? 'ðŸ””';
+  return NOTIFICATION_TYPES[type]?.icon ?? '🔔';
 }
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({
@@ -120,10 +120,10 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
             >
               {notification.title}
             </Typography>
-            {/* QUAN TRá»ŒNG badge for certain types */}
+            {/* QUAN TRỌNG badge for certain types */}
             {(notification.notificationType === 'PAYMENT' || notification.notificationType === 'REFUND') && (
               <Chip
-                label="QUAN TRá»ŒNG"
+                label="QUAN TRỌNG"
                 size="small"
                 sx={{
                   height: 20,
@@ -213,7 +213,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
                       '&:hover': { boxShadow: '0 2px 8px rgba(79, 70, 229, 0.3)' }
                     }}
                   >
-                    Xem chi tiáº¿t
+                    Xem chi tiết
                   </Button>
                 )}
 
@@ -238,7 +238,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
                       }
                     }}
                   >
-                    ÄÃ¡nh dáº¥u lÃ  chÆ°a Ä‘á»c
+                    Đánh dấu là chưa đọc
                   </Button>
                 )}
               </Box>

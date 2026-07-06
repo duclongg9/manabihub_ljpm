@@ -8,7 +8,7 @@
 --   3. Profile + Teacher KYC
 --   4. Course + Content + Approval
 --   5. Enrollment + Learning
---   6. AI Writing (Suggestion-Only â€” NOT grading/scoring)
+--   6. AI Writing (Suggestion-Only — NOT grading/scoring)
 --   7. Commerce + Wallet + Refund + Payout
 --   8. Moderation + Notification
 --
@@ -24,7 +24,7 @@
 -- PART 1: IDENTITY + RBAC
 -- ============================================================================
 
--- 1. app_users â€” Public platform users (Google OAuth)
+-- 1. app_users — Public platform users (Google OAuth)
 CREATE TABLE app_users (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     email           VARCHAR(255) UNIQUE NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE permissions (
 
 CREATE INDEX idx_permissions_code ON permissions (code);
 
--- 4. user_roles â€” Many-to-many: app_users <-> roles
+-- 4. user_roles — Many-to-many: app_users <-> roles
 CREATE TABLE user_roles (
     user_id    UUID        NOT NULL REFERENCES app_users (id),
     role_id    UUID        NOT NULL REFERENCES roles (id),
@@ -81,7 +81,7 @@ CREATE TABLE user_roles (
 CREATE INDEX idx_user_roles_user_id ON user_roles (user_id);
 CREATE INDEX idx_user_roles_role_id ON user_roles (role_id);
 
--- 5. role_permissions â€” Many-to-many: roles <-> permissions
+-- 5. role_permissions — Many-to-many: roles <-> permissions
 CREATE TABLE role_permissions (
     role_id       UUID        NOT NULL REFERENCES roles (id),
     permission_id UUID        NOT NULL REFERENCES permissions (id),
@@ -93,7 +93,7 @@ CREATE TABLE role_permissions (
 CREATE INDEX idx_role_permissions_role_id       ON role_permissions (role_id);
 CREATE INDEX idx_role_permissions_permission_id ON role_permissions (permission_id);
 
--- 6. internal_admin_accounts â€” Admin Portal accounts (separate from Google OAuth)
+-- 6. internal_admin_accounts — Admin Portal accounts (separate from Google OAuth)
 CREATE TABLE internal_admin_accounts (
     id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     email          VARCHAR(255) UNIQUE NOT NULL,
@@ -111,7 +111,7 @@ CREATE INDEX idx_internal_admin_email      ON internal_admin_accounts (email);
 CREATE INDEX idx_internal_admin_status     ON internal_admin_accounts (account_status);
 CREATE INDEX idx_internal_admin_created_at ON internal_admin_accounts (created_at);
 
--- 7. internal_admin_roles â€” Many-to-many: internal_admin_accounts <-> roles
+-- 7. internal_admin_roles — Many-to-many: internal_admin_accounts <-> roles
 CREATE TABLE internal_admin_roles (
     admin_account_id UUID        NOT NULL REFERENCES internal_admin_accounts (id),
     role_id          UUID        NOT NULL REFERENCES roles (id),
@@ -384,7 +384,7 @@ CREATE INDEX idx_lesson_progress_status        ON lesson_progress (status);
 
 
 -- ============================================================================
--- PART 6: AI WRITING (SUGGESTION-ONLY â€” NOT grading / scoring / official assessment)
+-- PART 6: AI WRITING (SUGGESTION-ONLY — NOT grading / scoring / official assessment)
 -- ============================================================================
 
 -- 21. writing_submissions

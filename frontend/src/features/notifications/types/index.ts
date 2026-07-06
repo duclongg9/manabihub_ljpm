@@ -36,34 +36,34 @@ export interface NotificationTypeConfig {
 
 export const NOTIFICATION_TYPES: Record<string, NotificationTypeConfig> = {
   PAYMENT: {
-    label: 'Thanh toÃ¡n',
+    label: 'Thanh toán',
     color: '#E65100',
     bgColor: '#FFF3E0',
-    icon: 'ðŸ’³',
+    icon: '💳',
   },
   AI_FEEDBACK: {
     label: 'AI Feedback',
     color: '#1565C0',
     bgColor: '#E3F2FD',
-    icon: 'âœ¨',
+    icon: '✨',
   },
   REFUND: {
-    label: 'HoÃ n tiá»n',
+    label: 'Hoàn tiền',
     color: '#6A1B9A',
     bgColor: '#F3E5F5',
-    icon: 'â†©',
+    icon: '↩',
   },
   COURSE: {
-    label: 'KhÃ³a há»c',
+    label: 'Khóa học',
     color: '#2E7D32',
     bgColor: '#E8F5E9',
-    icon: 'ðŸ“š',
+    icon: '📚',
   },
   SYSTEM: {
-    label: 'Há»‡ thá»‘ng',
+    label: 'Hệ thống',
     color: '#455A64',
     bgColor: '#ECEFF1',
-    icon: 'âš™',
+    icon: '⚙',
   },
 };
 

@@ -16,7 +16,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, breadcrumbs, acti
           <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
             {title}
           </Typography>
-
+          
           {breadcrumbs && breadcrumbs.length > 0 && (
             <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
               {breadcrumbs.map((bc, index) => {
@@ -37,7 +37,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, breadcrumbs, acti
             </Breadcrumbs>
           )}
         </Box>
-
+        
         {action && (
           <Box sx={{ display: 'flex', gap: 2 }}>
             {action}

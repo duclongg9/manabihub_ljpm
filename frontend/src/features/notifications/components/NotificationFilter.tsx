@@ -21,7 +21,7 @@ export const NotificationFilter: React.FC<NotificationFilterProps> = ({
       {/* Type filter chips */}
       <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
         <Chip
-          label="Táº¥t cáº£ loáº¡i"
+          label="Tất cả loại"
           onClick={() => onTypeChange(null)}
           variant={selectedType === null ? 'filled' : 'outlined'}
           color={selectedType === null ? 'primary' : 'default'}
@@ -63,9 +63,9 @@ export const NotificationFilter: React.FC<NotificationFilterProps> = ({
       {/* Read status filter */}
       <Stack direction="row" spacing={1}>
         {([
-          { key: 'ALL' as ReadFilter, label: 'Táº¥t cáº£' },
-          { key: 'UNREAD' as ReadFilter, label: 'ChÆ°a Ä‘á»c' },
-          { key: 'READ' as ReadFilter, label: 'ÄÃ£ Ä‘á»c' },
+          { key: 'ALL' as ReadFilter, label: 'Tất cả' },
+          { key: 'UNREAD' as ReadFilter, label: 'Chưa đọc' },
+          { key: 'READ' as ReadFilter, label: 'Đã đọc' },
         ]).map(({ key, label }) => (
           <Chip
             key={key}

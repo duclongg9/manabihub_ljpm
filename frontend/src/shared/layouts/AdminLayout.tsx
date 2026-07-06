@@ -15,13 +15,13 @@ export const AdminLayout: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       <Header showMenuIcon onMenuClick={handleDrawerToggle} />
-      <Sidebar
-        menuItems={ADMIN_MENU}
-        open={mobileOpen}
+      <Sidebar 
+        menuItems={ADMIN_MENU} 
+        open={mobileOpen} 
         onClose={handleDrawerToggle}
         variant="permanent"
       />
-
+      
       <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - 260px)` } }}>
         <Toolbar /> {/* Spacer */}
         <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
