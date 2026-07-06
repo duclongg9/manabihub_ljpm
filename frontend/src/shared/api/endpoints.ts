@@ -6,4 +6,10 @@ export const ENDPOINTS = {
     MARK_ALL_READ: '/v1/notifications/read-all',
     TEST_EMAIL: '/v1/notifications/test-email',
   },
+  teacherKyc: {
+    status: '/v1/teacher/kyc/status',
+    identityVerifications: '/v1/teacher/kyc/identity-verifications',
+    restartVerification: '/v1/teacher/kyc/restart-verification',
+    certificateSubmissions: '/v1/teacher/kyc/certificate-submissions',
+  },
 };

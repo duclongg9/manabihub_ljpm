@@ -4,6 +4,7 @@ import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
 import { AdminLayout } from '../shared/layouts/AdminLayout';
 import { NotificationsPage } from '../features/notifications/pages/NotificationsPage';
+import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
 
 export const router = createBrowserRouter([
   {
@@ -40,11 +41,15 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <div>Teacher Dashboard Placeholder</div>,
+        element: <TeacherKycRoute />,
       },
       {
         path: 'notifications',
         element: <NotificationsPage />,
+      },
+      {
+        path: 'kyc',
+        element: <TeacherKycRoute />,
       },
     ],
   },
