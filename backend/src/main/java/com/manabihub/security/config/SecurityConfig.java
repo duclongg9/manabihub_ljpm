@@ -46,6 +46,10 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // TODO: [UC-21 Tech Debt] This mock decoder accepts any UUID as a valid JWT.
+    // It is gated by @ConditionalOnProperty so it ONLY activates when
+    // manabihub.security.mock-jwt=true (set in application-local.yml).
+    // Replace with real JWT validation (e.g., Keycloak, Spring Auth Server) before production.
     @Bean
     @ConditionalOnProperty(name = "manabihub.security.mock-jwt", havingValue = "true")
     public JwtDecoder mockJwtDecoder() {

@@ -22,12 +22,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.web.bind.annotation.CrossOrigin;
 
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*") // Allow frontend requests
 public class NotificationController {
 
     private final NotificationService notificationService;
