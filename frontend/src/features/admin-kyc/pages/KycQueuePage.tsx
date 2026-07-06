@@ -54,7 +54,7 @@ export function KycQueuePage() {
               setError(null);
               const data = await adminKycService.getPendingKycQueue();
               setQueue(data);
-            } catch (e) {
+            } catch {
               setError('Không thể mock login. Vui lòng kiểm tra backend.');
             } finally {
               setLoading(false);

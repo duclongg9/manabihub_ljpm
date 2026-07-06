@@ -33,6 +33,8 @@ public final class MessageCodes {
     public static final String COMMON_NOT_FOUND = "COMMON_NOT_FOUND";
     public static final String COMMON_CONFLICT = "COMMON_CONFLICT";
     public static final String COMMON_INTERNAL_ERROR = "COMMON_INTERNAL_ERROR";
+    public static final String MSG_COM_002 = "MSG-COM-002"; // Required field is empty
+
 
     // ──────────────────────────────────────────────
     // VALIDATION — input validation errors
@@ -48,6 +50,9 @@ public final class MessageCodes {
     public static final String AUTH_TOKEN_INVALID = "AUTH_TOKEN_INVALID";
     public static final String AUTH_LOGIN_SUCCESS = "AUTH_LOGIN_SUCCESS";
     public static final String AUTH_LOGOUT_SUCCESS = "AUTH_LOGOUT_SUCCESS";
+    public static final String MSG_AUTH_007 = "MSG-AUTH-007"; // Admin login failed
+    public static final String MSG_AUTH_008 = "MSG-AUTH-008"; // Admin account locked
+
 
     // ──────────────────────────────────────────────
     // PROFILE — user profile management

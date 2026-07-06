@@ -1,5 +1,10 @@
 package com.manabihub;
 
+import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.identity.repository.RoleRepository;
+import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.service.TeacherKycService;
 import com.manabihub.mock.repository.MockJlptRegistryRepository;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
@@ -8,9 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import com.manabihub.kyc.repository.KycRequestRepository;
-import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.notification.repository.NotificationRepository;
-import com.manabihub.kyc.repository.InternalAdminAccountRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 
@@ -27,7 +30,7 @@ class ManabiHubApplicationTests {
     private KycRequestRepository kycRequestRepository;
 
     @MockBean
-    private InternalAdminAccountRepository internalAdminAccountRepository;
+    private com.manabihub.kyc.repository.InternalAdminAccountRepository kycInternalAdminAccountRepository;
 
     @MockBean
     private TeacherProfileRepository teacherProfileRepository;
@@ -46,6 +49,18 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private TeacherKycService teacherKycService;
+
+    @MockBean
+    private AppUserRepository appUserRepository;
+
+    @MockBean
+    private InternalAdminAccountRepository identityInternalAdminAccountRepository;
+
+    @MockBean
+    private RoleRepository roleRepository;
+
+    @MockBean
+    private StudentProfileRepository studentProfileRepository;
 
     @MockBean
     private MockNationalIdRegistryRepository mockNationalIdRegistryRepository;

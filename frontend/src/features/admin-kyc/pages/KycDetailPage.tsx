@@ -79,7 +79,7 @@ export function KycDetailPage() {
     if (detail.vnptResponseDetails) {
       vnptDetails = JSON.parse(detail.vnptResponseDetails);
     }
-  } catch (e) {
+  } catch {
     // Keep null if JSON parse fails
   }
 
