@@ -58,7 +58,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
     @Override
     @Transactional
-    // [CODE NOTE - UC-03]: Hàm login() xử lý xác thực email/password. 
+    // [CODE NOTE - UC-03]: Hàm login() xử lý xác thực email/password.
     // - Đáp ứng tiêu chí: "Invalid/locked login is handled safely with generic error response." (Báo lỗi chung MSG-AUTH-007).
     // - Đáp ứng tiêu chí: "Locked/disabled internal account cannot log in." (Kiểm tra AccountStatus và In-memory lock).
     public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
@@ -87,7 +87,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
         // Success -> reset attempts
         resetAttempts(email);
-        
+
         // Update last login
         account.setLastLoginAt(Instant.now());
         adminAccountRepository.save(account);

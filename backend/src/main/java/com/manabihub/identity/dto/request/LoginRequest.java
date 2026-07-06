@@ -6,7 +6,7 @@ import lombok.Data;
 
 @Data
 public class LoginRequest {
-    
+
     @NotBlank(message = "MSG-COM-002") // Required field is empty
     @Email(message = "MSG-COM-002")    // Reusing the general empty/invalid message code per spec
     private String email;

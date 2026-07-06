@@ -1,5 +1,8 @@
 package com.manabihub.security.config;
 
+import com.manabihub.security.oauth2.CustomOAuth2UserService;
+import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
+import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,23 +22,17 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import com.manabihub.security.oauth2.CustomOAuth2UserService;
-import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
-import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import javax.crypto.spec.SecretKeySpec;
 import java.util.Arrays;
 import java.util.List;
 
-import javax.crypto.spec.SecretKeySpec;
-
 @Configuration
 @EnableWebSecurity
-// [CODE NOTE - UC-03]: @EnableMethodSecurity cho phép dùng @PreAuthorize. Đáp
-// ứng tiêu chí "Every sensitive admin API must be protected server-side by
-// RBAC."
-@EnableMethodSecurity // Allows @PreAuthorize
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Value("${jwt.secret:defaultSecretKeyThatIsAtLeast32BytesLongForHS256Algorithm}")
@@ -47,17 +44,18 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
             CustomOAuth2UserService customOAuth2UserService,
             OAuth2AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler,
-            OAuth2AuthenticationFailureHandler oauth2AuthenticationFailureHandler) throws Exception {
+            OAuth2AuthenticationFailureHandler oauth2AuthenticationFailureHandler
+    ) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
+                .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(e -> e.authenticationEntryPoint(
                         new org.springframework.security.web.authentication.HttpStatusEntryPoint(
                                 org.springframework.http.HttpStatus.UNAUTHORIZED)))
-                // OAuth2 Login flow requires a temporary session for state/nonce verification
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -66,9 +64,9 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/api/v1/demo/**",
-                                // [CODE NOTE - UC-03]: Mở public endpoint login cho Admin Portal để client có
-                                // thể gọi.
-                                "/api/admin/auth/login", // Expose admin login endpoint
+                                "/api/v1/mock/**",
+                                "/api/v1/teacher/kyc/**",
+                                "/api/admin/auth/login",
                                 "/oauth2/**",
                                 "/login/oauth2/**")
                         .permitAll()
@@ -110,7 +108,6 @@ public class SecurityConfig {
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        // Convert "roles" claim into standard Spring Security "ROLE_*" authorities
         grantedAuthoritiesConverter.setAuthoritiesClaimName("role");
         grantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
 
@@ -118,5 +115,4 @@ public class SecurityConfig {
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
         return jwtAuthenticationConverter;
     }
-
 }

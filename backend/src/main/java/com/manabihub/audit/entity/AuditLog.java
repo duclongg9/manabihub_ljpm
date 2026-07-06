@@ -3,6 +3,7 @@ package com.manabihub.audit.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -11,7 +12,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -29,11 +29,11 @@ import java.util.UUID;
 public class AuditLog {
 
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "actor_type", nullable = false)
-    private String actorType; // USER, INTERNAL_ADMIN, SYSTEM
+    private String actorType;
 
     @Column(name = "actor_user_id")
     private UUID actorUserId;
@@ -52,7 +52,7 @@ public class AuditLog {
 
     @Column(name = "target_id")
     private UUID targetId;
-    
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "before_value", columnDefinition = "jsonb")
     private Map<String, Object> beforeValue;
@@ -62,7 +62,7 @@ public class AuditLog {
     private Map<String, Object> afterValue;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
+    @Column(name = "metadata", columnDefinition = "jsonb")
     private Map<String, Object> metadata;
 
     @Column(name = "ip_address")

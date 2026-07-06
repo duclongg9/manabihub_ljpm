@@ -13,4 +13,3 @@ public class AdminProfileResponse {
     private String fullName;
     private String role;
 }
-

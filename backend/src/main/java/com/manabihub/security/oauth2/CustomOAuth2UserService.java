@@ -44,12 +44,12 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                     .orElseThrow(() -> new IllegalStateException("STUDENT role not found in database"));
 
             AppUser newUser = AppUser.builder()
-                    
+
                     .email(email)
                     .fullName(name)
                     .avatarUrl(picture)
                     .provider("GOOGLE")
-                    
+
                     .providerUserId(providerUserId)
                     .roles(Set.of(studentRole))
                     .build();
@@ -71,9 +71,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         return new CustomOAuth2User(oauth2User, appUser);
-                    
+
     }
 }
-
-
-        

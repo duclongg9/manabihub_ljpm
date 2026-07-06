@@ -68,6 +68,7 @@ public final class MessageCodes {
     public static final String KYC_APPROVED = "KYC_APPROVED";
     public static final String KYC_REJECTED = "KYC_REJECTED";
     public static final String KYC_NOT_APPROVED = "KYC_NOT_APPROVED";
+    public static final String KYC_RESUBMISSION_REQUIRED = "KYC_RESUBMISSION_REQUIRED";
     public static final String KYC_TEACHER_NOT_FOUND = "KYC_TEACHER_NOT_FOUND";
     public static final String KYC_ALREADY_PENDING = "KYC_ALREADY_PENDING";
     public static final String KYC_ALREADY_APPROVED = "KYC_ALREADY_APPROVED";
@@ -152,6 +153,8 @@ public final class MessageCodes {
     // ──────────────────────────────────────────────
     public static final String ADMIN_ACTION_SUCCESS = "ADMIN_ACTION_SUCCESS";
     public static final String ADMIN_ACTION_FORBIDDEN = "ADMIN_ACTION_FORBIDDEN";
+    public static final String COURSE_MANAGER_REQUIRED = "COURSE_MANAGER_REQUIRED";
+    public static final String ADMIN_PERMISSION_DENIED = "ADMIN_PERMISSION_DENIED";
 
     // ──────────────────────────────────────────────
     // NOTIFICATION — notification system

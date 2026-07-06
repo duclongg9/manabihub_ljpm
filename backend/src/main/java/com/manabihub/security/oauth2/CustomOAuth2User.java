@@ -39,7 +39,7 @@ public class CustomOAuth2User implements OAuth2User {
     public String getEmail() {
         return oauth2User.getAttribute("email");
     }
-    
+
     public AppUser getAppUser() {
         return appUser;
     }

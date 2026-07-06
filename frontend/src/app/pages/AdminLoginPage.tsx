@@ -38,7 +38,7 @@ export function AdminLoginPage() {
     try {
       const response = await axiosClient.post(ENDPOINTS.ADMIN_LOGIN, { email, password });
       const token = response.data?.data?.token;
-      
+
       if (token) {
         localStorage.setItem('admin_token', token);
         navigate('/admin', { replace: true });
@@ -134,8 +134,8 @@ export function AdminLoginPage() {
           </Box>
 
           {errorMsg && (
-            <Alert 
-              severity="error" 
+            <Alert
+              severity="error"
               sx={{ mb: 4, borderRadius: 2, bgcolor: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', '& .MuiAlert-icon': { color: '#dc2626' } }}
             >
               {errorMsg}
@@ -158,7 +158,7 @@ export function AdminLoginPage() {
               }}
               sx={{ mb: 3 }}
             />
-            
+
             <TextField
               fullWidth
               type={showPassword ? 'text' : 'password'}
@@ -182,7 +182,7 @@ export function AdminLoginPage() {
               }}
               sx={{ mb: 4 }}
             />
-            
+
             <Button
               type="submit"
               fullWidth

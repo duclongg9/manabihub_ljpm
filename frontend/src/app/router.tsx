@@ -4,6 +4,8 @@ import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
 import { AdminLayout } from '../shared/layouts/AdminLayout';
 import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
+import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
+import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
@@ -109,7 +111,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'kyc/review',
-        element: <div>Teacher KYC Review Placeholder</div>,
+        element: <Navigate to="/admin/kyc" replace />,
+      },
+      {
+        path: 'kyc',
+        element: <KycQueuePage />,
+      },
+      {
+        path: 'kyc/:id',
+        element: <KycDetailPage />,
       },
       {
         path: 'courses/approvals',
