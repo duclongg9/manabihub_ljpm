@@ -471,30 +471,26 @@ public class TeacherKycService {
             String ipAddress,
             String userAgent
     ) {
-        try {
-            AuditLog auditLog = AuditLog.builder()
-                    .actorType("USER")
-                    .actorUserId(user.getId())
-                    .actorRoleCode("TEACHER")
-                    .action("KYC_IDENTITY_VERIFY")
-                    .targetType("KYC_REQUEST")
-                    .targetId(request.getId())
-                    .afterValue(Map.of(
-                            "identityStatus", request.getIdentityStatus().name(),
-                            "provider", request.getEkycProvider()
-                    ))
-                    .metadata(Map.of(
-                            "uc", "UC-22",
-                            "module", "IDENTITY_VERIFICATION",
-                            "provider", "VNPT_EKYC_WEB_SDK"
-                    ))
-                    .ipAddress(ipAddress)
-                    .userAgent(userAgent)
-                    .build();
-            auditLogRepository.save(auditLog);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(user.getId())
+                .actorRoleCode("TEACHER")
+                .action("KYC_IDENTITY_VERIFY")
+                .targetType("KYC_REQUEST")
+                .targetId(request.getId())
+                .afterValue(Map.of(
+                        "identityStatus", request.getIdentityStatus().name(),
+                        "provider", request.getEkycProvider()
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-22",
+                        "module", "IDENTITY_VERIFICATION",
+                        "provider", "VNPT_EKYC_WEB_SDK"
+                ))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
+        auditLogRepository.save(auditLog);
         return true;
     }
 
@@ -505,33 +501,29 @@ public class TeacherKycService {
             String ipAddress,
             String userAgent
     ) {
-        try {
-            AuditLog auditLog = AuditLog.builder()
-                    .actorType("USER")
-                    .actorUserId(user.getId())
-                    .actorRoleCode("TEACHER")
-                    .action("KYC_CERTIFICATE_SUBMIT")
-                    .targetType("KYC_REQUEST")
-                    .targetId(request.getId())
-                    .beforeValue(Map.of("teacherKycStatus", beforeStatus.name()))
-                    .afterValue(Map.of(
-                            "teacherKycStatus", TeacherKycStatus.PENDING.name(),
-                            "requestStatus", request.getStatus().name(),
-                            "certificateStatus", request.getCertificateStatus().name()
-                    ))
-                    .metadata(Map.of(
-                            "uc", "UC-22",
-                            "br", List.of("BR-KYC-01", "BR-KYC-03", "BR-NOTIF-02", "BR-AUD-01"),
-                            "msg", MessageCodes.MSG_KYC_003,
-                            "module", "CERTIFICATE_ASYNC_REVIEW"
-                    ))
-                    .ipAddress(ipAddress)
-                    .userAgent(userAgent)
-                    .build();
-            auditLogRepository.save(auditLog);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(user.getId())
+                .actorRoleCode("TEACHER")
+                .action("KYC_CERTIFICATE_SUBMIT")
+                .targetType("KYC_REQUEST")
+                .targetId(request.getId())
+                .beforeValue(Map.of("teacherKycStatus", beforeStatus.name()))
+                .afterValue(Map.of(
+                        "teacherKycStatus", TeacherKycStatus.PENDING.name(),
+                        "requestStatus", request.getStatus().name(),
+                        "certificateStatus", request.getCertificateStatus().name()
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-22",
+                        "br", List.of("BR-KYC-01", "BR-KYC-03", "BR-NOTIF-02", "BR-AUD-01"),
+                        "msg", MessageCodes.MSG_KYC_003,
+                        "module", "CERTIFICATE_ASYNC_REVIEW"
+                ))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
+        auditLogRepository.save(auditLog);
         return true;
     }
 
@@ -542,33 +534,29 @@ public class TeacherKycService {
             String ipAddress,
             String userAgent
     ) {
-        try {
-            AuditLog auditLog = AuditLog.builder()
-                    .actorType("USER")
-                    .actorUserId(user.getId())
-                    .actorRoleCode("TEACHER")
-                    .action("KYC_RESTART_VERIFICATION")
-                    .targetType("KYC_REQUEST")
-                    .targetId(request.getId())
-                    .beforeValue(Map.of("teacherKycStatus", beforeStatus.name()))
-                    .afterValue(Map.of(
-                            "teacherKycStatus", TeacherKycStatus.NOT_SUBMITTED.name(),
-                            "requestStatus", request.getStatus().name(),
-                            "identityStatus", request.getIdentityStatus().name(),
-                            "certificateStatus", request.getCertificateStatus().name()
-                    ))
-                    .metadata(Map.of(
-                            "uc", "UC-22",
-                            "module", "FULL_RESTART",
-                            "reason", "Teacher requested fresh identity and certificate verification"
-                    ))
-                    .ipAddress(ipAddress)
-                    .userAgent(userAgent)
-                    .build();
-            auditLogRepository.save(auditLog);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(user.getId())
+                .actorRoleCode("TEACHER")
+                .action("KYC_RESTART_VERIFICATION")
+                .targetType("KYC_REQUEST")
+                .targetId(request.getId())
+                .beforeValue(Map.of("teacherKycStatus", beforeStatus.name()))
+                .afterValue(Map.of(
+                        "teacherKycStatus", TeacherKycStatus.NOT_SUBMITTED.name(),
+                        "requestStatus", request.getStatus().name(),
+                        "identityStatus", request.getIdentityStatus().name(),
+                        "certificateStatus", request.getCertificateStatus().name()
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-22",
+                        "module", "FULL_RESTART",
+                        "reason", "Teacher requested fresh identity and certificate verification"
+                ))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
+        auditLogRepository.save(auditLog);
         return true;
     }
 
