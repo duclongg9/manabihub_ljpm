@@ -53,7 +53,7 @@ public class GlobalExceptionHandler {
                 ex.getMessage(),
                 request.getRequestURI()
         );
-        return ResponseEntity.status(ex.getHttpStatus()).body(response);
+        return ResponseEntity.status(ex.getHttpStatus().value()).body(response);
     }
 
     // ──────────────────────────────────────────────
@@ -88,7 +88,7 @@ public class GlobalExceptionHandler {
                 fieldErrors,
                 request.getRequestURI()
         );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST.value()).body(response);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -112,7 +112,7 @@ public class GlobalExceptionHandler {
                 errors,
                 request.getRequestURI()
         );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST.value()).body(response);
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
@@ -126,7 +126,7 @@ public class GlobalExceptionHandler {
                 "Missing required parameter: " + ex.getParameterName(),
                 request.getRequestURI()
         );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST.value()).body(response);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -140,7 +140,7 @@ public class GlobalExceptionHandler {
                 "Invalid value for parameter: " + ex.getName(),
                 request.getRequestURI()
         );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST.value()).body(response);
     }
 
     // ──────────────────────────────────────────────
@@ -158,7 +158,7 @@ public class GlobalExceptionHandler {
                 "You do not have permission to access this resource",
                 request.getRequestURI()
         );
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN.value()).body(response);
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -172,7 +172,7 @@ public class GlobalExceptionHandler {
                 "Authentication is required to access this resource",
                 request.getRequestURI()
         );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED.value()).body(response);
     }
 
     // ──────────────────────────────────────────────
@@ -190,7 +190,7 @@ public class GlobalExceptionHandler {
                 "The requested resource was not found",
                 request.getRequestURI()
         );
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND.value()).body(response);
     }
 
     // ──────────────────────────────────────────────
@@ -209,6 +209,6 @@ public class GlobalExceptionHandler {
                 "An unexpected error occurred. Please contact the administrator.",
                 request.getRequestURI()
         );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR.value()).body(response);
     }
 }

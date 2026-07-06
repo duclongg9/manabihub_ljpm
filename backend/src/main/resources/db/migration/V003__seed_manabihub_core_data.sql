@@ -106,9 +106,9 @@ INSERT INTO system_settings (id, setting_key, setting_value, value_type, descrip
 -- intended ONLY for local development and automated testing.
 -- ============================================================================
 INSERT INTO internal_admin_accounts (id, email, full_name, password_hash, account_status) VALUES
-    ('c0000000-0000-0000-0000-000000000001', 'sysadmin@manabihub.local',       'System Administrator',  '$2a$10$dummyHashForLocalDevOnlyDoNotUseInProductionEnvironment00', 'ACTIVE'),
-    ('c0000000-0000-0000-0000-000000000002', 'course.manager@manabihub.local', 'Course Manager',        '$2a$10$dummyHashForLocalDevOnlyDoNotUseInProductionEnvironment00', 'ACTIVE'),
-    ('c0000000-0000-0000-0000-000000000003', 'finance.manager@manabihub.local','Finance Manager',       '$2a$10$dummyHashForLocalDevOnlyDoNotUseInProductionEnvironment00', 'ACTIVE');
+    ('c0000000-0000-0000-0000-000000000001', 'sysadmin@manabihub.local',       'System Administrator',  '$2a$10$czNUoY31xNr08FYoTrwIKevmkeC/hH5JyKzWO0bnow0m1tzMUHIY.', 'ACTIVE'),
+    ('c0000000-0000-0000-0000-000000000002', 'course.manager@manabihub.local', 'Course Manager',        '$2a$10$czNUoY31xNr08FYoTrwIKevmkeC/hH5JyKzWO0bnow0m1tzMUHIY.', 'ACTIVE'),
+    ('c0000000-0000-0000-0000-000000000003', 'finance.manager@manabihub.local','Finance Manager',       '$2a$10$czNUoY31xNr08FYoTrwIKevmkeC/hH5JyKzWO0bnow0m1tzMUHIY.', 'ACTIVE');
 
 
 -- ============================================================================
