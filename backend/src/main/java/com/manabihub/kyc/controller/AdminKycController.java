@@ -61,7 +61,7 @@ public class AdminKycController {
         if (adminRole == null) {
             adminRole = "SYSTEM_ADMIN"; // Fallback for testing if missing
         }
-        
+
         KycRequestResponse updated = kycService.reviewKyc(id, reviewRequest, adminId, adminRole, adminEmail);
         return ResponseEntity.ok(ApiResponse.success(
                 MessageCodes.ADMIN_ACTION_SUCCESS,

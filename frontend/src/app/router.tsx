@@ -3,6 +3,7 @@ import { PublicLayout } from '../shared/layouts/PublicLayout';
 import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
 import { AdminLayout } from '../shared/layouts/AdminLayout';
+import { NotificationsPage } from '../features/notifications/pages/NotificationsPage';
 import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
 import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
 import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
@@ -54,6 +55,10 @@ export const router = createBrowserRouter([
         element: <div>Student Dashboard Placeholder</div>,
       },
       {
+        path: 'notifications',
+        element: <NotificationsPage />,
+      },
+      {
         path: 'payments',
         element: <div>Student Payments Placeholder</div>,
       },
@@ -80,6 +85,10 @@ export const router = createBrowserRouter([
         element: <div>Teacher Courses Placeholder</div>,
       },
       {
+        path: 'notifications',
+        element: <NotificationsPage />,
+      },
+      {
         path: 'kyc',
         element: <TeacherKycRoute />,
       },
@@ -100,6 +109,10 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <div>Admin Dashboard Placeholder</div>,
+      },
+      {
+        path: 'notifications',
+        element: <NotificationsPage />,
       },
       {
         path: 'settings',

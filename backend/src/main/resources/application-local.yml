@@ -1,3 +1,7 @@
+manabihub:
+  security:
+    mock-jwt: true
+
 spring:
   config:
     import: optional:classpath:application-secrets.yml
@@ -20,7 +24,6 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
-  # Placeholder configuration for OAuth2 client to satisfy auto-configuration triggers
   security:
     oauth2:
       client:
@@ -28,10 +31,25 @@ spring:
           google:
             client-id: ${GOOGLE_CLIENT_ID:your-client-id-here}
             client-secret: ${GOOGLE_CLIENT_SECRET:your-client-secret-here}
-            scope:  profile, email
+            scope: profile, email
         provider:
           google:
             issuer-uri: https://accounts.google.com
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        transport:
+          protocol: smtp
 
 server:
   port: 8081
