@@ -1,0 +1,177 @@
+package com.manabihub.course.service.impl;
+
+import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.common.exception.BusinessException;
+import com.manabihub.course.dto.request.CreateCourseDraftRequest;
+import com.manabihub.course.dto.response.CourseDraftResponse;
+import com.manabihub.course.entity.Course;
+import com.manabihub.course.enums.CourseStatus;
+import com.manabihub.course.enums.JlptLevel;
+import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.identity.service.CurrentUserService;
+import com.manabihub.kyc.domain.TeacherKycStatus;
+import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.repository.TeacherProfileRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class CourseServiceImplTest {
+
+    @Mock
+    private CourseRepository courseRepository;
+
+    @Mock
+    private TeacherProfileRepository teacherProfileRepository;
+
+    @Mock
+    private CurrentUserService currentUserService;
+
+    private CourseServiceImpl courseService;
+    private UUID userId;
+    private TeacherProfile approvedTeacher;
+
+    @BeforeEach
+    void setUp() {
+        courseService = new CourseServiceImpl(courseRepository, teacherProfileRepository, currentUserService);
+        userId = UUID.randomUUID();
+        approvedTeacher = new TeacherProfile();
+        approvedTeacher.setId(UUID.randomUUID());
+        approvedTeacher.setKycStatus(TeacherKycStatus.APPROVED);
+        approvedTeacher.setCanPublishCourse(true);
+    }
+
+    @Test
+    void createDraft_WhenTeacherApproved_ShouldSaveDraftWithLearningGoals() {
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.existsBySlug("jlpt-n5-foundation")).thenReturn(false);
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> {
+            Course course = invocation.getArgument(0);
+            course.setId(UUID.randomUUID());
+            return course;
+        });
+
+        CourseDraftResponse response = courseService.createDraft(validRequest());
+
+        assertNotNull(response.id());
+        assertEquals(CourseStatus.DRAFT, response.status());
+        assertEquals("jlpt-n5-foundation", response.slug());
+        assertEquals(4, response.learningGoals().size());
+        assertEquals("UC-23", response.srsTrace().get("uc"));
+
+        ArgumentCaptor<Course> courseCaptor = ArgumentCaptor.forClass(Course.class);
+        verify(courseRepository).save(courseCaptor.capture());
+
+        Course savedCourse = courseCaptor.getValue();
+        assertEquals(CourseStatus.DRAFT, savedCourse.getStatus());
+        assertEquals(approvedTeacher.getId(), savedCourse.getTeacher().getId());
+        assertEquals(4, savedCourse.getLearningGoals().size());
+        assertTrue(savedCourse.getLearningGoals().stream().allMatch(goal -> goal.getGoalText().length() <= 160));
+    }
+
+    @Test
+    void createDraft_WhenGoalsAreMissing_ShouldThrowGoalValidationError() {
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+
+        CreateCourseDraftRequest request = new CreateCourseDraftRequest(
+                "JLPT N5 Foundation",
+                "Introduction",
+                JlptLevel.N5,
+                "Basics",
+                null,
+                "Outcomes",
+                BigDecimal.valueOf(100000),
+                "No prerequisites",
+                "New learners",
+                List.of("Goal 1", "Goal 2", "Goal 3")
+        );
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> courseService.createDraft(request));
+
+        assertEquals(MessageCodes.MSG_GOAL_001, exception.getMessageCode());
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void createDraft_WhenGoalIsTooLong_ShouldThrowGoalLengthError() {
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+
+        String longGoal = "a".repeat(161);
+        CreateCourseDraftRequest request = new CreateCourseDraftRequest(
+                "JLPT N5 Foundation",
+                "Introduction",
+                JlptLevel.N5,
+                "Basics",
+                null,
+                "Outcomes",
+                BigDecimal.valueOf(100000),
+                "No prerequisites",
+                "New learners",
+                List.of("Goal 1", "Goal 2", "Goal 3", longGoal)
+        );
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> courseService.createDraft(request));
+
+        assertEquals(MessageCodes.MSG_GOAL_002, exception.getMessageCode());
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void createDraft_WhenTeacherKycIsNotApproved_ShouldThrowForbidden() {
+        TeacherProfile pendingTeacher = new TeacherProfile();
+        pendingTeacher.setId(UUID.randomUUID());
+        pendingTeacher.setKycStatus(TeacherKycStatus.PENDING);
+        pendingTeacher.setCanPublishCourse(false);
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(pendingTeacher));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> courseService.createDraft(validRequest()));
+
+        assertEquals(MessageCodes.MSG_KYC_010, exception.getMessageCode());
+        assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
+        verify(courseRepository, never()).save(any());
+    }
+
+    private CreateCourseDraftRequest validRequest() {
+        return new CreateCourseDraftRequest(
+                "JLPT N5 Foundation",
+                "Introductory Japanese course for new learners.",
+                JlptLevel.N5,
+                "Basics",
+                "https://cdn.example.com/n5.png",
+                "Learners can understand basic N5 grammar and vocabulary.",
+                BigDecimal.valueOf(100000),
+                "No prerequisites",
+                "Students starting Japanese from zero",
+                List.of(
+                        "Read Hiragana and Katakana with confidence",
+                        "Understand core N5 sentence patterns",
+                        "Use basic greetings and classroom phrases",
+                        "Prepare for beginner JLPT N5 practice"
+                )
+        );
+    }
+}

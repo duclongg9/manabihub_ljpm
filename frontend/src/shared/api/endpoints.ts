@@ -20,5 +20,8 @@ export const ENDPOINTS = {
     student: '/v1/student/profile',
     teacher: '/v1/teacher/profile',
   },
+  teacherCourses: {
+    drafts: '/v1/teacher/courses/drafts',
+  },
   ADMIN_LOGIN: '/admin/auth/login',
 };
