@@ -10,6 +10,7 @@ export const ROUTES = {
     MY_COURSES: '/student/courses',
     PAYMENTS: '/student/payments',
     NOTIFICATIONS: '/student/notifications',
+    PROFILE: '/student/profile',
   },
   TEACHER: {
     DASHBOARD: '/teacher/dashboard',
@@ -17,6 +18,7 @@ export const ROUTES = {
     KYC: '/teacher/kyc',
     WALLET: '/teacher/wallet',
     NOTIFICATIONS: '/teacher/notifications',
+    PROFILE: '/teacher/profile',
   },
   ADMIN: {
     DASHBOARD: '/admin/dashboard',

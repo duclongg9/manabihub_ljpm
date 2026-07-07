@@ -40,6 +40,9 @@ public class SecurityConfig {
     @Value("${jwt.secret:defaultSecretKeyThatIsAtLeast32BytesLongForHS256Algorithm}")
     private String jwtSecret;
 
+    @Value("${CORS_ALLOWED_ORIGINS:*}")
+    private List<String> allowedOrigins;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -68,6 +71,8 @@ public class SecurityConfig {
                                 "/api/v1/demo/**",
                                 "/api/v1/mock/**",
                                 "/api/v1/teacher/kyc/**",
+                                "/api/v1/student/profile/**",
+                                "/api/v1/teacher/profile/**",
                                 "/api/admin/auth/login",
                                 "/oauth2/**",
                                 "/login/oauth2/**")
@@ -87,10 +92,18 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173", "http://127.0.0.1:5173"));
+
+        if (allowedOrigins.size() == 1 && "*".equals(allowedOrigins.get(0))) {
+            configuration.setAllowedOriginPatterns(List.of("*"));
+        } else {
+            configuration.setAllowedOrigins(allowedOrigins);
+        }
+
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("Location"));
         configuration.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

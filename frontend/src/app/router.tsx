@@ -7,14 +7,21 @@ import { NotificationsPage } from '../features/notifications/pages/Notifications
 import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
 import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
 import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
+import StudentProfilePage from '../features/profile/StudentProfilePage';
+import TeacherProfilePage from '../features/profile/TeacherProfilePage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
+import { AdminLoginPage } from './pages/AdminLoginPage';
 
 export const router = createBrowserRouter([
   {
     path: '/login',
     element: <PublicLoginPage />,
+  },
+  {
+    path: '/admin/login',
+    element: <AdminLoginPage />,
   },
   {
     path: '/',
@@ -55,6 +62,10 @@ export const router = createBrowserRouter([
         element: <div>Student Dashboard Placeholder</div>,
       },
       {
+        path: 'profile',
+        element: <StudentProfilePage />,
+      },
+      {
         path: 'notifications',
         element: <NotificationsPage />,
       },
@@ -83,6 +94,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses',
         element: <div>Teacher Courses Placeholder</div>,
+      },
+      {
+        path: 'profile',
+        element: <TeacherProfilePage />,
       },
       {
         path: 'notifications',

@@ -16,5 +16,9 @@ export const ENDPOINTS = {
     restartVerification: '/v1/teacher/kyc/restart-verification',
     certificateSubmissions: '/v1/teacher/kyc/certificate-submissions',
   },
+  profile: {
+    student: '/v1/student/profile',
+    teacher: '/v1/teacher/profile',
+  },
   ADMIN_LOGIN: '/admin/auth/login',
 };

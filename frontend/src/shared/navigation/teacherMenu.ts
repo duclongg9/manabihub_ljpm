@@ -3,6 +3,7 @@ import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import WalletIcon from '@mui/icons-material/Wallet';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 export const TEACHER_MENU = [
   {
@@ -24,5 +25,10 @@ export const TEACHER_MENU = [
     title: 'Ví & Thanh toán',
     path: ROUTES.TEACHER.WALLET,
     icon: WalletIcon,
+  },
+  {
+    title: 'Hồ sơ',
+    path: ROUTES.TEACHER.PROFILE,
+    icon: AccountCircleIcon,
   },
 ];

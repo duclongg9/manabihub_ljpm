@@ -45,13 +45,17 @@ public class AppUser {
     @Column(name = "full_name", nullable = false)
     private String fullName;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
+
+    @Column(name = "phone_number")
+    private String phoneNumber;
 
     @Builder.Default
     @Column(nullable = false)
     private String provider = "GOOGLE";
 
+    @Column(name = "provider_user_id")
     private String providerUserId;
 
     @Builder.Default
@@ -59,6 +63,7 @@ public class AppUser {
     @Column(name = "user_status", nullable = false)
     private AccountStatus userStatus = AccountStatus.ACTIVE;
 
+    @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
     @CreationTimestamp
