@@ -20,6 +20,12 @@ export interface VnptIdentityResult {
   sdkResult: Record<string, unknown>;
 }
 
+export function resetVnptIdentitySdkRuntime() {
+  delete window.SDK;
+  delete window.__MANABIHUB_LAST_VNPT_CONFIG__;
+  document.querySelectorAll<HTMLScriptElement>('script[data-vnpt-sdk]').forEach((script) => script.remove());
+}
+
 export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResult) => Promise<void> | void) {
   const env = getVnptEnv();
 
@@ -80,8 +86,7 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
     SHOW_STEP: true,
     MAX_SIZE_IMAGE: 5,
     DEFAULT_LANGUAGE: 'vi',
-    LIST_TYPE_DOCUMENT: [-1, 4, 5, 6, 7, 9],
-    DOCUMENT_TYPE_START: 9,
+    LIST_TYPE_DOCUMENT: [9],
     HAS_QR_SCAN: false,
     SDK_FLOW: 'DOCUMENT_TO_FACE',
     FLOW_TAKEN: 'DOCUMENT_TO_FACE',
@@ -226,7 +231,6 @@ function safeDebugConfig(config: Record<string, unknown>) {
     SDK_FLOW: config.SDK_FLOW,
     FLOW_TAKEN: config.FLOW_TAKEN,
     USE_METHOD: config.USE_METHOD,
-    DOCUMENT_TYPE_START: config.DOCUMENT_TYPE_START,
     HAS_QR_SCAN: config.HAS_QR_SCAN,
     LIST_TYPE_DOCUMENT: config.LIST_TYPE_DOCUMENT,
     CHECK_LIVENESS_CARD: config.CHECK_LIVENESS_CARD,

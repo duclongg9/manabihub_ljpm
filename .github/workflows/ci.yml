@@ -7,9 +7,30 @@ on:
     branches: [develop]
 
 jobs:
-  # ──────────────────────────────────────────────
-  # Backend — Spring Boot (Java 21, Maven)
-  # ──────────────────────────────────────────────
+  repo-hygiene:
+    name: Repository Hygiene
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Block generated and local-only files
+        run: |
+          blocked_files="$(
+            git ls-files \
+              | grep -E '^(backend/target/|frontend/dist/|frontend/node_modules/|tmp/)|(^|/)(application-secrets\.yml|\.env(\..*)?)$' \
+              | grep -v -E '(^|/)\.env.*\.example$' \
+              || true
+          )"
+
+          if [ -n "$blocked_files" ]; then
+            echo "The following generated/local-only files are tracked by Git:"
+            echo "$blocked_files"
+            echo "Remove them with git rm --cached and keep them ignored."
+            exit 1
+          fi
+
   backend:
     name: Backend Tests
     runs-on: ubuntu-latest
@@ -35,9 +56,6 @@ jobs:
       - name: Run tests
         run: ./mvnw clean test --batch-mode --no-transfer-progress
 
-  # ──────────────────────────────────────────────
-  # Frontend — React + Vite (Node.js 20)
-  # ──────────────────────────────────────────────
   frontend:
     name: Frontend Build
     runs-on: ubuntu-latest
