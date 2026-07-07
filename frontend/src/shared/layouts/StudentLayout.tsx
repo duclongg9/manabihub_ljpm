@@ -1,18 +1,60 @@
-import React from 'react';
-import { Box, Toolbar, Container } from '@mui/material';
-import { Outlet } from 'react-router-dom';
-import { Header } from './Header';
+import React, { useState } from "react";
+import { Box, Toolbar } from "@mui/material";
+import { Outlet } from "react-router-dom";
+
+import { Header } from "./Header";
+import { Sidebar } from "./Sidebar";
+
+import { STUDENT_MENU } from "../navigation/studentMenu";
 
 export const StudentLayout: React.FC = () => {
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Header showMenuIcon={false} />
-      <Toolbar /> {/* Spacer */}
-      <Box component="main" sx={{ flexGrow: 1, py: 4, bgcolor: 'background.default' }}>
-        <Container maxWidth="lg">
-          <Outlet />
-        </Container>
-      </Box>
-    </Box>
-  );
+    const [mobileOpen, setMobileOpen] = useState(false);
+
+    const handleDrawerToggle = () => {
+        setMobileOpen(!mobileOpen);
+    };
+
+    return (
+        <Box
+            sx={{
+                display: "flex",
+                minHeight: "100vh",
+                bgcolor: "background.default",
+            }}
+        >
+            <Header
+                showMenuIcon
+                onMenuClick={handleDrawerToggle}
+            />
+
+            <Sidebar
+                menuItems={STUDENT_MENU}
+                open={mobileOpen}
+                onClose={handleDrawerToggle}
+                variant="permanent"
+            />
+
+            <Box
+                component="main"
+                sx={{
+                    flexGrow: 1,
+                    p: 3,
+                    width: {
+                        sm: `calc(100% - 260px)`,
+                    },
+                }}
+            >
+                <Toolbar />
+
+                <Box
+                    sx={{
+                        maxWidth: 1200,
+                        mx: "auto",
+                    }}
+                >
+                    <Outlet />
+                </Box>
+            </Box>
+        </Box>
+    );
 };

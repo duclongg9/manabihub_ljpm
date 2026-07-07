@@ -1,11 +1,6 @@
 package com.manabihub.kyc.domain;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -27,6 +22,12 @@ public class AppUser {
 
     @Column(name = "full_name", nullable = false)
     private String fullName;
+
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
+    @Column(name = "avatar_url")
+    private String avatarUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "user_status", nullable = false)

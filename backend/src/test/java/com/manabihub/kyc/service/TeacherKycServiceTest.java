@@ -65,10 +65,10 @@ class TeacherKycServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         UUID teacherId = UUID.randomUUID();
-        
+
         AppUser mockUser = new AppUser();
         mockUser.setId(userId);
-        
+
         TeacherProfile mockProfile = new TeacherProfile();
         mockProfile.setId(teacherId);
         mockProfile.setUser(mockUser);
@@ -86,7 +86,7 @@ class TeacherKycServiceTest {
         assertEquals(teacherId, response.teacherId());
         assertEquals("APPROVED", response.teacherKycStatus());
         assertTrue(response.canPublishCourse());
-        
+
         verify(teacherProfileRepository).findByUserId(userId);
         verify(kycRequestRepository).findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherId);
     }
