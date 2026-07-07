@@ -17,7 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 @Slf4j
 @Service
@@ -27,8 +30,6 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
-
-    // Query operations
 
     @Override
     public Page<NotificationResponse> listMyNotifications(UUID userId, String type,
@@ -40,19 +41,19 @@ public class NotificationServiceImpl implements NotificationService {
 
         if (hasType && hasReadFilter) {
             page = notificationRepository
-                    .findAllByRecipientUserIdAndNotificationTypeAndIsReadOrderByCreatedAtDesc(
+                    .findAllByUserIdAndTypeAndIsReadOrderByCreatedAtDesc(
                             userId, type, isRead, pageable);
         } else if (hasType) {
             page = notificationRepository
-                    .findAllByRecipientUserIdAndNotificationTypeOrderByCreatedAtDesc(
+                    .findAllByUserIdAndNotificationTypeOrderByCreatedAtDesc(
                             userId, type, pageable);
         } else if (hasReadFilter) {
             page = notificationRepository
-                    .findAllByRecipientUserIdAndIsReadOrderByCreatedAtDesc(
+                    .findAllByUserIdAndIsReadOrderByCreatedAtDesc(
                             userId, isRead, pageable);
         } else {
             page = notificationRepository
-                    .findAllByRecipientUserIdOrderByCreatedAtDesc(userId, pageable);
+                    .findAllByUserIdOrderByCreatedAtDesc(userId, pageable);
         }
 
         return page.map(this::toResponse);
@@ -60,10 +61,8 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public long countUnread(UUID userId) {
-        return notificationRepository.countByRecipientUserIdAndIsReadFalse(userId);
+        return notificationRepository.countUnreadByUserId(userId);
     }
-
-    // Command operations
 
     @Override
     @Transactional
@@ -75,8 +74,7 @@ public class NotificationServiceImpl implements NotificationService {
                         HttpStatus.NOT_FOUND
                 ));
 
-        // BR-NOTIF-01 / NFR-SEC-18: user can only mark own notifications
-        if (!userId.equals(notification.getRecipientUserId())) {
+        if (!userId.equals(notification.getRecipientUserId()) && !userId.equals(notification.getRecipientAdminId())) {
             throw new BusinessException(
                     MessageCodes.AUTH_FORBIDDEN,
                     "You do not have permission to access this notification",
@@ -95,15 +93,70 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public NotificationResponse markAsUnread(UUID notificationId, UUID userId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.NOTIFICATION_NOT_FOUND,
+                        "Notification not found",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        if (!userId.equals(notification.getRecipientUserId()) && !userId.equals(notification.getRecipientAdminId())) {
+            throw new BusinessException(
+                    MessageCodes.AUTH_FORBIDDEN,
+                    "You do not have permission to access this notification",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+
+        if (notification.isRead()) {
+            notification.setRead(false);
+            notification.setReadAt(null);
+            notificationRepository.save(notification);
+        }
+
+        return toResponse(notification);
+    }
+
+    @Override
+    @Transactional
     public int markAllAsRead(UUID userId) {
-        return notificationRepository.markAllAsReadByRecipientUserId(userId, Instant.now());
+        return notificationRepository.markAllAsReadByUserId(userId, Instant.now());
+    }
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Override
+    @Transactional
+    public void createNotificationForRole(String roleCode, String title, String message, String type, String actionUrl) {
+        String sql = "SELECT ur.user_id FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE r.code = :roleCode";
+
+        @SuppressWarnings("unchecked")
+        List<UUID> userIds = entityManager.createNativeQuery(sql, UUID.class)
+                .setParameter("roleCode", roleCode)
+                .getResultList();
+
+        List<Notification> notifications = userIds.stream().map(userId -> {
+            return Notification.builder()
+                    .recipientUserId(userId)
+                    .title(title)
+                    .message(message)
+                    .notificationType(type)
+                    .actionUrl(actionUrl)
+                    .isRead(false)
+                    .createdAt(Instant.now())
+                    .build();
+        }).toList();
+
+        notificationRepository.saveAll(notifications);
+        log.info("Broadcasted notification to {} users with role {}", userIds.size(), roleCode);
     }
 
     @Override
     @Transactional
     public void createNotification(UUID recipientUserId, String recipientEmail,
                                    String title, String message, String type) {
-        // 1. Persist notification in database
         Notification notification = Notification.builder()
                 .recipientUserId(recipientUserId)
                 .title(title)
@@ -111,20 +164,23 @@ public class NotificationServiceImpl implements NotificationService {
                 .notificationType(type)
                 .build();
 
-        // Sử dụng saveAndFlush để ép Hibernate kiểm tra ngay các lỗi (ví dụ: Foreign Key) 
-        // trước khi chạy các tác vụ bên ngoài (như gửi Email)
         notificationRepository.saveAndFlush(notification);
         log.info("Notification created for user {} — type={}, title={}",
                 recipientUserId, type, title);
 
-        // 2. Send email notification (async, best-effort)
         if (recipientEmail != null && !recipientEmail.isBlank()) {
             String emailBody = buildEmailBody(title, message, type);
             emailService.sendEmail(recipientEmail, "[ManabiHub] " + title, emailBody);
         }
     }
 
-    // Helpers
+    @Override
+    public void sendTestEmailOnly(String recipientEmail, String title, String message, String type) {
+        if (recipientEmail != null && !recipientEmail.isBlank()) {
+            String emailBody = buildEmailBody(title, message, type);
+            emailService.sendEmail(recipientEmail, "[ManabiHub] " + title, emailBody);
+        }
+    }
 
     private NotificationResponse toResponse(Notification entity) {
         return NotificationResponse.builder()
@@ -132,6 +188,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .title(entity.getTitle())
                 .message(entity.getMessage())
                 .notificationType(entity.getNotificationType())
+                .actionUrl(entity.getActionUrl())
                 .read(entity.isRead())
                 .createdAt(entity.getCreatedAt())
                 .readAt(entity.getReadAt())

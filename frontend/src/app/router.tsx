@@ -1,10 +1,21 @@
-import { createBrowserRouter } from 'react-router-dom';
-import { PublicLayout } from './layouts/PublicLayout';
-import { StudentLayout } from './layouts/StudentLayout';
-import { TeacherLayout } from './layouts/TeacherLayout';
-import { AdminLayout } from './layouts/AdminLayout';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { PublicLayout } from '../shared/layouts/PublicLayout';
+import { StudentLayout } from '../shared/layouts/StudentLayout';
+import { TeacherLayout } from '../shared/layouts/TeacherLayout';
+import { AdminLayout } from '../shared/layouts/AdminLayout';
+import { NotificationsPage } from '../features/notifications/pages/NotificationsPage';
+import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
+import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
+import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
+import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
+import { PublicLoginPage } from './pages/PublicLoginPage';
 
 export const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: <PublicLoginPage />,
+  },
   {
     path: '/',
     element: <PublicLayout />,
@@ -14,8 +25,20 @@ export const router = createBrowserRouter([
         element: <div>Home Page Placeholder</div>,
       },
       {
-        path: 'login',
-        element: <div>Login Page Placeholder</div>,
+        path: 'auth/callback',
+        element: <AuthCallbackPage />,
+      },
+      {
+        path: 'onboarding/student',
+        element: <StudentOnboardingPage />,
+      },
+      {
+        path: 'courses',
+        element: <div>Course Catalog Placeholder</div>,
+      },
+      {
+        path: 'register',
+        element: <div>Register Page Placeholder</div>,
       },
     ],
   },
@@ -25,7 +48,23 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <Navigate to="/student/dashboard" replace />,
+      },
+      {
+        path: 'dashboard',
         element: <div>Student Dashboard Placeholder</div>,
+      },
+      {
+        path: 'notifications',
+        element: <NotificationsPage />,
+      },
+      {
+        path: 'payments',
+        element: <div>Student Payments Placeholder</div>,
+      },
+      {
+        path: 'courses',
+        element: <div>Student Courses Placeholder</div>,
       },
     ],
   },
@@ -35,7 +74,27 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <Navigate to="/teacher/dashboard" replace />,
+      },
+      {
+        path: 'dashboard',
         element: <div>Teacher Dashboard Placeholder</div>,
+      },
+      {
+        path: 'courses',
+        element: <div>Teacher Courses Placeholder</div>,
+      },
+      {
+        path: 'notifications',
+        element: <NotificationsPage />,
+      },
+      {
+        path: 'kyc',
+        element: <TeacherKycRoute />,
+      },
+      {
+        path: 'wallet',
+        element: <div>Teacher Wallet Placeholder</div>,
       },
     ],
   },
@@ -45,7 +104,43 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <Navigate to="/admin/dashboard" replace />,
+      },
+      {
+        path: 'dashboard',
         element: <div>Admin Dashboard Placeholder</div>,
+      },
+      {
+        path: 'notifications',
+        element: <NotificationsPage />,
+      },
+      {
+        path: 'settings',
+        element: <div>System Settings Placeholder</div>,
+      },
+      {
+        path: 'users',
+        element: <div>User Management Placeholder</div>,
+      },
+      {
+        path: 'kyc/review',
+        element: <Navigate to="/admin/kyc" replace />,
+      },
+      {
+        path: 'kyc',
+        element: <KycQueuePage />,
+      },
+      {
+        path: 'kyc/:id',
+        element: <KycDetailPage />,
+      },
+      {
+        path: 'courses/approvals',
+        element: <div>Course Approval Placeholder</div>,
+      },
+      {
+        path: 'finance',
+        element: <div>Finance Placeholder</div>,
       },
     ],
   },

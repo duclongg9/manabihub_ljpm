@@ -15,8 +15,18 @@ public interface NotificationService {
 
     NotificationResponse markAsRead(UUID notificationId, UUID userId);
 
+    NotificationResponse markAsUnread(UUID notificationId, UUID userId);
+
     int markAllAsRead(UUID userId);
+
+    /**
+     * Broadcasts a notification to all users holding a specific role.
+     * Uses batch insert under the hood.
+     */
+    void createNotificationForRole(String roleCode, String title, String message, String type, String actionUrl);
 
     void createNotification(UUID recipientUserId, String recipientEmail,
                             String title, String message, String type);
+
+    void sendTestEmailOnly(String recipientEmail, String title, String message, String type);
 }

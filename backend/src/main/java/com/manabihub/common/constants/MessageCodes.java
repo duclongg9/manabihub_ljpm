@@ -33,6 +33,8 @@ public final class MessageCodes {
     public static final String COMMON_NOT_FOUND = "COMMON_NOT_FOUND";
     public static final String COMMON_CONFLICT = "COMMON_CONFLICT";
     public static final String COMMON_INTERNAL_ERROR = "COMMON_INTERNAL_ERROR";
+    public static final String MSG_COM_002 = "MSG-COM-002"; // Required field is empty
+
 
     // ──────────────────────────────────────────────
     // VALIDATION — input validation errors
@@ -48,6 +50,9 @@ public final class MessageCodes {
     public static final String AUTH_TOKEN_INVALID = "AUTH_TOKEN_INVALID";
     public static final String AUTH_LOGIN_SUCCESS = "AUTH_LOGIN_SUCCESS";
     public static final String AUTH_LOGOUT_SUCCESS = "AUTH_LOGOUT_SUCCESS";
+    public static final String MSG_AUTH_007 = "MSG-AUTH-007"; // Admin login failed
+    public static final String MSG_AUTH_008 = "MSG-AUTH-008"; // Admin account locked
+
 
     // ──────────────────────────────────────────────
     // PROFILE — user profile management
@@ -63,6 +68,17 @@ public final class MessageCodes {
     public static final String KYC_APPROVED = "KYC_APPROVED";
     public static final String KYC_REJECTED = "KYC_REJECTED";
     public static final String KYC_NOT_APPROVED = "KYC_NOT_APPROVED";
+    public static final String KYC_RESUBMISSION_REQUIRED = "KYC_RESUBMISSION_REQUIRED";
+    public static final String KYC_TEACHER_NOT_FOUND = "KYC_TEACHER_NOT_FOUND";
+    public static final String KYC_ALREADY_PENDING = "KYC_ALREADY_PENDING";
+    public static final String KYC_ALREADY_APPROVED = "KYC_ALREADY_APPROVED";
+    public static final String KYC_SUBMISSION_NOT_ALLOWED = "KYC_SUBMISSION_NOT_ALLOWED";
+    public static final String MSG_KYC_002 = "MSG-KYC-002";
+    public static final String MSG_KYC_003 = "MSG-KYC-003";
+    public static final String MSG_KYC_006 = "MSG-KYC-006";
+    public static final String MSG_KYC_008 = "MSG-KYC-008";
+    public static final String MSG_KYC_009 = "MSG-KYC-009";
+    public static final String MSG_ADM_002 = "MSG-ADM-002";
 
     // ──────────────────────────────────────────────
     // COURSE — course management
@@ -137,6 +153,8 @@ public final class MessageCodes {
     // ──────────────────────────────────────────────
     public static final String ADMIN_ACTION_SUCCESS = "ADMIN_ACTION_SUCCESS";
     public static final String ADMIN_ACTION_FORBIDDEN = "ADMIN_ACTION_FORBIDDEN";
+    public static final String COURSE_MANAGER_REQUIRED = "COURSE_MANAGER_REQUIRED";
+    public static final String ADMIN_PERMISSION_DENIED = "ADMIN_PERMISSION_DENIED";
 
     // ──────────────────────────────────────────────
     // NOTIFICATION — notification system
@@ -144,8 +162,6 @@ public final class MessageCodes {
     public static final String NOTIFICATION_SENT = "NOTIFICATION_SENT";
     public static final String NOTIFICATION_FAILED = "NOTIFICATION_FAILED";
     public static final String NOTIFICATION_NOT_FOUND = "NOTIFICATION_NOT_FOUND";
-    public static final String NOTIFICATION_MARKED_READ = "NOTIFICATION_MARKED_READ";
-    public static final String NOTIFICATION_EMAIL_FAILED = "NOTIFICATION_EMAIL_FAILED";
 
     // ──────────────────────────────────────────────
     // SYSTEM — system-level codes

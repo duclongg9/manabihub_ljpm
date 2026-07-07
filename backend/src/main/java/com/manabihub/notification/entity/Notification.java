@@ -8,8 +8,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
@@ -17,7 +18,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "notifications")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -33,23 +35,26 @@ public class Notification {
     @Column(name = "recipient_admin_id")
     private UUID recipientAdminId;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
 
-    @Column(name = "notification_type", length = 50)
+    @Column(name = "notification_type", nullable = false, length = 50)
     private String notificationType;
 
-    @Column(name = "is_read", nullable = false)
+    @Column(name = "action_url", length = 500)
+    private String actionUrl;
+
     @Builder.Default
+    @Column(name = "is_read", nullable = false)
     private boolean isRead = false;
+
+    @Column(name = "read_at")
+    private Instant readAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
-
-    @Column(name = "read_at")
-    private Instant readAt;
 }
