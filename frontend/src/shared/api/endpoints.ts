@@ -1,13 +1,24 @@
 export const ENDPOINTS = {
-    teacherKyc: {
-        status: "/v1/teacher/kyc/status",
-        identityVerifications: "/v1/teacher/kyc/identity-verifications",
-        restartVerification: "/v1/teacher/kyc/restart-verification",
-        certificateSubmissions: "/v1/teacher/kyc/certificate-submissions",
-    },
-
-    profile: {
-        teacher: "/v1/teacher/profile",
-        student: "/v1/student/profile",
-    },
+  NOTIFICATIONS: {
+    LIST: '/v1/notifications',
+    UNREAD_COUNT: '/v1/notifications/unread-count',
+    MARK_READ: (id: string) => `/v1/notifications/${id}/read`,
+    MARK_ALL_READ: '/v1/notifications/read-all',
+  },
+  ADMIN_KYC: {
+    QUEUE: '/v1/admin/kyc-requests',
+    DETAIL: (id: string) => `/v1/admin/kyc-requests/${id}`,
+    REVIEW: (id: string) => `/v1/admin/kyc-requests/${id}/review`,
+  },
+  teacherKyc: {
+    status: '/v1/teacher/kyc/status',
+    identityVerifications: '/v1/teacher/kyc/identity-verifications',
+    restartVerification: '/v1/teacher/kyc/restart-verification',
+    certificateSubmissions: '/v1/teacher/kyc/certificate-submissions',
+  },
+  profile: {
+    student: '/v1/student/profile',
+    teacher: '/v1/teacher/profile',
+  },
+  ADMIN_LOGIN: '/admin/auth/login',
 };

@@ -4,13 +4,13 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.dto.request.UpdateStudentProfileRequest;
 import com.manabihub.identity.dto.response.StudentProfileResponse;
+import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.mapper.StudentProfileMapper;
+import com.manabihub.identity.repository.AppUserRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
-import com.manabihub.identity.repository.UserRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.identity.service.StudentProfileService;
-import com.manabihub.kyc.domain.AppUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,7 +23,7 @@ import java.util.UUID;
 @Transactional
 public class StudentProfileServiceImpl implements StudentProfileService {
 
-    private final UserRepository userRepository;
+    private final AppUserRepository appUserRepository;
 
     private final StudentProfileRepository studentProfileRepository;
 
@@ -37,7 +37,7 @@ public class StudentProfileServiceImpl implements StudentProfileService {
 
         UUID userId = currentUserService.getCurrentUserId();
 
-        AppUser user = userRepository.findById(userId)
+        AppUser user = appUserRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COMMON_NOT_FOUND,
                         "User not found",
@@ -59,7 +59,7 @@ public class StudentProfileServiceImpl implements StudentProfileService {
 
         UUID userId = currentUserService.getCurrentUserId();
 
-        AppUser user = userRepository.findById(userId)
+        AppUser user = appUserRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COMMON_NOT_FOUND,
                         "User not found",
@@ -79,7 +79,7 @@ public class StudentProfileServiceImpl implements StudentProfileService {
 
         try {
 
-            userRepository.save(user);
+            appUserRepository.save(user);
 
             studentProfileRepository.save(profile);
 

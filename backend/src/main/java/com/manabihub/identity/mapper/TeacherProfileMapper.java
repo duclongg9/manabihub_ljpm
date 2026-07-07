@@ -2,8 +2,8 @@ package com.manabihub.identity.mapper;
 
 import com.manabihub.identity.dto.request.UpdateTeacherProfileRequest;
 import com.manabihub.identity.dto.response.TeacherProfileResponse;
+import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
-import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.TeacherProfile;
 import org.springframework.stereotype.Component;
 

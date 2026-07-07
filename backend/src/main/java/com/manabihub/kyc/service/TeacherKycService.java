@@ -3,7 +3,8 @@ package com.manabihub.kyc.service;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.kyc.domain.AppUser;
-import com.manabihub.kyc.domain.AuditLog;
+import com.manabihub.audit.entity.AuditLog;
+import com.manabihub.identity.entity.User;
 import com.manabihub.kyc.domain.CertificateVerificationStatus;
 import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.KycDocument;
@@ -21,14 +22,14 @@ import com.manabihub.kyc.dto.KycModuleStatusResponse;
 import com.manabihub.kyc.dto.KycRequestResponse;
 import com.manabihub.kyc.dto.KycRestartVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
-import com.manabihub.kyc.repository.AuditLogRepository;
+import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
-import com.manabihub.mock.domain.MockJlptRegistryRecord;
-import com.manabihub.mock.domain.MockNationalIdRegistryRecord;
-import com.manabihub.mock.repository.MockJlptRegistryRepository;
-import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
+import com.manabihub.kyc.port.JlptRecordDto;
+import com.manabihub.kyc.port.JlptRegistryPort;
+import com.manabihub.kyc.port.NationalIdRecordDto;
+import com.manabihub.kyc.port.NationalIdRegistryPort;
 import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -66,18 +67,19 @@ public class TeacherKycService {
     private final KycRequestRepository kycRequestRepository;
     private final KycDocumentRepository kycDocumentRepository;
     private final AuditLogRepository auditLogRepository;
-    private final MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
-    private final MockJlptRegistryRepository mockJlptRegistryRepository;
+    private final NationalIdRegistryPort nationalIdRegistryPort;
+    private final JlptRegistryPort jlptRegistryPort;
     private final EntityManager entityManager;
     private final Path storageRoot;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
     public TeacherKycService(
             TeacherProfileRepository teacherProfileRepository,
             KycRequestRepository kycRequestRepository,
             KycDocumentRepository kycDocumentRepository,
             AuditLogRepository auditLogRepository,
-            MockNationalIdRegistryRepository mockNationalIdRegistryRepository,
-            MockJlptRegistryRepository mockJlptRegistryRepository,
+            NationalIdRegistryPort nationalIdRegistryPort,
+            JlptRegistryPort jlptRegistryPort,
             EntityManager entityManager,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
@@ -85,8 +87,8 @@ public class TeacherKycService {
         this.kycRequestRepository = kycRequestRepository;
         this.kycDocumentRepository = kycDocumentRepository;
         this.auditLogRepository = auditLogRepository;
-        this.mockNationalIdRegistryRepository = mockNationalIdRegistryRepository;
-        this.mockJlptRegistryRepository = mockJlptRegistryRepository;
+        this.nationalIdRegistryPort = nationalIdRegistryPort;
+        this.jlptRegistryPort = jlptRegistryPort;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
     }
@@ -140,12 +142,12 @@ public class TeacherKycService {
             String ocrFullName = ocr.get("fullName");
             String ocrDob = ocr.get("dateOfBirth");
 
-            MockNationalIdRegistryRecord mockRecord = mockNationalIdRegistryRepository.findByIdNumberAndActiveTrue(idNumber).orElse(null);
+            NationalIdRecordDto mockRecord = nationalIdRegistryPort.findActiveByIdNumber(idNumber).orElse(null);
             if (mockRecord == null) {
                 verified = false;
                 failureReasons.add("Thông tin CCCD không tồn tại trong cơ sở dữ liệu quốc gia (Mock)");
             } else {
-                if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.getFullName()))) {
+                if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.fullName()))) {
                     verified = false;
                     failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia");
                 }
@@ -157,7 +159,7 @@ public class TeacherKycService {
                         } else {
                             dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
                         }
-                        if (!dob.equals(mockRecord.getDateOfBirth())) {
+                        if (!dob.equals(mockRecord.dateOfBirth())) {
                             verified = false;
                             failureReasons.add("Ngày sinh không khớp với cơ sở dữ liệu quốc gia");
                         }
@@ -469,24 +471,25 @@ public class TeacherKycService {
             String ipAddress,
             String userAgent
     ) {
-        AuditLog auditLog = new AuditLog();
-        auditLog.setActorType("USER");
-        auditLog.setActorUserId(user.getId());
-        auditLog.setActorRoleCode("TEACHER");
-        auditLog.setAction("KYC_IDENTITY_VERIFY");
-        auditLog.setTargetType("KYC_REQUEST");
-        auditLog.setTargetId(request.getId());
-        auditLog.setAfterValue(Map.of(
-                "identityStatus", request.getIdentityStatus().name(),
-                "provider", request.getEkycProvider()
-        ));
-        auditLog.setMetadata(Map.of(
-                "uc", "UC-22",
-                "module", "IDENTITY_VERIFICATION",
-                "provider", "VNPT_EKYC_WEB_SDK"
-        ));
-        auditLog.setIpAddress(ipAddress);
-        auditLog.setUserAgent(userAgent);
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(user.getId())
+                .actorRoleCode("TEACHER")
+                .action("KYC_IDENTITY_VERIFY")
+                .targetType("KYC_REQUEST")
+                .targetId(request.getId())
+                .afterValue(Map.of(
+                        "identityStatus", request.getIdentityStatus().name(),
+                        "provider", request.getEkycProvider()
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-22",
+                        "module", "IDENTITY_VERIFICATION",
+                        "provider", "VNPT_EKYC_WEB_SDK"
+                ))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
         auditLogRepository.save(auditLog);
         return true;
     }
@@ -498,27 +501,28 @@ public class TeacherKycService {
             String ipAddress,
             String userAgent
     ) {
-        AuditLog auditLog = new AuditLog();
-        auditLog.setActorType("USER");
-        auditLog.setActorUserId(user.getId());
-        auditLog.setActorRoleCode("TEACHER");
-        auditLog.setAction("KYC_CERTIFICATE_SUBMIT");
-        auditLog.setTargetType("KYC_REQUEST");
-        auditLog.setTargetId(request.getId());
-        auditLog.setBeforeValue(Map.of("teacherKycStatus", beforeStatus.name()));
-        auditLog.setAfterValue(Map.of(
-                "teacherKycStatus", TeacherKycStatus.PENDING.name(),
-                "requestStatus", request.getStatus().name(),
-                "certificateStatus", request.getCertificateStatus().name()
-        ));
-        auditLog.setMetadata(Map.of(
-                "uc", "UC-22",
-                "br", List.of("BR-KYC-01", "BR-KYC-03", "BR-NOTIF-02", "BR-AUD-01"),
-                "msg", MessageCodes.MSG_KYC_003,
-                "module", "CERTIFICATE_ASYNC_REVIEW"
-        ));
-        auditLog.setIpAddress(ipAddress);
-        auditLog.setUserAgent(userAgent);
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(user.getId())
+                .actorRoleCode("TEACHER")
+                .action("KYC_CERTIFICATE_SUBMIT")
+                .targetType("KYC_REQUEST")
+                .targetId(request.getId())
+                .beforeValue(Map.of("teacherKycStatus", beforeStatus.name()))
+                .afterValue(Map.of(
+                        "teacherKycStatus", TeacherKycStatus.PENDING.name(),
+                        "requestStatus", request.getStatus().name(),
+                        "certificateStatus", request.getCertificateStatus().name()
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-22",
+                        "br", List.of("BR-KYC-01", "BR-KYC-03", "BR-NOTIF-02", "BR-AUD-01"),
+                        "msg", MessageCodes.MSG_KYC_003,
+                        "module", "CERTIFICATE_ASYNC_REVIEW"
+                ))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
         auditLogRepository.save(auditLog);
         return true;
     }
@@ -530,27 +534,28 @@ public class TeacherKycService {
             String ipAddress,
             String userAgent
     ) {
-        AuditLog auditLog = new AuditLog();
-        auditLog.setActorType("USER");
-        auditLog.setActorUserId(user.getId());
-        auditLog.setActorRoleCode("TEACHER");
-        auditLog.setAction("KYC_RESTART_VERIFICATION");
-        auditLog.setTargetType("KYC_REQUEST");
-        auditLog.setTargetId(request.getId());
-        auditLog.setBeforeValue(Map.of("teacherKycStatus", beforeStatus.name()));
-        auditLog.setAfterValue(Map.of(
-                "teacherKycStatus", TeacherKycStatus.NOT_SUBMITTED.name(),
-                "requestStatus", request.getStatus().name(),
-                "identityStatus", request.getIdentityStatus().name(),
-                "certificateStatus", request.getCertificateStatus().name()
-        ));
-        auditLog.setMetadata(Map.of(
-                "uc", "UC-22",
-                "module", "FULL_RESTART",
-                "reason", "Teacher requested fresh identity and certificate verification"
-        ));
-        auditLog.setIpAddress(ipAddress);
-        auditLog.setUserAgent(userAgent);
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(user.getId())
+                .actorRoleCode("TEACHER")
+                .action("KYC_RESTART_VERIFICATION")
+                .targetType("KYC_REQUEST")
+                .targetId(request.getId())
+                .beforeValue(Map.of("teacherKycStatus", beforeStatus.name()))
+                .afterValue(Map.of(
+                        "teacherKycStatus", TeacherKycStatus.NOT_SUBMITTED.name(),
+                        "requestStatus", request.getStatus().name(),
+                        "identityStatus", request.getIdentityStatus().name(),
+                        "certificateStatus", request.getCertificateStatus().name()
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-22",
+                        "module", "FULL_RESTART",
+                        "reason", "Teacher requested fresh identity and certificate verification"
+                ))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
         auditLogRepository.save(auditLog);
         return true;
     }
@@ -703,8 +708,8 @@ public class TeacherKycService {
             throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "Mã chứng chỉ là bắt buộc", HttpStatus.BAD_REQUEST);
         }
 
-        MockJlptRegistryRecord jlptRecord = mockJlptRegistryRepository
-                .findByRegistrationNumberAndActiveTrue(code.trim())
+        JlptRecordDto jlptRecord = jlptRegistryPort
+                .findActiveByRegistrationNumber(code.trim())
                 .orElse(null);
 
         if (jlptRecord == null) {
@@ -721,7 +726,7 @@ public class TeacherKycService {
         }
 
         // Cross-match: JLPT registry fullName vs CCCD OCR fullName
-        if (!normalizeSearchText(jlptRecord.getFullName()).equals(normalizeSearchText(ocrFullName))) {
+        if (!normalizeSearchText(jlptRecord.fullName()).equals(normalizeSearchText(ocrFullName))) {
             throw new BusinessException(MessageCodes.MSG_KYC_006, "Họ và tên trên chứng chỉ JLPT không khớp với thông tin định danh CCCD", HttpStatus.BAD_REQUEST);
         }
 
@@ -732,7 +737,7 @@ public class TeacherKycService {
 
         try {
             LocalDate ocrDate = parseOcrDate(ocrDob);
-            if (!ocrDate.equals(jlptRecord.getDateOfBirth())) {
+            if (!ocrDate.equals(jlptRecord.dateOfBirth())) {
                 throw new BusinessException(MessageCodes.MSG_KYC_006, "Ngày sinh trên chứng chỉ JLPT không khớp với thông tin định danh CCCD", HttpStatus.BAD_REQUEST);
             }
         } catch (Exception e) {
@@ -742,12 +747,12 @@ public class TeacherKycService {
         // All checks passed → auto-approve
         String detail = String.format(
                 "JLPT %s registry match: %s (DOB: %s) — certificate %s, score %d, status %s",
-                jlptRecord.getTestLevel(),
-                jlptRecord.getFullName(),
-                jlptRecord.getDateOfBirth(),
-                jlptRecord.getRegistrationNumber(),
-                jlptRecord.getTotalScore(),
-                jlptRecord.getPassStatus()
+                jlptRecord.testLevel(),
+                jlptRecord.fullName(),
+                jlptRecord.dateOfBirth(),
+                jlptRecord.registrationNumber(),
+                jlptRecord.totalScore(),
+                jlptRecord.passStatus()
         );
 
         kycRequest.setStatus(KycRequestStatus.APPROVED);

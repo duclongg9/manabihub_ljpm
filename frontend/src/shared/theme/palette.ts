@@ -32,13 +32,13 @@ export const palette = {
     dark: '#047857',
   },
   background: {
-    default: '#F3F4F6', // Gray 100
+    default: '#F8FAFC', // Slate 50
     paper: '#FFFFFF',
   },
   text: {
-    primary: '#111827', // Gray 900
-    secondary: '#4B5563', // Gray 600
-    disabled: '#9CA3AF', // Gray 400
+    primary: '#1F2937', // Gray 800
+    secondary: '#64748B', // Slate 500
+    disabled: '#94A3B8', // Slate 400
   },
   divider: '#E5E7EB', // Gray 200
 };

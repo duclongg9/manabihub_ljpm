@@ -1,5 +1,5 @@
 import { ROUTES } from '../constants/routes';
-import DashboardIcon from '@mui/icons-material/Dashboard';
+import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
@@ -8,7 +8,7 @@ export const STUDENT_MENU = [
   {
     title: 'My Learning',
     path: ROUTES.STUDENT.DASHBOARD,
-    icon: DashboardIcon,
+    icon: SpaceDashboardIcon,
   },
   {
     title: 'Browse Courses',

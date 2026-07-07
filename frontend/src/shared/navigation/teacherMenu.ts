@@ -1,33 +1,33 @@
 import { ROUTES } from '../constants/routes';
-import DashboardIcon from '@mui/icons-material/Dashboard';
+import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import WalletIcon from '@mui/icons-material/Wallet';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 export const TEACHER_MENU = [
   {
-    title: 'Dashboard',
+    title: 'Tổng quan',
     path: ROUTES.TEACHER.DASHBOARD,
-    icon: DashboardIcon,
+    icon: SpaceDashboardIcon,
   },
   {
-    title: 'My Courses',
+    title: 'Khóa học của tôi',
     path: ROUTES.TEACHER.COURSES,
     icon: MenuBookIcon,
   },
   {
-    title: 'KYC Verification',
+    title: 'Xác minh giáo viên',
     path: ROUTES.TEACHER.KYC,
     icon: VerifiedUserIcon,
   },
   {
-    title: 'Wallet & Payouts',
+    title: 'Ví & Thanh toán',
     path: ROUTES.TEACHER.WALLET,
-    icon: AccountBalanceWalletIcon,
+    icon: WalletIcon,
   },
   {
-    title: "Manage Profile",
+    title: 'Hồ sơ',
     path: ROUTES.TEACHER.PROFILE,
     icon: AccountCircleIcon,
   },

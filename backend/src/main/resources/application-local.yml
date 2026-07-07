@@ -1,6 +1,12 @@
+manabihub:
+  security:
+    mock-jwt: true
+
 spring:
+  config:
+    import: optional:classpath:application-secrets.yml
   datasource:
-    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:manabihub}
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5433}/${DB_NAME:manabihub}
     username: ${DB_USERNAME:manabihub}
     password: ${DB_PASSWORD:manabihub_dev_password}
     driver-class-name: org.postgresql.Driver
@@ -18,18 +24,37 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
-  # Placeholder configuration for OAuth2 client to satisfy auto-configuration triggers
   security:
     oauth2:
       client:
         registration:
           google:
-            client-id: dummy-client-id
-            client-secret: dummy-client-secret
-            scope: openid, profile, email
+            client-id: ${GOOGLE_CLIENT_ID:your-client-id-here}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-client-secret-here}
+            scope: profile, email
         provider:
           google:
             issuer-uri: https://accounts.google.com
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        transport:
+          protocol: smtp
+
 server:
   port: 8081
+
+app:
+  frontend:
+    onboarding-url: http://localhost:5173/onboarding/student
+    success-url: http://localhost:5173/auth/callback

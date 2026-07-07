@@ -4,14 +4,14 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.dto.request.UpdateTeacherProfileRequest;
 import com.manabihub.identity.dto.response.TeacherProfileResponse;
+import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.mapper.TeacherProfileMapper;
+import com.manabihub.identity.repository.AppUserRepository;
 import com.manabihub.identity.repository.IdentityTeacherProfileRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
-import com.manabihub.identity.repository.UserRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.identity.service.TeacherProfileService;
-import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.TeacherProfile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,7 +25,7 @@ import java.util.UUID;
 @Transactional
 public class TeacherProfileServiceImpl implements TeacherProfileService {
 
-    private final UserRepository userRepository;
+    private final AppUserRepository appUserRepository;
 
     private final StudentProfileRepository studentProfileRepository;
 
@@ -41,7 +41,7 @@ public class TeacherProfileServiceImpl implements TeacherProfileService {
 
         UUID userId = currentUserService.getCurrentUserId();
 
-        AppUser user = userRepository.findById(userId)
+        AppUser user = appUserRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COMMON_NOT_FOUND,
                         "User not found",
@@ -78,7 +78,7 @@ public class TeacherProfileServiceImpl implements TeacherProfileService {
 
         UUID userId = currentUserService.getCurrentUserId();
 
-        AppUser user = userRepository.findById(userId)
+        AppUser user = appUserRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COMMON_NOT_FOUND,
                         "User not found",
@@ -105,7 +105,7 @@ public class TeacherProfileServiceImpl implements TeacherProfileService {
 
         try {
 
-            userRepository.save(user);
+            appUserRepository.save(user);
 
             studentProfileRepository.save(studentProfile);
 

@@ -33,6 +33,7 @@ public final class MessageCodes {
     public static final String COMMON_NOT_FOUND = "COMMON_NOT_FOUND";
     public static final String COMMON_CONFLICT = "COMMON_CONFLICT";
     public static final String COMMON_INTERNAL_ERROR = "COMMON_INTERNAL_ERROR";
+    public static final String MSG_COM_002 = "MSG-COM-002"; // Required field is empty
     public static final String MSG_COM_004 = "MSG-COM-004";
 
     // ──────────────────────────────────────────────
@@ -49,6 +50,8 @@ public final class MessageCodes {
     public static final String AUTH_TOKEN_INVALID = "AUTH_TOKEN_INVALID";
     public static final String AUTH_LOGIN_SUCCESS = "AUTH_LOGIN_SUCCESS";
     public static final String AUTH_LOGOUT_SUCCESS = "AUTH_LOGOUT_SUCCESS";
+    public static final String MSG_AUTH_007 = "MSG-AUTH-007"; // Admin login failed
+    public static final String MSG_AUTH_008 = "MSG-AUTH-008"; // Admin account locked
     public static final String MSG_AUTH_009 = "MSG-AUTH-009";
 
     // ──────────────────────────────────────────────
@@ -66,6 +69,7 @@ public final class MessageCodes {
     public static final String KYC_APPROVED = "KYC_APPROVED";
     public static final String KYC_REJECTED = "KYC_REJECTED";
     public static final String KYC_NOT_APPROVED = "KYC_NOT_APPROVED";
+    public static final String KYC_RESUBMISSION_REQUIRED = "KYC_RESUBMISSION_REQUIRED";
     public static final String KYC_TEACHER_NOT_FOUND = "KYC_TEACHER_NOT_FOUND";
     public static final String KYC_ALREADY_PENDING = "KYC_ALREADY_PENDING";
     public static final String KYC_ALREADY_APPROVED = "KYC_ALREADY_APPROVED";
@@ -150,12 +154,15 @@ public final class MessageCodes {
     // ──────────────────────────────────────────────
     public static final String ADMIN_ACTION_SUCCESS = "ADMIN_ACTION_SUCCESS";
     public static final String ADMIN_ACTION_FORBIDDEN = "ADMIN_ACTION_FORBIDDEN";
+    public static final String COURSE_MANAGER_REQUIRED = "COURSE_MANAGER_REQUIRED";
+    public static final String ADMIN_PERMISSION_DENIED = "ADMIN_PERMISSION_DENIED";
 
     // ──────────────────────────────────────────────
     // NOTIFICATION — notification system
     // ──────────────────────────────────────────────
     public static final String NOTIFICATION_SENT = "NOTIFICATION_SENT";
     public static final String NOTIFICATION_FAILED = "NOTIFICATION_FAILED";
+    public static final String NOTIFICATION_NOT_FOUND = "NOTIFICATION_NOT_FOUND";
 
     // ──────────────────────────────────────────────
     // SYSTEM — system-level codes

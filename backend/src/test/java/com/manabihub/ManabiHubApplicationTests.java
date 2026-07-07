@@ -1,14 +1,23 @@
 package com.manabihub;
 
+import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.identity.mapper.StudentProfileMapper;
 import com.manabihub.identity.mapper.TeacherProfileMapper;
+import com.manabihub.identity.repository.AppUserRepository;
 import com.manabihub.identity.repository.IdentityTeacherProfileRepository;
+import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.repository.UserRepository;
 import com.manabihub.identity.service.CurrentUserService;
+import com.manabihub.kyc.repository.KycDocumentRepository;
+import com.manabihub.kyc.repository.KycRequestRepository;
+import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.service.TeacherKycService;
 import com.manabihub.mock.repository.MockJlptRegistryRepository;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
+import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -22,6 +31,45 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 class ManabiHubApplicationTests {
 
     @MockBean
+    private KycRequestRepository kycRequestRepository;
+
+    @MockBean
+    private com.manabihub.kyc.repository.InternalAdminAccountRepository kycInternalAdminAccountRepository;
+
+    @MockBean
+    private TeacherProfileRepository teacherProfileRepository;
+
+    @MockBean
+    private KycDocumentRepository kycDocumentRepository;
+
+    @MockBean
+    private AuditLogRepository auditLogRepository;
+
+    @MockBean
+    private NotificationRepository notificationRepository;
+
+    @MockBean
+    private NotificationService notificationService;
+
+    @MockBean
+    private AppUserRepository appUserRepository;
+
+    @MockBean
+    private UserRepository userRepository;
+
+    @MockBean
+    private InternalAdminAccountRepository identityInternalAdminAccountRepository;
+
+    @MockBean
+    private RoleRepository roleRepository;
+
+    @MockBean
+    private StudentProfileRepository studentProfileRepository;
+
+    @MockBean
+    private IdentityTeacherProfileRepository identityTeacherProfileRepository;
+
+    @MockBean
     private TeacherKycService teacherKycService;
 
     @MockBean
@@ -30,30 +78,17 @@ class ManabiHubApplicationTests {
     @MockBean
     private MockJlptRegistryRepository mockJlptRegistryRepository;
 
-    // ===== Student Profile =====
-
-    @MockBean
-    private UserRepository userRepository;
-
-    @MockBean
-    private StudentProfileRepository studentProfileRepository;
-
     @MockBean
     private StudentProfileMapper studentProfileMapper;
 
     @MockBean
-    private CurrentUserService currentUserService;
-
-    // ===== Teacher Profile =====
-
-    @MockBean
-    private IdentityTeacherProfileRepository identityTeacherProfileRepository;
-
-    @MockBean
     private TeacherProfileMapper teacherProfileMapper;
+
+    @MockBean
+    private CurrentUserService currentUserService;
 
     @Test
     void contextLoads() {
-        // Basic integration test to verify the Spring Application Context loads correctly
+        // Basic integration test to verify the Spring Application Context loads correctly.
     }
 }
