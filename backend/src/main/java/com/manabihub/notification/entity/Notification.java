@@ -1,21 +1,32 @@
 package com.manabihub.notification.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "notifications")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Notification {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "recipient_user_id")
@@ -27,29 +38,23 @@ public class Notification {
     @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
 
-    @Column(name = "notification_type")
+    @Column(name = "notification_type", nullable = false, length = 50)
     private String notificationType;
 
-    @Column(name = "is_read", nullable = false)
-    private Boolean isRead;
+    @Column(name = "action_url", length = 500)
+    private String actionUrl;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Builder.Default
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead = false;
 
     @Column(name = "read_at")
-    private LocalDateTime readAt;
+    private Instant readAt;
 
-    @PrePersist
-    protected void onCreate() {
-        if (id == null) {
-            id = UUID.randomUUID();
-        }
-        createdAt = LocalDateTime.now();
-        if (isRead == null) {
-            isRead = false;
-        }
-    }
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 }
