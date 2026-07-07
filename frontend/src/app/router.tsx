@@ -12,11 +12,16 @@ import TeacherProfilePage from '../features/profile/TeacherProfilePage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
+import { AdminLoginPage } from './pages/AdminLoginPage';
 
 export const router = createBrowserRouter([
   {
     path: '/login',
     element: <PublicLoginPage />,
+  },
+  {
+    path: '/admin/login',
+    element: <AdminLoginPage />,
   },
   {
     path: '/',
