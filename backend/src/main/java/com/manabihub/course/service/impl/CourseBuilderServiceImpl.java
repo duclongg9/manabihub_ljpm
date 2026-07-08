@@ -343,7 +343,7 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
     private ValidatedBlockData validateQuizBlock(LessonBlockRequest request, String title) {
         List<QuizQuestionResponse> quizItems = normalizeQuizItems(request);
         if (quizItems.isEmpty()) {
-            throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Quiz block must include at least 1 question");
+            throw new BusinessException(MessageCodes.MSG_COURSE_013, "Quiz block must include at least 1 question");
         }
 
         QuizQuestionResponse firstQuestion = quizItems.getFirst();
@@ -373,7 +373,7 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
         Set<String> fronts = new HashSet<>();
         for (FlashcardItemResponse flashcard : flashcards) {
             if (!fronts.add(normalizeKey(flashcard.front()))) {
-                throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Flashcard terms cannot be duplicated");
+                throw new BusinessException(MessageCodes.MSG_COURSE_010, "Flashcard terms cannot be duplicated");
             }
         }
 
@@ -406,7 +406,7 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
                 List.of(),
                 List.of(),
                 requiredTrim(request.writingPrompt(), "Writing prompt is required"),
-                requiredTrim(request.rubric(), "Writing rubric is required")
+                requiredTrim(request.rubric(), "Writing rubric is required", MessageCodes.MSG_WRITE_005)
         );
     }
 
@@ -597,12 +597,12 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
                 throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Quiz options cannot be duplicated");
             }
 
-            String answer = requiredTrim(value.answer(), "Quiz answer key is required");
+            String answer = requiredTrim(value.answer(), "Quiz answer key is required", MessageCodes.MSG_COURSE_013);
             String matchedAnswer = options.stream()
                     .filter(option -> normalizeKey(option).equals(normalizeKey(answer)))
                     .findFirst()
                     .orElseThrow(() -> new BusinessException(
-                            MessageCodes.VALIDATION_FAILED,
+                            MessageCodes.MSG_COURSE_013,
                             "Quiz answer key must match one of the options"
                     ));
 
@@ -660,8 +660,12 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
     }
 
     private String requiredTrim(String value, String message) {
+        return requiredTrim(value, message, MessageCodes.VALIDATION_FAILED);
+    }
+
+    private String requiredTrim(String value, String message, String messageCode) {
         if (!StringUtils.hasText(value)) {
-            throw new BusinessException(MessageCodes.VALIDATION_FAILED, message);
+            throw new BusinessException(messageCode, message);
         }
         return value.trim();
     }
@@ -697,12 +701,27 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
     private Map<String, Object> srsTrace() {
         return Map.of(
                 "uc", "UC-34",
-                "br", List.of("NUI-VID-01", "BR-CONTENT"),
+                "br", List.of(
+                        "BR-PROD-04",
+                        "BR-PROD-05",
+                        "BR-COURSE-03",
+                        "BR-COURSE-06",
+                        "BR-CONTENT-01",
+                        "BR-CONTENT-02",
+                        "BR-CONTENT-03",
+                        "BR-CONTENT-04",
+                        "NUI-VID-01"
+                ),
                 "msg", List.of(
                         MessageCodes.CONTENT_CREATED,
                         MessageCodes.CONTENT_UPDATED,
                         MessageCodes.CONTENT_DELETED,
-                        MessageCodes.VALIDATION_FAILED
+                        MessageCodes.MSG_COURSE_001,
+                        MessageCodes.MSG_KYC_010,
+                        MessageCodes.MSG_COURSE_009,
+                        MessageCodes.MSG_COURSE_010,
+                        MessageCodes.MSG_COURSE_013,
+                        MessageCodes.MSG_WRITE_005
                 )
         );
     }

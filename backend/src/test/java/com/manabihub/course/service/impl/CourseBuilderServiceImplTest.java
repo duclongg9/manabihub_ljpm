@@ -118,6 +118,9 @@ class CourseBuilderServiceImplTest {
         assertEquals(1, response.modules().size());
         assertEquals("Bài 1: Làm quen N5", response.modules().getFirst().title());
         assertEquals("UC-34", response.srsTrace().get("uc"));
+        assertTrue(response.srsTrace().toString().contains("BR-CONTENT-01"));
+        assertTrue(response.srsTrace().toString().contains("BR-CONTENT-04"));
+        assertTrue(response.srsTrace().toString().contains(MessageCodes.MSG_COURSE_013));
     }
 
     @Test
@@ -144,7 +147,7 @@ class CourseBuilderServiceImplTest {
                 () -> service.createBlock(draft.getId(), module.getId(), request)
         );
 
-        assertEquals(MessageCodes.VALIDATION_FAILED, exception.getMessageCode());
+        assertEquals(MessageCodes.MSG_COURSE_013, exception.getMessageCode());
     }
 
     @Test
@@ -209,7 +212,7 @@ class CourseBuilderServiceImplTest {
                 () -> service.createBlock(draft.getId(), module.getId(), request)
         );
 
-        assertEquals(MessageCodes.VALIDATION_FAILED, exception.getMessageCode());
+        assertEquals(MessageCodes.MSG_COURSE_010, exception.getMessageCode());
     }
 
     @Test
@@ -236,7 +239,7 @@ class CourseBuilderServiceImplTest {
                 () -> service.createBlock(draft.getId(), module.getId(), request)
         );
 
-        assertEquals(MessageCodes.VALIDATION_FAILED, exception.getMessageCode());
+        assertEquals(MessageCodes.MSG_WRITE_005, exception.getMessageCode());
     }
 
     @Test

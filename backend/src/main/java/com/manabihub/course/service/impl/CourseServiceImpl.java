@@ -280,11 +280,27 @@ public class CourseServiceImpl implements CourseService {
     private Map<String, Object> srsTrace() {
         return Map.of(
                 "uc", "UC-23",
-                "br", List.of("BR-COURSE", "BR-GOAL", "BR-KYC"),
+                "br", List.of(
+                        "BR-PROD-04",
+                        "BR-PROD-05",
+                        "BR-GOAL-01",
+                        "BR-GOAL-02",
+                        "BR-GOAL-03",
+                        "BR-GOAL-04",
+                        "BR-GOAL-05",
+                        "BR-COURSE-01",
+                        "BR-COURSE-03",
+                        "BR-COURSE-04",
+                        "BR-COURSE-05"
+                ),
                 "msg", List.of(
                         MessageCodes.MSG_COURSE_001,
+                        MessageCodes.MSG_COURSE_003,
+                        MessageCodes.MSG_COURSE_004,
                         MessageCodes.MSG_GOAL_001,
                         MessageCodes.MSG_GOAL_002,
+                        MessageCodes.MSG_GOAL_003,
+                        MessageCodes.MSG_GOAL_004,
                         MessageCodes.MSG_KYC_010
                 )
         );
