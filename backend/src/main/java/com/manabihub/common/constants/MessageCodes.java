@@ -116,6 +116,10 @@ public final class MessageCodes {
     public static final String FINAL_TEST_NOT_FOUND = "FINAL_TEST_NOT_FOUND";
     public static final String FINAL_TEST_CREATED = "FINAL_TEST_CREATED";
     public static final String FINAL_TEST_ALREADY_PASSED = "FINAL_TEST_ALREADY_PASSED";
+    public static final String MSG_FTEST_001 = "MSG-FTEST-001";
+    public static final String MSG_FTEST_002 = "MSG-FTEST-002";
+    public static final String MSG_FTEST_003 = "MSG-FTEST-003";
+    public static final String MSG_FTEST_004 = "MSG-FTEST-004";
 
     // ──────────────────────────────────────────────
     // LEARNING — student learning progress

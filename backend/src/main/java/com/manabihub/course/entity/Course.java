@@ -14,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -112,6 +113,9 @@ public class Course {
     @OrderBy("orderIndex ASC")
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CourseLearningGoal> learningGoals = new ArrayList<>();
+
+    @OneToOne(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private com.manabihub.finaltest.entity.FinalTest finalTest;
 
     public void addLearningGoal(String goalText, int orderIndex) {
         CourseLearningGoal goal = CourseLearningGoal.builder()
