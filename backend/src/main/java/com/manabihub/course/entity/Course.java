@@ -113,6 +113,11 @@ public class Course {
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CourseLearningGoal> learningGoals = new ArrayList<>();
 
+    @Builder.Default
+    @OrderBy("orderIndex ASC")
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CourseModule> modules = new ArrayList<>();
+
     public void addLearningGoal(String goalText, int orderIndex) {
         CourseLearningGoal goal = CourseLearningGoal.builder()
                 .course(this)
@@ -120,5 +125,10 @@ public class Course {
                 .orderIndex(orderIndex)
                 .build();
         learningGoals.add(goal);
+    }
+
+    public void addModule(CourseModule module) {
+        module.setCourse(this);
+        modules.add(module);
     }
 }

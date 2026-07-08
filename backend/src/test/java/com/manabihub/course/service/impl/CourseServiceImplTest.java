@@ -88,6 +88,9 @@ class CourseServiceImplTest {
         assertEquals("jlpt-n5-foundation", response.slug());
         assertEquals(4, response.learningGoals().size());
         assertEquals("UC-23", response.srsTrace().get("uc"));
+        assertTrue(response.srsTrace().toString().contains("BR-GOAL-01"));
+        assertTrue(response.srsTrace().toString().contains("BR-COURSE-04"));
+        assertTrue(response.srsTrace().toString().contains(MessageCodes.MSG_COURSE_004));
 
         ArgumentCaptor<Course> courseCaptor = ArgumentCaptor.forClass(Course.class);
         verify(courseRepository).save(courseCaptor.capture());
