@@ -31,7 +31,7 @@ export const finalTestService = {
     try {
       const { data } = await axiosClient.get<{ data: FinalTestConfig }>(`/v1/teacher/courses/${courseId}/final-test`);
       return data.data;
-    } catch (error: any) {
+    } catch {
       // Return null if not configured yet (404/Empty)
       return null;
     }

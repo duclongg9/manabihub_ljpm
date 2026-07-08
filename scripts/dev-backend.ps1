@@ -60,6 +60,33 @@ if (-not $isJava21) {
 }
 
 
+$dbHost = if ($env:DB_HOST) { $env:DB_HOST } else { "127.0.0.1" }
+$dbPort = if ($env:DB_PORT) { [int]$env:DB_PORT } else { 5433 }
+Write-Host "Checking PostgreSQL at ${dbHost}:${dbPort}..." -ForegroundColor Cyan
+
+$tcpClient = New-Object System.Net.Sockets.TcpClient
+$dbReachable = $false
+try {
+    $connect = $tcpClient.BeginConnect($dbHost, $dbPort, $null, $null)
+    if ($connect.AsyncWaitHandle.WaitOne(1500, $false)) {
+        $tcpClient.EndConnect($connect)
+        $dbReachable = $true
+    }
+} catch {
+    $dbReachable = $false
+} finally {
+    $tcpClient.Close()
+}
+
+if (-not $dbReachable) {
+    Write-Host "ERROR: PostgreSQL is not reachable at ${dbHost}:${dbPort}." -ForegroundColor Red
+    Write-Host "Start Docker Desktop, then run this from the repository root:" -ForegroundColor Yellow
+    Write-Host "  powershell -ExecutionPolicy Bypass -File scripts\dev-db-up.ps1" -ForegroundColor Yellow
+    Write-Host "After the database is healthy, run the backend task again." -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "PostgreSQL is reachable." -ForegroundColor Green
 Write-Host "Starting Spring Boot backend..." -ForegroundColor Cyan
 Set-Location -Path "backend"
 $mvnCommand = if (Test-Path ".\mvnw.cmd") { ".\mvnw.cmd" } else { "mvn" }

@@ -9,6 +9,7 @@ import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
 import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
 import StudentProfilePage from '../features/profile/StudentProfilePage';
 import TeacherProfilePage from '../features/profile/TeacherProfilePage';
+import { CourseBuilderPage } from '../features/course-builder/pages/CourseBuilderPage';
 import { CourseDraftPage } from '../features/course-builder/pages/CourseDraftPage';
 import { TeacherCoursesPage } from '../features/course-builder/pages/TeacherCoursesPage';
 import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
@@ -101,6 +102,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses/new',
         element: <CourseDraftPage />,
+      },
+      {
+        path: 'courses/:draftId/builder',
+        element: <CourseBuilderPage />,
       },
       {
         path: 'courses/:courseId/final-test',

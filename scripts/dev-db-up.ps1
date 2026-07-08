@@ -42,7 +42,7 @@ if (-not $isHealthy) {
 
 Write-Host "`n=== Connection Info ===" -ForegroundColor Green
 Write-Host "Host:     localhost"
-Write-Host "Port:     5432"
+Write-Host "Port:     5433"
 Write-Host "Database: manabihub"
 Write-Host "Username: manabihub"
 Write-Host "Password: manabihub_dev_password"

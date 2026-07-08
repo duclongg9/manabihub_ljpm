@@ -117,6 +117,11 @@ public class Course {
     @OneToOne(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private com.manabihub.finaltest.entity.FinalTest finalTest;
 
+    @Builder.Default
+    @OrderBy("orderIndex ASC")
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CourseModule> modules = new ArrayList<>();
+
     public void addLearningGoal(String goalText, int orderIndex) {
         CourseLearningGoal goal = CourseLearningGoal.builder()
                 .course(this)
@@ -124,5 +129,10 @@ public class Course {
                 .orderIndex(orderIndex)
                 .build();
         learningGoals.add(goal);
+    }
+
+    public void addModule(CourseModule module) {
+        module.setCourse(this);
+        modules.add(module);
     }
 }
