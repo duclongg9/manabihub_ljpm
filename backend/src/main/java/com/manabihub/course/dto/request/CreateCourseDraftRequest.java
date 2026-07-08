@@ -10,7 +10,6 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record CreateCourseDraftRequest(
-        @NotBlank
         @Size(max = 255)
         String title,
 

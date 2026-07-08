@@ -68,10 +68,23 @@ export async function createCourseDraft(payload: CreateCourseDraftPayload) {
   return response.data.data;
 }
 
+export async function updateCourseDraft(id: string, payload: CreateCourseDraftPayload) {
+  const response = await axiosClient.put<ApiResponse<CourseDraftResponse>>(
+    ENDPOINTS.teacherCourses.draftDetail(id),
+    payload,
+  );
+
+  return response.data.data;
+}
+
 export async function fetchCourseDrafts() {
   const response = await axiosClient.get<ApiResponse<CourseDraftResponse[]>>(ENDPOINTS.teacherCourses.drafts);
 
   return response.data.data;
+}
+
+export async function deleteCourseDraft(id: string) {
+  await axiosClient.delete<ApiResponse<void>>(ENDPOINTS.teacherCourses.draftDetail(id));
 }
 
 export async function fetchCourseCategories() {

@@ -22,6 +22,7 @@ export const ENDPOINTS = {
   },
   teacherCourses: {
     drafts: '/v1/teacher/courses/drafts',
+    draftDetail: (id: string) => `/v1/teacher/courses/drafts/${id}`,
   },
   teacherCourseAssets: {
     thumbnails: '/v1/teacher/courses/assets/thumbnails',

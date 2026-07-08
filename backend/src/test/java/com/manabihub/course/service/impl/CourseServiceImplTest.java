@@ -100,6 +100,42 @@ class CourseServiceImplTest {
     }
 
     @Test
+    void createDraft_WhenTitleIsBlank_ShouldAssignDefaultDraftTitle() {
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
+        when(courseRepository.existsBySlug(any())).thenReturn(false);
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> {
+            Course course = invocation.getArgument(0);
+            course.setId(UUID.randomUUID());
+            return course;
+        });
+
+        CreateCourseDraftRequest request = new CreateCourseDraftRequest(
+                "",
+                "Introductory Japanese course for new learners.",
+                JlptLevel.N5,
+                "GRAMMAR",
+                null,
+                "Learners can understand basic N5 grammar and vocabulary.",
+                BigDecimal.ZERO,
+                "No prerequisites",
+                "Students starting Japanese from zero",
+                List.of(
+                        "Read Hiragana and Katakana with confidence",
+                        "Understand core N5 sentence patterns",
+                        "Use basic greetings and classroom phrases",
+                        "Prepare for beginner JLPT N5 practice"
+                )
+        );
+
+        CourseDraftResponse response = courseService.createDraft(request);
+
+        assertTrue(response.title().startsWith("[Bản nháp] Khóa học chưa đặt tên - "));
+        assertTrue(response.slug().startsWith("ban-nhap-khoa-hoc-chua-dat-ten"));
+    }
+
+    @Test
     void listMyDrafts_WhenTeacherApproved_ShouldReturnDraftCourses() {
         Course draft = Course.builder()
                 .id(UUID.randomUUID())
@@ -128,6 +164,61 @@ class CourseServiceImplTest {
         assertEquals(1, responses.size());
         assertEquals(draft.getId(), responses.get(0).id());
         assertEquals(CourseStatus.DRAFT, responses.get(0).status());
+    }
+
+    @Test
+    void updateDraft_WhenDraftExists_ShouldUpdateFieldsAndGoals() {
+        UUID draftId = UUID.randomUUID();
+        Course draft = Course.builder()
+                .id(draftId)
+                .teacher(approvedTeacher)
+                .title("Old title")
+                .slug("old-title")
+                .introduction("Old introduction")
+                .jlptLevel(JlptLevel.N5)
+                .category("GRAMMAR")
+                .outcomes("Old outcomes")
+                .price(BigDecimal.ZERO)
+                .currency("VND")
+                .prerequisites("Old prerequisites")
+                .targetStudents("Old students")
+                .status(CourseStatus.DRAFT)
+                .build();
+        draft.addLearningGoal("Old goal", 1);
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_IdAndStatus(draftId, approvedTeacher.getId(), CourseStatus.DRAFT))
+                .thenReturn(Optional.of(draft));
+        when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
+        when(courseRepository.existsBySlugAndIdNot("jlpt-n5-foundation", draftId)).thenReturn(false);
+
+        CourseDraftResponse response = courseService.updateDraft(draftId, validRequest());
+
+        assertEquals("JLPT N5 Foundation", response.title());
+        assertEquals("jlpt-n5-foundation", response.slug());
+        assertEquals(4, response.learningGoals().size());
+    }
+
+    @Test
+    void deleteDraft_WhenDraftExists_ShouldDeleteCourse() {
+        UUID draftId = UUID.randomUUID();
+        Course draft = Course.builder()
+                .id(draftId)
+                .teacher(approvedTeacher)
+                .title("Draft")
+                .slug("draft")
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_IdAndStatus(draftId, approvedTeacher.getId(), CourseStatus.DRAFT))
+                .thenReturn(Optional.of(draft));
+
+        courseService.deleteDraft(draftId);
+
+        verify(courseRepository).delete(draft);
     }
 
     @Test

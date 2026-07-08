@@ -5,6 +5,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import {
   Alert,
@@ -32,15 +33,17 @@ import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import Cropper, { type Area } from 'react-easy-crop';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
   type CourseCategory,
+  type CourseDraftResponse,
   type JlptLevel,
   courseDraftApiError,
   createCourseDraft,
   fetchCourseCategories,
+  updateCourseDraft,
   uploadCourseThumbnail,
 } from '../services/courseDraftService';
 
@@ -81,6 +84,10 @@ interface CropDraft {
   mimeType: string;
 }
 
+interface CourseDraftRouteState {
+  draftToEdit?: CourseDraftResponse;
+}
+
 const jlptLevels: JlptLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1'];
 const steps = ['Thông tin chung', 'Ảnh & mô tả', 'Mục tiêu & yêu cầu'];
 const maxImageSize = 5 * 1024 * 1024;
@@ -101,10 +108,47 @@ const initialForm: CourseDraftForm = {
   learningGoals: ['', '', '', ''],
 };
 
+function buildInitialForm(draft?: CourseDraftResponse): CourseDraftForm {
+  if (!draft) {
+    return {
+      ...initialForm,
+      learningGoals: [...initialForm.learningGoals],
+    };
+  }
+
+  return {
+    title: draft.title || '',
+    introduction: draft.introduction || '',
+    jlptLevel: draft.jlptLevel,
+    category: draft.category || '',
+    thumbnailUrl: draft.thumbnailUrl || '',
+    thumbnailPreviewUrl: resolveCourseAssetUrl(draft.thumbnailUrl) || '',
+    thumbnailFileName: draft.thumbnailUrl ? 'Ảnh bìa hiện tại' : '',
+    outcomes: draft.outcomes || '',
+    price: String(Number(draft.price || 0)),
+    prerequisites: draft.prerequisites || '',
+    targetStudents: draft.targetStudents || '',
+    learningGoals: withMinimumGoals(draft.learningGoals),
+  };
+}
+
+function withMinimumGoals(goals?: string[]) {
+  const normalized = [...(goals || [])];
+
+  while (normalized.length < 4) {
+    normalized.push('');
+  }
+
+  return normalized;
+}
+
 export function CourseDraftPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const editingDraft = (location.state as CourseDraftRouteState | null)?.draftToEdit;
+  const isEditing = Boolean(editingDraft);
   const [activeStep, setActiveStep] = useState(0);
-  const [form, setForm] = useState<CourseDraftForm>(initialForm);
+  const [form, setForm] = useState<CourseDraftForm>(() => buildInitialForm(editingDraft));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<CourseCategory[]>([]);
   const [categoryLoading, setCategoryLoading] = useState(true);
@@ -274,18 +318,22 @@ export function CourseDraftPage() {
 
     setSaving(true);
     try {
-      const draft = await createCourseDraft({
+      const payload = {
         title: form.title.trim(),
         introduction: form.introduction,
         jlptLevel: form.jlptLevel,
         category: form.category,
-        thumbnailUrl: form.thumbnailUrl,
+        thumbnailUrl: form.thumbnailUrl || null,
         outcomes: form.outcomes,
         price: Number(form.price),
         prerequisites: form.prerequisites,
         targetStudents: form.targetStudents,
         learningGoals: form.learningGoals.map((goal) => goal.trim()).filter(Boolean),
-      });
+      };
+      const draft = editingDraft
+        ? await updateCourseDraft(editingDraft.id, payload)
+        : await createCourseDraft(payload);
+
       navigate(ROUTES.TEACHER.COURSES, {
         state: {
           draftSaved: true,
@@ -353,11 +401,11 @@ export function CourseDraftPage() {
   return (
     <Box>
       <PageHeader
-        title="Tạo khóa học nháp"
+        title={isEditing ? 'Tiếp tục soạn khóa học' : 'Tạo khóa học nháp'}
         breadcrumbs={[
           { label: 'Giảng viên' },
           { label: 'Khóa học của tôi', href: ROUTES.TEACHER.COURSES },
-          { label: 'Tạo bản nháp' },
+          { label: isEditing ? 'Tiếp tục soạn' : 'Tạo bản nháp' },
         ]}
         action={(
           <Button
@@ -399,13 +447,12 @@ export function CourseDraftPage() {
             <Stack spacing={2.5}>
               <TextField
                 fullWidth
-                required
                 label="Tên khóa học"
                 placeholder="Ví dụ: JLPT N5 nền tảng cho người mới bắt đầu"
                 value={form.title}
                 onChange={updateField('title')}
                 error={Boolean(errors.title)}
-                helperText={errors.title || 'Tên nên rõ cấp độ, lợi ích chính và nhóm học viên phù hợp.'}
+                helperText={errors.title || 'Có thể để trống khi lưu nháp; hệ thống sẽ tự đặt tên theo ngày tạo.'}
               />
 
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -660,7 +707,7 @@ export function CourseDraftPage() {
                   onClick={handleSubmit}
                   sx={{ minWidth: 180, textTransform: 'none', fontWeight: 700 }}
                 >
-                  {saving ? 'Đang lưu...' : 'Lưu bản nháp'}
+                  {saving ? 'Đang lưu...' : (isEditing ? 'Cập nhật bản nháp' : 'Lưu bản nháp')}
                 </Button>
               )}
             </Stack>
@@ -843,7 +890,7 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
   return (
     <Box>
       <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.75 }}>
-        Ảnh đại diện khóa học
+        Ảnh bìa khóa học
       </Typography>
 
       <Paper
@@ -893,10 +940,28 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
           </Stack>
         ) : (
           <Stack spacing={1.25} sx={{ alignItems: 'center', textAlign: 'center' }}>
-            <CloudUploadIcon color="primary" sx={{ fontSize: 44 }} />
-            <Typography sx={{ fontWeight: 700 }}>Kéo thả ảnh vào đây</Typography>
+            <Box
+              sx={{
+                alignItems: 'center',
+                aspectRatio: '16 / 9',
+                background: 'linear-gradient(135deg, #eef7ff 0%, #f7f1ff 48%, #fff6e8 100%)',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                maxWidth: 280,
+                px: 2,
+                width: '100%',
+              }}
+            >
+              <MenuBookIcon color="primary" sx={{ fontSize: 42, mb: 0.5 }} />
+              <Typography sx={{ fontWeight: 800 }}>Chưa có ảnh bìa</Typography>
+            </Box>
+            <Typography sx={{ fontWeight: 700 }}>Kéo thả ảnh vào đây để thay ảnh mặc định</Typography>
             <Typography variant="body2" color="text.secondary">
-              Hỗ trợ PNG/JPG, tối đa 5MB. Ảnh sẽ được cắt bắt buộc theo tỷ lệ 16:9.
+              Hỗ trợ PNG/JPG, tối đa 5MB. Nếu chưa chọn ảnh, hệ thống sẽ dùng ảnh bìa mặc định.
             </Typography>
             <Button variant="contained" onClick={() => inputRef.current?.click()} sx={{ textTransform: 'none', fontWeight: 700 }}>
               Chọn ảnh từ máy
@@ -955,9 +1020,6 @@ function collectStepErrors(step: number, form: CourseDraftForm, categoryLoadErro
   const nextErrors: Record<string, string> = {};
 
   if (step === 0) {
-    if (!form.title.trim()) {
-      nextErrors.title = 'Vui lòng nhập tên khóa học.';
-    }
     if (categoryLoadError) {
       nextErrors.category = 'Chưa tải được danh mục chuẩn từ hệ thống.';
     } else if (!form.category) {
@@ -969,9 +1031,6 @@ function collectStepErrors(step: number, form: CourseDraftForm, categoryLoadErro
   }
 
   if (step === 1) {
-    if (!form.thumbnailUrl) {
-      nextErrors.thumbnailUrl = 'Vui lòng tải và cắt ảnh đại diện khóa học.';
-    }
     if (!hasRichText(form.introduction)) {
       nextErrors.introduction = 'Vui lòng nhập giới thiệu khóa học.';
     }
@@ -1019,6 +1078,21 @@ function clearStepErrors(step: number, learningGoals: string[]) {
   };
 
   return Object.fromEntries(keysByStep[step].map((key) => [key, '']));
+}
+
+function resolveCourseAssetUrl(url?: string | null) {
+  if (!url) {
+    return undefined;
+  }
+
+  if (/^(https?:|blob:|data:)/i.test(url)) {
+    return url;
+  }
+
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api';
+  const assetOrigin = apiBaseUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
+
+  return `${assetOrigin}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
 function hasRichText(value: string) {

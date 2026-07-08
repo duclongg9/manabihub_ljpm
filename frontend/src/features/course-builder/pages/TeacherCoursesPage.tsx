@@ -1,16 +1,37 @@
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { Alert, Box, Button, Chip, CircularProgress, Divider, Paper, Stack, Typography } from '@mui/material';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import SearchIcon from '@mui/icons-material/Search';
+import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Divider,
+  InputAdornment,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
+  deleteCourseDraft,
   fetchCourseCategories,
   fetchCourseDrafts,
   type CourseCategory,
   type CourseDraftResponse,
+  type JlptLevel,
 } from '../services/courseDraftService';
 
 interface CourseDraftSavedState {
@@ -18,6 +39,14 @@ interface CourseDraftSavedState {
   draftId?: string;
   draftTitle?: string;
 }
+
+type Feedback = {
+  message: string;
+  severity: 'success' | 'error';
+} | null;
+
+const allFilterValue = 'ALL';
+const jlptLevels: JlptLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1'];
 
 const priceFormatter = new Intl.NumberFormat('vi-VN', {
   currency: 'VND',
@@ -40,13 +69,36 @@ export function TeacherCoursesPage() {
   const recentlySaved = Boolean(draftState?.draftSaved);
   const [drafts, setDrafts] = useState<CourseDraftResponse[]>([]);
   const [categories, setCategories] = useState<CourseCategory[]>([]);
+  const [query, setQuery] = useState('');
+  const [levelFilter, setLevelFilter] = useState(allFilterValue);
+  const [categoryFilter, setCategoryFilter] = useState(allFilterValue);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback>(null);
 
   const categoryNames = useMemo(
     () => new Map(categories.map((category) => [category.code, category.name])),
     [categories],
   );
+
+  const filteredDrafts = useMemo(() => {
+    const normalizedQuery = normalizeSearch(query);
+
+    return drafts.filter((course) => {
+      const categoryName = categoryNames.get(course.category) || course.category;
+      const searchText = normalizeSearch([
+        displayDraftTitle(course),
+        toPlainText(course.introduction),
+        course.jlptLevel,
+        categoryName,
+      ].join(' '));
+
+      return (!normalizedQuery || searchText.includes(normalizedQuery))
+        && (levelFilter === allFilterValue || course.jlptLevel === levelFilter)
+        && (categoryFilter === allFilterValue || course.category === categoryFilter);
+    });
+  }, [categoryFilter, categoryNames, drafts, levelFilter, query]);
 
   const loadDrafts = useCallback(async () => {
     setIsLoading(true);
@@ -70,6 +122,42 @@ export function TeacherCoursesPage() {
   useEffect(() => {
     void loadDrafts();
   }, [loadDrafts]);
+
+  function clearFilters() {
+    setQuery('');
+    setLevelFilter(allFilterValue);
+    setCategoryFilter(allFilterValue);
+  }
+
+  function editDraft(course: CourseDraftResponse) {
+    navigate(ROUTES.TEACHER.COURSE_CREATE, {
+      state: {
+        draftToEdit: course,
+      },
+    });
+  }
+
+  async function deleteDraft(course: CourseDraftResponse) {
+    const title = displayDraftTitle(course);
+    const confirmed = window.confirm(`Xóa bản nháp "${title}"? Thao tác này không thể hoàn tác.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(course.id);
+    setFeedback(null);
+
+    try {
+      await deleteCourseDraft(course.id);
+      setDrafts((current) => current.filter((draft) => draft.id !== course.id));
+      setFeedback({ severity: 'success', message: `Đã xóa bản nháp "${title}".` });
+    } catch {
+      setFeedback({ severity: 'error', message: 'Không thể xóa bản nháp. Vui lòng thử lại.' });
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <Box>
@@ -110,6 +198,12 @@ export function TeacherCoursesPage() {
         </Alert>
       )}
 
+      {feedback && (
+        <Alert severity={feedback.severity} sx={{ mb: 2 }} onClose={() => setFeedback(null)}>
+          {feedback.message}
+        </Alert>
+      )}
+
       <Paper
         elevation={0}
         sx={{
@@ -119,75 +213,161 @@ export function TeacherCoursesPage() {
           p: { xs: 2, md: 3 },
         }}
       >
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={2}
-          sx={{ justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 2 }}
-        >
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Danh sách bản nháp
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Các khóa học đang được soạn thảo sẽ xuất hiện tại đây để bạn kiểm tra trước khi gửi duyệt.
-            </Typography>
-          </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            disabled={isLoading}
-            onClick={() => void loadDrafts()}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
+        <Stack spacing={2.5}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{ justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' } }}
           >
-            Tải lại
-          </Button>
-        </Stack>
-
-        {isLoading && <DraftLoadingState />}
-
-        {!isLoading && loadError && (
-          <Alert
-            severity="error"
-            action={(
-              <Button color="inherit" size="small" onClick={() => void loadDrafts()} sx={{ textTransform: 'none' }}>
-                Thử lại
-              </Button>
-            )}
-          >
-            {loadError}
-          </Alert>
-        )}
-
-        {!isLoading && !loadError && drafts.length === 0 && (
-          <DraftEmptyState onCreate={() => navigate(ROUTES.TEACHER.COURSE_CREATE)} />
-        )}
-
-        {!isLoading && !loadError && drafts.length > 0 && (
-          <Stack divider={<Divider flexItem />} spacing={0}>
-            {drafts.map((course) => (
-              <CourseDraftRow
-                key={course.id}
-                course={course}
-                categoryName={categoryNames.get(course.category)}
-                highlighted={course.id === draftState?.draftId}
-              />
-            ))}
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Danh sách bản nháp
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Tìm, lọc và tiếp tục hoàn thiện các khóa học đang soạn trước khi gửi duyệt.
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              disabled={isLoading}
+              onClick={() => void loadDrafts()}
+              sx={{ textTransform: 'none', fontWeight: 700 }}
+            >
+              Tải lại
+            </Button>
           </Stack>
-        )}
+
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={1.5}
+            sx={{ alignItems: { xs: 'stretch', md: 'center' } }}
+          >
+            <TextField
+              fullWidth
+              size="small"
+              label="Tìm kiếm bản nháp"
+              placeholder="Nhập tên khóa học, mô tả hoặc danh mục"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+            <TextField
+              select
+              size="small"
+              label="Trình độ"
+              value={levelFilter}
+              onChange={(event) => setLevelFilter(event.target.value)}
+              sx={{ minWidth: { xs: '100%', md: 150 } }}
+            >
+              <MenuItemValue value={allFilterValue}>Tất cả</MenuItemValue>
+              {jlptLevels.map((level) => (
+                <MenuItemValue key={level} value={level}>{level}</MenuItemValue>
+              ))}
+            </TextField>
+            <TextField
+              select
+              size="small"
+              label="Danh mục"
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              sx={{ minWidth: { xs: '100%', md: 210 } }}
+            >
+              <MenuItemValue value={allFilterValue}>Tất cả danh mục</MenuItemValue>
+              {categories.map((category) => (
+                <MenuItemValue key={category.code} value={category.code}>
+                  {category.name}
+                </MenuItemValue>
+              ))}
+            </TextField>
+            <Button
+              variant="text"
+              startIcon={<FilterListIcon />}
+              onClick={clearFilters}
+              sx={{ alignSelf: { xs: 'flex-start', md: 'center' }, textTransform: 'none', fontWeight: 700 }}
+            >
+              Xóa lọc
+            </Button>
+          </Stack>
+
+          {isLoading && <DraftLoadingState />}
+
+          {!isLoading && loadError && (
+            <Alert
+              severity="error"
+              action={(
+                <Button color="inherit" size="small" onClick={() => void loadDrafts()} sx={{ textTransform: 'none' }}>
+                  Thử lại
+                </Button>
+              )}
+            >
+              {loadError}
+            </Alert>
+          )}
+
+          {!isLoading && !loadError && drafts.length === 0 && (
+            <DraftEmptyState onCreate={() => navigate(ROUTES.TEACHER.COURSE_CREATE)} />
+          )}
+
+          {!isLoading && !loadError && drafts.length > 0 && filteredDrafts.length === 0 && (
+            <DraftNoResultsState onClear={clearFilters} />
+          )}
+
+          {!isLoading && !loadError && filteredDrafts.length > 0 && (
+            <Stack divider={<Divider flexItem />} spacing={0}>
+              {filteredDrafts.map((course) => (
+                <CourseDraftRow
+                  key={course.id}
+                  categoryName={categoryNames.get(course.category)}
+                  course={course}
+                  deleting={deletingId === course.id}
+                  highlighted={course.id === draftState?.draftId}
+                  onDelete={() => void deleteDraft(course)}
+                  onEdit={() => editDraft(course)}
+                />
+              ))}
+            </Stack>
+          )}
+        </Stack>
       </Paper>
     </Box>
+  );
+}
+
+interface MenuItemValueProps {
+  children: ReactNode;
+  value: string;
+}
+
+function MenuItemValue({ children, value }: MenuItemValueProps) {
+  return (
+    <MenuItem value={value}>
+      {children}
+    </MenuItem>
   );
 }
 
 interface CourseDraftRowProps {
   categoryName?: string;
   course: CourseDraftResponse;
+  deleting: boolean;
   highlighted: boolean;
+  onDelete: () => void;
+  onEdit: () => void;
 }
 
-function CourseDraftRow({ categoryName, course, highlighted }: CourseDraftRowProps) {
+function CourseDraftRow({ categoryName, course, deleting, highlighted, onDelete, onEdit }: CourseDraftRowProps) {
   const thumbnailSrc = resolveAssetUrl(course.thumbnailUrl);
   const summary = toPlainText(course.introduction) || 'Chưa có mô tả ngắn cho bản nháp này.';
+  const title = displayDraftTitle(course);
 
   return (
     <Box
@@ -197,22 +377,18 @@ function CourseDraftRow({ categoryName, course, highlighted }: CourseDraftRowPro
         borderLeftColor: highlighted ? 'primary.main' : 'transparent',
         display: 'grid',
         gap: 2,
-        gridTemplateColumns: { xs: '1fr', sm: '132px 1fr' },
-        px: { xs: 0, sm: 1.5 },
+        gridTemplateColumns: { xs: '1fr', md: '168px minmax(0, 1fr)' },
+        px: { xs: 0, md: 1.5 },
         py: 2.5,
       }}
     >
       <Box
         sx={{
-          alignItems: 'center',
           aspectRatio: '16 / 9',
-          bgcolor: 'grey.100',
           border: '1px solid',
           borderColor: 'divider',
           borderRadius: 1,
-          display: 'flex',
-          justifyContent: 'center',
-          minHeight: { xs: 160, sm: 74 },
+          minHeight: { xs: 170, md: 94 },
           overflow: 'hidden',
         }}
       >
@@ -220,22 +396,32 @@ function CourseDraftRow({ categoryName, course, highlighted }: CourseDraftRowPro
           <Box
             component="img"
             src={thumbnailSrc}
-            alt={course.title}
+            alt={title}
             sx={{ height: '100%', objectFit: 'cover', width: '100%' }}
           />
         ) : (
-          <MenuBookIcon color="primary" sx={{ fontSize: 32 }} />
+          <CourseCoverPlaceholder />
         )}
       </Box>
 
-      <Stack spacing={1}>
+      <Stack spacing={1.25} sx={{ minWidth: 0 }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={1}
           sx={{ justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' } }}
         >
-          <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-            {course.title}
+          <Typography
+            variant="subtitle1"
+            title={title}
+            sx={{
+              fontWeight: 800,
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {title}
           </Typography>
           <Chip color="warning" label="Bản nháp" size="small" />
         </Stack>
@@ -245,6 +431,7 @@ function CourseDraftRow({ categoryName, course, highlighted }: CourseDraftRowPro
           color="text.secondary"
           sx={{
             display: '-webkit-box',
+            minHeight: 40,
             overflow: 'hidden',
             WebkitBoxOrient: 'vertical',
             WebkitLineClamp: 2,
@@ -263,8 +450,67 @@ function CourseDraftRow({ categoryName, course, highlighted }: CourseDraftRowPro
             Lưu lúc {formatDate(course.createdAt)}
           </Typography>
         </Stack>
+
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'flex-end', pt: 0.5 }}>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<EditOutlinedIcon />}
+            onClick={onEdit}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Tiếp tục soạn
+          </Button>
+          <Button
+            color="error"
+            variant="outlined"
+            size="small"
+            startIcon={<DeleteIcon />}
+            disabled={deleting}
+            onClick={onDelete}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            {deleting ? 'Đang xóa...' : 'Xóa'}
+          </Button>
+          <Tooltip title="Luồng gửi duyệt sẽ được mở ở bước Course Validation/Submit Course.">
+            <span>
+              <Button
+                disabled
+                variant="outlined"
+                size="small"
+                startIcon={<SendOutlinedIcon />}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                Gửi duyệt
+              </Button>
+            </span>
+          </Tooltip>
+        </Stack>
       </Stack>
     </Box>
+  );
+}
+
+function CourseCoverPlaceholder() {
+  return (
+    <Stack
+      spacing={0.75}
+      sx={{
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #eef7ff 0%, #f7f1ff 48%, #fff6e8 100%)',
+        color: 'text.secondary',
+        height: '100%',
+        justifyContent: 'center',
+        px: 2,
+        textAlign: 'center',
+        width: '100%',
+      }}
+    >
+      <MenuBookIcon color="primary" sx={{ fontSize: 34 }} />
+      <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 800 }}>
+        Chưa có ảnh bìa
+      </Typography>
+    </Stack>
   );
 }
 
@@ -286,7 +532,7 @@ interface DraftEmptyStateProps {
 function DraftEmptyState({ onCreate }: DraftEmptyStateProps) {
   return (
     <Stack spacing={2} sx={{ alignItems: 'center', py: 6, textAlign: 'center' }}>
-      <MenuBookIcon color="primary" sx={{ fontSize: 48 }} />
+      <CourseCoverPlaceholder />
       <Box>
         <Typography variant="h6" sx={{ fontWeight: 800 }}>
           Chưa có bản nháp khóa học
@@ -300,6 +546,35 @@ function DraftEmptyState({ onCreate }: DraftEmptyStateProps) {
       </Button>
     </Stack>
   );
+}
+
+interface DraftNoResultsStateProps {
+  onClear: () => void;
+}
+
+function DraftNoResultsState({ onClear }: DraftNoResultsStateProps) {
+  return (
+    <Stack spacing={1.5} sx={{ alignItems: 'center', py: 5, textAlign: 'center' }}>
+      <SearchIcon color="primary" sx={{ fontSize: 40 }} />
+      <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+        Không tìm thấy bản nháp phù hợp
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Thử đổi từ khóa hoặc bỏ bớt bộ lọc để xem thêm bản nháp.
+      </Typography>
+      <Button variant="outlined" onClick={onClear} sx={{ textTransform: 'none', fontWeight: 700 }}>
+        Xóa bộ lọc
+      </Button>
+    </Stack>
+  );
+}
+
+function displayDraftTitle(course: CourseDraftResponse) {
+  if (course.title?.trim()) {
+    return course.title.trim();
+  }
+
+  return `[Bản nháp] Khóa học chưa đặt tên - ${formatDate(course.createdAt)}`;
 }
 
 function formatPrice(price: number) {
@@ -345,4 +620,12 @@ function toPlainText(value?: string | null) {
 
   const document = new DOMParser().parseFromString(value, 'text/html');
   return document.body.textContent?.replace(/\s+/g, ' ').trim() || '';
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
 }
