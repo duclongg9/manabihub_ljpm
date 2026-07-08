@@ -95,6 +95,8 @@ public final class MessageCodes {
     public static final String MSG_COURSE_001 = "MSG-COURSE-001";
     public static final String MSG_COURSE_002 = "MSG-COURSE-002";
     public static final String MSG_COURSE_003 = "MSG-COURSE-003";
+    public static final String MSG_COURSE_004 = "MSG-COURSE-004";
+    public static final String MSG_COURSE_005 = "MSG-COURSE-005";
     public static final String MSG_GOAL_001 = "MSG-GOAL-001";
     public static final String MSG_GOAL_002 = "MSG-GOAL-002";
     public static final String MSG_GOAL_003 = "MSG-GOAL-003";

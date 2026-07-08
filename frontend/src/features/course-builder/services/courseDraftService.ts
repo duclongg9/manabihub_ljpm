@@ -38,6 +38,20 @@ export interface CourseDraftResponse {
   srsTrace: Record<string, unknown>;
 }
 
+export interface CourseCategory {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+}
+
+export interface CourseThumbnailUploadResponse {
+  publicUrl: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+}
+
 interface ApiResponse<T> {
   success: boolean;
   messageCode?: string;
@@ -54,10 +68,45 @@ export async function createCourseDraft(payload: CreateCourseDraftPayload) {
   return response.data.data;
 }
 
-export function courseDraftErrorMessage(error: unknown) {
+export async function fetchCourseDrafts() {
+  const response = await axiosClient.get<ApiResponse<CourseDraftResponse[]>>(ENDPOINTS.teacherCourses.drafts);
+
+  return response.data.data;
+}
+
+export async function fetchCourseCategories() {
+  const response = await axiosClient.get<ApiResponse<CourseCategory[]>>(ENDPOINTS.courseCategories.list);
+
+  return response.data.data;
+}
+
+export async function uploadCourseThumbnail(file: File) {
+  const formData = new FormData();
+  formData.append('thumbnail', file);
+
+  const response = await axiosClient.post<ApiResponse<CourseThumbnailUploadResponse>>(
+    ENDPOINTS.teacherCourseAssets.thumbnails,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    },
+  );
+
+  return response.data.data;
+}
+
+export function courseDraftApiError(error: unknown) {
   if (axios.isAxiosError<ApiResponse<unknown>>(error)) {
-    return error.response?.data?.message ?? 'Could not save course draft.';
+    return {
+      messageCode: error.response?.data?.messageCode,
+      message: error.response?.data?.message ?? 'Không thể lưu bản nháp khóa học.',
+    };
   }
 
-  return 'Could not save course draft.';
+  return {
+    messageCode: undefined,
+    message: 'Không thể lưu bản nháp khóa học.',
+  };
 }

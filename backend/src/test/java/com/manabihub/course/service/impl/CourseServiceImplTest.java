@@ -7,6 +7,7 @@ import com.manabihub.course.dto.response.CourseDraftResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.enums.JlptLevel;
+import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
@@ -41,6 +42,9 @@ class CourseServiceImplTest {
     private CourseRepository courseRepository;
 
     @Mock
+    private CourseCategoryRepository courseCategoryRepository;
+
+    @Mock
     private TeacherProfileRepository teacherProfileRepository;
 
     @Mock
@@ -52,7 +56,12 @@ class CourseServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        courseService = new CourseServiceImpl(courseRepository, teacherProfileRepository, currentUserService);
+        courseService = new CourseServiceImpl(
+                courseRepository,
+                courseCategoryRepository,
+                teacherProfileRepository,
+                currentUserService
+        );
         userId = UUID.randomUUID();
         approvedTeacher = new TeacherProfile();
         approvedTeacher.setId(UUID.randomUUID());
@@ -64,6 +73,7 @@ class CourseServiceImplTest {
     void createDraft_WhenTeacherApproved_ShouldSaveDraftWithLearningGoals() {
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
         when(courseRepository.existsBySlug("jlpt-n5-foundation")).thenReturn(false);
         when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> {
             Course course = invocation.getArgument(0);
@@ -90,15 +100,47 @@ class CourseServiceImplTest {
     }
 
     @Test
+    void listMyDrafts_WhenTeacherApproved_ShouldReturnDraftCourses() {
+        Course draft = Course.builder()
+                .id(UUID.randomUUID())
+                .teacher(approvedTeacher)
+                .title("JLPT N5 Foundation")
+                .slug("jlpt-n5-foundation")
+                .introduction("Introductory Japanese course for new learners.")
+                .jlptLevel(JlptLevel.N5)
+                .category("GRAMMAR")
+                .outcomes("Learners can understand basic N5 grammar and vocabulary.")
+                .price(BigDecimal.valueOf(100000))
+                .currency("VND")
+                .prerequisites("No prerequisites")
+                .targetStudents("Students starting Japanese from zero")
+                .status(CourseStatus.DRAFT)
+                .build();
+        draft.addLearningGoal("Read Hiragana and Katakana with confidence", 1);
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByTeacher_IdAndStatusOrderByCreatedAtDesc(approvedTeacher.getId(), CourseStatus.DRAFT))
+                .thenReturn(List.of(draft));
+
+        List<CourseDraftResponse> responses = courseService.listMyDrafts();
+
+        assertEquals(1, responses.size());
+        assertEquals(draft.getId(), responses.get(0).id());
+        assertEquals(CourseStatus.DRAFT, responses.get(0).status());
+    }
+
+    @Test
     void createDraft_WhenGoalsAreMissing_ShouldThrowGoalValidationError() {
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
 
         CreateCourseDraftRequest request = new CreateCourseDraftRequest(
                 "JLPT N5 Foundation",
                 "Introduction",
                 JlptLevel.N5,
-                "Basics",
+                "GRAMMAR",
                 null,
                 "Outcomes",
                 BigDecimal.valueOf(100000),
@@ -117,13 +159,14 @@ class CourseServiceImplTest {
     void createDraft_WhenGoalIsTooLong_ShouldThrowGoalLengthError() {
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
 
         String longGoal = "a".repeat(161);
         CreateCourseDraftRequest request = new CreateCourseDraftRequest(
                 "JLPT N5 Foundation",
                 "Introduction",
                 JlptLevel.N5,
-                "Basics",
+                "GRAMMAR",
                 null,
                 "Outcomes",
                 BigDecimal.valueOf(100000),
@@ -160,7 +203,7 @@ class CourseServiceImplTest {
                 "JLPT N5 Foundation",
                 "Introductory Japanese course for new learners.",
                 JlptLevel.N5,
-                "Basics",
+                "GRAMMAR",
                 "https://cdn.example.com/n5.png",
                 "Learners can understand basic N5 grammar and vocabulary.",
                 BigDecimal.valueOf(100000),

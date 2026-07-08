@@ -23,5 +23,11 @@ export const ENDPOINTS = {
   teacherCourses: {
     drafts: '/v1/teacher/courses/drafts',
   },
+  teacherCourseAssets: {
+    thumbnails: '/v1/teacher/courses/assets/thumbnails',
+  },
+  courseCategories: {
+    list: '/v1/course-categories',
+  },
   ADMIN_LOGIN: '/admin/auth/login',
 };

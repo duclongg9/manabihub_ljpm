@@ -7,6 +7,7 @@ import com.manabihub.course.dto.response.CourseDraftResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseLearningGoal;
 import com.manabihub.course.enums.CourseStatus;
+import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.CourseService;
 import com.manabihub.identity.service.CurrentUserService;
@@ -36,6 +37,7 @@ public class CourseServiceImpl implements CourseService {
     private static final int MAX_LEARNING_GOAL_LENGTH = 160;
 
     private final CourseRepository courseRepository;
+    private final CourseCategoryRepository courseCategoryRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final CurrentUserService currentUserService;
 
@@ -72,6 +74,21 @@ public class CourseServiceImpl implements CourseService {
         return toResponse(savedCourse);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseDraftResponse> listMyDrafts() {
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+
+        return courseRepository.findByTeacher_IdAndStatusOrderByCreatedAtDesc(
+                        teacherProfile.getId(),
+                        CourseStatus.DRAFT
+                )
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     private TeacherProfile resolveApprovedTeacher(UUID userId) {
         TeacherProfile teacherProfile = teacherProfileRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(
@@ -94,6 +111,11 @@ public class CourseServiceImpl implements CourseService {
     private void validateDraftRequest(CreateCourseDraftRequest request, List<String> learningGoals) {
         if (!StringUtils.hasText(request.title())) {
             throw new BusinessException(MessageCodes.MSG_COURSE_002, "Course title is required");
+        }
+
+        if (!StringUtils.hasText(request.category())
+                || !courseCategoryRepository.existsByCodeAndActiveTrue(request.category().trim())) {
+            throw new BusinessException(MessageCodes.MSG_COURSE_004, "Course category is invalid");
         }
 
         if (request.price() == null || request.price().compareTo(BigDecimal.ZERO) < 0) {
@@ -206,4 +228,5 @@ public class CourseServiceImpl implements CourseService {
     private String blankToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
+
 }
