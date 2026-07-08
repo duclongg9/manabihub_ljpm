@@ -79,6 +79,7 @@ public final class MessageCodes {
     public static final String MSG_KYC_006 = "MSG-KYC-006";
     public static final String MSG_KYC_008 = "MSG-KYC-008";
     public static final String MSG_KYC_009 = "MSG-KYC-009";
+    public static final String MSG_KYC_010 = "MSG-KYC-010";
     public static final String MSG_ADM_002 = "MSG-ADM-002";
 
     // ──────────────────────────────────────────────
@@ -91,6 +92,15 @@ public final class MessageCodes {
     public static final String COURSE_NOT_EDITABLE = "COURSE_NOT_EDITABLE";
     public static final String COURSE_NOT_PUBLISHED = "COURSE_NOT_PUBLISHED";
     public static final String COURSE_ALREADY_PUBLISHED = "COURSE_ALREADY_PUBLISHED";
+    public static final String MSG_COURSE_001 = "MSG-COURSE-001";
+    public static final String MSG_COURSE_002 = "MSG-COURSE-002";
+    public static final String MSG_COURSE_003 = "MSG-COURSE-003";
+    public static final String MSG_COURSE_004 = "MSG-COURSE-004";
+    public static final String MSG_COURSE_005 = "MSG-COURSE-005";
+    public static final String MSG_GOAL_001 = "MSG-GOAL-001";
+    public static final String MSG_GOAL_002 = "MSG-GOAL-002";
+    public static final String MSG_GOAL_003 = "MSG-GOAL-003";
+    public static final String MSG_GOAL_004 = "MSG-GOAL-004";
 
     // ──────────────────────────────────────────────
     // CONTENT — lesson / content management

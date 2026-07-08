@@ -15,6 +15,7 @@ export const ROUTES = {
   TEACHER: {
     DASHBOARD: '/teacher/dashboard',
     COURSES: '/teacher/courses',
+    COURSE_CREATE: '/teacher/courses/new',
     KYC: '/teacher/kyc',
     WALLET: '/teacher/wallet',
     NOTIFICATIONS: '/teacher/notifications',
