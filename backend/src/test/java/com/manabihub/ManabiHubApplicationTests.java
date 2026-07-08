@@ -1,6 +1,8 @@
 package com.manabihub;
 
 import com.manabihub.audit.repository.AuditLogRepository;
+import com.manabihub.course.repository.CourseCategoryRepository;
+import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.identity.mapper.StudentProfileMapper;
 import com.manabihub.identity.mapper.TeacherProfileMapper;
 import com.manabihub.identity.repository.AppUserRepository;
@@ -86,6 +88,12 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private CurrentUserService currentUserService;
+
+    @MockBean
+    private CourseRepository courseRepository;
+
+    @MockBean
+    private CourseCategoryRepository courseCategoryRepository;
 
     @Test
     void contextLoads() {

@@ -1,0 +1,31 @@
+package com.manabihub.course.dto.response;
+
+import com.manabihub.course.enums.CourseStatus;
+import com.manabihub.course.enums.JlptLevel;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+public record CourseDraftResponse(
+        UUID id,
+        UUID teacherId,
+        String title,
+        String slug,
+        String introduction,
+        JlptLevel jlptLevel,
+        String category,
+        String thumbnailUrl,
+        String outcomes,
+        BigDecimal price,
+        String currency,
+        String prerequisites,
+        String targetStudents,
+        CourseStatus status,
+        List<String> learningGoals,
+        Instant createdAt,
+        Map<String, Object> srsTrace
+) {
+}
