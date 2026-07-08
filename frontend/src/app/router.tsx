@@ -15,8 +15,14 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
 
 export const router = createBrowserRouter([
+  {
+    path: '/',
+    index: true,
+    element: <PublicHomePage />,
+  },
   {
     path: '/login',
     element: <PublicLoginPage />,
@@ -29,10 +35,6 @@ export const router = createBrowserRouter([
     path: '/',
     element: <PublicLayout />,
     children: [
-      {
-        index: true,
-        element: <div>Home Page Placeholder</div>,
-      },
       {
         path: 'auth/callback',
         element: <AuthCallbackPage />,
