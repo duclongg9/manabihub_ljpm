@@ -88,6 +88,12 @@
             <version>${springdoc-openapi.version}</version>
         </dependency>
 
+        <!-- Mail (Gmail OAuth2 / SMTP) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
