@@ -19,8 +19,12 @@ export const FinalTestConfigPage = () => {
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'success' as 'success' | 'error',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info',
   });
+
+  const notify = (msg: string, severity: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    setSnackbar({ open: true, message: msg, severity });
+  };
   
   const [form, setForm] = useState<UpdateFinalTestRequest>({
     timeLimitMinutes: 60,
@@ -203,6 +207,7 @@ export const FinalTestConfigPage = () => {
             onChange={(q) => setForm({ ...form, questions: q })} 
             expanded={expanded}
             setExpanded={setExpanded}
+            onNotify={notify}
           />
         </Stack>
       </Box>

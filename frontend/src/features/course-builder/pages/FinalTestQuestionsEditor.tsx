@@ -1,5 +1,5 @@
-import { 
-  Button, IconButton, Stack, TextField, Typography, Tooltip, 
+import {
+  Button, IconButton, Stack, TextField, Typography, Tooltip,
   Accordion, AccordionSummary, AccordionDetails, Radio, RadioGroup, FormControlLabel,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Box,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
@@ -11,18 +11,19 @@ import DownloadIcon from '@mui/icons-material/Download';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import type { FinalTestQuestion, FinalTestChoice } from '../services/finalTestService';
+import type { FinalTestQuestion } from '../services/finalTestService';
 
 interface Props {
   questions: FinalTestQuestion[];
   onChange: (questions: FinalTestQuestion[]) => void;
   expanded: number | false;
   setExpanded: (expanded: number | false) => void;
+  onNotify: (msg: string, severity: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
-export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExpanded }: Props) => {
+export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExpanded, onNotify }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // States for Excel Import Dialog
   const [pendingImport, setPendingImport] = useState<FinalTestQuestion[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -56,7 +57,7 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
 
         const headerRow = data[0];
         if (!headerRow || !headerRow.some((col: any) => String(col).toLowerCase().includes('câu hỏi'))) {
-          alert("File Excel không đúng định dạng. Cột đầu tiên phải chứa từ 'Câu hỏi'.");
+          onNotify("File Excel không đúng định dạng. Cột đầu tiên phải chứa từ 'Câu hỏi'.", "error");
           if (fileInputRef.current) fileInputRef.current.value = '';
           return;
         }
@@ -103,20 +104,22 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
 
         if (newQuestions.length > 0) {
           if (duplicateCount > 0) {
-            alert(`Hệ thống tự động bỏ qua ${duplicateCount} câu hỏi bị trùng lặp nội dung.\\n\\nTìm thấy ${newQuestions.length} câu hỏi mới hợp lệ.`);
+            onNotify(`Hệ thống tự động bỏ qua ${duplicateCount} câu hỏi bị trùng lặp nội dung. Tìm thấy ${newQuestions.length} câu hỏi mới hợp lệ.`, "warning");
+          } else {
+            onNotify(`Đã tải thành công ${newQuestions.length} câu hỏi từ Excel.`, "success");
           }
           setPendingImport(newQuestions);
           setOpenDialog(true);
         } else {
           if (duplicateCount > 0) {
-            alert(`Tất cả ${duplicateCount} câu hỏi trong file Excel đều đã có sẵn trong danh sách.\\nKhông có câu hỏi mới nào được thêm.`);
+            onNotify(`Tất cả ${duplicateCount} câu hỏi trong file Excel đều đã có sẵn trong danh sách. Không có câu hỏi mới nào được thêm.`, "info");
           } else {
-            alert("Không tìm thấy câu hỏi hợp lệ nào trong file.");
+            onNotify("Không tìm thấy câu hỏi hợp lệ nào trong file.", "warning");
           }
         }
       } catch (err) {
         console.error("Error parsing Excel:", err);
-        alert("Có lỗi xảy ra khi đọc file Excel.");
+        onNotify("Có lỗi xảy ra khi đọc file Excel.", "error");
       }
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -133,11 +136,11 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
 
     // Expand the first newly imported question
     if (pendingImport.length > 0) {
-       const newIndex = questions.length;
-       setExpanded(newIndex);
-       setTimeout(() => {
-         document.getElementById(`question-accordion-${newIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-       }, 100);
+      const newIndex = questions.length;
+      setExpanded(newIndex);
+      setTimeout(() => {
+        document.getElementById(`question-accordion-${newIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
     }
   };
 
@@ -199,7 +202,7 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
   const handleAddChoice = (qIndex: number) => {
     const newQuestions = [...questions];
     if (newQuestions[qIndex].choices.length >= 10) {
-      alert("Tối đa 10 lựa chọn cho mỗi câu hỏi.");
+      onNotify("Tối đa 10 lựa chọn cho mỗi câu hỏi.", "warning");
       return;
     }
     newQuestions[qIndex].choices.push({ content: '', isCorrect: false });
@@ -209,7 +212,7 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
   const handleRemoveChoice = (qIndex: number, cIndex: number) => {
     const newQuestions = [...questions];
     if (newQuestions[qIndex].choices.length <= 2) {
-      alert("Tối thiểu phải có 2 lựa chọn.");
+      onNotify("Tối thiểu phải có 2 lựa chọn.", "warning");
       return;
     }
     newQuestions[qIndex].choices.splice(cIndex, 1);
@@ -223,11 +226,11 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
   return (
     <Stack spacing={3}>
       {questions.length === 0 ? (
-        <Box 
-          sx={{ 
-            p: 5, 
-            textAlign: 'center', 
-            bgcolor: '#f9f9f9', 
+        <Box
+          sx={{
+            p: 5,
+            textAlign: 'center',
+            bgcolor: '#f9f9f9',
             borderRadius: 2,
             border: '2px dashed #ccc'
           }}
@@ -243,102 +246,102 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
         questions.map((q, qIndex) => {
           // Find which index is correct
           const correctChoiceIndex = q.choices.findIndex(c => c.isCorrect);
-        
-        return (
-          <Accordion 
-            id={`question-accordion-${qIndex}`}
-            key={qIndex} 
-            expanded={expanded === qIndex} 
-            onChange={handleAccordionChange(qIndex)}
-            variant="outlined"
-            sx={{ '&:before': { display: 'none' } }}
-          >
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', pr: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                  Câu {qIndex + 1}: {q.content ? (q.content.length > 50 ? q.content.substring(0, 50) + '...' : q.content) : '(Chưa nhập nội dung)'}
-                </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Tooltip title="Xóa câu hỏi">
-                    <IconButton component="span" size="small" color="error" onClick={(e) => handleRemoveQuestion(e, qIndex)}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-              </Box>
-            </AccordionSummary>
-            
-            <AccordionDetails sx={{ borderTop: '1px solid #e0e0e0', pt: 3 }}>
-              <Stack spacing={3}>
-                <TextField
-                  label="Nội dung câu hỏi"
-                  multiline
-                  rows={2}
-                  fullWidth
-                  value={q.content}
-                  onChange={(e) => handleChangeQuestion(qIndex, 'content', e.target.value)}
-                  required
-                />
 
-                <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Các lựa chọn (chọn 1 đáp án đúng):</Typography>
-                  <RadioGroup 
-                    value={correctChoiceIndex.toString()} 
-                    onChange={(e) => handleCorrectChoiceChange(qIndex, e.target.value)}
-                  >
-                    <Stack spacing={1}>
-                      {q.choices.map((choice, cIndex) => (
-                        <Stack direction="row" spacing={2} key={cIndex} sx={{ alignItems: 'center' }}>
-                          <FormControlLabel
-                            value={cIndex.toString()}
-                            control={<Radio />}
-                            label=""
-                            sx={{ mr: 0 }}
-                          />
-                          <TextField
-                            size="small"
-                            fullWidth
-                            placeholder={`Lựa chọn ${cIndex + 1}`}
-                            value={choice.content}
-                            onChange={(e) => handleChoiceContentChange(qIndex, cIndex, e.target.value)}
-                            required
-                          />
-                          {q.choices.length > 2 && (
-                            <Tooltip title="Xóa lựa chọn">
-                              <IconButton size="small" color="error" onClick={() => handleRemoveChoice(qIndex, cIndex)}>
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Stack>
-                      ))}
-                    </Stack>
-                  </RadioGroup>
-                  <Button 
-                    variant="text" 
-                    size="small" 
-                    startIcon={<AddIcon />} 
-                    onClick={() => handleAddChoice(qIndex)}
-                    sx={{ alignSelf: 'flex-start', mt: 1, textTransform: 'none' }}
-                  >
-                    Thêm lựa chọn
-                  </Button>
+          return (
+            <Accordion
+              id={`question-accordion-${qIndex}`}
+              key={qIndex}
+              expanded={expanded === qIndex}
+              onChange={handleAccordionChange(qIndex)}
+              variant="outlined"
+              sx={{ '&:before': { display: 'none' } }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', pr: 2 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                    Câu {qIndex + 1}: {q.content ? (q.content.length > 50 ? q.content.substring(0, 50) + '...' : q.content) : '(Chưa nhập nội dung)'}
+                  </Typography>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <Tooltip title="Xóa câu hỏi">
+                      <IconButton component="span" size="small" color="error" onClick={(e) => handleRemoveQuestion(e, qIndex)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
                 </Box>
+              </AccordionSummary>
 
-                <TextField
-                  label="Giải thích đáp án"
-                  multiline
-                  rows={2}
-                  fullWidth
-                  value={q.explanation}
-                  onChange={(e) => handleChangeQuestion(qIndex, 'explanation', e.target.value)}
-                  required
-                />
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
-        );
-      }))}
+              <AccordionDetails sx={{ borderTop: '1px solid #e0e0e0', pt: 3 }}>
+                <Stack spacing={3}>
+                  <TextField
+                    label="Nội dung câu hỏi"
+                    multiline
+                    rows={2}
+                    fullWidth
+                    value={q.content}
+                    onChange={(e) => handleChangeQuestion(qIndex, 'content', e.target.value)}
+                    required
+                  />
+
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Các lựa chọn (chọn 1 đáp án đúng):</Typography>
+                    <RadioGroup
+                      value={correctChoiceIndex.toString()}
+                      onChange={(e) => handleCorrectChoiceChange(qIndex, e.target.value)}
+                    >
+                      <Stack spacing={1}>
+                        {q.choices.map((choice, cIndex) => (
+                          <Stack direction="row" spacing={2} key={cIndex} sx={{ alignItems: 'center' }}>
+                            <FormControlLabel
+                              value={cIndex.toString()}
+                              control={<Radio />}
+                              label=""
+                              sx={{ mr: 0 }}
+                            />
+                            <TextField
+                              size="small"
+                              fullWidth
+                              placeholder={`Lựa chọn ${cIndex + 1}`}
+                              value={choice.content}
+                              onChange={(e) => handleChoiceContentChange(qIndex, cIndex, e.target.value)}
+                              required
+                            />
+                            {q.choices.length > 2 && (
+                              <Tooltip title="Xóa lựa chọn">
+                                <IconButton size="small" color="error" onClick={() => handleRemoveChoice(qIndex, cIndex)}>
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        ))}
+                      </Stack>
+                    </RadioGroup>
+                    <Button
+                      variant="text"
+                      size="small"
+                      startIcon={<AddIcon />}
+                      onClick={() => handleAddChoice(qIndex)}
+                      sx={{ alignSelf: 'flex-start', mt: 1, textTransform: 'none' }}
+                    >
+                      Thêm lựa chọn
+                    </Button>
+                  </Box>
+
+                  <TextField
+                    label="Giải thích đáp án"
+                    multiline
+                    rows={2}
+                    fullWidth
+                    value={q.explanation}
+                    onChange={(e) => handleChangeQuestion(qIndex, 'explanation', e.target.value)}
+                    required
+                  />
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          );
+        }))}
 
       <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
         <Button
@@ -365,12 +368,12 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
         >
           Tải file mẫu
         </Button>
-        <input 
-          type="file" 
-          accept=".xlsx, .xls, .csv" 
-          hidden 
-          ref={fileInputRef} 
-          onChange={handleFileUpload} 
+        <input
+          type="file"
+          accept=".xlsx, .xls, .csv"
+          hidden
+          ref={fileInputRef}
+          onChange={handleFileUpload}
         />
       </Stack>
 
@@ -381,11 +384,11 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
             Hệ thống đã quét và tìm thấy <strong>{pendingImport.length}</strong> câu hỏi hợp lệ từ file Excel.
             Dữ liệu mới sẽ được nối thêm vào cuối danh sách hiện tại.
           </DialogContentText>
-          
+
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
             Xem trước dữ liệu ({Math.min(3, pendingImport.length)} câu đầu tiên):
           </Typography>
-          
+
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
               <TableHead sx={{ bgcolor: '#f5f5f5' }}>
