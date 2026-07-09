@@ -61,6 +61,9 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
           return;
         }
 
+        const existingContents = new Set(questions.map(q => q.content.trim().toLowerCase()));
+        let duplicateCount = 0;
+
         const newQuestions: FinalTestQuestion[] = [];
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
@@ -68,6 +71,15 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
 
           const content = String(row[0] || '').trim();
           if (!content) continue;
+
+          // Bỏ qua nếu nội dung câu hỏi đã tồn tại
+          const normalizedContent = content.toLowerCase();
+          if (existingContents.has(normalizedContent)) {
+            duplicateCount++;
+            continue;
+          }
+          // Thêm vào set để tránh trùng lặp ngay trong chính file Excel
+          existingContents.add(normalizedContent);
 
           const c1 = String(row[1] || '');
           const c2 = String(row[2] || '');
@@ -90,10 +102,17 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
         }
 
         if (newQuestions.length > 0) {
+          if (duplicateCount > 0) {
+            alert(`Hệ thống tự động bỏ qua ${duplicateCount} câu hỏi bị trùng lặp nội dung.\\n\\nTìm thấy ${newQuestions.length} câu hỏi mới hợp lệ.`);
+          }
           setPendingImport(newQuestions);
           setOpenDialog(true);
         } else {
-          alert("Không tìm thấy câu hỏi hợp lệ nào trong file.");
+          if (duplicateCount > 0) {
+            alert(`Tất cả ${duplicateCount} câu hỏi trong file Excel đều đã có sẵn trong danh sách.\\nKhông có câu hỏi mới nào được thêm.`);
+          } else {
+            alert("Không tìm thấy câu hỏi hợp lệ nào trong file.");
+          }
         }
       } catch (err) {
         console.error("Error parsing Excel:", err);
@@ -110,6 +129,8 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
     onChange([...questions, ...pendingImport]);
     setPendingImport([]);
     setOpenDialog(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
     // Expand the first newly imported question
     if (pendingImport.length > 0) {
        const newIndex = questions.length;
@@ -123,6 +144,7 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
   const handleCancelImport = () => {
     setPendingImport([]);
     setOpenDialog(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleAddQuestion = () => {

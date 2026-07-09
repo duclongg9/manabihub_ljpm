@@ -234,7 +234,7 @@ export const FinalTestConfigPage = () => {
           variant="outlined" 
           color="primary"
           onClick={() => handleSave(false)} 
-          disabled={saving || form.questions.length < 20}
+          disabled={saving}
         >
           {saving ? 'Đang lưu...' : 'Lưu & Tiếp tục'}
         </Button>
@@ -242,7 +242,7 @@ export const FinalTestConfigPage = () => {
           variant="contained" 
           color="success"
           onClick={() => handleSave(true)} 
-          disabled={saving || form.questions.length < 20}
+          disabled={saving}
         >
           {saving ? 'Đang lưu...' : 'Lưu & Thoát'}
         </Button>
