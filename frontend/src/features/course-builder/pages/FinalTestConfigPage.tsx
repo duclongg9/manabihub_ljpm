@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Button, Stack, Typography, TextField, MenuItem, CircularProgress, Alert, Snackbar } from '@mui/material';
+import { Box, Button, Stack, Typography, TextField, MenuItem, CircularProgress, Alert, Snackbar, InputAdornment, Paper } from '@mui/material';
 import { finalTestService } from '../services/finalTestService';
 import type { UpdateFinalTestRequest } from '../services/finalTestService';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
@@ -15,6 +15,7 @@ export const FinalTestConfigPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>('');
+  const [expanded, setExpanded] = useState<number | false>(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -26,7 +27,7 @@ export const FinalTestConfigPage = () => {
     passingScore: 50,
     maxRetakes: 3,
     jlptLevel: 'N5',
-    skillFocus: 'Tổng hợp (Từ vựng, Ngữ pháp, Đọc hiểu)',
+    skillFocus: 'Từ vựng, Ngữ pháp, Đọc hiểu',
     questions: [],
   });
 
@@ -37,12 +38,12 @@ export const FinalTestConfigPage = () => {
       .then((config) => {
         if (config) {
           setForm({
-            timeLimitMinutes: config.timeLimitMinutes,
-            passingScore: config.passingScore,
-            maxRetakes: config.maxRetakes,
-            jlptLevel: config.jlptLevel,
-            skillFocus: config.skillFocus,
-            questions: config.questions,
+            timeLimitMinutes: config.timeLimitMinutes || 60,
+            passingScore: config.passingScore || 50,
+            maxRetakes: config.maxRetakes || 3,
+            jlptLevel: config.jlptLevel || 'N5',
+            skillFocus: 'Tổng hợp',
+            questions: config.questions || [],
           });
         }
       })
@@ -54,33 +55,76 @@ export const FinalTestConfigPage = () => {
       });
   }, [courseId]);
 
-  const handleSave = async () => {
+  const handleSave = async (shouldExit: boolean = false) => {
     if (!courseId) return;
 
+    const showError = (msg: string) => {
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+    };
+
     if (form.questions.length < 20) {
-      setError('Final Test cần có tối thiểu 20 câu hỏi đang hoạt động');
+      showError('Final Test cần có tối thiểu 20 câu hỏi đang hoạt động');
       return;
     }
 
+    if (form.timeLimitMinutes < 1 || form.timeLimitMinutes > 180) {
+      showError('Thời gian làm bài phải từ 1 đến 180 phút.');
+      return;
+    }
+
+    if (form.passingScore < 0 || form.passingScore > 100) {
+      showError('Điểm đạt phải từ 0 đến 100%.');
+      return;
+    }
+
+    if (form.maxRetakes < 1 || form.maxRetakes > 10) {
+      showError('Số lần thi lại phải từ 1 đến 10 lần.');
+      return;
+    }
+
+    // Validate empty fields in questions
+    for (let i = 0; i < form.questions.length; i++) {
+      const q = form.questions[i];
+      const validateError = (msg: string) => {
+        showError(msg);
+        setExpanded(i);
+        setTimeout(() => {
+          document.getElementById(`question-accordion-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      };
+
+      if (!q.content.trim()) { validateError(`Lỗi ở Câu ${i + 1}: Nội dung câu hỏi không được để trống.`); return; }
+      if (!q.explanation.trim()) { validateError(`Lỗi ở Câu ${i + 1}: Vui lòng điền giải thích đáp án.`); return; }
+      for (let j = 0; j < q.choices.length; j++) {
+        if (!q.choices[j].content.trim()) { validateError(`Lỗi ở Câu ${i + 1}: Lựa chọn số ${j + 1} đang bị bỏ trống.`); return; }
+      }
+      if (!q.choices.some(c => c.isCorrect)) { validateError(`Lỗi ở Câu ${i + 1}: Chưa có đáp án đúng nào được chọn.`); return; }
+    }
+
     setSaving(true);
-    setError('');
 
     try {
-      await finalTestService.updateFinalTest(courseId, form);
+      const payload = {
+        ...form,
+        skillFocus: 'Tổng hợp'
+      };
+      await finalTestService.updateFinalTest(courseId, payload);
       setSnackbar({
         open: true,
         message: 'Lưu cấu hình thành công!',
         severity: 'success',
       });
-      setTimeout(() => {
-        navigate('/teacher/courses');
-      }, 1500);
+      if (shouldExit) {
+        setTimeout(() => {
+          navigate('/teacher/courses');
+        }, 1500);
+      }
     } catch (err: any) {
       if (err.response?.data?.messageCode) {
         // Here we could map MessageCodes to actual strings if we had i18n
-        setError(err.response.data.message || 'Có lỗi xảy ra khi lưu cấu hình.');
+        showError(err.response.data.message || 'Có lỗi xảy ra khi lưu cấu hình.');
       } else {
-        setError('Có lỗi xảy ra, vui lòng thử lại.');
+        showError('Có lỗi xảy ra, vui lòng thử lại.');
       }
     } finally {
       setSaving(false);
@@ -94,21 +138,14 @@ export const FinalTestConfigPage = () => {
   return (
     <Box sx={{ pb: 10 }}>
       <PageHeader
-        title="Cấu hình Final Test"
+        title="Cấu hình Bài thi cuối khóa"
         breadcrumbs={[
           { label: 'Khóa học của tôi', href: '/teacher/courses' },
-          { label: 'Final Test' },
+          { label: 'Bài thi cuối khóa' },
         ]}
-        action={
-          <Button variant="contained" onClick={handleSave} disabled={saving}>
-            {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
-          </Button>
-        }
       />
 
       <Box sx={{ mt: 3, maxWidth: 800 }}>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
         <Stack spacing={3}>
           <Typography variant="h6">Cấu hình chung</Typography>
           
@@ -119,13 +156,18 @@ export const FinalTestConfigPage = () => {
               fullWidth
               value={form.timeLimitMinutes}
               onChange={(e) => setForm({ ...form, timeLimitMinutes: Number(e.target.value) })}
+              inputProps={{ min: 1, max: 180 }}
             />
             <TextField
-              label="Điểm đạt"
+              label="Điểm đạt (%)"
               type="number"
               fullWidth
               value={form.passingScore}
               onChange={(e) => setForm({ ...form, passingScore: Number(e.target.value) })}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">%</InputAdornment>,
+              }}
+              inputProps={{ min: 0, max: 100 }}
             />
             <TextField
               label="Số lần thi lại tối đa"
@@ -133,12 +175,14 @@ export const FinalTestConfigPage = () => {
               fullWidth
               value={form.maxRetakes}
               onChange={(e) => setForm({ ...form, maxRetakes: Number(e.target.value) })}
+              inputProps={{ min: 1, max: 10 }}
             />
           </Stack>
 
           <Stack direction="row" spacing={2}>
             <TextField
               select
+              required
               label="Trình độ JLPT"
               fullWidth
               value={form.jlptLevel}
@@ -148,43 +192,17 @@ export const FinalTestConfigPage = () => {
                 <MenuItem key={lvl} value={lvl}>{lvl}</MenuItem>
               ))}
             </TextField>
-
-            <TextField
-              label="Kỹ năng tập trung"
-              fullWidth
-              value={form.skillFocus}
-              onChange={(e) => setForm({ ...form, skillFocus: e.target.value })}
-            />
           </Stack>
 
           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 4 }}>
             <Typography variant="h6">Danh sách câu hỏi ({form.questions.length}/20 tối thiểu)</Typography>
-            {form.questions.length === 0 && (
-              <Button 
-                variant="outlined" 
-                color="secondary" 
-                onClick={() => {
-                  const sampleQuestions = Array.from({ length: 20 }).map((_, i) => ({
-                    content: `Câu hỏi mẫu số ${i + 1}: Kanji của từ "Điện thoại" là gì?`,
-                    explanation: `Giải thích cho câu số ${i + 1}: Điện thoại là 電話 (Denwa)`,
-                    choices: [
-                      { content: '電話', isCorrect: true },
-                      { content: '電車', isCorrect: false },
-                      { content: '電気', isCorrect: false },
-                      { content: '電話機', isCorrect: false }
-                    ]
-                  }));
-                  setForm({ ...form, questions: sampleQuestions });
-                }}
-              >
-                Tạo nhanh 20 câu hỏi mẫu
-              </Button>
-            )}
           </Stack>
           
           <FinalTestQuestionsEditor 
             questions={form.questions} 
             onChange={(q) => setForm({ ...form, questions: q })} 
+            expanded={expanded}
+            setExpanded={setExpanded}
           />
         </Stack>
       </Box>
@@ -199,6 +217,36 @@ export const FinalTestConfigPage = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, p: 2, zIndex: 1000, display: 'flex', justifyContent: 'flex-end', gap: 2, borderTop: '1px solid #e0e0e0' }} elevation={3}>
+        <Button 
+          variant="outlined" 
+          color="inherit" 
+          onClick={() => {
+            if (window.confirm("Bạn có những thay đổi chưa được lưu. Bạn có chắc chắn muốn rời đi không?")) {
+              navigate('/teacher/courses');
+            }
+          }}
+        >
+          Hủy
+        </Button>
+        <Button 
+          variant="outlined" 
+          color="primary"
+          onClick={() => handleSave(false)} 
+          disabled={saving || form.questions.length < 20}
+        >
+          {saving ? 'Đang lưu...' : 'Lưu & Tiếp tục'}
+        </Button>
+        <Button 
+          variant="contained" 
+          color="success"
+          onClick={() => handleSave(true)} 
+          disabled={saving || form.questions.length < 20}
+        >
+          {saving ? 'Đang lưu...' : 'Lưu & Thoát'}
+        </Button>
+      </Paper>
     </Box>
   );
 };
