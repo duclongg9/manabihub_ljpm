@@ -3,9 +3,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import {
   Alert,
   Box,
@@ -13,8 +15,11 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  IconButton,
   InputAdornment,
+  Menu,
   MenuItem,
+  Pagination,
   Paper,
   Stack,
   TextField,
@@ -46,6 +51,7 @@ type Feedback = {
 } | null;
 
 const allFilterValue = 'ALL';
+const draftPageSize = 6;
 const jlptLevels: JlptLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1'];
 
 const priceFormatter = new Intl.NumberFormat('vi-VN', {
@@ -76,6 +82,7 @@ export function TeacherCoursesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const categoryNames = useMemo(
     () => new Map(categories.map((category) => [category.code, category.name])),
@@ -100,6 +107,12 @@ export function TeacherCoursesPage() {
     });
   }, [categoryFilter, categoryNames, drafts, levelFilter, query]);
 
+  const pageCount = Math.max(1, Math.ceil(filteredDrafts.length / draftPageSize));
+  const pagedDrafts = useMemo(() => {
+    const startIndex = (currentPage - 1) * draftPageSize;
+    return filteredDrafts.slice(startIndex, startIndex + draftPageSize);
+  }, [currentPage, filteredDrafts]);
+
   const loadDrafts = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
@@ -123,6 +136,16 @@ export function TeacherCoursesPage() {
     void loadDrafts();
   }, [loadDrafts]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categoryFilter, levelFilter, query]);
+
+  useEffect(() => {
+    if (currentPage > pageCount) {
+      setCurrentPage(pageCount);
+    }
+  }, [currentPage, pageCount]);
+
   function clearFilters() {
     setQuery('');
     setLevelFilter(allFilterValue);
@@ -135,6 +158,10 @@ export function TeacherCoursesPage() {
         draftToEdit: course,
       },
     });
+  }
+
+  function buildCourseContent(course: CourseDraftResponse) {
+    navigate(ROUTES.TEACHER.COURSE_BUILDER(course.id));
   }
 
   async function deleteDraft(course: CourseDraftResponse) {
@@ -211,6 +238,7 @@ export function TeacherCoursesPage() {
           borderColor: 'divider',
           borderRadius: 2,
           p: { xs: 2, md: 3 },
+          pb: { xs: 3, md: 4 },
         }}
       >
         <Stack spacing={2.5}>
@@ -322,18 +350,36 @@ export function TeacherCoursesPage() {
           )}
 
           {!isLoading && !loadError && filteredDrafts.length > 0 && (
-            <Stack divider={<Divider flexItem />} spacing={0}>
-              {filteredDrafts.map((course) => (
-                <CourseDraftRow
-                  key={course.id}
-                  categoryName={categoryNames.get(course.category)}
-                  course={course}
-                  deleting={deletingId === course.id}
-                  highlighted={course.id === draftState?.draftId}
-                  onDelete={() => void deleteDraft(course)}
-                  onEdit={() => editDraft(course)}
-                />
-              ))}
+            <Stack spacing={2}>
+              <Stack divider={<Divider flexItem />} spacing={0}>
+                {pagedDrafts.map((course) => (
+                  <CourseDraftRow
+                    key={course.id}
+                    categoryName={categoryNames.get(course.category)}
+                    course={course}
+                    deleting={deletingId === course.id}
+                    highlighted={course.id === draftState?.draftId}
+                    onBuild={() => buildCourseContent(course)}
+                    onDelete={() => void deleteDraft(course)}
+                    onEdit={() => editDraft(course)}
+                  />
+                ))}
+              </Stack>
+
+              {pageCount > 1 && (
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between', pt: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Hiển thị {pagedDrafts.length} trong {filteredDrafts.length} bản nháp
+                  </Typography>
+                  <Pagination
+                    color="primary"
+                    count={pageCount}
+                    page={currentPage}
+                    onChange={(_, page) => setCurrentPage(page)}
+                    shape="rounded"
+                  />
+                </Stack>
+              )}
             </Stack>
           )}
         </Stack>
@@ -360,14 +406,26 @@ interface CourseDraftRowProps {
   course: CourseDraftResponse;
   deleting: boolean;
   highlighted: boolean;
+  onBuild: () => void;
   onDelete: () => void;
   onEdit: () => void;
 }
 
-function CourseDraftRow({ categoryName, course, deleting, highlighted, onDelete, onEdit }: CourseDraftRowProps) {
+function CourseDraftRow({ categoryName, course, deleting, highlighted, onBuild, onDelete, onEdit }: CourseDraftRowProps) {
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const thumbnailSrc = resolveAssetUrl(course.thumbnailUrl);
   const summary = toPlainText(course.introduction) || 'Chưa có mô tả ngắn cho bản nháp này.';
   const title = displayDraftTitle(course);
+  const menuOpen = Boolean(menuAnchor);
+
+  function closeMenu() {
+    setMenuAnchor(null);
+  }
+
+  function handleDelete() {
+    closeMenu();
+    onDelete();
+  }
 
   return (
     <Box
@@ -453,7 +511,7 @@ function CourseDraftRow({ categoryName, course, deleting, highlighted, onDelete,
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'flex-end', pt: 0.5 }}>
           <Button
-            variant="contained"
+            variant="outlined"
             size="small"
             startIcon={<EditOutlinedIcon />}
             onClick={onEdit}
@@ -462,29 +520,51 @@ function CourseDraftRow({ categoryName, course, deleting, highlighted, onDelete,
             Tiếp tục soạn
           </Button>
           <Button
-            color="error"
-            variant="outlined"
+            variant="contained"
             size="small"
-            startIcon={<DeleteIcon />}
-            disabled={deleting}
-            onClick={onDelete}
+            startIcon={<ViewModuleIcon />}
+            onClick={onBuild}
             sx={{ textTransform: 'none', fontWeight: 700 }}
           >
-            {deleting ? 'Đang xóa...' : 'Xóa'}
+            Xây nội dung
           </Button>
-          <Tooltip title="Luồng gửi duyệt sẽ được mở ở bước Course Validation/Submit Course.">
-            <span>
-              <Button
-                disabled
-                variant="outlined"
-                size="small"
-                startIcon={<SendOutlinedIcon />}
-                sx={{ textTransform: 'none', fontWeight: 700 }}
-              >
-                Gửi duyệt
-              </Button>
-            </span>
+          <Tooltip title="Tác vụ khác">
+            <IconButton
+              aria-controls={menuOpen ? `course-draft-${course.id}-menu` : undefined}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen ? 'true' : undefined}
+              onClick={(event) => setMenuAnchor(event.currentTarget)}
+              size="small"
+              sx={{ border: '1px solid', borderColor: 'divider' }}
+            >
+              <MoreHorizIcon fontSize="small" />
+            </IconButton>
           </Tooltip>
+          <Menu
+            id={`course-draft-${course.id}-menu`}
+            anchorEl={menuAnchor}
+            open={menuOpen}
+            onClose={closeMenu}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+          >
+            <MenuItem disabled={deleting} onClick={handleDelete}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <DeleteIcon color="error" fontSize="small" />
+                <Typography variant="body2">{deleting ? 'Đang xóa...' : 'Xóa bản nháp'}</Typography>
+              </Stack>
+            </MenuItem>
+            <Tooltip title="Vui lòng vào phần Xây nội dung để thêm ít nhất 1 bài học trước khi gửi duyệt." placement="left">
+              <span>
+                <MenuItem disabled>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <SendOutlinedIcon fontSize="small" />
+                    <Typography variant="body2">Gửi duyệt</Typography>
+                  </Stack>
+                </MenuItem>
+              </span>
+            </Tooltip>
+          </Menu>
         </Stack>
       </Stack>
     </Box>
