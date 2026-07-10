@@ -61,7 +61,7 @@ export const LandingFooter: React.FC = () => {
         </Grid>
 
         <Divider sx={{ mb: 3 }} />
-        
+
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
           <Typography variant="body2" sx={{ color: '#94a3b8' }}>
             © {new Date().getFullYear()} ManabiHub. All rights reserved.

@@ -23,9 +23,9 @@ export const LandingHeader: React.FC = () => {
               ManabiHub
             </Typography>
           </Box>
-          
-          <Button 
-            color="inherit" 
+
+          <Button
+            color="inherit"
             endIcon={<KeyboardArrowDownIcon />}
             sx={{ textTransform: 'none', fontWeight: 600, display: { xs: 'none', md: 'flex' } }}
           >
@@ -35,7 +35,7 @@ export const LandingHeader: React.FC = () => {
 
         {/* Center Section: Search Bar */}
         <Box sx={{ flexGrow: 1, maxWidth: 400, mx: 2, display: { xs: 'none', md: 'block' } }}>
-          <Box sx={{ 
+          <Box sx={{
             display: 'flex', alignItems: 'center', bgcolor: '#f1f5f9', borderRadius: 6, px: 2, py: 0.5,
             border: '1px solid transparent', '&:focus-within': { borderColor: '#3b82f6', bgcolor: '#ffffff' }
           }}>
@@ -51,22 +51,22 @@ export const LandingHeader: React.FC = () => {
 
         {/* Right Section: Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
-          <Typography 
-            component={Link} 
+          <Typography
+            component={Link}
             to={ROUTES.TEACHER.KYC}
             sx={{ textDecoration: 'none', color: '#475569', fontWeight: 600, fontSize: '0.9rem', display: { xs: 'none', lg: 'block' }, '&:hover': { color: '#0f172a' } }}
           >
             Trở thành giảng viên
           </Typography>
-          
+
           <IconButton color="inherit" sx={{ display: { xs: 'none', sm: 'flex' } }}>
             <Badge badgeContent={0} color="error">
               <ShoppingCartOutlinedIcon />
             </Badge>
           </IconButton>
 
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             onClick={() => navigate(ROUTES.PUBLIC.LOGIN)}
             sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#0f172a', color: 'white', borderRadius: 2, px: 3, '&:hover': { bgcolor: '#334155' } }}
           >

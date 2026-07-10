@@ -53,34 +53,34 @@ export const FeaturesSection: React.FC = () => {
     <Box ref={sectionRef} sx={{ py: 12, bgcolor: '#ffffff', perspective: '1000px' }}>
       <Container maxWidth="lg">
         <Typography variant="h3" sx={{ fontWeight: 800, color: '#0f172a', textAlign: 'center', mb: 2 }}>
-          Cách thức hoạt động
+          Lý do chọn chúng tôi
         </Typography>
         <Typography variant="h6" sx={{ color: '#64748b', textAlign: 'center', mb: 8, fontWeight: 400 }}>
-          Hành trình làm chủ tiếng Nhật của bạn trên ManabiHub
+          Tại sao bạn nên đồng hành cùng ManabiHub
         </Typography>
 
         <Grid container spacing={4}>
           {FEATURES.map((feature, index) => (
-            <Grid 
-              size={{ xs: 12, sm: 6, md: 3 }} 
+            <Grid
+              size={{ xs: 12, sm: 6, md: 3 }}
               key={index}
               sx={{
                 opacity: isVisible ? 1 : 0,
-                transform: isVisible 
-                  ? 'translateZ(0) translateY(0) rotateX(0deg) scale(1)' 
+                transform: isVisible
+                  ? 'translateZ(0) translateY(0) rotateX(0deg) scale(1)'
                   : 'translateZ(-200px) translateY(80px) rotateX(-20deg) scale(0.9)',
                 transition: `all 1.2s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.15}s`,
                 transformStyle: 'preserve-3d'
               }}
             >
-              <Paper 
+              <Paper
                 elevation={0}
-                sx={{ 
-                  p: 4, 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
+                sx={{
+                  p: 4,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
                   textAlign: 'center',
                   borderRadius: 4,
                   bgcolor: '#ffffff',
@@ -89,10 +89,10 @@ export const FeaturesSection: React.FC = () => {
                   '&:hover': { transform: 'translateY(-8px)', borderColor: '#e2e8f0', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.05)' }
                 }}
               >
-                <Box 
-                  sx={{ 
-                    width: 80, height: 80, borderRadius: '50%', bgcolor: feature.iconBg, 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 
+                <Box
+                  sx={{
+                    width: 80, height: 80, borderRadius: '50%', bgcolor: feature.iconBg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3
                   }}
                 >
                   {feature.icon}
