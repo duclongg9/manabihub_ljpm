@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { Box, Typography } from '@mui/material';
 import { PublicLayout } from '../shared/layouts/PublicLayout';
 import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
@@ -11,6 +12,8 @@ import StudentProfilePage from '../features/profile/StudentProfilePage';
 import TeacherProfilePage from '../features/profile/TeacherProfilePage';
 import { CourseDraftPage } from '../features/course-builder/pages/CourseDraftPage';
 import { TeacherCoursesPage } from '../features/course-builder/pages/TeacherCoursesPage';
+import { CourseApprovalQueuePage } from '../features/admin-course-approval/pages/CourseApprovalQueuePage';
+import { CourseApprovalDetailPage } from '../features/admin-course-approval/pages/CourseApprovalDetailPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
@@ -158,8 +161,16 @@ export const router = createBrowserRouter([
         element: <KycDetailPage />,
       },
       {
+        path: 'tasks/queue',
+        element: <CourseApprovalQueuePage />,
+      },
+      {
         path: 'courses/approvals',
-        element: <div>Course Approval Placeholder</div>,
+        element: <Box sx={{ p: 4, mt: 4, textAlign: 'center', color: 'text.secondary' }}><Typography variant="h5">Vui lòng chọn một khóa học từ Task Queue để tiến hành phê duyệt.</Typography></Box>,
+      },
+      {
+        path: 'courses/approvals/:id',
+        element: <CourseApprovalDetailPage />,
       },
       {
         path: 'finance',

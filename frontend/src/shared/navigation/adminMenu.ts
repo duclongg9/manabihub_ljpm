@@ -6,6 +6,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import WalletIcon from '@mui/icons-material/Wallet';
 import RuleIcon from '@mui/icons-material/Rule';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 
 export const ADMIN_MENU = [
   {
@@ -30,6 +31,12 @@ export const ADMIN_MENU = [
     title: 'Teacher KYC Review',
     path: ROUTES.ADMIN.KYC_REVIEW,
     icon: FactCheckIcon,
+    roles: [ROLES.COURSE_MANAGER],
+  },
+  {
+    title: 'Task Queue',
+    path: ROUTES.ADMIN.TASK_QUEUE,
+    icon: FormatListBulletedIcon,
     roles: [ROLES.COURSE_MANAGER],
   },
   {

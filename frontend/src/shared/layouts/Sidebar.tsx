@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -8,6 +8,7 @@ export interface MenuItem {
   title: string;
   path: string;
   icon: React.ElementType;
+  roles?: string[];
 }
 
 interface SidebarProps {
@@ -21,10 +22,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ menuItems, open, onClose, vari
   const location = useLocation();
   const navigate = useNavigate();
 
+  const userRole = useMemo(() => {
+    try {
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('auth_token');
+      if (!token) return null;
+      const payloadBase64 = token.split('.')[1];
+      const decodedPayload = JSON.parse(atob(payloadBase64));
+      return decodedPayload.role;
+    } catch (e) {
+      return null;
+    }
+  }, []);
+
+  const visibleMenuItems = useMemo(() => {
+    if (!userRole) return menuItems;
+    return menuItems.filter(item => {
+      if (!item.roles || item.roles.length === 0) return true;
+      return item.roles.includes(userRole);
+    });
+  }, [menuItems, userRole]);
+
   const content = (
     <Box sx={{ overflow: 'auto', mt: 2 }}>
       <List>
-        {menuItems.map((item) => {
+        {visibleMenuItems.map((item) => {
           const isSelected = location.pathname.startsWith(item.path);
           return (
             <ListItem key={item.path} disablePadding sx={{ display: 'block', mb: 0.5 }}>

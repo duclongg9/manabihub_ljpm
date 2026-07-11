@@ -9,3 +9,18 @@ export const axiosClient = axios.create({
 });
 
 // Add interceptors later
+axiosClient.interceptors.request.use((config) => {
+  const adminToken = localStorage.getItem('admin_token');
+  const authToken = localStorage.getItem('auth_token');
+  
+  // Do not attach token for login requests to prevent 401 due to expired tokens
+  if (config.url && config.url.includes('/login')) {
+    return config;
+  }
+  
+  const token = adminToken || authToken;
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
