@@ -9,6 +9,7 @@ import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.enums.JlptLevel;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.service.CourseValidationService;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -50,6 +52,10 @@ class CourseServiceImplTest {
     @Mock
     private CurrentUserService currentUserService;
 
+    @Mock
+    private CourseValidationService courseValidationService;
+
+    @InjectMocks
     private CourseServiceImpl courseService;
     private UUID userId;
     private TeacherProfile approvedTeacher;
