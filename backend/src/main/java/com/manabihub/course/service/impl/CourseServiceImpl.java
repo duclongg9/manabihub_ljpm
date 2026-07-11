@@ -10,6 +10,9 @@ import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.CourseService;
+import com.manabihub.course.service.CourseValidationService;
+import com.manabihub.course.dto.response.ValidationResultResponse;
+import com.manabihub.course.dto.response.ValidationError;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -46,6 +49,7 @@ public class CourseServiceImpl implements CourseService {
     private final CourseCategoryRepository courseCategoryRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final CurrentUserService currentUserService;
+    private final CourseValidationService courseValidationService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -133,6 +137,25 @@ public class CourseServiceImpl implements CourseService {
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
 
         courseRepository.delete(course);
+    }
+
+    @Override
+    public void submitForReview(UUID draftId) {
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
+
+        ValidationResultResponse validationResult = courseValidationService.validateCourse(draftId);
+        if (!validationResult.isValid()) {
+            throw new BusinessException(
+                    "MSG-COURSE-004",
+                    "Sản phẩm chưa đáp ứng điều kiện gửi duyệt.",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        course.setStatus(CourseStatus.SUBMITTED);
+        course.setSubmittedAt(Instant.now());
     }
 
     private TeacherProfile resolveApprovedTeacher(UUID userId) {
