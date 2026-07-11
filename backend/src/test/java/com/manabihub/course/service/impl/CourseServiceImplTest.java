@@ -66,7 +66,8 @@ class CourseServiceImplTest {
                 courseRepository,
                 courseCategoryRepository,
                 teacherProfileRepository,
-                currentUserService
+                currentUserService,
+                courseValidationService
         );
         userId = UUID.randomUUID();
         approvedTeacher = new TeacherProfile();

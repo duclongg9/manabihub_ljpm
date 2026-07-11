@@ -145,12 +145,20 @@ public class CourseServiceImpl implements CourseService {
         TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
 
+        if (course.getStatus() != CourseStatus.DRAFT && course.getStatus() != CourseStatus.REJECTED && course.getStatus() != CourseStatus.FORCED_DRAFT) {
+            throw new BusinessException(
+                    com.manabihub.common.constants.MessageCodes.COMMON_BAD_REQUEST,
+                    "Không thể gửi duyệt khóa học ở trạng thái hiện tại.",
+                    org.springframework.http.HttpStatus.BAD_REQUEST
+            );
+        }
+
         ValidationResultResponse validationResult = courseValidationService.validateCourse(draftId);
         if (!validationResult.isValid()) {
-            throw new BusinessException(
+            throw new com.manabihub.common.exception.ValidationBusinessException(
                     "MSG-COURSE-004",
                     "Sản phẩm chưa đáp ứng điều kiện gửi duyệt.",
-                    HttpStatus.BAD_REQUEST
+                    validationResult.errors()
             );
         }
 
