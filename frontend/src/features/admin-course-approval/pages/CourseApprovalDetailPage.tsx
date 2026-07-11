@@ -53,11 +53,11 @@ export const CourseApprovalDetailPage: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f8fafc', minHeight: '100vh' }}>
-      <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+      <Typography variant="h6" sx={{ fontWeight: 'bold',  mb: 1 }}>
         Course Approvals
       </Typography>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold">
+        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
           Review Course: {detail.courseName}
         </Typography>
         <Box
@@ -89,7 +89,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 4 }}>
               <MenuBookIcon sx={{ color: 'text.secondary' }} />
-              <Typography variant="h6" fontWeight="bold">Course Details & Teacher Info</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Course Details & Teacher Info</Typography>
             </Box>
 
             <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2, fontWeight: 'bold' }}>
@@ -100,7 +100,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
                 {detail.teacherName.charAt(0).toUpperCase()}
               </Avatar>
               <Box>
-                <Typography variant="subtitle1" fontWeight="bold">{detail.teacherName}</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{detail.teacherName}</Typography>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                   {detail.teacherEmail}
                 </Typography>
@@ -158,7 +158,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
               top: 24
             }}
           >
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>Decision Panel</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold',  mb: 3 }}>Decision Panel</Typography>
 
             <TextField
               multiline
@@ -241,6 +241,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
         autoHideDuration={4000}
         onClose={() => setFeedback(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        // @ts-expect-error: TransitionComponent typing issue with React 19 and MUI v5
         TransitionComponent={SlideTransition}
       >
         <Alert 

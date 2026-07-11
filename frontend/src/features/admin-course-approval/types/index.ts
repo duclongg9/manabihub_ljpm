@@ -4,7 +4,7 @@ export interface CourseApproval {
   teacherName: string;
   teacherEmail: string;
   submittedAt: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'REQUEST_CORRECTION';
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'REQUEST_CORRECTION';
 }
 
 export interface CourseApprovalDetail extends CourseApproval {

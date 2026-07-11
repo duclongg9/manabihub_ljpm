@@ -70,7 +70,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
     return filteredAndSearchedQueue.slice(startIndex, startIndex + rowsPerPage);
   }, [filteredAndSearchedQueue, page]);
 
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
   };
 
@@ -78,7 +78,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
     return (
       <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#fef2f2', borderRadius: 2, color: '#991b1b', border: '1px solid #fecaca', mt: 4 }}>
         <ErrorIcon sx={{ fontSize: 48, mb: 2, color: '#dc2626' }} />
-        <Typography variant="h5" gutterBottom fontWeight="bold">Access Denied</Typography>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>Access Denied</Typography>
         <Typography>Finance Manager access to course approval is blocked.</Typography>
       </Box>
     );
@@ -87,7 +87,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
   if (error === 'UNAUTHORIZED') {
     return (
       <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#fffbeb', borderRadius: 2, color: '#b45309', border: '1px solid #fde68a', mt: 4 }}>
-        <Typography variant="h5" gutterBottom fontWeight="bold">Phiên đăng nhập không hợp lệ</Typography>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>Phiên đăng nhập không hợp lệ</Typography>
         <Typography>Vui lòng đăng nhập lại với tư cách Course Manager.</Typography>
       </Box>
     );
@@ -103,7 +103,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f8fafc', minHeight: '100vh' }}>
-      <Typography variant="h5" fontWeight="bold" sx={{ mb: 4 }}>
+      <Typography variant="h5" sx={{ fontWeight: 'bold',  mb: 4 }}>
         Task Queue
       </Typography>
 
@@ -148,7 +148,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
         <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <HistoryIcon sx={{ color: 'text.secondary' }} />
-            <Typography variant="h6" fontWeight="bold">Operation Queue</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Operation Queue</Typography>
           </Box>
           <Button
             variant="outlined"
@@ -207,7 +207,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                           <MenuBookIcon sx={{ color: 'text.secondary', mt: 0.5 }} />
                           <Box>
-                            <Typography variant="body2" fontWeight="bold" sx={{ color: '#475569' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold',  color: '#475569' }}>
                               Khóa học: {row.courseName}
                             </Typography>
                             <Typography variant="caption" sx={{ color: '#94a3b8' }}>
@@ -217,7 +217,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#334155' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold',  color: '#334155' }}>
                           Teacher: {row.teacherName}
                         </Typography>
                       </TableCell>
