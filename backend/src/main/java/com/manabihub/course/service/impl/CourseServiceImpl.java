@@ -12,7 +12,6 @@ import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.CourseService;
 import com.manabihub.course.service.CourseValidationService;
 import com.manabihub.course.dto.response.ValidationResultResponse;
-import com.manabihub.course.dto.response.ValidationError;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -22,6 +21,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import com.manabihub.audit.service.AuditLogService;
+import com.manabihub.notification.service.NotificationService;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -50,6 +51,8 @@ public class CourseServiceImpl implements CourseService {
     private final TeacherProfileRepository teacherProfileRepository;
     private final CurrentUserService currentUserService;
     private final CourseValidationService courseValidationService;
+    private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -164,6 +167,25 @@ public class CourseServiceImpl implements CourseService {
 
         course.setStatus(CourseStatus.SUBMITTED);
         course.setSubmittedAt(Instant.now());
+
+        notificationService.createNotificationForRole(
+                "ADMIN",
+                "Course submitted for review",
+                "Teacher submitted course \"" + course.getTitle() + "\" for review.",
+                "COURSE_REVIEW",
+                "/admin/courses/" + course.getId()
+        );
+
+        auditLogService.logUserAction(
+                currentUserId,
+                "TEACHER",
+                "SUBMIT_COURSE",
+                "COURSE",
+                course.getId(),
+                Map.of("status", CourseStatus.DRAFT.name()),
+                Map.of("status", CourseStatus.SUBMITTED.name()),
+                Map.of("courseTitle", course.getTitle())
+        );
     }
 
     private TeacherProfile resolveApprovedTeacher(UUID userId) {

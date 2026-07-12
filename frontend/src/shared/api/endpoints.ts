@@ -30,6 +30,8 @@ export const ENDPOINTS = {
     builderBlocks: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks`,
     builderBlockDetail: (id: string, moduleId: string, blockId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/${blockId}`,
     builderBlockOrder: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/order`,
+    validate: (id: string) => `/v1/teacher/courses/drafts/${id}/validate`,
+    submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`
   },
   teacherCourseAssets: {
     thumbnails: '/v1/teacher/courses/assets/thumbnails',

@@ -111,6 +111,18 @@ export interface CourseBuilderResponse {
   srsTrace: Record<string, unknown>;
 }
 
+export interface ValidationIssue {
+  code: string;
+  field: string;
+  severity: string;
+  message: string;
+}
+
+export interface ValidationResultResponse {
+  valid: boolean;
+  issues: ValidationIssue[];
+}
+
 interface ApiResponse<T> {
   success: boolean;
   messageCode?: string;
@@ -146,8 +158,23 @@ export async function deleteCourseDraft(id: string) {
   await axiosClient.delete<ApiResponse<void>>(ENDPOINTS.teacherCourses.draftDetail(id));
 }
 
+export async function submitCourseForReview(draftId: string) {
+  await axiosClient.post<ApiResponse<void>>(
+      ENDPOINTS.teacherCourses.submitReview(draftId),
+  );
+}
+
 export async function fetchCourseBuilder(draftId: string) {
   const response = await axiosClient.get<ApiResponse<CourseBuilderResponse>>(ENDPOINTS.teacherCourses.builder(draftId));
+
+  return response.data.data;
+}
+
+export async function validateCourseDraft(draftId: string) {
+  const response =
+      await axiosClient.get<ApiResponse<ValidationResultResponse>>(
+          ENDPOINTS.teacherCourses.validate(draftId),
+      );
 
   return response.data.data;
 }
