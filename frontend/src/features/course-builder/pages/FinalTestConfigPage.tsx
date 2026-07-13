@@ -8,6 +8,13 @@ import { FinalTestQuestionsEditor } from './FinalTestQuestionsEditor';
 
 const jlptLevels = ['N5', 'N4', 'N3', 'N2', 'N1'];
 
+type FinalTestFormState = Omit<UpdateFinalTestRequest, 'timeLimitMinutes' | 'passingScore' | 'maxRetakes' | 'jlptLevel'> & {
+  timeLimitMinutes: number | '';
+  passingScore: number | '';
+  maxRetakes: number | '';
+  jlptLevel: string;
+};
+
 export const FinalTestConfigPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
@@ -26,12 +33,12 @@ export const FinalTestConfigPage = () => {
     setSnackbar({ open: true, message: msg, severity });
   };
   
-  const [form, setForm] = useState<UpdateFinalTestRequest>({
-    timeLimitMinutes: 60,
-    passingScore: 50,
-    maxRetakes: 3,
-    jlptLevel: 'N5',
-    skillFocus: 'Từ vựng, Ngữ pháp, Đọc hiểu',
+  const [form, setForm] = useState<FinalTestFormState>({
+    timeLimitMinutes: '',
+    passingScore: '',
+    maxRetakes: '',
+    jlptLevel: '',
+    skillFocus: 'Tổng hợp',
     questions: [],
   });
 
@@ -42,10 +49,10 @@ export const FinalTestConfigPage = () => {
       .then((config) => {
         if (config) {
           setForm({
-            timeLimitMinutes: config.timeLimitMinutes || 60,
-            passingScore: config.passingScore || 50,
-            maxRetakes: config.maxRetakes || 3,
-            jlptLevel: config.jlptLevel || 'N5',
+            timeLimitMinutes: config.timeLimitMinutes || '',
+            passingScore: config.passingScore || '',
+            maxRetakes: config.maxRetakes || '',
+            jlptLevel: config.jlptLevel || '',
             skillFocus: 'Tổng hợp',
             questions: config.questions || [],
           });
@@ -71,18 +78,23 @@ export const FinalTestConfigPage = () => {
       return;
     }
 
-    if (form.timeLimitMinutes < 1 || form.timeLimitMinutes > 180) {
-      showError('Thời gian làm bài phải từ 1 đến 180 phút.');
+    if (form.timeLimitMinutes === '' || form.timeLimitMinutes < 1 || form.timeLimitMinutes > 180) {
+      showError('Vui lòng nhập thời gian làm bài (từ 1 đến 180 phút).');
       return;
     }
 
-    if (form.passingScore < 0 || form.passingScore > 100) {
-      showError('Điểm đạt phải từ 0 đến 100%.');
+    if (form.passingScore === '' || form.passingScore < 0 || form.passingScore > 100) {
+      showError('Vui lòng nhập điểm đạt (từ 0 đến 100%).');
       return;
     }
 
-    if (form.maxRetakes < 1 || form.maxRetakes > 10) {
-      showError('Số lần thi lại phải từ 1 đến 10 lần.');
+    if (form.maxRetakes === '' || form.maxRetakes < 1 || form.maxRetakes > 10) {
+      showError('Vui lòng nhập số lần thi lại (từ 1 đến 10 lần).');
+      return;
+    }
+
+    if (!form.jlptLevel) {
+      showError('Vui lòng chọn trình độ JLPT.');
       return;
     }
 
@@ -108,11 +120,14 @@ export const FinalTestConfigPage = () => {
     setSaving(true);
 
     try {
-      const payload = {
+      const request: UpdateFinalTestRequest = {
         ...form,
-        skillFocus: 'Tổng hợp'
+        timeLimitMinutes: Number(form.timeLimitMinutes),
+        passingScore: Number(form.passingScore),
+        maxRetakes: Number(form.maxRetakes),
       };
-      await finalTestService.updateFinalTest(courseId, payload);
+
+      await finalTestService.updateFinalTest(courseId, request);
       setSnackbar({
         open: true,
         message: 'Lưu cấu hình thành công!',
@@ -159,7 +174,7 @@ export const FinalTestConfigPage = () => {
               type="number"
               fullWidth
               value={form.timeLimitMinutes}
-              onChange={(e) => setForm({ ...form, timeLimitMinutes: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, timeLimitMinutes: e.target.value === '' ? '' : Number(e.target.value) })}
               inputProps={{ min: 1, max: 180 }}
             />
             <TextField
@@ -167,7 +182,7 @@ export const FinalTestConfigPage = () => {
               type="number"
               fullWidth
               value={form.passingScore}
-              onChange={(e) => setForm({ ...form, passingScore: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, passingScore: e.target.value === '' ? '' : Number(e.target.value) })}
               InputProps={{
                 endAdornment: <InputAdornment position="end">%</InputAdornment>,
               }}
@@ -178,7 +193,7 @@ export const FinalTestConfigPage = () => {
               type="number"
               fullWidth
               value={form.maxRetakes}
-              onChange={(e) => setForm({ ...form, maxRetakes: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, maxRetakes: e.target.value === '' ? '' : Number(e.target.value) })}
               inputProps={{ min: 1, max: 10 }}
             />
           </Stack>
