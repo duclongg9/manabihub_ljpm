@@ -10,6 +10,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useRef, useState } from 'react';
+// @ts-ignore - Bypass type resolution issue in some strict TS bundler environments
 import * as XLSX from 'xlsx';
 import type { FinalTestQuestion } from '../services/finalTestService';
 

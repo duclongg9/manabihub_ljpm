@@ -13,6 +13,7 @@ type FinalTestFormState = Omit<UpdateFinalTestRequest, 'timeLimitMinutes' | 'pas
   passingScore: number | '';
   maxRetakes: number | '';
   jlptLevel: string;
+  skillFocus: string;
 };
 
 export const FinalTestConfigPage = () => {
@@ -21,7 +22,6 @@ export const FinalTestConfigPage = () => {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string>('');
   const [expanded, setExpanded] = useState<number | false>(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -53,7 +53,7 @@ export const FinalTestConfigPage = () => {
             passingScore: config.passingScore || '',
             maxRetakes: config.maxRetakes || '',
             jlptLevel: config.jlptLevel || '',
-            skillFocus: 'Tổng hợp',
+            skillFocus: config.skillFocus || '',
             questions: config.questions || [],
           });
         }
@@ -78,23 +78,33 @@ export const FinalTestConfigPage = () => {
       return;
     }
 
-    if (form.timeLimitMinutes === '' || form.timeLimitMinutes < 1 || form.timeLimitMinutes > 180) {
+    if (form.timeLimitMinutes === '' || Number(form.timeLimitMinutes) < 1 || Number(form.timeLimitMinutes) > 180) {
       showError('Vui lòng nhập thời gian làm bài (từ 1 đến 180 phút).');
       return;
     }
 
-    if (form.passingScore === '' || form.passingScore < 0 || form.passingScore > 100) {
+    if (form.passingScore === '' || Number(form.passingScore) < 0 || Number(form.passingScore) > 100) {
       showError('Vui lòng nhập điểm đạt (từ 0 đến 100%).');
       return;
     }
 
-    if (form.maxRetakes === '' || form.maxRetakes < 1 || form.maxRetakes > 10) {
+    if (form.maxRetakes === '' || Number(form.maxRetakes) < 1 || Number(form.maxRetakes) > 10) {
       showError('Vui lòng nhập số lần thi lại (từ 1 đến 10 lần).');
       return;
     }
 
     if (!form.jlptLevel) {
       showError('Vui lòng chọn trình độ JLPT.');
+      return;
+    }
+
+    if (!form.skillFocus || !form.skillFocus.trim()) {
+      showError('Vui lòng nhập kỹ năng tập trung.');
+      return;
+    }
+
+    if (form.skillFocus.length > 50) {
+      showError('Kỹ năng tập trung không được vượt quá 50 ký tự.');
       return;
     }
 
@@ -139,9 +149,10 @@ export const FinalTestConfigPage = () => {
         }, 1500);
       }
     } catch (err: any) {
-      if (err.response?.data?.messageCode) {
-        // Here we could map MessageCodes to actual strings if we had i18n
-        showError(err.response.data.message || 'Có lỗi xảy ra khi lưu cấu hình.');
+      if (err.response?.data?.errors?.length > 0) {
+        showError(err.response.data.errors[0].message);
+      } else if (err.response?.data?.message) {
+        showError(err.response.data.message);
       } else {
         showError('Có lỗi xảy ra, vui lòng thử lại.');
       }
@@ -170,36 +181,40 @@ export const FinalTestConfigPage = () => {
           
           <Stack direction="row" spacing={2}>
             <TextField
+              variant="outlined"
               label="Thời gian làm bài (phút)"
               type="number"
               fullWidth
-              value={form.timeLimitMinutes}
+              value={form.timeLimitMinutes as number}
               onChange={(e) => setForm({ ...form, timeLimitMinutes: e.target.value === '' ? '' : Number(e.target.value) })}
-              inputProps={{ min: 1, max: 180 }}
+              slotProps={{ htmlInput: { min: 1, max: 180 } }}
             />
             <TextField
+              variant="outlined"
               label="Điểm đạt (%)"
               type="number"
               fullWidth
-              value={form.passingScore}
+              value={form.passingScore as number}
               onChange={(e) => setForm({ ...form, passingScore: e.target.value === '' ? '' : Number(e.target.value) })}
-              InputProps={{
-                endAdornment: <InputAdornment position="end">%</InputAdornment>,
+              slotProps={{
+                input: { endAdornment: <InputAdornment position="end">%</InputAdornment> },
+                htmlInput: { min: 0, max: 100 }
               }}
-              inputProps={{ min: 0, max: 100 }}
             />
             <TextField
+              variant="outlined"
               label="Số lần thi lại tối đa"
               type="number"
               fullWidth
-              value={form.maxRetakes}
+              value={form.maxRetakes as number}
               onChange={(e) => setForm({ ...form, maxRetakes: e.target.value === '' ? '' : Number(e.target.value) })}
-              inputProps={{ min: 1, max: 10 }}
+              slotProps={{ htmlInput: { min: 1, max: 10 } }}
             />
           </Stack>
 
           <Stack direction="row" spacing={2}>
             <TextField
+              variant="outlined"
               select
               required
               label="Trình độ JLPT"
@@ -211,6 +226,14 @@ export const FinalTestConfigPage = () => {
                 <MenuItem key={lvl} value={lvl}>{lvl}</MenuItem>
               ))}
             </TextField>
+            <TextField
+              variant="outlined"
+              label="Kỹ năng tập trung"
+              fullWidth
+              value={form.skillFocus}
+              onChange={(e) => setForm({ ...form, skillFocus: e.target.value })}
+              placeholder="VD: Từ vựng, Ngữ pháp, Nghe hiểu..."
+            />
           </Stack>
 
           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 4 }}>
