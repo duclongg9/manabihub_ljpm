@@ -111,16 +111,15 @@ export interface CourseBuilderResponse {
   srsTrace: Record<string, unknown>;
 }
 
-export interface ValidationIssue {
+export interface ValidationError {
   code: string;
-  field: string;
-  severity: string;
   message: string;
+  severity: string;
 }
 
 export interface ValidationResultResponse {
-  valid: boolean;
-  issues: ValidationIssue[];
+  isValid: boolean;
+  errors: ValidationError[];
 }
 
 interface ApiResponse<T> {
