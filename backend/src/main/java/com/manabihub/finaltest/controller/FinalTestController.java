@@ -27,7 +27,7 @@ public class FinalTestController {
     @GetMapping
     public ResponseEntity<ApiResponse<FinalTestResponse>> getFinalTest(
             @PathVariable UUID courseId) {
-        
+
         FinalTestResponse response = finalTestService.getFinalTest(courseId);
         return ResponseEntity.ok(ApiResponse.success(MessageCodes.COMMON_SUCCESS, "Success", response));
     }
@@ -36,7 +36,7 @@ public class FinalTestController {
     public ResponseEntity<ApiResponse<FinalTestResponse>> updateFinalTest(
             @PathVariable UUID courseId,
             @Valid @RequestBody UpdateFinalTestRequest request) {
-        
+
         FinalTestResponse response = finalTestService.updateFinalTest(courseId, request);
         return ResponseEntity.ok(ApiResponse.success(MessageCodes.COMMON_UPDATED, "Success", response));
     }

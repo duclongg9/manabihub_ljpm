@@ -71,7 +71,7 @@ public class FinalTestServiceImpl implements FinalTestService {
 
         // Update Questions
         finalTest.getQuestions().clear();
-        
+
         int qOrder = 0;
         for (FinalTestQuestionDto qDto : request.getQuestions()) {
             FinalTestQuestion question = FinalTestQuestion.builder()
@@ -80,7 +80,7 @@ public class FinalTestServiceImpl implements FinalTestService {
                     .explanation(qDto.getExplanation())
                     .orderIndex(qOrder++)
                     .build();
-                    
+
             int cOrder = 0;
             for (FinalTestChoiceDto cDto : qDto.getChoices()) {
                 FinalTestChoice choice = FinalTestChoice.builder()
@@ -95,11 +95,11 @@ public class FinalTestServiceImpl implements FinalTestService {
         }
 
         FinalTest saved = finalTestRepository.save(finalTest);
-        
+
         // Ensure course references final test
         course.setFinalTest(saved);
         courseRepository.save(course);
-        
+
         return mapToResponse(saved);
     }
 
@@ -170,7 +170,7 @@ public class FinalTestServiceImpl implements FinalTestService {
                 qDto.setId(q.getId());
                 qDto.setContent(q.getContent());
                 qDto.setExplanation(q.getExplanation());
-                
+
                 List<FinalTestChoiceDto> cDtos = new ArrayList<>();
                 if (q.getChoices() != null) {
                     for (FinalTestChoice c : q.getChoices()) {
