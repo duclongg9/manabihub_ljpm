@@ -26,7 +26,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -296,9 +296,9 @@ export function TeacherCoursesPage() {
               onChange={(event) => setLevelFilter(event.target.value)}
               sx={{ minWidth: { xs: '100%', md: 150 } }}
             >
-              <MenuItemValue value={allFilterValue}>Tất cả</MenuItemValue>
+              <MenuItem value={allFilterValue}>Tất cả</MenuItem>
               {jlptLevels.map((level) => (
-                <MenuItemValue key={level} value={level}>{level}</MenuItemValue>
+                <MenuItem key={level} value={level}>{level}</MenuItem>
               ))}
             </TextField>
             <TextField
@@ -309,11 +309,11 @@ export function TeacherCoursesPage() {
               onChange={(event) => setCategoryFilter(event.target.value)}
               sx={{ minWidth: { xs: '100%', md: 210 } }}
             >
-              <MenuItemValue value={allFilterValue}>Tất cả danh mục</MenuItemValue>
+              <MenuItem value={allFilterValue}>Tất cả danh mục</MenuItem>
               {categories.map((category) => (
-                <MenuItemValue key={category.code} value={category.code}>
+                <MenuItem key={category.code} value={category.code}>
                   {category.name}
-                </MenuItemValue>
+                </MenuItem>
               ))}
             </TextField>
             <Button
@@ -360,6 +360,7 @@ export function TeacherCoursesPage() {
                     deleting={deletingId === course.id}
                     highlighted={course.id === draftState?.draftId}
                     onBuild={() => buildCourseContent(course)}
+                    onConfigureFinalTest={() => navigate(`/teacher/courses/${course.id}/final-test`)}
                     onDelete={() => void deleteDraft(course)}
                     onEdit={() => editDraft(course)}
                   />
@@ -388,18 +389,7 @@ export function TeacherCoursesPage() {
   );
 }
 
-interface MenuItemValueProps {
-  children: ReactNode;
-  value: string;
-}
 
-function MenuItemValue({ children, value }: MenuItemValueProps) {
-  return (
-    <MenuItem value={value}>
-      {children}
-    </MenuItem>
-  );
-}
 
 interface CourseDraftRowProps {
   categoryName?: string;
@@ -407,11 +397,21 @@ interface CourseDraftRowProps {
   deleting: boolean;
   highlighted: boolean;
   onBuild: () => void;
+  onConfigureFinalTest: () => void;
   onDelete: () => void;
   onEdit: () => void;
 }
 
-function CourseDraftRow({ categoryName, course, deleting, highlighted, onBuild, onDelete, onEdit }: CourseDraftRowProps) {
+function CourseDraftRow({
+  categoryName,
+  course,
+  deleting,
+  highlighted,
+  onBuild,
+  onConfigureFinalTest,
+  onDelete,
+  onEdit,
+}: CourseDraftRowProps) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const thumbnailSrc = resolveAssetUrl(course.thumbnailUrl);
   const summary = toPlainText(course.introduction) || 'Chưa có mô tả ngắn cho bản nháp này.';
@@ -521,6 +521,16 @@ function CourseDraftRow({ categoryName, course, deleting, highlighted, onBuild, 
           </Button>
           <Button
             variant="contained"
+            color="secondary"
+            size="small"
+            startIcon={<MenuBookIcon />}
+            onClick={onConfigureFinalTest}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Cấu hình Final Test
+          </Button>
+          <Button
+            variant="outlined"
             size="small"
             startIcon={<ViewModuleIcon />}
             onClick={onBuild}
