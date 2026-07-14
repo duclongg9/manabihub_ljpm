@@ -412,6 +412,7 @@ export function TeacherCoursesPage() {
                     highlighted={course.id === draftState?.draftId}
                     submitting={submittingId === course.id}
                     onBuild={() => buildCourseContent(course)}
+                    onConfigureFinalTest={() => navigate(`/teacher/courses/${course.id}/final-test`)}
                     onDelete={() => void deleteDraft(course)}
                     onEdit={() => editDraft(course)}
                     onSubmit={() => void submitDraft(course)}
@@ -460,13 +461,25 @@ interface CourseDraftRowProps {
   deleting: boolean;
   highlighted: boolean;
   onBuild: () => void;
+  onConfigureFinalTest: () => void;
   onDelete: () => void;
   onEdit: () => void;
   submitting: boolean;
   onSubmit: () => void;
 }
 
-function CourseDraftRow({ categoryName, course, deleting, highlighted, submitting, onBuild, onDelete, onEdit, onSubmit}: CourseDraftRowProps) {
+function CourseDraftRow({
+  categoryName,
+  course,
+  deleting,
+  highlighted,
+  submitting,
+  onBuild,
+  onConfigureFinalTest,
+  onDelete,
+  onEdit,
+  onSubmit,
+}: CourseDraftRowProps) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const thumbnailSrc = resolveAssetUrl(course.thumbnailUrl);
   const summary = toPlainText(course.introduction) || 'Chưa có mô tả ngắn cho bản nháp này.';
@@ -584,6 +597,16 @@ function CourseDraftRow({ categoryName, course, deleting, highlighted, submittin
           </Button>
           <Button
             variant="contained"
+            color="secondary"
+            size="small"
+            startIcon={<MenuBookIcon />}
+            onClick={onConfigureFinalTest}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Cấu hình Final Test
+          </Button>
+          <Button
+            variant="outlined"
             size="small"
             startIcon={<ViewModuleIcon />}
             onClick={onBuild}

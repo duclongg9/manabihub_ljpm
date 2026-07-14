@@ -125,6 +125,7 @@ public class CourseServiceImpl implements CourseService {
         course.setPrerequisites(trim(request.prerequisites()));
         course.setTargetStudents(trim(request.targetStudents()));
         course.getLearningGoals().clear();
+        courseRepository.saveAndFlush(course);
 
         for (int index = 0; index < learningGoals.size(); index++) {
             course.addLearningGoal(learningGoals.get(index), index + 1);

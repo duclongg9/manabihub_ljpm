@@ -11,6 +11,11 @@ import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.LessonBlockType;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.CourseValidationService;
+import com.manabihub.finaltest.entity.FinalTest;
+import com.manabihub.finaltest.entity.FinalTestChoice;
+import com.manabihub.finaltest.entity.FinalTestQuestion;
+import com.manabihub.finaltest.repository.FinalTestRepository;
+import com.manabihub.identity.service.CurrentUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +36,8 @@ public class CourseValidationServiceImpl implements CourseValidationService {
 
     private final CourseRepository courseRepository;
     private final ObjectMapper objectMapper;
+    private final CurrentUserService currentUserService;
+    private final FinalTestRepository finalTestRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -38,13 +45,16 @@ public class CourseValidationServiceImpl implements CourseValidationService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
 
+        if (course.getTeacher() == null
+                || course.getTeacher().getUser() == null
+                || !course.getTeacher().getUser().getId().equals(currentUserService.getCurrentUserId())) {
+            throw new SecurityException("You do not have permission to validate this course");
+        }
+
         List<ValidationError> errors = new ArrayList<>();
 
         validateMetadata(course, errors);
         validateGoals(course, errors);
-        
-        // TODO: Distinguish between Video Course and Final Test products
-        // For now, if there are modules, we validate them.
         validateHierarchy(course, errors);
         validateContentBlocks(course, errors);
         validateFinalTest(course, errors);
@@ -53,15 +63,13 @@ public class CourseValidationServiceImpl implements CourseValidationService {
     }
 
     private void validateMetadata(Course course, List<ValidationError> errors) {
-        // BR-COURSE-04 & Extended Metadata Check
-        if (!StringUtils.hasText(course.getTitle()) || 
-            course.getJlptLevel() == null ||
-            !StringUtils.hasText(course.getIntroduction()) ||
-            !StringUtils.hasText(course.getOutcomes()) ||
-            !StringUtils.hasText(course.getThumbnailUrl()) ||
-            !StringUtils.hasText(course.getCategory()) ||
-            course.getPrice() == null) {
-            
+        if (!StringUtils.hasText(course.getTitle())
+                || course.getJlptLevel() == null
+                || !StringUtils.hasText(course.getIntroduction())
+                || !StringUtils.hasText(course.getOutcomes())
+                || !StringUtils.hasText(course.getThumbnailUrl())
+                || !StringUtils.hasText(course.getCategory())
+                || course.getPrice() == null) {
             errors.add(new ValidationError("MSG-COURSE-004", "Sản phẩm chưa đáp ứng điều kiện gửi duyệt.", "error"));
         } else {
             int titleLen = course.getTitle().trim().length();
@@ -72,8 +80,7 @@ public class CourseValidationServiceImpl implements CourseValidationService {
                 errors.add(new ValidationError("MSG-COURSE-021", "Đường dẫn ảnh thu nhỏ không hợp lệ (phải bắt đầu bằng http/https).", "error"));
             }
         }
-        
-        // BR-COURSE-05 (Strict)
+
         if (course.getPrice() != null) {
             double price = course.getPrice().doubleValue();
             if (price < 0) {
@@ -85,13 +92,11 @@ public class CourseValidationServiceImpl implements CourseValidationService {
     }
 
     private void validateGoals(Course course, List<ValidationError> errors) {
-        // BR-GOAL-01
         List<CourseLearningGoal> goals = course.getLearningGoals();
         if (goals == null || goals.size() < 4) {
             errors.add(new ValidationError("MSG-GOAL-001", "Vui lòng nhập tối thiểu 4 mục tiêu học tập.", "error"));
         }
-        
-        // BR-GOAL-02 & Duplicate Check
+
         if (goals != null) {
             Set<String> uniqueGoals = new HashSet<>();
             for (CourseLearningGoal goal : goals) {
@@ -106,13 +111,11 @@ public class CourseValidationServiceImpl implements CourseValidationService {
                 }
             }
         }
-        
-        // BR-GOAL-03
+
         if (!StringUtils.hasText(course.getPrerequisites())) {
             errors.add(new ValidationError("MSG-GOAL-003", "Vui lòng nhập yêu cầu đầu vào hoặc chọn Không yêu cầu đầu vào.", "error"));
         }
-        
-        // BR-GOAL-04
+
         if (!StringUtils.hasText(course.getTargetStudents())) {
             errors.add(new ValidationError("MSG-GOAL-004", "Vui lòng mô tả đối tượng học viên phù hợp với sản phẩm này.", "error"));
         }
@@ -121,12 +124,12 @@ public class CourseValidationServiceImpl implements CourseValidationService {
     private void validateHierarchy(Course course, List<ValidationError> errors) {
         List<CourseModule> modules = course.getModules();
         if (modules == null || modules.isEmpty()) {
-            return; // Skip if no modules (might be a Final Test product)
+            return;
         }
-        
+
         int totalLessons = 0;
         int totalVideoDuration = 0;
-        
+
         for (CourseModule module : modules) {
             if (module.getBlocks() == null || module.getBlocks().isEmpty()) {
                 errors.add(new ValidationError("MSG-COURSE-017", "Không được phép có Module rỗng (Module chưa có bài học nào).", "error"));
@@ -139,13 +142,11 @@ public class CourseValidationServiceImpl implements CourseValidationService {
                 }
             }
         }
-        
-        // BR-CRS-05
+
         if (totalLessons < 5) {
             errors.add(new ValidationError("MSG-COURSE-015", "Video Course cần có tối thiểu 5 bài học trước khi gửi duyệt.", "error"));
         }
-        
-        // BR-CRS-06
+
         if (totalVideoDuration < 30) {
             errors.add(new ValidationError("MSG-COURSE-016", "Video Course cần có tổng thời lượng video tối thiểu 30 phút trước khi gửi duyệt.", "error"));
         }
@@ -153,89 +154,179 @@ public class CourseValidationServiceImpl implements CourseValidationService {
 
     private void validateContentBlocks(Course course, List<ValidationError> errors) {
         List<CourseModule> modules = course.getModules();
-        if (modules == null || modules.isEmpty()) return;
-        
+        if (modules == null || modules.isEmpty()) {
+            return;
+        }
+
         boolean hasJapaneseEvidence = false;
-        
-        // Flatten blocks for cross-module video limit check
         List<LessonBlock> allBlocks = new ArrayList<>();
         for (CourseModule module : modules) {
             if (module.getBlocks() != null) {
                 allBlocks.addAll(module.getBlocks());
             }
         }
-        
-        if (allBlocks.isEmpty()) return;
-        
+
+        if (allBlocks.isEmpty()) {
+            return;
+        }
+
         for (int i = 0; i < allBlocks.size(); i++) {
             LessonBlock block = allBlocks.get(i);
-            
-            // BR-CRS-02
-            if (block.getType() == LessonBlockType.QUIZ || block.getType() == LessonBlockType.FLASHCARD || block.getType() == LessonBlockType.WRITING) {
+
+            if (block.getType() == LessonBlockType.QUIZ
+                    || block.getType() == LessonBlockType.FLASHCARD
+                    || block.getType() == LessonBlockType.WRITING) {
                 hasJapaneseEvidence = true;
             }
-            
-            // BR-CRS-03 (Cross-Module check)
-            if (block.getType() == LessonBlockType.VIDEO && block.getDurationMinutes() != null && block.getDurationMinutes() > 15) {
-                boolean hasInteractionAfter = false;
-                if (i + 1 < allBlocks.size()) {
-                    LessonBlockType nextType = allBlocks.get(i + 1).getType();
-                    if (nextType == LessonBlockType.QUIZ || nextType == LessonBlockType.FLASHCARD || nextType == LessonBlockType.WRITING) {
-                        hasInteractionAfter = true;
-                    }
-                }
-                if (!hasInteractionAfter) {
-                    errors.add(new ValidationError("MSG-COURSE-009", "Video vượt quá 15 phút nhưng không có Quiz/Flashcard/Writing ngay sau.", "error"));
-                }
+
+            if (block.getType() == LessonBlockType.VIDEO
+                    && block.getDurationMinutes() != null
+                    && block.getDurationMinutes() > 15
+                    && !hasInteractionAfter(allBlocks, i)) {
+                errors.add(new ValidationError("MSG-COURSE-009", "Video vượt quá 15 phút nhưng không có Quiz/Flashcard/Writing ngay sau.", "error"));
             }
-                
-                // BR-CONTENT-02 & Quiz Options Check
-                if (block.getType() == LessonBlockType.QUIZ) {
-                    if (!StringUtils.hasText(block.getQuizAnswer())) {
-                        errors.add(new ValidationError("MSG-COURSE-013", "Câu hỏi quiz cần có đáp án đúng trước khi lưu.", "error"));
-                    } else if (StringUtils.hasText(block.getQuizOptionsJson())) {
-                        try {
-                            List<Map<String, Object>> options = objectMapper.readValue(block.getQuizOptionsJson(), new TypeReference<>() {});
-                            boolean answerMatches = options.stream()
-                                    .anyMatch(opt -> block.getQuizAnswer().equals(opt.get("id")) || block.getQuizAnswer().equals(opt.get("value")) || block.getQuizAnswer().equals(opt.get("text")));
-                            if (!answerMatches) {
-                                errors.add(new ValidationError("MSG-COURSE-014", "Đáp án đúng không khớp với bất kỳ lựa chọn nào trong danh sách.", "error"));
-                            }
-                        } catch (Exception e) {
-                            log.error("Failed to parse quiz options JSON for block {}", block.getId(), e);
-                        }
-                    }
-                }
-                
-                // BR-CONTENT-03
-                if (block.getType() == LessonBlockType.FLASHCARD && StringUtils.hasText(block.getFlashcardsJson())) {
-                    try {
-                        List<Map<String, String>> flashcards = objectMapper.readValue(block.getFlashcardsJson(), new TypeReference<>() {});
-                        Set<String> fronts = new HashSet<>();
-                        for (Map<String, String> card : flashcards) {
-                            String front = card.get("front");
-                            if (front != null && !fronts.add(front.trim().toLowerCase())) {
-                                errors.add(new ValidationError("MSG-COURSE-010", "Phát hiện thẻ từ vựng bị trùng lặp. Vui lòng kiểm tra lại bộ Flashcard.", "error"));
-                                break;
-                            }
-                        }
-                    } catch (Exception e) {
-                        log.error("Failed to parse flashcards JSON for block {}", block.getId(), e);
-                    }
-                }
-                
-                // BR-CONTENT-04
-                if (block.getType() == LessonBlockType.WRITING && !StringUtils.hasText(block.getRubric())) {
-                    errors.add(new ValidationError("MSG-WRITE-005", "Bài writing cần chọn rubric đánh giá trước khi lưu.", "error"));
-                }
-            }
-        
+
+            validateQuizBlock(block, errors);
+            validateFlashcardBlock(block, errors);
+            validateWritingBlock(block, errors);
+        }
+
         if (!hasJapaneseEvidence) {
             errors.add(new ValidationError("MSG-COURSE-012", "Bài học cần có bằng chứng học tiếng Nhật (từ vựng, ngữ pháp, quiz, flashcard...).", "error"));
         }
     }
 
+    private boolean hasInteractionAfter(List<LessonBlock> allBlocks, int currentIndex) {
+        if (currentIndex + 1 >= allBlocks.size()) {
+            return false;
+        }
+        LessonBlockType nextType = allBlocks.get(currentIndex + 1).getType();
+        return nextType == LessonBlockType.QUIZ
+                || nextType == LessonBlockType.FLASHCARD
+                || nextType == LessonBlockType.WRITING;
+    }
+
+    private void validateQuizBlock(LessonBlock block, List<ValidationError> errors) {
+        if (block.getType() != LessonBlockType.QUIZ) {
+            return;
+        }
+
+        if (!StringUtils.hasText(block.getQuizAnswer())) {
+            errors.add(new ValidationError("MSG-COURSE-013", "Câu hỏi quiz cần có đáp án đúng trước khi lưu.", "error"));
+            return;
+        }
+
+        if (!StringUtils.hasText(block.getQuizOptionsJson())) {
+            return;
+        }
+
+        try {
+            List<Map<String, Object>> options = objectMapper.readValue(block.getQuizOptionsJson(), new TypeReference<>() {});
+            boolean answerMatches = options.stream()
+                    .anyMatch(opt -> block.getQuizAnswer().equals(opt.get("id"))
+                            || block.getQuizAnswer().equals(opt.get("value"))
+                            || block.getQuizAnswer().equals(opt.get("text")));
+            if (!answerMatches) {
+                errors.add(new ValidationError("MSG-COURSE-014", "Đáp án đúng không khớp với bất kỳ lựa chọn nào trong danh sách.", "error"));
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse quiz options JSON for block {}", block.getId(), e);
+        }
+    }
+
+    private void validateFlashcardBlock(LessonBlock block, List<ValidationError> errors) {
+        if (block.getType() != LessonBlockType.FLASHCARD || !StringUtils.hasText(block.getFlashcardsJson())) {
+            return;
+        }
+
+        try {
+            List<Map<String, String>> flashcards = objectMapper.readValue(block.getFlashcardsJson(), new TypeReference<>() {});
+            Set<String> fronts = new HashSet<>();
+            for (Map<String, String> card : flashcards) {
+                String front = card.get("front");
+                if (front != null && !fronts.add(front.trim().toLowerCase())) {
+                    errors.add(new ValidationError("MSG-COURSE-010", "Phát hiện thẻ từ vựng bị trùng lặp. Vui lòng kiểm tra lại bộ Flashcard.", "error"));
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to parse flashcards JSON for block {}", block.getId(), e);
+        }
+    }
+
+    private void validateWritingBlock(LessonBlock block, List<ValidationError> errors) {
+        if (block.getType() == LessonBlockType.WRITING && !StringUtils.hasText(block.getRubric())) {
+            errors.add(new ValidationError("MSG-WRITE-005", "Bài writing cần chọn rubric đánh giá trước khi lưu.", "error"));
+        }
+    }
+
     private void validateFinalTest(Course course, List<ValidationError> errors) {
-        // TODO: Implement FinalTest validation once FinalTest entity is available in the module.
+        FinalTest finalTest = finalTestRepository.findByCourseId(course.getId()).orElse(null);
+        if (finalTest == null) {
+            errors.add(new ValidationError("MSG-FINAL-001", "Vui lòng cấu hình bài kiểm tra cuối khóa trước khi gửi duyệt.", "error"));
+            return;
+        }
+
+        if (finalTest.getTimeLimitMinutes() == null || finalTest.getTimeLimitMinutes() <= 0) {
+            errors.add(new ValidationError("MSG-FINAL-002", "Thời gian làm bài kiểm tra cuối khóa phải lớn hơn 0 phút.", "error"));
+        }
+        if (finalTest.getPassingScore() == null || finalTest.getPassingScore() < 0 || finalTest.getPassingScore() > 100) {
+            errors.add(new ValidationError("MSG-FINAL-003", "Điểm đạt bài kiểm tra cuối khóa phải nằm trong khoảng 0 đến 100.", "error"));
+        }
+        if (finalTest.getMaxRetakes() == null || finalTest.getMaxRetakes() < 0) {
+            errors.add(new ValidationError("MSG-FINAL-004", "Số lần làm lại bài kiểm tra cuối khóa không được âm.", "error"));
+        }
+        if (finalTest.getJlptLevel() == null) {
+            errors.add(new ValidationError("MSG-FINAL-005", "Vui lòng chọn cấp độ JLPT cho bài kiểm tra cuối khóa.", "error"));
+        }
+        if (!StringUtils.hasText(finalTest.getSkillFocus())) {
+            errors.add(new ValidationError("MSG-FINAL-006", "Vui lòng chọn kỹ năng trọng tâm cho bài kiểm tra cuối khóa.", "error"));
+        }
+
+        List<FinalTestQuestion> questions = finalTest.getQuestions();
+        if (questions == null || questions.size() < 20) {
+            errors.add(new ValidationError("MSG-FINAL-007", "Bài kiểm tra cuối khóa cần có tối thiểu 20 câu hỏi.", "error"));
+            return;
+        }
+
+        Set<String> uniqueQuestions = new HashSet<>();
+        for (FinalTestQuestion question : questions) {
+            validateFinalTestQuestion(question, uniqueQuestions, errors);
+        }
+    }
+
+    private void validateFinalTestQuestion(FinalTestQuestion question, Set<String> uniqueQuestions, List<ValidationError> errors) {
+        if (!StringUtils.hasText(question.getContent())) {
+            errors.add(new ValidationError("MSG-FINAL-008", "Mỗi câu hỏi trong bài kiểm tra cuối khóa cần có nội dung.", "error"));
+            return;
+        }
+
+        String normalizedContent = question.getContent().trim().toLowerCase();
+        if (!uniqueQuestions.add(normalizedContent)) {
+            errors.add(new ValidationError("MSG-FINAL-009", "Phát hiện câu hỏi bài kiểm tra cuối khóa bị trùng lặp.", "error"));
+        }
+
+        if (!StringUtils.hasText(question.getExplanation())) {
+            errors.add(new ValidationError("MSG-FINAL-010", "Mỗi câu hỏi trong bài kiểm tra cuối khóa cần có giải thích đáp án.", "error"));
+        }
+
+        List<FinalTestChoice> choices = question.getChoices();
+        if (choices == null || choices.size() < 2) {
+            errors.add(new ValidationError("MSG-FINAL-011", "Mỗi câu hỏi trong bài kiểm tra cuối khóa cần có tối thiểu 2 lựa chọn.", "error"));
+            return;
+        }
+
+        long correctChoices = choices.stream()
+                .filter(choice -> Boolean.TRUE.equals(choice.getIsCorrect()))
+                .count();
+        if (correctChoices != 1) {
+            errors.add(new ValidationError("MSG-FINAL-012", "Mỗi câu hỏi trong bài kiểm tra cuối khóa phải có đúng 1 đáp án đúng.", "error"));
+        }
+
+        boolean hasBlankChoice = choices.stream()
+                .anyMatch(choice -> !StringUtils.hasText(choice.getContent()));
+        if (hasBlankChoice) {
+            errors.add(new ValidationError("MSG-FINAL-013", "Các lựa chọn trong bài kiểm tra cuối khóa không được để trống.", "error"));
+        }
     }
 }
