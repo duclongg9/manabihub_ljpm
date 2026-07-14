@@ -11,6 +11,7 @@ import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.LessonBlockType;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.CourseValidationService;
+import com.manabihub.identity.service.CurrentUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,12 +32,17 @@ public class CourseValidationServiceImpl implements CourseValidationService {
 
     private final CourseRepository courseRepository;
     private final ObjectMapper objectMapper;
+    private final CurrentUserService currentUserService;
 
     @Override
     @Transactional(readOnly = true)
     public ValidationResultResponse validateCourse(UUID courseId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
+
+        if (!course.getTeacher().getId().equals(currentUserService.getCurrentUserId())) {
+            throw new SecurityException("You do not have permission to validate this course");
+        }
 
         List<ValidationError> errors = new ArrayList<>();
 

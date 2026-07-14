@@ -6,6 +6,7 @@ import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import OndemandVideoIcon from '@mui/icons-material/OndemandVideo';
@@ -559,13 +560,24 @@ export function CourseBuilderPage() {
               />
             </Stack>
 
-            {builder.validationWarnings.length > 0 && (
+            {builder.validationWarnings.length > 0 ? (
               <Alert severity="warning" icon={<WarningAmberIcon />}>
-                {builder.validationWarnings.map((warning) => (
-                  <Typography key={warning} variant="body2">
-                    {warning}
-                  </Typography>
-                ))}
+                <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>
+                  Khóa học cần hoàn thiện các mục sau trước khi gửi duyệt:
+                </Typography>
+                <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                  {builder.validationWarnings.map((warning, index) => (
+                    <Typography component="li" key={index} variant="body2" sx={{ mb: 0.5 }}>
+                      {warning}
+                    </Typography>
+                  ))}
+                </Box>
+              </Alert>
+            ) : (
+              <Alert severity="success" icon={<CheckCircleOutlinedIcon />}>
+                <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                  Tất cả các điều kiện đã thỏa mãn! Khóa học đã sẵn sàng để gửi duyệt.
+                </Typography>
               </Alert>
             )}
 
