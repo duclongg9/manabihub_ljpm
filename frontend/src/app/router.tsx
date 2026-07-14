@@ -12,6 +12,7 @@ import TeacherProfilePage from '../features/profile/TeacherProfilePage';
 import { CourseBuilderPage } from '../features/course-builder/pages/CourseBuilderPage';
 import { CourseDraftPage } from '../features/course-builder/pages/CourseDraftPage';
 import { TeacherCoursesPage } from '../features/course-builder/pages/TeacherCoursesPage';
+import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
@@ -105,6 +106,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses/:draftId/builder',
         element: <CourseBuilderPage />,
+      },
+      {
+        path: 'courses/:courseId/final-test',
+        element: <FinalTestConfigPage />,
       },
       {
         path: 'profile',

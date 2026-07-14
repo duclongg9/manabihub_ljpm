@@ -20,6 +20,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.manabihub.common.exception.ValidationBusinessException;
+
 /**
  * Centralized exception handler that guarantees all API responses follow
  * the {@link ApiResponse} envelope format.
@@ -51,6 +53,29 @@ public class GlobalExceptionHandler {
         ApiResponse<Void> response = ApiResponse.error(
                 ex.getMessageCode(),
                 ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(ex.getHttpStatus().value()).body(response);
+    }
+
+    @ExceptionHandler(ValidationBusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleValidationBusinessException(
+            ValidationBusinessException ex, HttpServletRequest request) {
+
+        log.warn("Validation Business rule violation: [{}] - {} with {} errors", 
+                ex.getMessageCode(), ex.getMessage(), ex.getValidationErrors().size());
+
+        List<ErrorResponse> fieldErrors = ex.getValidationErrors().stream()
+                .map(err -> ErrorResponse.builder()
+                        .messageCode(err.code())
+                        .message(err.message())
+                        .build())
+                .collect(Collectors.toList());
+
+        ApiResponse<Void> response = ApiResponse.error(
+                ex.getMessageCode(),
+                ex.getMessage(),
+                fieldErrors,
                 request.getRequestURI()
         );
         return ResponseEntity.status(ex.getHttpStatus().value()).body(response);
