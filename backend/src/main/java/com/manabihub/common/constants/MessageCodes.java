@@ -143,7 +143,9 @@ public final class MessageCodes {
     public static final String LEARNING_NOT_ENROLLED = "LEARNING_NOT_ENROLLED";
     public static final String LEARNING_ALREADY_ENROLLED = "LEARNING_ALREADY_ENROLLED";
     public static final String LEARNING_PROGRESS_UPDATED = "LEARNING_PROGRESS_UPDATED";
-
+    public static final String MSG_FLASHCARD_001 = "MSG_FLASHCARD_001";
+    public static final String MSG_FLASHCARD_002 = "MSG_FLASHCARD_002";
+    public static final String MSG_FLASHCARD_003 = "MSG_FLASHCARD_003";
     // ──────────────────────────────────────────────
     // AI — AI-related operations
     // ──────────────────────────────────────────────
