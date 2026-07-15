@@ -136,7 +136,7 @@ export const BestSellingCourses: React.FC = () => {
               >
                 {/* 365x519 Exact Size Card */}
                 <Card
-                  onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
+                  onClick={() => navigate(ROUTES.PUBLIC.COURSE_DETAIL.replace(':id', course.id))}
                   sx={{
                     width: '365px',
                     height: '519px',

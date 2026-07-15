@@ -3,10 +3,12 @@ import { Box, Container, Typography, Paper, Button, IconButton } from '@mui/mate
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArticleIcon from '@mui/icons-material/Article';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import ComputerIcon from '@mui/icons-material/Computer';
-import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import HeadphonesIcon from '@mui/icons-material/Headphones';
+import ChromeReaderModeIcon from '@mui/icons-material/ChromeReaderMode';
+import EditIcon from '@mui/icons-material/Edit';
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import { useNavigate } from 'react-router-dom';
@@ -14,15 +16,18 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
 
 const CATEGORIES = [
-  { id: 'jlpt', name: 'Luyện thi JLPT', count: '36+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'kaiwa', name: 'Giao tiếp Kaiwa', count: '41+', icon: <ReceiptLongIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'business', name: 'Tiếng Nhật Thương mại', count: '24+', icon: <BusinessCenterIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'it', name: 'Tiếng Nhật IT', count: '51+', icon: <ComputerIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  // Duplicate for slider effect
-  { id: 'jlpt-2', name: 'Luyện thi JLPT', count: '36+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'kaiwa-2', name: 'Giao tiếp Kaiwa', count: '41+', icon: <ReceiptLongIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'business-2', name: 'Tiếng Nhật Thương mại', count: '24+', icon: <BusinessCenterIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'it-2', name: 'Tiếng Nhật IT', count: '51+', icon: <ComputerIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'n5', name: 'JLPT N5', count: '12+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'n4', name: 'JLPT N4', count: '15+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'n3', name: 'JLPT N3', count: '20+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'n2', name: 'JLPT N2', count: '18+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'n1', name: 'JLPT N1', count: '8+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'vocab', name: 'Từ vựng (Goi)', count: '25+', icon: <TextSnippetIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
+  { id: 'grammar', name: 'Ngữ pháp (Bunpou)', count: '22+', icon: <MenuBookIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
+  { id: 'listening', name: 'Nghe hiểu (Choukai)', count: '30+', icon: <HeadphonesIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
+  { id: 'reading', name: 'Đọc hiểu (Dokkai)', count: '15+', icon: <ChromeReaderModeIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
+  { id: 'writing', name: 'Viết & Kanji', count: '10+', icon: <EditIcon sx={{ fontSize: 32, color: '#8b5cf6' }} /> },
+  { id: 'n5-2', name: 'JLPT N5', count: '12+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'n4-2', name: 'JLPT N4', count: '15+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
 ];
 
 export const TopCategories: React.FC = () => {

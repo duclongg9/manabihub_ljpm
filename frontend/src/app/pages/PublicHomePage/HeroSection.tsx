@@ -124,8 +124,8 @@ export const HeroSection: React.FC = () => {
                   letterSpacing: '-1px'
                 }}
               >
-                Học tiếng Nhật <br />
-                <Box component="span" sx={{ color: '#60a5fa' }}>Dễ dàng & Hiệu quả</Box>
+                {'Học tiếng Nhật'} <br />
+                <Box component="span" sx={{ color: '#60a5fa' }}>{'Dễ dàng & Hiệu quả'}</Box>
               </Typography>
 
               <Typography
@@ -139,7 +139,7 @@ export const HeroSection: React.FC = () => {
                   pr: { md: 4 }
                 }}
               >
-                Nền tảng học tiếng Nhật trực tuyến hàng đầu. Kết nối bạn với những giảng viên xuất sắc nhất. Học mọi lúc, mọi nơi với giáo trình chuẩn JLPT, hỗ trợ tận tình và cam kết chất lượng đầu ra.
+                {'Nền tảng học tiếng Nhật trực tuyến hàng đầu. Kết nối bạn với những giảng viên xuất sắc nhất. Học mọi lúc, mọi nơi với giáo trình chuẩn JLPT, hỗ trợ tận tình và cam kết chất lượng đầu ra.'}
               </Typography>
 
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -166,7 +166,7 @@ export const HeroSection: React.FC = () => {
                     }
                   }}
                 >
-                  Khám phá khóa học
+                  {'Khám phá khóa học'}
                 </Button>
 
                 <Button
@@ -190,7 +190,7 @@ export const HeroSection: React.FC = () => {
                     }
                   }}
                 >
-                  Trở thành giảng viên
+                  {'Trở thành giảng viên'}
                 </Button>
               </Box>
             </Box>

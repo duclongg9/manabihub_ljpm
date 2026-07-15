@@ -16,6 +16,7 @@ import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
+import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
 
 export const router = createBrowserRouter([
   {
@@ -48,8 +49,16 @@ export const router = createBrowserRouter([
         element: <div>Course Catalog Placeholder</div>,
       },
       {
+        path: 'courses/:id',
+        element: <div>Course Detail Placeholder</div>,
+      },
+      {
         path: 'register',
         element: <div>Register Page Placeholder</div>,
+      },
+      {
+        path: 'about',
+        element: <AboutUsPage />,
       },
     ],
   },

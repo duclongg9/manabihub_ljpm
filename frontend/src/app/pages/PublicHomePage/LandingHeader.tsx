@@ -25,9 +25,11 @@ export const LandingHeader: React.FC = () => {
           </Box>
 
           <Button
+            component={Link}
+            to={ROUTES.PUBLIC.COURSE_BROWSE}
             color="inherit"
             endIcon={<KeyboardArrowDownIcon />}
-            sx={{ textTransform: 'none', fontWeight: 600, display: { xs: 'none', md: 'flex' } }}
+            sx={{ textTransform: 'none', fontWeight: 600, display: { xs: 'none', md: 'flex' }, textDecoration: 'none' }}
           >
             Danh mục
           </Button>
