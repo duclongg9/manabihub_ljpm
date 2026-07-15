@@ -11,7 +11,7 @@ interface CourseHeroProps {
 
 export const CourseHero = ({ course }: CourseHeroProps) => {
   return (
-    <div className="relative bg-slate-900 text-white pt-12 pb-16 sm:pt-16 sm:pb-20 overflow-hidden">
+    <div className="relative bg-slate-900 text-white pt-12 pb-16 sm:pt-16 sm:pb-20 overflow-hidden rounded-3xl mt-4">
       {/* Background Gradient Meshes */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-900 opacity-80" />
       <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-blue-600/20 blur-3xl" />
