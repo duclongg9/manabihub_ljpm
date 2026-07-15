@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import com.manabihub.course.dto.response.ValidationResultResponse;
+import com.manabihub.course.service.CourseValidationService;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +29,27 @@ import java.util.UUID;
 public class TeacherCourseController {
 
     private final CourseService courseService;
+    private final CourseValidationService courseValidationService;
+
+    @GetMapping("/drafts/{draftId}/validate")
+    public ResponseEntity<ApiResponse<ValidationResultResponse>> validateDraft(@PathVariable UUID draftId) {
+        ValidationResultResponse response = courseValidationService.validateCourse(draftId);
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.MSG_COURSE_001,
+                "Course validation result loaded.",
+                response
+        ));
+    }
+
+    @PostMapping("/drafts/{draftId}/submit-review")
+    public ResponseEntity<ApiResponse<Void>> submitForReview(@PathVariable UUID draftId) {
+        courseService.submitForReview(draftId);
+        return ResponseEntity.ok(ApiResponse.success(
+                "MSG-COURSE-005", // MSG-COURSE-005 from SRS: Course submitted for review
+                "Sản phẩm đã được gửi để xét duyệt.",
+                null
+        ));
+    }
 
     @GetMapping("/drafts")
     public ResponseEntity<ApiResponse<List<CourseDraftResponse>>> listDrafts() {

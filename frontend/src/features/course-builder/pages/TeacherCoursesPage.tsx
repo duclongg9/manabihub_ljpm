@@ -37,6 +37,8 @@ import {
   type CourseCategory,
   type CourseDraftResponse,
   type JlptLevel,
+  submitCourseForReview,
+  validateCourseDraft
 } from '../services/courseDraftService';
 
 interface CourseDraftSavedState {
@@ -53,6 +55,7 @@ type Feedback = {
 const allFilterValue = 'ALL';
 const draftPageSize = 6;
 const jlptLevels: JlptLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1'];
+
 
 const priceFormatter = new Intl.NumberFormat('vi-VN', {
   currency: 'VND',
@@ -83,6 +86,7 @@ export function TeacherCoursesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
 
   const categoryNames = useMemo(
     () => new Map(categories.map((category) => [category.code, category.name])),
@@ -186,6 +190,53 @@ export function TeacherCoursesPage() {
     }
   }
 
+  async function submitDraft(course: CourseDraftResponse) {
+    setSubmittingId(course.id);
+
+    try {
+
+      const validation =
+          await validateCourseDraft(course.id);
+
+      if (!validation.isValid) {
+
+        const errorMessage = [
+          "Không thể gửi khóa học để xét duyệt.",
+          "",
+          ...validation.errors.map(error => `• ${error.message}`),
+        ].join("\n");
+
+        setFeedback({
+          severity: "error",
+          message: errorMessage,
+        });
+
+        return;
+      }
+
+      await submitCourseForReview(course.id);
+
+      setFeedback({
+        severity: "success",
+        message: "Đã gửi khóa học để xét duyệt.",
+      });
+
+      await loadDrafts();
+
+    } catch {
+
+      setFeedback({
+        severity: "error",
+        message: "Không thể gửi khóa học.",
+      });
+
+    } finally {
+
+      setSubmittingId(null);
+
+    }
+  }
+
   return (
     <Box>
       <PageHeader
@@ -226,7 +277,7 @@ export function TeacherCoursesPage() {
       )}
 
       {feedback && (
-        <Alert severity={feedback.severity} sx={{ mb: 2 }} onClose={() => setFeedback(null)}>
+        <Alert severity={feedback.severity} sx={{ mb: 2, whiteSpace: "pre-line" }} onClose={() => setFeedback(null)}>
           {feedback.message}
         </Alert>
       )}
@@ -359,9 +410,12 @@ export function TeacherCoursesPage() {
                     course={course}
                     deleting={deletingId === course.id}
                     highlighted={course.id === draftState?.draftId}
+                    submitting={submittingId === course.id}
                     onBuild={() => buildCourseContent(course)}
+                    onConfigureFinalTest={() => navigate(`/teacher/courses/${course.id}/final-test`)}
                     onDelete={() => void deleteDraft(course)}
                     onEdit={() => editDraft(course)}
+                    onSubmit={() => void submitDraft(course)}
                   />
                 ))}
               </Stack>
@@ -407,11 +461,25 @@ interface CourseDraftRowProps {
   deleting: boolean;
   highlighted: boolean;
   onBuild: () => void;
+  onConfigureFinalTest: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  submitting: boolean;
+  onSubmit: () => void;
 }
 
-function CourseDraftRow({ categoryName, course, deleting, highlighted, onBuild, onDelete, onEdit }: CourseDraftRowProps) {
+function CourseDraftRow({
+  categoryName,
+  course,
+  deleting,
+  highlighted,
+  submitting,
+  onBuild,
+  onConfigureFinalTest,
+  onDelete,
+  onEdit,
+  onSubmit,
+}: CourseDraftRowProps) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const thumbnailSrc = resolveAssetUrl(course.thumbnailUrl);
   const summary = toPlainText(course.introduction) || 'Chưa có mô tả ngắn cho bản nháp này.';
@@ -481,7 +549,15 @@ function CourseDraftRow({ categoryName, course, deleting, highlighted, onBuild, 
           >
             {title}
           </Typography>
-          <Chip color="warning" label="Bản nháp" size="small" />
+          <Chip color={
+            course.status === "SUBMITTED"
+                ? "info"
+                : "warning"}
+                label={
+                  course.status === "SUBMITTED"
+                      ? "Chờ duyệt"
+                      : "Bản nháp"}
+                size="small" />
         </Stack>
 
         <Typography
@@ -521,6 +597,16 @@ function CourseDraftRow({ categoryName, course, deleting, highlighted, onBuild, 
           </Button>
           <Button
             variant="contained"
+            color="secondary"
+            size="small"
+            startIcon={<MenuBookIcon />}
+            onClick={onConfigureFinalTest}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Cấu hình Final Test
+          </Button>
+          <Button
+            variant="outlined"
             size="small"
             startIcon={<ViewModuleIcon />}
             onClick={onBuild}
@@ -556,7 +642,11 @@ function CourseDraftRow({ categoryName, course, deleting, highlighted, onBuild, 
             </MenuItem>
             <Tooltip title="Vui lòng vào phần Xây nội dung để thêm ít nhất 1 bài học trước khi gửi duyệt." placement="left">
               <span>
-                <MenuItem disabled>
+                <MenuItem disabled={deleting || submitting}
+                          onClick={() => {
+                            closeMenu();
+                            onSubmit();
+                          }}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <SendOutlinedIcon fontSize="small" />
                     <Typography variant="body2">Gửi duyệt</Typography>
