@@ -11,6 +11,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import HistoryIcon from '@mui/icons-material/History';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import SearchIcon from '@mui/icons-material/Search';
 
 // Helper function to format "Time Waiting"
 const formatTimeAgo = (dateString: string) => {
@@ -36,6 +37,8 @@ export const CourseApprovalQueuePage: React.FC = () => {
   // Search, Filter, Pagination states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [tempSearchTerm, setTempSearchTerm] = useState('');
+  const [tempStatusFilter, setTempStatusFilter] = useState('ALL');
   const [page, setPage] = useState(1); // MUI Pagination is 1-indexed
   const rowsPerPage = 10;
 
@@ -96,7 +99,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
   if (error === 'ERROR') {
     return (
       <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#fef2f2', borderRadius: 2, color: '#991b1b', border: '1px solid #fecaca', mt: 4 }}>
-        <Typography>Không thể tải danh sách chờ duyệt. Vui lòng kiểm tra lại backend hoặc đảm bảo các endpoints giả định đã được cấu hình đúng.</Typography>
+        <Typography>Đã xảy ra lỗi khi tải danh sách chờ duyệt. Vui lòng kiểm tra lại kết nối mạng hoặc liên hệ quản trị viên.</Typography>
       </Box>
     );
   }
@@ -107,38 +110,59 @@ export const CourseApprovalQueuePage: React.FC = () => {
         Task Queue
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <TextField
-          label="Tìm kiếm theo tên khóa học"
-          variant="outlined"
-          size="small"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
+      <Paper elevation={0} sx={{ p: 2, mb: 4, borderRadius: 3, border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', justifyContent: 'space-between', bgcolor: 'white', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', flexGrow: 1 }}>
+          <TextField
+            placeholder="Tìm kiếm theo tên khóa học..."
+            variant="outlined"
+            size="small"
+            value={tempSearchTerm}
+            onChange={(e) => setTempSearchTerm(e.target.value)}
+            sx={{ width: { xs: '100%', sm: 280 }, '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#f8fafc' } }}
+            slotProps={{
+              input: {
+                startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+              }
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: 200, '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#f8fafc' } }}>
+            <Select
+              value={tempStatusFilter}
+              onChange={(e) => setTempStatusFilter(e.target.value)}
+              displayEmpty
+            >
+              <MenuItem value="ALL">All</MenuItem>
+              <MenuItem value="PENDING">Pending</MenuItem>
+              <MenuItem value="APPROVED">Approved</MenuItem>
+              <MenuItem value="REJECTED">Rejected</MenuItem>
+              <MenuItem value="DRAFT">Correction</MenuItem>
+              <MenuItem value="PUBLISHED">Published</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<FilterListIcon />}
+          onClick={() => {
+            setSearchTerm(tempSearchTerm);
+            setStatusFilter(tempStatusFilter);
             setPage(1);
           }}
-          sx={{ flexGrow: 1, maxWidth: 400, bgcolor: 'white', borderRadius: 1 }}
-        />
-        <FormControl size="small" sx={{ minWidth: 200, bgcolor: 'white', borderRadius: 1 }}>
-          <InputLabel id="status-filter-label">Trạng thái</InputLabel>
-          <Select
-            labelId="status-filter-label"
-            value={statusFilter}
-            label="Trạng thái"
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <MenuItem value="ALL">Tất cả</MenuItem>
-            <MenuItem value="PENDING">Pending </MenuItem>
-            <MenuItem value="APPROVED">Approved</MenuItem>
-            <MenuItem value="REJECTED">Rejected</MenuItem>
-            <MenuItem value="DRAFT">Correction</MenuItem>
-            <MenuItem value="PUBLISHED">Published</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
+          sx={{
+            bgcolor: '#4f46e5',
+            color: 'white',
+            borderRadius: 2,
+            textTransform: 'none',
+            px: 4,
+            py: 1,
+            fontWeight: 'bold',
+            boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2)',
+            '&:hover': { bgcolor: '#4338ca', boxShadow: '0 6px 8px -1px rgba(79, 70, 229, 0.3)' }
+          }}
+        >
+          Áp dụng
+        </Button>
+      </Paper>
 
       <Paper
         sx={{
@@ -154,13 +178,6 @@ export const CourseApprovalQueuePage: React.FC = () => {
             <HistoryIcon sx={{ color: 'text.secondary' }} />
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Operation Queue</Typography>
           </Box>
-          <Button
-            variant="outlined"
-            startIcon={<FilterListIcon />}
-            sx={{ borderRadius: 8, textTransform: 'none', color: 'text.primary', borderColor: '#cbd5e1' }}
-          >
-            Filter
-          </Button>
         </Box>
 
         <TableContainer>
