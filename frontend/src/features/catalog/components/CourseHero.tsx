@@ -11,7 +11,7 @@ interface CourseHeroProps {
 
 export const CourseHero = ({ course }: CourseHeroProps) => {
   return (
-    <div className="relative bg-slate-900 text-white pt-20 pb-24 overflow-hidden">
+    <div className="relative bg-slate-900 text-white pt-12 pb-16 sm:pt-16 sm:pb-20 overflow-hidden">
       {/* Background Gradient Meshes */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-900 opacity-80" />
       <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-blue-600/20 blur-3xl" />
@@ -20,10 +20,12 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 flex flex-col items-start">
           {/* Breadcrumbs / Badges */}
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            <span className="px-3 py-1 bg-indigo-500/20 border border-indigo-400/30 rounded-full text-indigo-300 text-xs font-semibold tracking-wide uppercase">
-              {course.category}
-            </span>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            {course.category && (
+              <span className="px-3 py-1 bg-indigo-500/20 border border-indigo-400/30 rounded-full text-indigo-300 text-xs font-semibold tracking-wide uppercase">
+                {course.category}
+              </span>
+            )}
             {course.jlptLevel && (
               <span className="px-3 py-1 bg-fuchsia-500/20 border border-fuchsia-400/30 rounded-full text-fuchsia-300 text-xs font-semibold tracking-wide uppercase">
                 {course.jlptLevel}
@@ -32,13 +34,13 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
           </div>
           
           {/* Title */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 leading-tight drop-shadow-md">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4 leading-tight drop-shadow-md">
             {course.title}
           </h1>
           
           {/* Description */}
           <div 
-            className="text-lg sm:text-xl text-slate-300 mb-8 max-w-3xl leading-relaxed prose prose-invert prose-lg"
+            className="text-base sm:text-lg text-slate-300 mb-6 max-w-3xl leading-relaxed prose prose-invert"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.description || course.introduction || '') }}
           />
           
