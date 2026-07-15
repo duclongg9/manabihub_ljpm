@@ -13,6 +13,7 @@ import { CourseBuilderPage } from '../features/course-builder/pages/CourseBuilde
 import { CourseDraftPage } from '../features/course-builder/pages/CourseDraftPage';
 import { TeacherCoursesPage } from '../features/course-builder/pages/TeacherCoursesPage';
 import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
+import { CourseDetailPage } from '../features/catalog/pages/CourseDetailPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
@@ -46,6 +47,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses',
         element: <div>Course Catalog Placeholder</div>,
+      },
+      {
+        path: 'courses/:id',
+        element: <CourseDetailPage />,
       },
       {
         path: 'register',

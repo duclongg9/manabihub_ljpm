@@ -4,8 +4,13 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.dto.request.CreateCourseDraftRequest;
 import com.manabihub.course.dto.response.CourseDraftResponse;
+import com.manabihub.course.dto.response.PublicCourseDetailResponse;
+import com.manabihub.course.dto.response.PublicModuleResponse;
+import com.manabihub.course.dto.response.PublicLessonBlockResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseLearningGoal;
+import com.manabihub.course.entity.CourseModule;
+import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
@@ -187,6 +192,114 @@ public class CourseServiceImpl implements CourseService {
                 Map.of("status", CourseStatus.SUBMITTED.name()),
                 Map.of("courseTitle", course.getTitle())
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PublicCourseDetailResponse getPublicCourseDetail(String identifier) {
+        Course course;
+        try {
+            UUID courseId = UUID.fromString(identifier);
+            course = courseRepository.findByIdWithDetails(courseId)
+                    .orElseThrow(() -> new BusinessException(
+                            MessageCodes.MSG_CATALOG_001,
+                            "Course was not found",
+                            HttpStatus.NOT_FOUND
+                    ));
+        } catch (IllegalArgumentException e) {
+            course = courseRepository.findBySlugWithDetails(identifier)
+                    .orElseThrow(() -> new BusinessException(
+                            MessageCodes.MSG_CATALOG_001,
+                            "Course was not found",
+                            HttpStatus.NOT_FOUND
+                    ));
+        }
+
+        java.util.Optional<UUID> currentUserIdOpt = currentUserService.getCurrentUserIdOptional();
+
+        boolean isAuthor = currentUserIdOpt.isPresent() && 
+                           course.getTeacher() != null && 
+                           course.getTeacher().getUser() != null && 
+                           currentUserIdOpt.get().equals(course.getTeacher().getUser().getId());
+
+        boolean isAdmin = currentUserService.hasRole("ADMIN") || currentUserService.hasRole("SUPER_ADMIN");
+
+        if (course.getStatus() != CourseStatus.PUBLISHED && !isAuthor && !isAdmin) {
+            throw new BusinessException(
+                    MessageCodes.MSG_CATALOG_001,
+                    "Course was not found or is not published yet",
+                    HttpStatus.NOT_FOUND
+            );
+        }
+
+        boolean isEnrolled = false;
+        if (currentUserIdOpt.isPresent()) {
+            isEnrolled = courseRepository.checkEnrollmentExists(course.getId(), currentUserIdOpt.get());
+        }
+
+        // Aggregate stats
+        int totalDurationMinutes = 0;
+        int totalLessons = 0;
+        
+        List<PublicModuleResponse> moduleResponses = new ArrayList<>();
+        for (CourseModule module : course.getModules()) {
+            PublicModuleResponse modRes = mapModuleToPublicResponse(module);
+            moduleResponses.add(modRes);
+            for (PublicLessonBlockResponse block : modRes.getBlocks()) {
+                if ("VIDEO".equals(block.getType()) && block.getDurationMinutes() != null) {
+                    totalDurationMinutes += block.getDurationMinutes();
+                }
+                totalLessons++;
+            }
+        }
+
+        return PublicCourseDetailResponse.builder()
+                .id(course.getId())
+                .title(course.getTitle())
+                .slug(course.getSlug())
+                .description(course.getDescription())
+                .introduction(course.getIntroduction())
+                .jlptLevel(course.getJlptLevel())
+                .category(course.getCategory())
+                .thumbnailUrl(course.getThumbnailUrl())
+                .outcomes(course.getOutcomes())
+                .price(course.getPrice())
+                .currency(course.getCurrency())
+                .prerequisites(course.getPrerequisites())
+                .targetStudents(course.getTargetStudents())
+                .publishedAt(course.getPublishedAt())
+                .teacher(PublicCourseDetailResponse.TeacherDto.builder()
+                        .id(course.getTeacher().getId())
+                        .name(course.getTeacher().getDisplayName())
+                        .avatarUrl(course.getTeacher().getUser() != null ? course.getTeacher().getUser().getAvatarUrl() : null)
+                        .bio(course.getTeacher().getBio())
+                        .build())
+                .averageRating(0.0) // Mocked as 0 for now until Review module is ready
+                .totalReviews(0) // Mocked as 0 for now until Review module is ready
+                .isEnrolled(isEnrolled)
+                .totalDurationMinutes(totalDurationMinutes)
+                .totalLessons(totalLessons)
+                .modules(moduleResponses)
+                .build();
+    }
+
+    private PublicModuleResponse mapModuleToPublicResponse(CourseModule module) {
+        return PublicModuleResponse.builder()
+                .id(module.getId())
+                .title(module.getTitle())
+                .orderIndex(module.getOrderIndex())
+                .blocks(module.getBlocks().stream().map(this::mapBlockToPublicResponse).toList())
+                .build();
+    }
+
+    private PublicLessonBlockResponse mapBlockToPublicResponse(LessonBlock block) {
+        return PublicLessonBlockResponse.builder()
+                .id(block.getId())
+                .title(block.getTitle())
+                .type(block.getType())
+                .durationMinutes(block.getDurationMinutes())
+                .orderIndex(block.getOrderIndex())
+                .build();
     }
 
     private TeacherProfile resolveApprovedTeacher(UUID userId) {

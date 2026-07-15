@@ -1,0 +1,54 @@
+package com.manabihub.course.dto.response;
+
+import com.manabihub.course.enums.JlptLevel;
+import lombok.Builder;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+@Data
+@Builder
+public class PublicCourseDetailResponse {
+    private UUID id;
+    private String title;
+    private String slug;
+    private String description;
+    private String introduction;
+    private JlptLevel jlptLevel;
+    private String category;
+    private String thumbnailUrl;
+    private String outcomes;
+    private BigDecimal price;
+    private String currency;
+    private String prerequisites;
+    private String targetStudents;
+    private Instant publishedAt;
+    
+    // Teacher Info
+    private TeacherDto teacher;
+    
+    // Mock reviews
+    private Double averageRating;
+    private Integer totalReviews;
+    
+    // Enrollment mock
+    private Boolean isEnrolled;
+    
+    // Aggregation
+    private Integer totalDurationMinutes;
+    private Integer totalLessons;
+    
+    private List<PublicModuleResponse> modules;
+
+    @Data
+    @Builder
+    public static class TeacherDto {
+        private UUID id;
+        private String name;
+        private String avatarUrl;
+        private String bio;
+    }
+}
