@@ -103,7 +103,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f8fafc', minHeight: '100vh' }}>
-      <Typography variant="h5" sx={{ fontWeight: 'bold',  mb: 4 }}>
+      <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 4 }}>
         Task Queue
       </Typography>
 
@@ -131,7 +131,11 @@ export const CourseApprovalQueuePage: React.FC = () => {
             }}
           >
             <MenuItem value="ALL">Tất cả</MenuItem>
-            <MenuItem value="PENDING">Pending</MenuItem>
+            <MenuItem value="PENDING">Pending </MenuItem>
+            <MenuItem value="APPROVED">Approved</MenuItem>
+            <MenuItem value="REJECTED">Rejected</MenuItem>
+            <MenuItem value="DRAFT">Correction</MenuItem>
+            <MenuItem value="PUBLISHED">Published</MenuItem>
           </Select>
         </FormControl>
       </Box>
@@ -207,7 +211,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                           <MenuBookIcon sx={{ color: 'text.secondary', mt: 0.5 }} />
                           <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 'bold',  color: '#475569' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#475569' }}>
                               Khóa học: {row.courseName}
                             </Typography>
                             <Typography variant="caption" sx={{ color: '#94a3b8' }}>
@@ -217,7 +221,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold',  color: '#334155' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#334155' }}>
                           Teacher: {row.teacherName}
                         </Typography>
                       </TableCell>

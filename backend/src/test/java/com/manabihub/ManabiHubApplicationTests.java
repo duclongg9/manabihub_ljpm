@@ -20,6 +20,7 @@ import com.manabihub.mock.repository.MockJlptRegistryRepository;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.course.repository.CourseApprovalDecisionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -94,6 +95,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private CourseCategoryRepository courseCategoryRepository;
+
+    @MockBean
+    private CourseApprovalDecisionRepository courseApprovalDecisionRepository;
 
     @Test
     void contextLoads() {

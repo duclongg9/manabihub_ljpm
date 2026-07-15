@@ -46,13 +46,17 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<CourseApprovalQueueResponse> getQueue(UUID adminId) {
         checkCourseManagerAccess(adminId);
-        List<Course> courses = courseRepository.findAllByStatusOrderBySubmittedAtDesc(CourseStatus.SUBMITTED);
+        // Fetch courses that are currently in review queue or have been reviewed recently
+        List<Course> courses = courseRepository.findAllByStatusInOrderBySubmittedAtDesc(
+                List.of(CourseStatus.PENDING, CourseStatus.APPROVED, CourseStatus.REJECTED, CourseStatus.DRAFT, CourseStatus.PUBLISHED));
         return courses.stream().map(this::mapToQueueResponse).collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CourseApprovalDetailResponse getDetail(UUID adminId, UUID courseId) {
         checkCourseManagerAccess(adminId);
         Course course = courseRepository.findById(courseId)
@@ -71,7 +75,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
                 .curriculumSummary(course.getDescription())
                 .lessonBlocksCount(lessonBlocksCount)
                 .finalTestIncluded(finalTestIncluded)
-                .policyEvidence("The teacher agreed to the terms and policies upon submission.")
+                .policyEvidence("Digital Copyright Liability Agreement accepted upon course submission at " + course.getSubmittedAt())
                 .build();
     }
 
@@ -83,8 +87,8 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException("MSG-COM-001", "Course not found"));
 
-        if (course.getStatus() != CourseStatus.SUBMITTED) {
-            throw new BusinessException("MSG-COM-004", "Course is not in SUBMITTED state");
+        if (course.getStatus() != CourseStatus.PENDING) {
+            throw new BusinessException("MSG-COM-004", "Course is not in PENDING state");
         }
 
         CourseStatus oldStatus = course.getStatus();
@@ -142,7 +146,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
 
         // Create Notification
         Notification notification = Notification.builder()
-                .recipientUserId(course.getTeacher().getId())
+                .recipientUserId(course.getTeacher().getUser().getId())
                 .title("Course Review Update")
                 .message(notificationMessage)
                 .notificationType("COURSE_APPROVAL")

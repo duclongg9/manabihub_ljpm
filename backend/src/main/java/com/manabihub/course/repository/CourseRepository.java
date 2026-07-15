@@ -18,7 +18,7 @@ public interface CourseRepository extends JpaRepository<Course, UUID> {
 
         Optional<Course> findByIdAndTeacher_IdAndStatus(UUID id, UUID teacherId, CourseStatus status);
 
-        List<Course> findAllByStatusOrderBySubmittedAtDesc(CourseStatus status);
+        List<Course> findAllByStatusInOrderBySubmittedAtDesc(java.util.Collection<CourseStatus> statuses);
 
         @org.springframework.data.jpa.repository.Query(value = "SELECT COUNT(*) FROM lesson_blocks lb " +
                         "JOIN lessons l ON lb.lesson_id = l.id " +
