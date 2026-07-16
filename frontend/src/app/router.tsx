@@ -10,15 +10,18 @@ import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
 import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
 import StudentProfilePage from '../features/profile/StudentProfilePage';
 import TeacherProfilePage from '../features/profile/TeacherProfilePage';
+import { CourseBuilderPage } from '../features/course-builder/pages/CourseBuilderPage';
 import { CourseDraftPage } from '../features/course-builder/pages/CourseDraftPage';
 import { TeacherCoursesPage } from '../features/course-builder/pages/TeacherCoursesPage';
 import { CourseApprovalQueuePage } from '../features/admin-course-approval/pages/CourseApprovalQueuePage';
 import { CourseApprovalDetailPage } from '../features/admin-course-approval/pages/CourseApprovalDetailPage';
+import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
+import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
 
 export const router = createBrowserRouter([
   {
@@ -51,8 +54,16 @@ export const router = createBrowserRouter([
         element: <div>Course Catalog Placeholder</div>,
       },
       {
+        path: 'courses/:id',
+        element: <div>Course Detail Placeholder</div>,
+      },
+      {
         path: 'register',
         element: <div>Register Page Placeholder</div>,
+      },
+      {
+        path: 'about',
+        element: <AboutUsPage />,
       },
     ],
   },
@@ -105,6 +116,14 @@ export const router = createBrowserRouter([
       {
         path: 'courses/new',
         element: <CourseDraftPage />,
+      },
+      {
+        path: 'courses/:draftId/builder',
+        element: <CourseBuilderPage />,
+      },
+      {
+        path: 'courses/:courseId/final-test',
+        element: <FinalTestConfigPage />,
       },
       {
         path: 'profile',

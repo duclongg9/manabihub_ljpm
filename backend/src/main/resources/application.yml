@@ -6,7 +6,7 @@ spring:
       max-file-size: 5MB
       max-request-size: 28MB
   profiles:
-    active: local
+    default: local
   jpa:
     open-in-view: false
     properties:

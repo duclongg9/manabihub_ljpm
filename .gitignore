@@ -18,6 +18,7 @@ replay_pid*
 backend/target/
 frontend/dist/
 frontend/node_modules/
+/node_modules/
 
 # Local/temp workspace files
 tmp/

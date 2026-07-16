@@ -53,10 +53,10 @@ export const FeaturesSection: React.FC = () => {
     <Box ref={sectionRef} sx={{ py: 12, bgcolor: '#ffffff', perspective: '1000px' }}>
       <Container maxWidth="lg">
         <Typography variant="h3" sx={{ fontWeight: 800, color: '#0f172a', textAlign: 'center', mb: 2 }}>
-          Lý do chọn chúng tôi
+          {'Lý do chọn chúng tôi'}
         </Typography>
         <Typography variant="h6" sx={{ color: '#64748b', textAlign: 'center', mb: 8, fontWeight: 400 }}>
-          Tại sao bạn nên đồng hành cùng ManabiHub
+          {'Tại sao bạn nên đồng hành cùng ManabiHub'}
         </Typography>
 
         <Grid container spacing={4}>

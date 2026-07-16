@@ -1,13 +1,72 @@
 server:
-  port: ${PORT:5000} # Elastic Beanstalk usually defaults to 5000
+  port: ${PORT:5000}
+  forward-headers-strategy: framework
+  shutdown: graceful
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    driver-class-name: org.postgresql.Driver
+    # Keep real connection values in Elastic Beanstalk environment properties.
+    # Defaults only exist so local prod smoke tests fail predictably.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${RDS_HOSTNAME:${DB_HOST:127.0.0.1}}:${RDS_PORT:${DB_PORT:5432}}/${RDS_DB_NAME:${DB_NAME:manabihub}}}
+    username: ${RDS_USERNAME:${DB_USERNAME:manabihub}}
+    password: ${RDS_PASSWORD:${DB_PASSWORD:}}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    hikari:
+      connection-timeout: 10000
+      validation-timeout: 3000
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:10}
+      minimum-idle: ${DB_MIN_IDLE:2}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
+  flyway:
+    enabled: true
+    validate-on-migrate: true
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: profile, email
+        provider:
+          google:
+            issuer-uri: https://accounts.google.com
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    mail:
+      enabled: false
+
+manabihub:
+  security:
+    mock-jwt: false
+
+jwt:
+  secret: ${JWT_SECRET}
+
+app:
+  frontend:
+    onboarding-url: ${FRONTEND_BASE_URL}/onboarding/student
+    success-url: ${FRONTEND_BASE_URL}/auth/callback

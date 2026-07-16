@@ -1,75 +1,152 @@
 import React from 'react';
-import { Box, Container, Grid, Typography, Stack, Divider } from '@mui/material';
+import { Box, Container, Grid, Typography, Stack, Divider, IconButton } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../shared/constants/routes';
+
+const FooterLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => (
+  <Typography
+    variant="body2"
+    component={Link}
+    to={to}
+    sx={{
+      color: '#94a3b8',
+      textDecoration: 'none',
+      display: 'inline-block',
+      transition: 'all 0.3s ease',
+      position: 'relative',
+      '&::after': {
+        content: '""',
+        position: 'absolute',
+        width: '0',
+        height: '1px',
+        bottom: '-2px',
+        left: 0,
+        backgroundColor: '#3b82f6',
+        transition: 'width 0.3s ease',
+      },
+      '&:hover': {
+        color: '#ffffff',
+        transform: 'translateX(4px)',
+        '&::after': {
+          width: '100%',
+        }
+      }
+    }}
+  >
+    {children}
+  </Typography>
+);
 
 export const LandingFooter: React.FC = () => {
   return (
-    <Box sx={{ bgcolor: '#ffffff', pt: 8, pb: 4, borderTop: '1px solid #f1f5f9' }}>
-      <Container maxWidth="lg">
-        <Grid container spacing={4} sx={{ mb: 6 }}>
+    <Box sx={{ bgcolor: '#0b1120', pt: { xs: 10, md: 14 }, pb: 6, borderTop: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
+      {/* Background Glow Effects */}
+      <Box sx={{ position: 'absolute', top: '-20%', left: '-10%', width: '40%', height: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
+      <Box sx={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '30%', height: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.05) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
+
+      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+        <Grid container spacing={8} sx={{ mb: 10 }}>
           {/* Logo & Description */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <Box sx={{ width: 32, height: 32, bgcolor: '#3b82f6', borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <MenuBookIcon sx={{ fontSize: 20, color: 'white' }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+              <Box
+                sx={{
+                  width: 40, height: 40,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  borderRadius: 2,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)'
+                }}
+              >
+                <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
               </Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', letterSpacing: '-0.5px' }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#ffffff', letterSpacing: '-0.5px' }}>
                 ManabiHub
               </Typography>
             </Box>
-            <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.6, pr: { md: 4 } }}>
-              Nền tảng học tiếng Nhật trực tuyến hàng đầu, kết nối học viên và những giảng viên xuất sắc nhất.
+            <Typography variant="body1" sx={{ color: '#94a3b8', lineHeight: 1.8, pr: { md: 4 }, mb: 4, fontWeight: 300 }}>
+              Nền tảng học tiếng Nhật trực tuyến hàng đầu, kết nối học viên và những chuyên gia xuất sắc nhất. Chinh phục JLPT dễ dàng hơn bao giờ hết.
             </Typography>
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              {[<FacebookIcon key="fb" />, <TwitterIcon key="tw" />, <LinkedInIcon key="in" />].map((icon, index) => (
+                <IconButton
+                  key={index}
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    color: '#cbd5e1',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      bgcolor: '#3b82f6',
+                      color: '#ffffff',
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 10px 20px rgba(59, 130, 246, 0.3)'
+                    }
+                  }}
+                >
+                  {icon}
+                </IconButton>
+              ))}
+            </Box>
           </Grid>
 
           {/* Links Column 1 */}
           <Grid size={{ xs: 12, sm: 4, md: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', mb: 2 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#ffffff', mb: 3, letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: '0.85rem' }}>
               ManabiHub
             </Typography>
-            <Stack spacing={1.5}>
-              <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', '&:hover': { color: '#3b82f6' } }}>Về chúng tôi</Typography>
-              <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', '&:hover': { color: '#3b82f6' } }}>Liên hệ</Typography>
-              <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', '&:hover': { color: '#3b82f6' } }}>Tuyển dụng</Typography>
+            <Stack spacing={2}>
+              <FooterLink to={ROUTES.PUBLIC.ABOUT}>Về chúng tôi</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.ABOUT}>Liên hệ</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.COURSE_BROWSE}>Khám phá khóa học</FooterLink>
             </Stack>
           </Grid>
 
           {/* Links Column 2 */}
           <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', mb: 2 }}>
-              Hỗ trợ
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#ffffff', mb: 3, letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: '0.85rem' }}>
+              Hỗ Trợ
             </Typography>
-            <Stack spacing={1.5}>
-              <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', '&:hover': { color: '#3b82f6' } }}>Điều khoản sử dụng</Typography>
-              <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', '&:hover': { color: '#3b82f6' } }}>Chính sách bảo mật</Typography>
-              <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', '&:hover': { color: '#3b82f6' } }}>Câu hỏi thường gặp</Typography>
+            <Stack spacing={2}>
+              <FooterLink to="#">Điều khoản sử dụng</FooterLink>
+              <FooterLink to="#">Chính sách bảo mật</FooterLink>
+              <FooterLink to="#">Câu hỏi thường gặp</FooterLink>
             </Stack>
           </Grid>
 
           {/* Links Column 3 */}
           <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', mb: 2 }}>
-              Giảng dạy
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#ffffff', mb: 3, letterSpacing: '0.5px', textTransform: 'uppercase', fontSize: '0.85rem' }}>
+              Giảng Dạy
             </Typography>
-            <Stack spacing={1.5}>
-              <Typography variant="body2" component={Link} to="/teacher/kyc" sx={{ color: '#64748b', textDecoration: 'none', '&:hover': { color: '#3b82f6' } }}>Trở thành giảng viên</Typography>
-              <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', '&:hover': { color: '#3b82f6' } }}>Quy định giảng viên</Typography>
-              <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', '&:hover': { color: '#3b82f6' } }}>Chính sách chia sẻ doanh thu</Typography>
+            <Stack spacing={2}>
+              <FooterLink to={ROUTES.TEACHER.KYC}>Trở thành giảng viên</FooterLink>
+              <FooterLink to="#">Quy định giảng viên</FooterLink>
+              <FooterLink to="#">Chia sẻ doanh thu (lên đến 97%)</FooterLink>
             </Stack>
           </Grid>
         </Grid>
 
-        <Divider sx={{ mb: 3 }} />
+        <Divider sx={{ mb: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
 
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+          <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 300 }}>
             © {new Date().getFullYear()} ManabiHub. All rights reserved.
           </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Box sx={{ width: 32, height: 32, bgcolor: '#f1f5f9', borderRadius: '50%' }} />
-            <Box sx={{ width: 32, height: 32, bgcolor: '#f1f5f9', borderRadius: '50%' }} />
-            <Box sx={{ width: 32, height: 32, bgcolor: '#f1f5f9', borderRadius: '50%' }} />
+          <Box sx={{ display: 'flex', gap: 3 }}>
+            <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.3s', '&:hover': { color: '#ffffff' } }}>
+              Privacy
+            </Typography>
+            <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.3s', '&:hover': { color: '#ffffff' } }}>
+              Terms
+            </Typography>
+            <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.3s', '&:hover': { color: '#ffffff' } }}>
+              Sitemap
+            </Typography>
           </Box>
         </Box>
       </Container>
