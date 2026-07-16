@@ -2,6 +2,7 @@ package com.manabihub.kyc.controller;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
+import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.dto.KycCertificateSubmissionResponse;
 import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
 import com.manabihub.kyc.dto.KycIdentityVerificationResponse;
@@ -16,41 +17,34 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.UUID;
-
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/teacher/kyc")
 public class TeacherKycController {
 
-    private static final UUID DEMO_TEACHER_USER_ID = UUID.fromString("d0000000-0000-0000-0000-000000000003");
-
     private final TeacherKycService teacherKycService;
+    private final CurrentUserService currentUserService;
 
     @GetMapping("/status")
-    public ResponseEntity<ApiResponse<KycStatusResponse>> getStatus(
-            @RequestHeader(value = "X-Demo-User-Id", required = false) UUID userId
-    ) {
-        KycStatusResponse response = teacherKycService.getStatus(resolveUserId(userId));
+    public ResponseEntity<ApiResponse<KycStatusResponse>> getStatus() {
+        KycStatusResponse response = teacherKycService.getStatus(currentUserService.getCurrentUserId());
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping(value = "/identity-verifications", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<KycIdentityVerificationResponse>> verifyIdentity(
-            @RequestHeader(value = "X-Demo-User-Id", required = false) UUID userId,
             @RequestBody KycIdentityVerificationRequest payload,
             HttpServletRequest request
     ) {
         KycIdentityVerificationResponse response = teacherKycService.verifyIdentity(
-                resolveUserId(userId),
+                currentUserService.getCurrentUserId(),
                 payload,
                 request.getRemoteAddr(),
                 request.getHeader("User-Agent")
@@ -65,11 +59,10 @@ public class TeacherKycController {
 
     @PostMapping("/restart-verification")
     public ResponseEntity<ApiResponse<KycRestartVerificationResponse>> restartVerification(
-            @RequestHeader(value = "X-Demo-User-Id", required = false) UUID userId,
             HttpServletRequest request
     ) {
         KycRestartVerificationResponse response = teacherKycService.restartVerification(
-                resolveUserId(userId),
+                currentUserService.getCurrentUserId(),
                 request.getRemoteAddr(),
                 request.getHeader("User-Agent")
         );
@@ -83,14 +76,13 @@ public class TeacherKycController {
 
     @PostMapping(value = "/certificate-submissions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<KycCertificateSubmissionResponse>> submitCertificate(
-            @RequestHeader(value = "X-Demo-User-Id", required = false) UUID userId,
             @RequestPart("certificate") MultipartFile certificate,
             @RequestParam("copyrightAgreementAccepted") boolean copyrightAgreementAccepted,
             @RequestParam("certificateCode") String certificateCode,
             HttpServletRequest request
     ) {
         KycCertificateSubmissionResponse response = teacherKycService.submitCertificate(
-                resolveUserId(userId),
+                currentUserService.getCurrentUserId(),
                 certificate,
                 certificateCode,
                 copyrightAgreementAccepted,
@@ -103,9 +95,5 @@ public class TeacherKycController {
                 "Certificate submitted successfully. KYC is waiting for registry matching.",
                 response
         ));
-    }
-
-    private UUID resolveUserId(UUID userId) {
-        return userId == null ? DEMO_TEACHER_USER_ID : userId;
     }
 }
