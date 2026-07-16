@@ -29,7 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ menuItems, open, onClose, vari
       const payloadBase64 = token.split('.')[1];
       const decodedPayload = JSON.parse(atob(payloadBase64));
       return decodedPayload.role;
-    } catch (e) {
+    } catch {
       return null;
     }
   }, []);

@@ -28,7 +28,7 @@ export const BestSellingCourses: React.FC = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const itemsToShow = 3; 
+  const itemsToShow = 3;
   const maxIndex = COURSES.length - itemsToShow;
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export const BestSellingCourses: React.FC = () => {
   return (
     <Box ref={sectionRef} sx={{ py: 10, bgcolor: '#f8fafc', perspective: '1500px' }}>
       <Container maxWidth="xl" sx={{ px: { xs: 3, md: 6 } }}>
-        
+
         {/* Header Block */}
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'flex-end' }, mb: 5 }}>
           <Box>
@@ -72,7 +72,7 @@ export const BestSellingCourses: React.FC = () => {
               Các Khóa Học Phổ Biến
             </Typography>
           </Box>
-          
+
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mt: { xs: 3, md: 0 } }}>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <IconButton onClick={handlePrev} sx={{ border: '1px solid #e2e8f0', bgcolor: '#ffffff', '&:hover': { bgcolor: '#f1f5f9' } }}>
@@ -82,15 +82,15 @@ export const BestSellingCourses: React.FC = () => {
                 <KeyboardArrowRightIcon />
               </IconButton>
             </Box>
-            
-            <Button 
-              variant="contained" 
+
+            <Button
+              variant="contained"
               endIcon={<ArrowForwardIcon />}
               onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
-              sx={{ 
-                bgcolor: '#2563eb', 
-                py: 1.5, 
-                px: 3, 
+              sx={{
+                bgcolor: '#2563eb',
+                py: 1.5,
+                px: 3,
                 fontWeight: 600,
                 borderRadius: 1,
                 boxShadow: 'none',
@@ -107,9 +107,9 @@ export const BestSellingCourses: React.FC = () => {
         </Box>
 
         {/* Slider Block */}
-        <Box 
-          sx={{ 
-            width: '100%', 
+        <Box
+          sx={{
+            width: '100%',
             overflow: 'hidden',
             position: 'relative',
             opacity: isVisible ? 1 : 0,
@@ -117,18 +117,18 @@ export const BestSellingCourses: React.FC = () => {
             transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         >
-          <Box 
-            sx={{ 
-              display: 'flex', 
+          <Box
+            sx={{
+              display: 'flex',
               transition: 'transform 0.5s ease-in-out',
               transform: `translateX(-${currentIndex * (100 / itemsToShow)}%)`,
             }}
           >
             {COURSES.map((course) => (
-              <Box 
-                key={course.id} 
-                sx={{ 
-                  minWidth: { xs: '100%', sm: '50%', md: `${100 / itemsToShow}%` }, 
+              <Box
+                key={course.id}
+                sx={{
+                  minWidth: { xs: '100%', sm: '50%', md: `${100 / itemsToShow}%` },
                   px: 2, // Gutter between cards
                   display: 'flex',
                   justifyContent: 'center'
@@ -159,23 +159,23 @@ export const BestSellingCourses: React.FC = () => {
                     alt={course.title}
                   />
                   <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 3 }}>
-                    <Typography 
-                      variant="h6" 
-                      sx={{ 
-                        fontWeight: 700, 
-                        color: '#0f172a', 
-                        lineHeight: 1.4, 
-                        mb: 1.5, 
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        color: '#0f172a',
+                        lineHeight: 1.4,
+                        mb: 1.5,
                         fontSize: '1.15rem',
-                        display: '-webkit-box', 
-                        WebkitLineClamp: 2, 
-                        WebkitBoxOrient: 'vertical', 
-                        overflow: 'hidden' 
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
                       }}
                     >
                       {course.title}
                     </Typography>
-                    
+
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
                       <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: '0.8rem', bgcolor: '#e2e8f0', color: '#0f172a', fontWeight: 600 }}>{course.instructor.charAt(0)}</Avatar>
                       <Typography variant="body2" sx={{ color: '#64748b' }}>

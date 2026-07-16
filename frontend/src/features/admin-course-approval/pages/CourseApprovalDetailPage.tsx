@@ -244,11 +244,11 @@ export const CourseApprovalDetailPage: React.FC = () => {
         // @ts-expect-error: TransitionComponent typing issue with React 19 and MUI v5
         TransitionComponent={SlideTransition}
       >
-        <Alert 
-          severity={feedback?.severity} 
+        <Alert
+          severity={feedback?.severity}
           onClose={() => setFeedback(null)}
           variant="filled"
-          sx={{ 
+          sx={{
             width: '100%',
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
             borderRadius: 2,

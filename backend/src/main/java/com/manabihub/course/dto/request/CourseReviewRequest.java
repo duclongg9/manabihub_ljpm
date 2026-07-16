@@ -11,9 +11,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CourseReviewRequest {
-    
+
     @NotBlank(message = "Action is required")
     private String action; // "APPROVE", "REJECT", "REQUEST_CORRECTION"
-    
+
     private String reason; // Required for REJECT and REQUEST_CORRECTION
 }

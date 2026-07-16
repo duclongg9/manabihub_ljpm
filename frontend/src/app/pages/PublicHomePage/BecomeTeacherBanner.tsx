@@ -13,7 +13,7 @@ export const BecomeTeacherBanner: React.FC = () => {
         <Typography variant="h3" sx={{ fontWeight: 800, color: '#ffffff', mb: 3, fontSize: { xs: '2rem', md: '2.5rem' } }}>
           Trở thành Giảng viên ManabiHub
         </Typography>
-        
+
         <Typography variant="h6" sx={{ color: '#cbd5e1', fontWeight: 400, mb: 1, lineHeight: 1.6, px: { md: 4 } }}>
           Chia sẻ kiến thức của bạn và tạo thu nhập thụ động. Nền tảng chia sẻ lợi nhuận hấp dẫn lên đến 40% cho mỗi khóa học được bán ra.
         </Typography>
@@ -21,16 +21,16 @@ export const BecomeTeacherBanner: React.FC = () => {
           * Tất cả giảng viên đều phải vượt qua quy trình kiểm duyệt hồ sơ (KYC) khắt khe trước khi xuất bản khóa học để đảm bảo uy tín.
         </Typography>
 
-        <Button 
-          variant="contained" 
+        <Button
+          variant="contained"
           size="large"
           onClick={() => navigate(ROUTES.TEACHER.KYC)}
           startIcon={<WorkspacePremiumIcon />}
-          sx={{ 
-            py: 1.5, px: 5, borderRadius: 2, 
-            bgcolor: '#2563eb', color: 'white', 
+          sx={{
+            py: 1.5, px: 5, borderRadius: 2,
+            bgcolor: '#2563eb', color: 'white',
             fontWeight: 700, textTransform: 'none', fontSize: '1.1rem',
-            '&:hover': { bgcolor: '#1d4ed8' } 
+            '&:hover': { bgcolor: '#1d4ed8' }
           }}
         >
           Bắt đầu giảng dạy ngay

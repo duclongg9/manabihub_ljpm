@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button, Box, Typography, Chip, TextField, MenuItem, Select,
-  FormControl, InputLabel, Pagination, Paper, Table, TableBody,
+  FormControl, Pagination, Paper, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow
 } from '@mui/material';
 import { courseApprovalService } from '../services/courseApprovalService';
