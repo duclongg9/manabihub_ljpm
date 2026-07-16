@@ -171,7 +171,7 @@ public class CourseServiceImpl implements CourseService {
             );
         }
 
-        course.setStatus(CourseStatus.SUBMITTED);
+        course.setStatus(CourseStatus.PENDING);
         course.setSubmittedAt(Instant.now());
 
         notificationService.createNotificationForRole(
@@ -189,7 +189,7 @@ public class CourseServiceImpl implements CourseService {
                 "COURSE",
                 course.getId(),
                 Map.of("status", CourseStatus.DRAFT.name()),
-                Map.of("status", CourseStatus.SUBMITTED.name()),
+                Map.of("status", CourseStatus.PENDING.name()),
                 Map.of("courseTitle", course.getTitle())
         );
     }

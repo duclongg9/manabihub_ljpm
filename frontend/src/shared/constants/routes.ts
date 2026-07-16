@@ -28,6 +28,7 @@ export const ROUTES = {
     DASHBOARD: '/admin/dashboard',
     SYSTEM_SETTINGS: '/admin/settings',
     USERS: '/admin/users',
+    TASK_QUEUE: '/admin/tasks/queue',
     COURSE_APPROVAL: '/admin/courses/approvals',
     KYC_REVIEW: '/admin/kyc',
     FINANCE: '/admin/finance',
