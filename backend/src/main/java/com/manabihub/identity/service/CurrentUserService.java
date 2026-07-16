@@ -5,12 +5,7 @@ import java.util.UUID;
 /**
  * Provides information about the currently authenticated user.
  * <p>
- * Iteration 1:
- * Returns a demo user for testing.
- * <p>
- * Future:
- * This service will obtain the current user from Spring Security
- * after Google OAuth and JWT authentication are implemented.
+ * Identity is resolved from the active Spring Security authentication.
  */
 public interface CurrentUserService {
 
@@ -18,6 +13,8 @@ public interface CurrentUserService {
      * Returns the current authenticated user's ID.
      *
      * @return current user's UUID
+     * @throws org.springframework.security.authentication.AuthenticationCredentialsNotFoundException
+     *         when no valid authenticated UUID is available
      */
     UUID getCurrentUserId();
 
