@@ -17,6 +17,7 @@ import { CourseApprovalQueuePage } from '../features/admin-course-approval/pages
 import { CourseApprovalDetailPage } from '../features/admin-course-approval/pages/CourseApprovalDetailPage';
 import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
 import { CourseDetailPage } from '../features/catalog/pages/CourseDetailPage';
+import { CourseCatalogPage } from '../features/catalog/pages/CourseCatalogPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
@@ -52,7 +53,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'courses',
-        element: <div>Course Catalog Placeholder</div>,
+        element: <CourseCatalogPage />,
       },
       {
         path: 'courses/:id',
@@ -60,7 +61,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'register',
-        element: <div>Register Page Placeholder</div>,
+        element: <Navigate to="/login" replace />,
       },
       {
         path: 'about',
