@@ -6,18 +6,18 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
 
 const SLIDER_DATA = [
-  { 
-    teacherImg: getAsset('teacher1.png'), 
+  {
+    teacherImg: getAsset('teacher1.png'),
     courseBg: getAsset('course1.png'),
     teacherName: 'Giảng viên 1'
   },
-  { 
-    teacherImg: getAsset('teacher2.png'), 
+  {
+    teacherImg: getAsset('teacher2.png'),
     courseBg: getAsset('course2.png'),
     teacherName: 'Giảng viên 2'
   },
-  { 
-    teacherImg: getAsset('teacher3.png'), 
+  {
+    teacherImg: getAsset('teacher3.png'),
     courseBg: getAsset('course3.png'),
     teacherName: 'Giảng viên 3'
   },
@@ -85,12 +85,12 @@ export const HeroSection: React.FC = () => {
 
       {/* Content overlayed on top */}
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
-        <Box 
-          sx={{ 
-            display: 'flex', 
-            flexDirection: { xs: 'column-reverse', md: 'row' }, 
-            alignItems: 'center', 
-            gap: { xs: 6, md: 4 } 
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column-reverse', md: 'row' },
+            alignItems: 'center',
+            gap: { xs: 6, md: 4 }
           }}
         >
           {/* Left Content (Text + Buttons) - 55% to give right more space */}
@@ -100,15 +100,15 @@ export const HeroSection: React.FC = () => {
               sx={{
                 animation: 'flowOut 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards',
                 '@keyframes flowOut': {
-                  '0%': { 
-                    opacity: 0, 
-                    transform: 'translateX(-100px)', 
-                    filter: 'blur(8px)' 
+                  '0%': {
+                    opacity: 0,
+                    transform: 'translateX(-100px)',
+                    filter: 'blur(8px)'
                   },
-                  '100%': { 
-                    opacity: 1, 
-                    transform: 'translateX(0)', 
-                    filter: 'blur(0)' 
+                  '100%': {
+                    opacity: 1,
+                    transform: 'translateX(0)',
+                    filter: 'blur(0)'
                   }
                 }
               }}
@@ -197,8 +197,8 @@ export const HeroSection: React.FC = () => {
           </Box>
 
           {/* Right Content (Teacher Images Slider in a Circle) - 45% */}
-          <Box 
-            sx={{ 
+          <Box
+            sx={{
               width: { xs: '100%', md: '45%' },
               display: 'flex',
               flexDirection: 'column',

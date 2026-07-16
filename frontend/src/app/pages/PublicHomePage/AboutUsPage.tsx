@@ -37,8 +37,8 @@ export const AboutUsPage: React.FC = () => {
   return (
     <Box sx={{ bgcolor: '#fafafa', minHeight: '100vh', pb: 12 }}>
       {/* Hero Section with Premium Background Image */}
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           backgroundImage: `linear-gradient(to right, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.7) 100%), url(${getAsset('hero.png')})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -54,11 +54,11 @@ export const AboutUsPage: React.FC = () => {
         <Box sx={{ position: 'absolute', bottom: '-20%', left: '-10%', width: '40%', height: '100%', background: 'radial-gradient(circle, rgba(16,185,129,0.1) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
 
         <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-          <Typography 
-            variant="h1" 
-            sx={{ 
-              fontWeight: 900, 
-              color: '#ffffff', 
+          <Typography
+            variant="h1"
+            sx={{
+              fontWeight: 900,
+              color: '#ffffff',
               fontSize: { xs: '3rem', md: '4.5rem' },
               letterSpacing: '-1.5px',
               mb: 3,
@@ -67,11 +67,11 @@ export const AboutUsPage: React.FC = () => {
           >
             Về Chúng Tôi
           </Typography>
-          <Typography 
-            variant="h6" 
-            sx={{ 
-              color: '#94a3b8', 
-              maxWidth: 700, 
+          <Typography
+            variant="h6"
+            sx={{
+              color: '#94a3b8',
+              maxWidth: 700,
               mx: 'auto',
               fontWeight: 400,
               lineHeight: 1.8,
@@ -88,7 +88,7 @@ export const AboutUsPage: React.FC = () => {
         <Grid container spacing={4}>
           {CONTACT_INFO.map((info, index) => (
             <Grid size={{ xs: 12, md: 4 }} key={index}>
-              <Paper 
+              <Paper
                 component="a"
                 href={info.link}
                 target={info.title === 'Trụ Sở Chính' ? '_blank' : '_self'}
@@ -121,9 +121,9 @@ export const AboutUsPage: React.FC = () => {
                   }
                 }}
               >
-                <Box 
+                <Box
                   className="icon-container"
-                  sx={{ 
+                  sx={{
                     width: 64, height: 64, borderRadius: 3, bgcolor: info.bg, color: info.color,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 4,
                     transition: 'transform 0.4s ease'
@@ -131,7 +131,7 @@ export const AboutUsPage: React.FC = () => {
                 >
                   {info.icon}
                 </Box>
-                
+
                 <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', mb: 1 }}>
                   {info.title}
                 </Typography>
@@ -159,11 +159,11 @@ export const AboutUsPage: React.FC = () => {
             Ghé thăm văn phòng của ManabiHub tại khuôn viên Đại học FPT, nơi nuôi dưỡng những ý tưởng sáng tạo và công nghệ đột phá.
           </Typography>
 
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 1.5, 
-              borderRadius: 6, 
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.5,
+              borderRadius: 6,
               bgcolor: '#ffffff',
               border: '1px solid rgba(0,0,0,0.05)',
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.04)',
@@ -174,22 +174,22 @@ export const AboutUsPage: React.FC = () => {
               }
             }}
           >
-            <Box 
-              sx={{ 
-                width: '100%', 
-                height: { xs: 400, md: 550 }, 
-                borderRadius: 5, 
+            <Box
+              sx={{
+                width: '100%',
+                height: { xs: 400, md: 550 },
+                borderRadius: 5,
                 overflow: 'hidden',
                 position: 'relative'
               }}
             >
-              <iframe 
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3724.485534608307!2d105.52471961540209!3d21.013249093685957!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31345b465a4e65fb%3A0xaae6040cfabe8fe!2zVHLGsOG7nW5nIMSQ4bqhaSBI4buNYyBGUFQgSMOgIE7hu5lp!5e0!3m2!1svi!2s!4v1689230554504!5m2!1svi!2s" 
-                width="100%" 
-                height="100%" 
-                style={{ border: 0 }} 
-                allowFullScreen={true} 
-                loading="lazy" 
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3724.485534608307!2d105.52471961540209!3d21.013249093685957!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31345b465a4e65fb%3A0xaae6040cfabe8fe!2zVHLGsOG7nW5nIMSQ4bqhaSBI4buNYyBGUFQgSMOgIE7hu5lp!5e0!3m2!1svi!2s!4v1689230554504!5m2!1svi!2s"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen={true}
+                loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 title="Google Map Đại học FPT"
               />

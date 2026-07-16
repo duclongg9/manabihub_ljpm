@@ -8,13 +8,13 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 
 const FooterLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => (
-  <Typography 
-    variant="body2" 
-    component={Link} 
-    to={to} 
-    sx={{ 
-      color: '#94a3b8', 
-      textDecoration: 'none', 
+  <Typography
+    variant="body2"
+    component={Link}
+    to={to}
+    sx={{
+      color: '#94a3b8',
+      textDecoration: 'none',
       display: 'inline-block',
       transition: 'all 0.3s ease',
       position: 'relative',
@@ -28,13 +28,13 @@ const FooterLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, c
         backgroundColor: '#3b82f6',
         transition: 'width 0.3s ease',
       },
-      '&:hover': { 
+      '&:hover': {
         color: '#ffffff',
         transform: 'translateX(4px)',
         '&::after': {
           width: '100%',
         }
-      } 
+      }
     }}
   >
     {children}
@@ -53,11 +53,11 @@ export const LandingFooter: React.FC = () => {
           {/* Logo & Description */}
           <Grid size={{ xs: 12, md: 4 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-              <Box 
-                sx={{ 
-                  width: 40, height: 40, 
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', 
-                  borderRadius: 2, 
+              <Box
+                sx={{
+                  width: 40, height: 40,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  borderRadius: 2,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)'
                 }}
@@ -73,10 +73,10 @@ export const LandingFooter: React.FC = () => {
             </Typography>
             <Box sx={{ display: 'flex', gap: 1.5 }}>
               {[<FacebookIcon key="fb" />, <TwitterIcon key="tw" />, <LinkedInIcon key="in" />].map((icon, index) => (
-                <IconButton 
+                <IconButton
                   key={index}
-                  sx={{ 
-                    bgcolor: 'rgba(255,255,255,0.05)', 
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.05)',
                     color: '#cbd5e1',
                     border: '1px solid rgba(255,255,255,0.1)',
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',

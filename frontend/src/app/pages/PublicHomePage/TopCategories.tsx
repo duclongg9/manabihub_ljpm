@@ -66,18 +66,18 @@ export const TopCategories: React.FC = () => {
   return (
     <Box ref={sectionRef} sx={{ py: 10, bgcolor: '#ffffff' }}>
       <Container disableGutters sx={{ maxWidth: { md: '1157px' }, px: { xs: 3, md: 0 }, margin: '0 auto' }}>
-        
+
         {/* ======================================= */}
         {/* TOP BLOCK: CATEGORIES */}
         {/* ======================================= */}
         <Box sx={{ mb: { xs: 10, md: 14 } }}>
-          
+
           {/* Header area (1133 x 164.22) */}
-          <Box 
-            sx={{ 
-              width: { md: '1133px' }, 
-              height: { md: '164.22px' }, 
-              display: 'flex', 
+          <Box
+            sx={{
+              width: { md: '1133px' },
+              height: { md: '164.22px' },
+              display: 'flex',
               flexDirection: { xs: 'column', md: 'row' },
               alignItems: { xs: 'flex-start', md: 'center' },
               justifyContent: 'space-between',
@@ -105,15 +105,15 @@ export const TopCategories: React.FC = () => {
                   <KeyboardArrowRightIcon />
                 </IconButton>
               </Box>
-              
-              <Button 
-                variant="contained" 
+
+              <Button
+                variant="contained"
                 endIcon={<ArrowForwardIcon />}
                 onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
-                sx={{ 
-                  bgcolor: '#2563eb', 
-                  py: 1.5, 
-                  px: 3, 
+                sx={{
+                  bgcolor: '#2563eb',
+                  py: 1.5,
+                  px: 3,
                   fontWeight: 600,
                   borderRadius: 1,
                   boxShadow: 'none',
@@ -130,27 +130,27 @@ export const TopCategories: React.FC = () => {
           </Box>
 
           {/* Slider area (1133 x 284.95) */}
-          <Box 
-            sx={{ 
-              width: { md: '1133px' }, 
+          <Box
+            sx={{
+              width: { md: '1133px' },
               height: { md: '284.95px' },
               overflow: 'hidden',
               position: 'relative'
             }}
           >
-            <Box 
-              sx={{ 
-                display: 'flex', 
+            <Box
+              sx={{
+                display: 'flex',
                 transition: 'transform 0.5s ease-in-out',
                 transform: `translateX(-${currentIndex * (100 / itemsToShow)}%)`,
                 height: '100%'
               }}
             >
               {CATEGORIES.map((cat, index) => (
-                <Box 
-                  key={cat.id + index} 
-                  sx={{ 
-                    minWidth: { xs: '100%', sm: '50%', md: `${100 / itemsToShow}%` }, 
+                <Box
+                  key={cat.id + index}
+                  sx={{
+                    minWidth: { xs: '100%', sm: '50%', md: `${100 / itemsToShow}%` },
                     px: 1.5,
                     height: '100%'
                   }}
@@ -175,15 +175,15 @@ export const TopCategories: React.FC = () => {
                       }
                     }}
                   >
-                    <Box sx={{ 
-                      mb: 2, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      width: 64, 
-                      height: 64, 
-                      borderRadius: '50%', 
-                      bgcolor: '#eff6ff' 
+                    <Box sx={{
+                      mb: 2,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 64,
+                      height: 64,
+                      borderRadius: '50%',
+                      bgcolor: '#eff6ff'
                     }}>
                       {cat.icon}
                     </Box>
@@ -193,12 +193,12 @@ export const TopCategories: React.FC = () => {
                     <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
                       {cat.count} Khóa học
                     </Typography>
-                    <Button 
-                      variant="contained" 
+                    <Button
+                      variant="contained"
                       fullWidth
                       endIcon={<ArrowForwardIcon fontSize="small" />}
-                      sx={{ 
-                        fontWeight: 600, 
+                      sx={{
+                        fontWeight: 600,
                         bgcolor: '#2563eb',
                         boxShadow: 'none',
                         mt: 'auto',
@@ -223,10 +223,10 @@ export const TopCategories: React.FC = () => {
         {/* BOTTOM BLOCK: INTRODUCTION              */}
         {/* ======================================= */}
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 0 }}>
-          
+
           {/* LEFT: Image (578.5 x 583.67) */}
-          <Box 
-            sx={{ 
+          <Box
+            sx={{
               width: { xs: '100%', md: '578.5px' },
               height: { xs: 'auto', md: '583.67px' },
               opacity: isVisible ? 1 : 0,
@@ -249,8 +249,8 @@ export const TopCategories: React.FC = () => {
           </Box>
 
           {/* RIGHT: Content (578.5 x 583.67) */}
-          <Box 
-            sx={{ 
+          <Box
+            sx={{
               width: { xs: '100%', md: '578.5px' },
               height: { xs: 'auto', md: '583.67px' },
               pl: { xs: 0, md: 5 },
@@ -278,7 +278,7 @@ export const TopCategories: React.FC = () => {
               Bạn muốn nâng cao kiến thức và kỹ năng của mình? Bạn muốn học những khóa học chất lượng<br />
               từ những chuyên gia hàng đầu trong ngành? Hãy ghé thăm Website Bán Khóa học của chúng tôi!
             </Typography>
-            
+
             <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.7, mb: 4 }}>
               Chúng tôi là một nền tảng học tiếng nhật trực tuyến cung cấp một loạt các khóa học<br />
               đa dạng và chất lượng, từ JLPTN1-5. Với đội ngũ giảng viên giàu kinh nghiệm và kiến thức<br />
@@ -300,8 +300,8 @@ export const TopCategories: React.FC = () => {
               />
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 {[
-                  'Được tiếp cận hơn 1000 khóa học hàng đầu', 
-                  'Các chủ đề phổ biến để tìm hiểu ngay bây giờ', 
+                  'Được tiếp cận hơn 1000 khóa học hàng đầu',
+                  'Các chủ đề phổ biến để tìm hiểu ngay bây giờ',
                   'Tìm người hướng dẫn phù hợp cho bạn'
                 ].map((item, i) => (
                   <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start' }}>
