@@ -23,6 +23,7 @@ import { PublicLoginPage } from './pages/PublicLoginPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
 import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
+import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 
 export const router = createBrowserRouter([
   {
@@ -95,6 +96,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses',
         element: <div>Student Courses Placeholder</div>,
+      },
+      {
+        path: 'courses/:courseId/lesson-blocks/:lessonBlockId/ai-chat',
+        element: <StudentAiChatPage />,
       },
     ],
   },

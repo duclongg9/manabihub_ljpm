@@ -151,6 +151,11 @@ public final class MessageCodes {
     public static final String AI_NOT_AVAILABLE = "AI_NOT_AVAILABLE";
     public static final String AI_NOT_AVAILABLE_FOR_COURSE = "AI_NOT_AVAILABLE_FOR_COURSE";
     public static final String AI_GENERATION_FAILED = "AI_GENERATION_FAILED";
+    public static final String MSG_AI_001 = "MSG-AI-001"; // AI quota or rate limit reached
+    public static final String MSG_AI_002 = "MSG-AI-002"; // AI provider temporarily unavailable
+    public static final String MSG_AI_005 = "MSG-AI-005"; // Unsafe or out-of-scope AI request
+    public static final String MSG_AI_007 = "MSG-AI-007"; // AI content is non-official guidance
+    public static final String MSG_AI_008 = "MSG-AI-008"; // AI is unavailable for this course or request
 
     // ──────────────────────────────────────────────
     // PAYMENT — payment processing

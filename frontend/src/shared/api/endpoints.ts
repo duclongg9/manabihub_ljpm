@@ -25,6 +25,12 @@ export const ENDPOINTS = {
     student: '/v1/student/profile',
     teacher: '/v1/teacher/profile',
   },
+  studentAiChat: {
+    eligibility: (courseId: string, lessonBlockId: string) =>
+      `/v1/student/courses/${courseId}/lesson-blocks/${lessonBlockId}/ai-chat/eligibility`,
+    messages: (courseId: string, lessonBlockId: string) =>
+      `/v1/student/courses/${courseId}/lesson-blocks/${lessonBlockId}/ai-chat/messages`,
+  },
   teacherCourses: {
     drafts: '/v1/teacher/courses/drafts',
     draftDetail: (id: string) => `/v1/teacher/courses/drafts/${id}`,

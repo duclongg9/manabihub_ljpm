@@ -31,3 +31,14 @@ management:
   endpoint:
     health:
       show-details: always
+
+manabihub:
+  ai:
+    chat:
+      base-url: ${AI_CHAT_PROVIDER_BASE_URL:}
+      endpoint: ${AI_CHAT_PROVIDER_ENDPOINT:/v1/chat/completions}
+      api-key: ${AI_CHAT_PROVIDER_API_KEY:}
+      model: ${AI_CHAT_PROVIDER_MODEL:gpt-4o-mini}
+      rate-limit-per-minute: ${AI_CHAT_RATE_LIMIT_PER_MINUTE:10}
+      daily-limit: ${AI_CHAT_DAILY_LIMIT:50}
+      timeout-seconds: ${AI_CHAT_TIMEOUT_SECONDS:20}

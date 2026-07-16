@@ -1,6 +1,7 @@
 package com.manabihub;
 
 import com.manabihub.audit.repository.AuditLogRepository;
+import com.manabihub.ai.repository.AiUsageLogRepository;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseModuleRepository;
 import com.manabihub.course.repository.CourseRepository;
@@ -24,6 +25,7 @@ import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.course.repository.CourseApprovalDecisionRepository;
+import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -110,6 +112,12 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private FinalTestRepository finalTestRepository;
+
+    @MockBean
+    private AiUsageLogRepository aiUsageLogRepository;
+
+    @MockBean
+    private SystemSettingRepository systemSettingRepository;
 
     @Test
     void contextLoads() {
