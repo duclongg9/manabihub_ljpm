@@ -17,4 +17,6 @@ public interface CourseService {
     void deleteDraft(UUID draftId);
 
     void submitForReview(UUID draftId);
+
+    com.manabihub.course.dto.response.PublicCourseDetailResponse getPublicCourseDetail(String identifier);
 }

@@ -71,6 +71,7 @@ public class SecurityConfig {
                                 "/api/v1/demo/**",
                                 "/api/v1/mock/**",
                                 "/api/v1/course-categories",
+                                "/api/v1/public/courses/**",
                                 "/api/v1/teacher/kyc/**",
                                 "/api/v1/teacher/courses/**",
                                 "/uploads/course-thumbnails/**",
