@@ -10,6 +10,8 @@ import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.CourseService;
+import com.manabihub.course.service.CourseValidationService;
+import com.manabihub.course.dto.response.ValidationResultResponse;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -19,6 +21,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import com.manabihub.audit.service.AuditLogService;
+import com.manabihub.notification.service.NotificationService;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -46,6 +50,9 @@ public class CourseServiceImpl implements CourseService {
     private final CourseCategoryRepository courseCategoryRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final CurrentUserService currentUserService;
+    private final CourseValidationService courseValidationService;
+    private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -118,6 +125,7 @@ public class CourseServiceImpl implements CourseService {
         course.setPrerequisites(trim(request.prerequisites()));
         course.setTargetStudents(trim(request.targetStudents()));
         course.getLearningGoals().clear();
+        courseRepository.saveAndFlush(course);
 
         for (int index = 0; index < learningGoals.size(); index++) {
             course.addLearningGoal(learningGoals.get(index), index + 1);
@@ -133,6 +141,52 @@ public class CourseServiceImpl implements CourseService {
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
 
         courseRepository.delete(course);
+    }
+
+    @Override
+    public void submitForReview(UUID draftId) {
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
+
+        if (course.getStatus() != CourseStatus.DRAFT && course.getStatus() != CourseStatus.REJECTED && course.getStatus() != CourseStatus.FORCED_DRAFT) {
+            throw new BusinessException(
+                    com.manabihub.common.constants.MessageCodes.COMMON_BAD_REQUEST,
+                    "Không thể gửi duyệt khóa học ở trạng thái hiện tại.",
+                    org.springframework.http.HttpStatus.BAD_REQUEST
+            );
+        }
+
+        ValidationResultResponse validationResult = courseValidationService.validateCourse(draftId);
+        if (!validationResult.isValid()) {
+            throw new com.manabihub.common.exception.ValidationBusinessException(
+                    "MSG-COURSE-004",
+                    "Sản phẩm chưa đáp ứng điều kiện gửi duyệt.",
+                    validationResult.errors()
+            );
+        }
+
+        course.setStatus(CourseStatus.SUBMITTED);
+        course.setSubmittedAt(Instant.now());
+
+        notificationService.createNotificationForRole(
+                "ADMIN",
+                "Course submitted for review",
+                "Teacher submitted course \"" + course.getTitle() + "\" for review.",
+                "COURSE_REVIEW",
+                "/admin/courses/" + course.getId()
+        );
+
+        auditLogService.logUserAction(
+                currentUserId,
+                "TEACHER",
+                "SUBMIT_COURSE",
+                "COURSE",
+                course.getId(),
+                Map.of("status", CourseStatus.DRAFT.name()),
+                Map.of("status", CourseStatus.SUBMITTED.name()),
+                Map.of("courseTitle", course.getTitle())
+        );
     }
 
     private TeacherProfile resolveApprovedTeacher(UUID userId) {
@@ -280,11 +334,27 @@ public class CourseServiceImpl implements CourseService {
     private Map<String, Object> srsTrace() {
         return Map.of(
                 "uc", "UC-23",
-                "br", List.of("BR-COURSE", "BR-GOAL", "BR-KYC"),
+                "br", List.of(
+                        "BR-PROD-04",
+                        "BR-PROD-05",
+                        "BR-GOAL-01",
+                        "BR-GOAL-02",
+                        "BR-GOAL-03",
+                        "BR-GOAL-04",
+                        "BR-GOAL-05",
+                        "BR-COURSE-01",
+                        "BR-COURSE-03",
+                        "BR-COURSE-04",
+                        "BR-COURSE-05"
+                ),
                 "msg", List.of(
                         MessageCodes.MSG_COURSE_001,
+                        MessageCodes.MSG_COURSE_003,
+                        MessageCodes.MSG_COURSE_004,
                         MessageCodes.MSG_GOAL_001,
                         MessageCodes.MSG_GOAL_002,
+                        MessageCodes.MSG_GOAL_003,
+                        MessageCodes.MSG_GOAL_004,
                         MessageCodes.MSG_KYC_010
                 )
         );

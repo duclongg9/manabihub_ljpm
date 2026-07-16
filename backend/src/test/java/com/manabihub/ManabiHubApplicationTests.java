@@ -2,7 +2,10 @@ package com.manabihub;
 
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.course.repository.CourseCategoryRepository;
+import com.manabihub.course.repository.CourseModuleRepository;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.repository.LessonBlockRepository;
+import com.manabihub.finaltest.repository.FinalTestRepository;
 import com.manabihub.identity.mapper.StudentProfileMapper;
 import com.manabihub.identity.mapper.TeacherProfileMapper;
 import com.manabihub.identity.repository.AppUserRepository;
@@ -94,6 +97,15 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private CourseCategoryRepository courseCategoryRepository;
+
+    @MockBean
+    private CourseModuleRepository courseModuleRepository;
+
+    @MockBean
+    private LessonBlockRepository lessonBlockRepository;
+
+    @MockBean
+    private FinalTestRepository finalTestRepository;
 
     @Test
     void contextLoads() {

@@ -15,4 +15,6 @@ public interface CourseService {
     CourseDraftResponse updateDraft(UUID draftId, CreateCourseDraftRequest request);
 
     void deleteDraft(UUID draftId);
+
+    void submitForReview(UUID draftId);
 }

@@ -23,6 +23,15 @@ export const ENDPOINTS = {
   teacherCourses: {
     drafts: '/v1/teacher/courses/drafts',
     draftDetail: (id: string) => `/v1/teacher/courses/drafts/${id}`,
+    builder: (id: string) => `/v1/teacher/courses/drafts/${id}/builder`,
+    builderModules: (id: string) => `/v1/teacher/courses/drafts/${id}/builder/modules`,
+    builderModuleDetail: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}`,
+    builderModuleOrder: (id: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/order`,
+    builderBlocks: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks`,
+    builderBlockDetail: (id: string, moduleId: string, blockId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/${blockId}`,
+    builderBlockOrder: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/order`,
+    validate: (id: string) => `/v1/teacher/courses/drafts/${id}/validate`,
+    submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`
   },
   teacherCourseAssets: {
     thumbnails: '/v1/teacher/courses/assets/thumbnails',

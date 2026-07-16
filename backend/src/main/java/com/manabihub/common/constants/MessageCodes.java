@@ -92,16 +92,32 @@ public final class MessageCodes {
     public static final String COURSE_NOT_EDITABLE = "COURSE_NOT_EDITABLE";
     public static final String COURSE_NOT_PUBLISHED = "COURSE_NOT_PUBLISHED";
     public static final String COURSE_ALREADY_PUBLISHED = "COURSE_ALREADY_PUBLISHED";
+    public static final String MSG_PROD_001 = "MSG-PROD-001";
+    public static final String MSG_PROD_002 = "MSG-PROD-002";
     public static final String MSG_COURSE_001 = "MSG-COURSE-001";
     public static final String MSG_COURSE_002 = "MSG-COURSE-002";
     public static final String MSG_COURSE_003 = "MSG-COURSE-003";
     public static final String MSG_COURSE_004 = "MSG-COURSE-004";
     public static final String MSG_COURSE_005 = "MSG-COURSE-005";
+    public static final String MSG_COURSE_006 = "MSG-COURSE-006";
+    public static final String MSG_COURSE_007 = "MSG-COURSE-007";
+    public static final String MSG_COURSE_008 = "MSG-COURSE-008";
+    public static final String MSG_COURSE_009 = "MSG-COURSE-009";
+    public static final String MSG_COURSE_010 = "MSG-COURSE-010";
+    public static final String MSG_COURSE_011 = "MSG-COURSE-011";
+    public static final String MSG_COURSE_012 = "MSG-COURSE-012";
+    public static final String MSG_COURSE_013 = "MSG-COURSE-013";
+    public static final String MSG_COURSE_014 = "MSG-COURSE-014";
+    public static final String MSG_COURSE_015 = "MSG-COURSE-015";
+    public static final String MSG_COURSE_016 = "MSG-COURSE-016";
+    public static final String MSG_COURSE_017 = "MSG-COURSE-017";
+    public static final String MSG_COURSE_018 = "MSG-COURSE-018";
+    public static final String MSG_COURSE_019 = "MSG-COURSE-019";
     public static final String MSG_GOAL_001 = "MSG-GOAL-001";
     public static final String MSG_GOAL_002 = "MSG-GOAL-002";
     public static final String MSG_GOAL_003 = "MSG-GOAL-003";
     public static final String MSG_GOAL_004 = "MSG-GOAL-004";
-
+    public static final String MSG_WRITE_005 = "MSG-WRITE-005";
     // ──────────────────────────────────────────────
     // CONTENT — lesson / content management
     // ──────────────────────────────────────────────
@@ -116,6 +132,10 @@ public final class MessageCodes {
     public static final String FINAL_TEST_NOT_FOUND = "FINAL_TEST_NOT_FOUND";
     public static final String FINAL_TEST_CREATED = "FINAL_TEST_CREATED";
     public static final String FINAL_TEST_ALREADY_PASSED = "FINAL_TEST_ALREADY_PASSED";
+    public static final String MSG_FTEST_001 = "MSG-FTEST-001";
+    public static final String MSG_FTEST_002 = "MSG-FTEST-002";
+    public static final String MSG_FTEST_003 = "MSG-FTEST-003";
+    public static final String MSG_FTEST_004 = "MSG-FTEST-004";
 
     // ──────────────────────────────────────────────
     // LEARNING — student learning progress

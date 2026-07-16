@@ -55,6 +55,17 @@ CI runs automatically via GitHub Actions (`.github/workflows/ci.yml`).
 
 Jobs run in parallel. No database is required - backend tests exclude DataSource auto-configuration.
 
+## AWS Deployment
+
+Build the Elastic Beanstalk source bundle with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build-eb-bundle.ps1
+```
+
+See [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md) for the RDS, Beanstalk,
+CloudFront, and Amplify configuration.
+
 ### Branch Naming
 
 Feature branches must include the Jira issue key:

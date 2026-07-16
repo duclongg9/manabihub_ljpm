@@ -4,6 +4,7 @@ import { ENDPOINTS } from '../../../shared/api/endpoints';
 
 export type JlptLevel = 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
 export type CourseStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'FORCED_DRAFT' | 'ARCHIVED';
+export type LessonBlockType = 'VIDEO' | 'TEXT' | 'QUIZ' | 'FLASHCARD' | 'WRITING';
 
 export interface CreateCourseDraftPayload {
   title: string;
@@ -52,6 +53,75 @@ export interface CourseThumbnailUploadResponse {
   size: number;
 }
 
+export interface CourseModulePayload {
+  title: string;
+  description?: string | null;
+}
+
+export interface FlashcardItemPayload {
+  front: string;
+  back: string;
+}
+
+export interface QuizQuestionPayload {
+  question: string;
+  options: string[];
+  answer: string;
+}
+
+export interface LessonBlockPayload {
+  type: LessonBlockType;
+  title: string;
+  content?: string | null;
+  videoUrl?: string | null;
+  durationMinutes?: number | null;
+  quizQuestion?: string | null;
+  quizOptions?: string[] | null;
+  quizAnswer?: string | null;
+  quizItems?: QuizQuestionPayload[] | null;
+  flashcards?: FlashcardItemPayload[] | null;
+  writingPrompt?: string | null;
+  rubric?: string | null;
+}
+
+export interface LessonBlockResponse extends LessonBlockPayload {
+  id: string;
+  orderIndex: number;
+  interactionRequiredAfter: boolean;
+  interactionSatisfied: boolean;
+  validationMessage?: string | null;
+  quizOptions: string[];
+  quizItems: QuizQuestionPayload[];
+  flashcards: FlashcardItemPayload[];
+}
+
+export interface CourseModuleResponse {
+  id: string;
+  title: string;
+  description?: string | null;
+  orderIndex: number;
+  blocks: LessonBlockResponse[];
+}
+
+export interface CourseBuilderResponse {
+  draftId: string;
+  courseTitle: string;
+  modules: CourseModuleResponse[];
+  validationWarnings: string[];
+  srsTrace: Record<string, unknown>;
+}
+
+export interface ValidationError {
+  code: string;
+  message: string;
+  severity: string;
+}
+
+export interface ValidationResultResponse {
+  isValid: boolean;
+  errors: ValidationError[];
+}
+
 interface ApiResponse<T> {
   success: boolean;
   messageCode?: string;
@@ -85,6 +155,97 @@ export async function fetchCourseDrafts() {
 
 export async function deleteCourseDraft(id: string) {
   await axiosClient.delete<ApiResponse<void>>(ENDPOINTS.teacherCourses.draftDetail(id));
+}
+
+export async function submitCourseForReview(draftId: string) {
+  await axiosClient.post<ApiResponse<void>>(
+      ENDPOINTS.teacherCourses.submitReview(draftId),
+  );
+}
+
+export async function fetchCourseBuilder(draftId: string) {
+  const response = await axiosClient.get<ApiResponse<CourseBuilderResponse>>(ENDPOINTS.teacherCourses.builder(draftId));
+
+  return response.data.data;
+}
+
+export async function validateCourseDraft(draftId: string) {
+  const response =
+      await axiosClient.get<ApiResponse<ValidationResultResponse>>(
+          ENDPOINTS.teacherCourses.validate(draftId),
+      );
+
+  return response.data.data;
+}
+
+export async function createCourseModule(draftId: string, payload: CourseModulePayload) {
+  const response = await axiosClient.post<ApiResponse<CourseBuilderResponse>>(
+    ENDPOINTS.teacherCourses.builderModules(draftId),
+    payload,
+  );
+
+  return response.data.data;
+}
+
+export async function updateCourseModule(draftId: string, moduleId: string, payload: CourseModulePayload) {
+  const response = await axiosClient.put<ApiResponse<CourseBuilderResponse>>(
+    ENDPOINTS.teacherCourses.builderModuleDetail(draftId, moduleId),
+    payload,
+  );
+
+  return response.data.data;
+}
+
+export async function deleteCourseModule(draftId: string, moduleId: string) {
+  const response = await axiosClient.delete<ApiResponse<CourseBuilderResponse>>(
+    ENDPOINTS.teacherCourses.builderModuleDetail(draftId, moduleId),
+  );
+
+  return response.data.data;
+}
+
+export async function reorderCourseModules(draftId: string, orderedIds: string[]) {
+  const response = await axiosClient.put<ApiResponse<CourseBuilderResponse>>(
+    ENDPOINTS.teacherCourses.builderModuleOrder(draftId),
+    { orderedIds },
+  );
+
+  return response.data.data;
+}
+
+export async function createLessonBlock(draftId: string, moduleId: string, payload: LessonBlockPayload) {
+  const response = await axiosClient.post<ApiResponse<CourseBuilderResponse>>(
+    ENDPOINTS.teacherCourses.builderBlocks(draftId, moduleId),
+    payload,
+  );
+
+  return response.data.data;
+}
+
+export async function updateLessonBlock(draftId: string, moduleId: string, blockId: string, payload: LessonBlockPayload) {
+  const response = await axiosClient.put<ApiResponse<CourseBuilderResponse>>(
+    ENDPOINTS.teacherCourses.builderBlockDetail(draftId, moduleId, blockId),
+    payload,
+  );
+
+  return response.data.data;
+}
+
+export async function deleteLessonBlock(draftId: string, moduleId: string, blockId: string) {
+  const response = await axiosClient.delete<ApiResponse<CourseBuilderResponse>>(
+    ENDPOINTS.teacherCourses.builderBlockDetail(draftId, moduleId, blockId),
+  );
+
+  return response.data.data;
+}
+
+export async function reorderLessonBlocks(draftId: string, moduleId: string, orderedIds: string[]) {
+  const response = await axiosClient.put<ApiResponse<CourseBuilderResponse>>(
+    ENDPOINTS.teacherCourses.builderBlockOrder(draftId, moduleId),
+    { orderedIds },
+  );
+
+  return response.data.data;
 }
 
 export async function fetchCourseCategories() {
