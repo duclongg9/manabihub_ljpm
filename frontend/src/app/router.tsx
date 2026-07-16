@@ -8,6 +8,8 @@ import { NotificationsPage } from '../features/notifications/pages/Notifications
 import { TeacherKycRoute } from '../features/kyc/TeacherKycRoute';
 import { KycQueuePage } from '../features/admin-kyc/pages/KycQueuePage';
 import { KycDetailPage } from '../features/admin-kyc/pages/KycDetailPage';
+import { StudentDashboardPage } from '../features/student/pages/StudentDashboardPage';
+import { StudentCoursesPage } from '../features/student/pages/StudentCoursesPage';
 import StudentProfilePage from '../features/profile/StudentProfilePage';
 import TeacherProfilePage from '../features/profile/TeacherProfilePage';
 import { CourseBuilderPage } from '../features/course-builder/pages/CourseBuilderPage';
@@ -79,7 +81,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'dashboard',
-        element: <div>Student Dashboard Placeholder</div>,
+        element: <StudentDashboardPage />,
       },
       {
         path: 'profile',
@@ -95,7 +97,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'courses',
-        element: <div>Student Courses Placeholder</div>,
+        element: <StudentCoursesPage />,
       },
     ],
   },
