@@ -4,10 +4,9 @@ import type { PublicCourseDetail } from '../types/courseDetailTypes';
 import type {
   CourseCatalogParams,
   CourseCategory,
-  PageResponse,
   PublicCourseSummary,
 } from '../types/catalogTypes';
-import type { ApiResponse } from '../../../shared/types/api';
+import type { ApiResponse, PageResponse } from '../../../shared/types/api';
 
 export const catalogService = {
   getCourseDetail: async (id: string): Promise<PublicCourseDetail> => {

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
-import StarIcon from '@mui/icons-material/Star';
 
 interface CourseStickyHeaderProps {
   course: PublicCourseDetail;
@@ -32,12 +31,6 @@ export const CourseStickyHeader = ({ course }: CourseStickyHeaderProps) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
         <div className="flex flex-col overflow-hidden mr-4">
           <h3 className="text-white font-bold text-sm sm:text-base truncate">{course.title}</h3>
-          <div className="flex items-center text-xs mt-0.5">
-            <span className="flex items-center text-yellow-400 font-bold mr-2">
-              {course.averageRating.toFixed(1)} <StarIcon sx={{ fontSize: 14 }} className="ml-0.5 -mt-0.5" />
-            </span>
-            <span className="text-slate-400">({course.totalReviews.toLocaleString()} đánh giá)</span>
-          </div>
         </div>
 
         <div className="flex items-center flex-shrink-0 gap-4">

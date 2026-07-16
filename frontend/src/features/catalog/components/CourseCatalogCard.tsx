@@ -8,7 +8,6 @@ import {
   Stack,
   Typography,
   Box,
-  Rating,
 } from '@mui/material';
 import SchoolIcon from '@mui/icons-material/School';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -119,27 +118,14 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
             {course.title}
           </Typography>
 
-          {/* Teacher */}
-          <Stack direction="row" sx={{ alignItems: 'center' }} spacing={0.5}>
-            <SchoolIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {course.teacherName || 'Giảng viên'}
-            </Typography>
-          </Stack>
-
-          {/* Rating + Lessons */}
-          <Stack direction="row" sx={{ alignItems: 'center' }} spacing={1}>
-            <Rating
-              value={course.averageRating}
-              precision={0.5}
-              size="small"
-              readOnly
-              sx={{ fontSize: '0.9rem' }}
-            />
-            <Typography variant="caption" color="text.secondary">
-              ({course.totalReviews})
-            </Typography>
-            <Box sx={{ flexGrow: 1 }} />
+          {/* Teacher + Lessons */}
+          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }} spacing={1}>
+            <Stack direction="row" sx={{ alignItems: 'center' }} spacing={0.5}>
+              <SchoolIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {course.teacherName || 'Giảng viên'}
+              </Typography>
+            </Stack>
             <Stack direction="row" sx={{ alignItems: 'center' }} spacing={0.3}>
               <MenuBookIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
               <Typography variant="caption" color="text.secondary">

@@ -1,5 +1,4 @@
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
-import StarIcon from '@mui/icons-material/Star';
 import LanguageIcon from '@mui/icons-material/Language';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 
@@ -43,27 +42,6 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
             className="text-base sm:text-lg text-slate-300 mb-6 max-w-3xl leading-relaxed prose prose-invert"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.description || course.introduction || '') }}
           />
-
-          {/* Stats Bar */}
-          <div className="flex flex-wrap items-center gap-6 text-sm mb-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl px-5 py-3">
-            {/* Rating Block */}
-            {course.totalReviews > 0 ? (
-              <div className="flex items-center">
-                <span className="flex items-center text-yellow-400 font-bold text-base mr-2">
-                  {course.averageRating.toFixed(1)}
-                  <StarIcon fontSize="small" className="ml-1 -mt-0.5" />
-                </span>
-                <span className="text-slate-300">
-                  ({course.totalReviews.toLocaleString()} đánh giá)
-                </span>
-              </div>
-            ) : (
-              <span className="text-yellow-400 font-medium">Chưa có đánh giá</span>
-            )}
-
-            <div className="w-1 h-1 rounded-full bg-slate-600 hidden sm:block" />
-            <span className="text-slate-300 font-medium">12,345 học viên</span>
-          </div>
 
           {/* Meta Info */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-400">

@@ -20,9 +20,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
+import org.springframework.validation.annotation.Validated;
+
 @RestController
 @RequestMapping("/api/v1/public/courses")
 @RequiredArgsConstructor
+@Validated
 public class PublicCourseController {
 
     private final CourseService courseService;
@@ -32,13 +37,21 @@ public class PublicCourseController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) JlptLevel jlptLevel,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(required = false) @Min(value = 0, message = "Min price must be non-negative") BigDecimal minPrice,
+            @RequestParam(required = false) @Min(value = 0, message = "Max price must be non-negative") BigDecimal maxPrice,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page index must not be less than zero") int page,
+            @RequestParam(defaultValue = "12") @Min(value = 1, message = "Page size must not be less than one") @Max(value = 50, message = "Page size must not be greater than 50") int size,
             @RequestParam(defaultValue = "publishedAt,desc") String sort
     ) {
-        Pageable pageable = buildPageable(page, Math.min(size, 50), sort);
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
+            throw new com.manabihub.common.exception.BusinessException(
+                    com.manabihub.common.constants.MessageCodes.COMMON_BAD_REQUEST,
+                    "minPrice cannot be greater than maxPrice",
+                    org.springframework.http.HttpStatus.BAD_REQUEST
+            );
+        }
+
+        Pageable pageable = buildPageable(page, size, sort);
         Page<PublicCourseSummaryResponse> result = courseService.searchPublicCourses(
                 keyword, category, jlptLevel, minPrice, maxPrice, pageable
         );

@@ -65,8 +65,6 @@ class PublicCourseControllerTest {
                 .price(price)
                 .currency("VND")
                 .teacherName("Teacher Test")
-                .averageRating(0.0)
-                .totalReviews(0)
                 .totalLessons(10)
                 .publishedAt(Instant.now())
                 .build();

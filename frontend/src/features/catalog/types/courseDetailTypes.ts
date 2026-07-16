@@ -36,8 +36,6 @@ export interface PublicCourseDetail {
   targetStudents?: string;
   publishedAt?: string;
   teacher: PublicTeacherProfile;
-  averageRating: number;
-  totalReviews: number;
   isEnrolled: boolean;
   totalDurationMinutes: number;
   totalLessons: number;

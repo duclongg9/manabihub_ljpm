@@ -30,10 +30,6 @@ public class PublicCourseDetailResponse {
     // Teacher Info
     private TeacherDto teacher;
 
-    // Mock reviews
-    private Double averageRating;
-    private Integer totalReviews;
-
     // Enrollment mock
     private Boolean isEnrolled;
 

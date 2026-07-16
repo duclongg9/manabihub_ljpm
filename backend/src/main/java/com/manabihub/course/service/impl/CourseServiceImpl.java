@@ -278,8 +278,6 @@ public class CourseServiceImpl implements CourseService {
                         .avatarUrl(course.getTeacher().getUser() != null ? course.getTeacher().getUser().getAvatarUrl() : null)
                         .bio(course.getTeacher().getBio())
                         .build())
-                .averageRating(0.0) // Mocked as 0 for now until Review module is ready
-                .totalReviews(0) // Mocked as 0 for now until Review module is ready
                 .isEnrolled(isEnrolled)
                 .totalDurationMinutes(totalDurationMinutes)
                 .totalLessons(totalLessons)
@@ -527,8 +525,6 @@ public class CourseServiceImpl implements CourseService {
                 .currency(course.getCurrency())
                 .teacherName(teacherName)
                 .teacherAvatarUrl(teacherAvatarUrl)
-                .averageRating(0.0) // Placeholder until Review module is ready
-                .totalReviews(0)    // Placeholder until Review module is ready
                 .totalLessons(totalLessons)
                 .publishedAt(course.getPublishedAt())
                 .build();

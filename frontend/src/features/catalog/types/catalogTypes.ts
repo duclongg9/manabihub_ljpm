@@ -1,15 +1,3 @@
-// ─── Paginated Response ───────────────────────────────────────────
-
-export interface PageResponse<T> {
-  content: T[];
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-  first: boolean;
-  last: boolean;
-}
-
 // ─── Public Course Summary (catalog list item) ───────────────────
 
 export interface PublicCourseSummary {
@@ -23,8 +11,6 @@ export interface PublicCourseSummary {
   currency: string;
   teacherName?: string;
   teacherAvatarUrl?: string;
-  averageRating: number;
-  totalReviews: number;
   totalLessons: number;
   publishedAt?: string;
 }

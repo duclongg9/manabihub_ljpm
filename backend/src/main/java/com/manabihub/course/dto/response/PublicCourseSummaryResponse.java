@@ -26,8 +26,6 @@ public class PublicCourseSummaryResponse {
     private String currency;
     private String teacherName;
     private String teacherAvatarUrl;
-    private Double averageRating;
-    private Integer totalReviews;
     private Integer totalLessons;
     private Instant publishedAt;
 }
