@@ -34,7 +34,7 @@ public class CurrentUserServiceImpl implements CurrentUserService {
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
             return java.util.Optional.empty();
         }
-        
+
         if (authentication instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwtAuth) {
             try {
                 return java.util.Optional.of(UUID.fromString(jwtAuth.getName()));
@@ -43,7 +43,7 @@ public class CurrentUserServiceImpl implements CurrentUserService {
                 return java.util.Optional.empty();
             }
         }
-        
+
         try {
             return java.util.Optional.of(UUID.fromString(authentication.getName()));
         } catch (IllegalArgumentException e) {
@@ -59,7 +59,7 @@ public class CurrentUserServiceImpl implements CurrentUserService {
         }
 
         String targetRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
-        
+
         return authentication.getAuthorities().stream()
                 .anyMatch(authority -> authority.getAuthority().equals(targetRole));
     }

@@ -32,18 +32,18 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
               </span>
             )}
           </div>
-          
+
           {/* Title */}
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4 leading-tight drop-shadow-md">
             {course.title}
           </h1>
-          
+
           {/* Description */}
-          <div 
+          <div
             className="text-base sm:text-lg text-slate-300 mb-6 max-w-3xl leading-relaxed prose prose-invert"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.description || course.introduction || '') }}
           />
-          
+
           {/* Stats Bar */}
           <div className="flex flex-wrap items-center gap-6 text-sm mb-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl px-5 py-3">
             {/* Rating Block */}
@@ -60,11 +60,11 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
             ) : (
               <span className="text-yellow-400 font-medium">Chưa có đánh giá</span>
             )}
-            
+
             <div className="w-1 h-1 rounded-full bg-slate-600 hidden sm:block" />
             <span className="text-slate-300 font-medium">12,345 học viên</span>
           </div>
-          
+
           {/* Meta Info */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-400">
             <span className="flex items-center">

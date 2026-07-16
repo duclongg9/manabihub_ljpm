@@ -217,9 +217,9 @@ public class CourseServiceImpl implements CourseService {
 
         java.util.Optional<UUID> currentUserIdOpt = currentUserService.getCurrentUserIdOptional();
 
-        boolean isAuthor = currentUserIdOpt.isPresent() && 
-                           course.getTeacher() != null && 
-                           course.getTeacher().getUser() != null && 
+        boolean isAuthor = currentUserIdOpt.isPresent() &&
+                           course.getTeacher() != null &&
+                           course.getTeacher().getUser() != null &&
                            currentUserIdOpt.get().equals(course.getTeacher().getUser().getId());
 
         boolean isAdmin = currentUserService.hasRole("ADMIN") || currentUserService.hasRole("SUPER_ADMIN");
@@ -240,7 +240,7 @@ public class CourseServiceImpl implements CourseService {
         // Aggregate stats
         int totalDurationMinutes = 0;
         int totalLessons = 0;
-        
+
         List<PublicModuleResponse> moduleResponses = new ArrayList<>();
         for (CourseModule module : course.getModules()) {
             PublicModuleResponse modRes = mapModuleToPublicResponse(module);

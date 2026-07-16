@@ -26,21 +26,21 @@ public class PublicCourseDetailResponse {
     private String prerequisites;
     private String targetStudents;
     private Instant publishedAt;
-    
+
     // Teacher Info
     private TeacherDto teacher;
-    
+
     // Mock reviews
     private Double averageRating;
     private Integer totalReviews;
-    
+
     // Enrollment mock
     private Boolean isEnrolled;
-    
+
     // Aggregation
     private Integer totalDurationMinutes;
     private Integer totalLessons;
-    
+
     private List<PublicModuleResponse> modules;
 
     @Data

@@ -35,7 +35,7 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
     <>
       <div className="bg-white text-slate-800 shadow-2xl rounded-2xl overflow-hidden border border-slate-200/60 backdrop-blur-xl transform transition-all duration-300 hover:shadow-indigo-500/10">
         {/* Thumbnail Image */}
-        <div 
+        <div
           className="relative aspect-video bg-slate-100 flex items-center justify-center p-1 cursor-pointer group"
           onClick={() => setIsVideoModalOpen(true)}
         >
@@ -113,8 +113,8 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
       </div>
       </div>
 
-      <Dialog 
-        open={isVideoModalOpen} 
+      <Dialog
+        open={isVideoModalOpen}
         onClose={() => setIsVideoModalOpen(false)}
         maxWidth="md"
         fullWidth
@@ -128,13 +128,13 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
         </div>
         <DialogContent className="p-0 bg-black aspect-video flex items-center justify-center">
           {isVideoModalOpen && (
-            <iframe 
-              width="100%" 
-              height="100%" 
-              src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1" 
-              title="Course Preview" 
-              frameBorder="0" 
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            <iframe
+              width="100%"
+              height="100%"
+              src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
+              title="Course Preview"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             ></iframe>
           )}

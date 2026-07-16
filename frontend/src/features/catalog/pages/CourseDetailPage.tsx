@@ -62,7 +62,7 @@ export const CourseDetailPage = () => {
     : [];
 
   // Plain text fallback for meta description
-  const metaDescription = course.introduction 
+  const metaDescription = course.introduction
     ? course.introduction.replace(/<[^>]+>/g, '').substring(0, 160)
     : course.description
       ? course.description.replace(/<[^>]+>/g, '').substring(0, 160)
@@ -88,10 +88,10 @@ export const CourseDetailPage = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 relative">
-          
+
           {/* Left Column: Main Content */}
           <div className="lg:col-span-2">
-            
+
             {/* What you will learn */}
             {outcomesList.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 mb-12 hover:shadow-md transition-shadow">
@@ -134,7 +134,7 @@ export const CourseDetailPage = () => {
             {course.targetStudents && (
               <div className="mb-12">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">Đối tượng phù hợp</h2>
-                <div 
+                <div
                   className="prose prose-slate text-sm max-w-none text-slate-700 whitespace-pre-line"
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.targetStudents) }}
                 />
@@ -151,7 +151,7 @@ export const CourseDetailPage = () => {
               <CourseStickyCard course={course} />
             </div>
           </div>
-          
+
         </div>
       </div>
     </div>

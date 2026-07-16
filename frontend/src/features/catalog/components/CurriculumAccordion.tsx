@@ -57,7 +57,7 @@ export const CurriculumAccordion = ({ modules }: CurriculumAccordionProps) => {
     <div>
       <div className="flex justify-end mb-4">
         {isAllExpanded ? (
-          <button 
+          <button
             onClick={handleCollapseAll}
             className="flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
           >
@@ -65,7 +65,7 @@ export const CurriculumAccordion = ({ modules }: CurriculumAccordionProps) => {
             Thu gọn tất cả
           </button>
         ) : (
-          <button 
+          <button
             onClick={handleExpandAll}
             className="flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
           >
@@ -77,11 +77,11 @@ export const CurriculumAccordion = ({ modules }: CurriculumAccordionProps) => {
 
       <div className="space-y-4">
         {modules.map((module, index) => (
-          <Accordion 
-            key={module.id} 
+          <Accordion
+            key={module.id}
             expanded={!!expandedModules[module.id]}
             onChange={() => handleToggleAccordion(module.id)}
-            disableGutters 
+            disableGutters
             elevation={0}
             className="border border-slate-200/60 rounded-xl overflow-hidden shadow-sm before:hidden hover:shadow-md transition-shadow"
             sx={{
