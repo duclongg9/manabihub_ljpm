@@ -1,8 +1,9 @@
-import { Box, Typography, Button, Stack, Avatar, AvatarGroup, keyframes } from '@mui/material';
+import { Alert, Box, Typography, Button, Stack, Avatar, AvatarGroup, keyframes } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { getAsset } from '../../shared/utils/assets';
+import { rememberPostLoginRoute } from '../../shared/auth/authSession';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(20px); }
@@ -25,10 +26,18 @@ const GoogleIcon = () => (
 );
 
 export function PublicLoginPage() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get('reason') === 'session-expired';
+
   const handleGoogleLogin = () => {
-    // Navigate to backend OAuth endpoint
+    const returnTo = (location.state as { from?: unknown } | null)?.from;
+    if (typeof returnTo === 'string') {
+      rememberPostLoginRoute('public', returnTo);
+    }
+
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api';
-    const baseUrl = apiBaseUrl.replace('/api', '');
+    const baseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
     window.location.href = `${baseUrl}/oauth2/authorization/google`;
   };
 
@@ -117,6 +126,12 @@ export function PublicLoginPage() {
               Để đảm bảo tính minh bạch cộng đồng và chất lượng người dùng, ManabiHub <Box component="span" sx={{ fontWeight: 600, color: '#334155' }}>chỉ hỗ trợ đăng ký và đăng nhập qua tài khoản Google</Box>.
             </Typography>
           </Box>
+
+          {sessionExpired && (
+            <Alert severity="warning" sx={{ mb: 3 }}>
+              Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.
+            </Alert>
+          )}
 
           {/* Primary Action */}
           <Button

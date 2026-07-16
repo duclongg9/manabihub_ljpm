@@ -1,33 +1,22 @@
-import React, { useState } from 'react';
-import { Box, Toolbar } from '@mui/material';
-import { Outlet } from 'react-router-dom';
-import { Header } from './Header';
-import { Sidebar } from './Sidebar';
+import React from 'react';
+import { useLocation } from 'react-router-dom';
+import { ROLES } from '../constants/roles';
 import { ADMIN_MENU } from '../navigation/adminMenu';
+import { DashboardLayout } from './DashboardLayout';
+
+const INTERNAL_ROLES = [ROLES.SYSTEM_ADMIN, ROLES.COURSE_MANAGER, ROLES.FINANCE_MANAGER];
 
 export const AdminLayout: React.FC = () => {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
+  const location = useLocation();
+  const matchingMenuItem = [...ADMIN_MENU]
+    .sort((left, right) => right.path.length - left.path.length)
+    .find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Header showMenuIcon onMenuClick={handleDrawerToggle} />
-      <Sidebar 
-        menuItems={ADMIN_MENU} 
-        open={mobileOpen} 
-        onClose={handleDrawerToggle}
-        variant="permanent"
-      />
-      
-      <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - 260px)` } }}>
-        <Toolbar /> {/* Spacer */}
-        <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
-          <Outlet />
-        </Box>
-      </Box>
-    </Box>
+    <DashboardLayout
+      allowedRoles={matchingMenuItem?.roles ?? INTERNAL_ROLES}
+      menuItems={ADMIN_MENU}
+      sessionKind="admin"
+    />
   );
 };

@@ -1,60 +1,14 @@
-import React, { useState } from "react";
-import { Box, Toolbar } from "@mui/material";
-import { Outlet } from "react-router-dom";
-
-import { Header } from "./Header";
-import { Sidebar } from "./Sidebar";
-
-import { STUDENT_MENU } from "../navigation/studentMenu";
+import React from 'react';
+import { ROLES } from '../constants/roles';
+import { STUDENT_MENU } from '../navigation/studentMenu';
+import { DashboardLayout } from './DashboardLayout';
 
 export const StudentLayout: React.FC = () => {
-    const [mobileOpen, setMobileOpen] = useState(false);
-
-    const handleDrawerToggle = () => {
-        setMobileOpen(!mobileOpen);
-    };
-
-    return (
-        <Box
-            sx={{
-                display: "flex",
-                minHeight: "100vh",
-                bgcolor: "background.default",
-            }}
-        >
-            <Header
-                showMenuIcon
-                onMenuClick={handleDrawerToggle}
-            />
-
-            <Sidebar
-                menuItems={STUDENT_MENU}
-                open={mobileOpen}
-                onClose={handleDrawerToggle}
-                variant="permanent"
-            />
-
-            <Box
-                component="main"
-                sx={{
-                    flexGrow: 1,
-                    p: 3,
-                    width: {
-                        sm: `calc(100% - 260px)`,
-                    },
-                }}
-            >
-                <Toolbar />
-
-                <Box
-                    sx={{
-                        maxWidth: 1200,
-                        mx: "auto",
-                    }}
-                >
-                    <Outlet />
-                </Box>
-            </Box>
-        </Box>
-    );
+  return (
+    <DashboardLayout
+      allowedRoles={[ROLES.STUDENT]}
+      menuItems={STUDENT_MENU}
+      sessionKind="public"
+    />
+  );
 };
