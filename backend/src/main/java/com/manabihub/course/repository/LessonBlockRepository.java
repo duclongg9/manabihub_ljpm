@@ -12,4 +12,16 @@ public interface LessonBlockRepository extends JpaRepository<LessonBlock, UUID> 
     List<LessonBlock> findByModule_IdOrderByOrderIndexAsc(UUID moduleId);
 
     Optional<LessonBlock> findByIdAndModule_Id(UUID id, UUID moduleId);
+
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT block
+            FROM LessonBlock block
+            JOIN FETCH block.module module
+            JOIN FETCH module.course course
+            WHERE block.id = :lessonBlockId AND course.id = :courseId
+            """)
+    Optional<LessonBlock> findByIdAndCourseId(
+            @org.springframework.data.repository.query.Param("lessonBlockId") UUID lessonBlockId,
+            @org.springframework.data.repository.query.Param("courseId") UUID courseId
+    );
 }

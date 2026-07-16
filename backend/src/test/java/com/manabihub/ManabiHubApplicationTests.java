@@ -1,6 +1,7 @@
 package com.manabihub;
 
 import com.manabihub.audit.repository.AuditLogRepository;
+import com.manabihub.ai.repository.AiUsageLogRepository;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseModuleRepository;
 import com.manabihub.course.repository.CourseRepository;
@@ -25,6 +26,7 @@ import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.course.repository.CourseApprovalDecisionRepository;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
 import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
@@ -126,6 +128,12 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private TeacherWritingFeedbackRepository teacherWritingFeedbackRepository;
+
+    @MockBean
+    private AiUsageLogRepository aiUsageLogRepository;
+
+    @MockBean
+    private SystemSettingRepository systemSettingRepository;
 
     @Test
     void contextLoads() {
