@@ -24,6 +24,8 @@ import { AdminLoginPage } from './pages/AdminLoginPage';
 import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
 import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
 
+import { LearningPage } from '../features/learning/pages/LearningPage';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -95,6 +97,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses',
         element: <div>Student Courses Placeholder</div>,
+      },
+      {
+        path: 'courses/:courseId/learn',
+        element: <LearningPage />,
       },
     ],
   },
