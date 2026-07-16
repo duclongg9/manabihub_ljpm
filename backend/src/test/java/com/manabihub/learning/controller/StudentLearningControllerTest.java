@@ -79,6 +79,13 @@ class StudentLearningControllerTest {
     }
 
     @Test
+    void getDashboardStats_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/student/dashboard/stats")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void getEnrolledCourses_success() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID enrollmentId = UUID.randomUUID();
@@ -92,12 +99,17 @@ class StudentLearningControllerTest {
                 .teacherName("John Doe")
                 .enrollmentStatus(EnrollmentStatus.ACTIVE)
                 .enrolledAt(Instant.now())
-                .progressPercentage(50)
                 .build();
 
-        PageResponse<StudentCourseSummaryResponse> pageResponse = new PageResponse<>(
-                List.of(summary), 0, 12, 1, 1, true
-        );
+        PageResponse<StudentCourseSummaryResponse> pageResponse = PageResponse.<StudentCourseSummaryResponse>builder()
+                .content(List.of(summary))
+                .page(0)
+                .size(12)
+                .totalElements(1)
+                .totalPages(1)
+                .first(true)
+                .last(true)
+                .build();
 
         when(studentLearningService.getEnrolledCourses(eq(userId), any(Pageable.class)))
                 .thenReturn(pageResponse);
@@ -107,7 +119,19 @@ class StudentLearningControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
                 .andExpect(jsonPath("$.content[0].courseTitle", is("Test Course")))
-                .andExpect(jsonPath("$.content[0].enrollmentStatus", is("ACTIVE")))
-                .andExpect(jsonPath("$.content[0].progressPercentage", is(50)));
+                .andExpect(jsonPath("$.content[0].enrollmentStatus", is("ACTIVE")));
+    }
+
+    @Test
+    void getEnrolledCourses_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/student/courses"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getEnrolledCourses_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/student/courses")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
     }
 }

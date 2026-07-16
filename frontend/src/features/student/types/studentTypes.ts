@@ -14,5 +14,4 @@ export interface StudentCourseSummary {
   teacherName: string | null;
   enrollmentStatus: EnrollmentStatus;
   enrolledAt: string;
-  progressPercentage: number;
 }

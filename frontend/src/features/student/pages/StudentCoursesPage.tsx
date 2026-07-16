@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Box, Typography, Grid, CircularProgress, Alert, Pagination } from '@mui/material';
+import { Box, Typography, Grid, CircularProgress, Alert, Pagination, Paper, Button } from '@mui/material';
+import SchoolIcon from '@mui/icons-material/School';
 import { useStudentCourses } from '../hooks/useStudentCourses';
 import { StudentCourseCard } from '../components/StudentCourseCard';
+import type { StudentCourseSummary } from '../types/studentTypes';
 
 export const StudentCoursesPage: React.FC = () => {
   const [page, setPage] = useState(0);
@@ -41,13 +43,28 @@ export const StudentCoursesPage: React.FC = () => {
       </Typography>
 
       {courses.length === 0 ? (
-        <Alert severity="info" sx={{ mt: 4 }}>
-          You have not enrolled in any courses yet.
-        </Alert>
+        <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 3, bgcolor: 'background.default' }} elevation={0}>
+          <SchoolIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
+          <Typography variant="h5" color="text.secondary" gutterBottom>
+            You haven't enrolled in any courses yet
+          </Typography>
+          <Typography color="text.secondary" sx={{ mb: 4 }}>
+            Start your learning journey by exploring our wide range of courses.
+          </Typography>
+          <Button 
+            variant="contained" 
+            size="large" 
+            color="primary"
+            onClick={() => window.location.href = '/courses'}
+            sx={{ px: 4, py: 1.5, borderRadius: 2, fontWeight: 'bold' }}
+          >
+            Explore Courses
+          </Button>
+        </Paper>
       ) : (
         <>
           <Grid container spacing={3}>
-            {courses.map((course: any) => (
+            {courses.map((course: StudentCourseSummary) => (
               <Grid size={{ xs: 12, sm: 6, md: 4 }} key={course.enrollmentId}>
                 <StudentCourseCard course={course} />
               </Grid>

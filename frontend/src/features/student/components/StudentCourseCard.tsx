@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardMedia, Typography, Box, Chip, LinearProgress } from '@mui/material';
+import { Card, CardContent, CardMedia, Typography, Box, Chip, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import type { StudentCourseSummary } from '../types/studentTypes';
 import PersonIcon from '@mui/icons-material/Person';
@@ -48,7 +48,7 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
       <CardMedia
         component="img"
         height="180"
-        image={course.thumbnailUrl || 'https://via.placeholder.com/300x180?text=No+Image'}
+        image={course.thumbnailUrl || '/placeholder-course.png'}
         alt={course.courseTitle}
         sx={{ objectFit: 'cover' }}
       />
@@ -83,22 +83,22 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
         </Box>
 
         <Box sx={{ mt: 'auto', pt: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Chip 
               label={course.enrollmentStatus} 
               size="small" 
               color={getStatusColor(course.enrollmentStatus) as any} 
               variant="outlined" 
             />
-            <Typography variant="body2" color="text.secondary">
-              {course.progressPercentage}%
-            </Typography>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              size="small" 
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+            >
+              Continue Learning
+            </Button>
           </Box>
-          <LinearProgress 
-            variant="determinate" 
-            value={course.progressPercentage} 
-            sx={{ height: 6, borderRadius: 3 }}
-          />
         </Box>
       </CardContent>
     </Card>

@@ -13,5 +13,5 @@ import java.util.UUID;
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     int countByStudentId(UUID studentId);
     int countByStudentIdAndStatus(UUID studentId, EnrollmentStatus status);
-    Page<Enrollment> findByStudentId(UUID studentId, Pageable pageable);
+    Page<Enrollment> findByStudentIdAndStatusIn(UUID studentId, java.util.List<EnrollmentStatus> statuses, Pageable pageable);
 }

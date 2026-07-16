@@ -32,7 +32,10 @@ public class StudentLearningServiceImpl implements StudentLearningService {
     @Transactional(readOnly = true)
     public StudentDashboardStatsResponse getDashboardStats(UUID userId) {
         StudentProfile profile = studentProfileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Student profile not found for user: " + userId));
+                .orElseThrow(() -> new com.manabihub.common.exception.BusinessException(
+                        com.manabihub.common.constants.MessageCodes.COMMON_BAD_REQUEST,
+                        "Student profile not found for user",
+                        org.springframework.http.HttpStatus.BAD_REQUEST));
 
         UUID studentId = profile.getId();
         int total = enrollmentRepository.countByStudentId(studentId);
@@ -50,22 +53,18 @@ public class StudentLearningServiceImpl implements StudentLearningService {
     @Transactional(readOnly = true)
     public PageResponse<StudentCourseSummaryResponse> getEnrolledCourses(UUID userId, Pageable pageable) {
         StudentProfile profile = studentProfileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Student profile not found for user: " + userId));
+                .orElseThrow(() -> new com.manabihub.common.exception.BusinessException(
+                        com.manabihub.common.constants.MessageCodes.COMMON_BAD_REQUEST,
+                        "Student profile not found for user",
+                        org.springframework.http.HttpStatus.BAD_REQUEST));
 
-        Page<Enrollment> enrollmentsPage = enrollmentRepository.findByStudentId(profile.getId(), pageable);
+        Page<Enrollment> enrollmentsPage = enrollmentRepository.findByStudentIdAndStatusIn(
+                profile.getId(), 
+                List.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED), 
+                pageable);
 
-        List<StudentCourseSummaryResponse> content = enrollmentsPage.getContent().stream()
-                .map(this::mapToSummaryResponse)
-                .toList();
-
-        return new PageResponse<>(
-                content,
-                enrollmentsPage.getNumber(),
-                enrollmentsPage.getSize(),
-                enrollmentsPage.getTotalElements(),
-                enrollmentsPage.getTotalPages(),
-                enrollmentsPage.isLast()
-        );
+        Page<StudentCourseSummaryResponse> responsePage = enrollmentsPage.map(this::mapToSummaryResponse);
+        return PageResponse.from(responsePage);
     }
 
     private StudentCourseSummaryResponse mapToSummaryResponse(Enrollment enrollment) {
@@ -82,7 +81,6 @@ public class StudentLearningServiceImpl implements StudentLearningService {
                 .teacherName(teacherName)
                 .enrollmentStatus(enrollment.getStatus())
                 .enrolledAt(enrollment.getEnrolledAt())
-                .progressPercentage(0) // Mocked for now until lesson progress is implemented
                 .build();
     }
 }
