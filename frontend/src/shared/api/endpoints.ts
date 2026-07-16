@@ -10,6 +10,11 @@ export const ENDPOINTS = {
     DETAIL: (id: string) => `/v1/admin/kyc-requests/${id}`,
     REVIEW: (id: string) => `/v1/admin/kyc-requests/${id}/review`,
   },
+  ADMIN_COURSE_APPROVAL: {
+    QUEUE: '/v1/admin/course-approvals',
+    DETAIL: (id: string) => `/v1/admin/course-approvals/${id}`,
+    REVIEW: (id: string) => `/v1/admin/course-approvals/${id}/review`,
+  },
   teacherKyc: {
     status: '/v1/teacher/kyc/status',
     identityVerifications: '/v1/teacher/kyc/identity-verifications',
