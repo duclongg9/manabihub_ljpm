@@ -1,17 +1,26 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, Button, Stack, Card,
+  Alert, Box, Typography, Button, CircularProgress, Stack, Card,
   TextField, Stepper, Step, StepLabel,
-  Avatar, Container, InputAdornment,
+  Container, InputAdornment,
   FormControl, InputLabel, Select, FormHelperText
 } from '@mui/material';
+import { isAxiosError } from 'axios';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  clearAuthSession,
+  consumePostLoginRoute,
+  getAuthSession,
+  hasAnyRole,
+  storeAuthToken,
+} from '../../shared/auth/authSession';
+import { ROLES } from '../../shared/constants/roles';
+import { updateMyStudentProfile } from '../../features/profile/profileApi';
 
 // [CODE NOTE]: Giao diện Onboarding cho Học viên mới lần đầu login bằng Google (UC-01/02).
 // User bắt buộc phải điền đủ thông tin (Tên) mới được vào hệ thống.
@@ -24,18 +33,27 @@ export function StudentOnboardingPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [goal, setGoal] = useState('n3');
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Validation errors
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
 
-  // Store token after returning from Google Login
   useEffect(() => {
     const token = searchParams.get('token');
-    if (token) {
-      localStorage.setItem('auth_token', token);
+    const session = token
+      ? storeAuthToken('public', token)
+      : getAuthSession('public');
+
+    if (!session || !hasAnyRole(session, [ROLES.STUDENT])) {
+      navigate('/login', { replace: true });
+      return;
     }
-  }, [searchParams]);
+
+    if (token) {
+      navigate('/onboarding/student', { replace: true });
+    }
+  }, [navigate, searchParams]);
 
   const steps = ['Cập nhật thông tin Học viên', 'Hoàn tất'];
 
@@ -44,37 +62,45 @@ export function StudentOnboardingPage() {
     if (!name.trim()) {
       newErrors.name = 'Vui lòng nhập họ và tên';
     }
-    // Optional phone, but if provided must be valid (10-11 digits)
-    if (phone.trim() && !/^\d{10,11}$/.test(phone.trim())) {
-      newErrors.phone = 'Số điện thoại không hợp lệ (gồm 10-11 số)';
+    if (phone.trim() && !/^(0\d{9}|\+84\d{9})$/.test(phone.trim())) {
+      newErrors.phone = 'Số điện thoại phải có dạng 0xxxxxxxxx hoặc +84xxxxxxxxx';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
-    if (activeStep === 0) {
-      const isValid = validateStep0();
-      if (!isValid) return;
-      setActiveStep((prev) => prev + 1);
-    } else if (activeStep === 1) {
-      // In real scenario, here we'd call backend to update profile (avatarFile, name, phone, goal)
-      navigate('/student', { replace: true });
+  const handleNext = async () => {
+    if (activeStep === 1) {
+      const session = getAuthSession('public');
+      navigate(session ? consumePostLoginRoute('public', session) : '/login', { replace: true });
+      return;
+    }
+
+    if (!validateStep0()) return;
+
+    setSaving(true);
+    setSubmitError(null);
+
+    try {
+      await updateMyStudentProfile({
+        displayName: name.trim(),
+        fullName: name.trim(),
+        jlptGoal: goal.toUpperCase(),
+        phoneNumber: phone.trim() || null,
+      });
+      setActiveStep(1);
+    } catch (requestError) {
+      const responseMessage = isAxiosError<{ message?: string }>(requestError)
+        ? requestError.response?.data?.message
+        : null;
+      setSubmitError(responseMessage || 'Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và thử lại.');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleBack = () => setActiveStep((prev) => prev - 1);
-
-  // [CODE NOTE]: Hàm xử lý chọn ảnh từ máy tính (Upload Avatar).
-  // Đọc file thành chuỗi objectURL để hiển thị ảnh preview tạm thời trên giao diện.
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const previewUrl = URL.createObjectURL(file);
-      setAvatarPreview(previewUrl);
-    }
-  };
 
   return (
     <Box sx={{ minHeight: 'calc(100vh - 140px)', bgcolor: 'grey.50', py: { xs: 4, md: 6 }, display: 'flex', alignItems: 'center' }}>
@@ -120,38 +146,6 @@ export function StudentOnboardingPage() {
                 </Typography>
 
                 <Stack spacing={3}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <Avatar
-                      src={avatarPreview || undefined}
-                      sx={{ width: 80, height: 80, bgcolor: '#eff6ff', color: '#3b82f6', border: avatarPreview ? '2px solid #e5e7eb' : 'none' }}
-                    >
-                      {!avatarPreview && <PersonIcon sx={{ fontSize: 40 }} />}
-                    </Avatar>
-
-                    <Box>
-                      <input
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        id="avatar-upload-button"
-                        type="file"
-                        onChange={handleImageChange}
-                      />
-                      <label htmlFor="avatar-upload-button">
-                        <Button
-                          variant="outlined"
-                          component="span"
-                          startIcon={<UploadFileIcon />}
-                          sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, borderColor: 'grey.300', color: 'grey.700' }}
-                        >
-                          Tải ảnh lên
-                        </Button>
-                      </label>
-                      <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'grey.500' }}>
-                        Khuyến nghị ảnh vuông, tối đa 2MB
-                      </Typography>
-                    </Box>
-                  </Box>
-
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
                     <TextField
                       label="Họ và tên *"
@@ -172,7 +166,7 @@ export function StudentOnboardingPage() {
                       fullWidth
                       variant="outlined"
                       error={!!errors.phone}
-                      helperText={errors.phone || 'Để trống hoặc nhập 10-11 chữ số'}
+                      helperText={errors.phone || 'Không bắt buộc. Ví dụ: 0912345678'}
                       slotProps={{ input: { startAdornment: <InputAdornment position="start"><PhoneIcon sx={{ color: 'grey.400' }} /></InputAdornment> } }}
                     />
                   </Box>
@@ -226,6 +220,8 @@ export function StudentOnboardingPage() {
                     </Box>
                   </Box>
 
+                  {submitError && <Alert severity="error">{submitError}</Alert>}
+
                 </Stack>
               </Box>
             )}
@@ -249,8 +245,10 @@ export function StudentOnboardingPage() {
           <Box sx={{ p: { xs: 3, md: 4 }, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'grey.200', display: 'flex', justifyContent: 'space-between', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
             <Button
               color="error"
+              disabled={saving}
               onClick={() => {
                 if (activeStep === 0) {
+                  clearAuthSession('public');
                   navigate('/login');
                 } else {
                   handleBack();
@@ -263,9 +261,11 @@ export function StudentOnboardingPage() {
             <Button
               variant="contained"
               onClick={handleNext}
+              disabled={saving}
+              startIcon={saving ? <CircularProgress color="inherit" size={18} /> : undefined}
               sx={{ px: 4, py: 1.5, borderRadius: 2, textTransform: 'none', fontWeight: 700, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}
             >
-              {activeStep === steps.length - 1 ? 'Khám phá Trang chủ' : 'Tiếp tục'}
+              {saving ? 'Đang lưu...' : activeStep === steps.length - 1 ? 'Khám phá Trang chủ' : 'Tiếp tục'}
             </Button>
           </Box>
         </Card>

@@ -1,8 +1,20 @@
 import React, { useMemo } from 'react';
-import { Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography } from '@mui/material';
+import {
+  Box,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-const DRAWER_WIDTH = 260;
+export const DRAWER_WIDTH = 260;
+export const COLLAPSED_DRAWER_WIDTH = 72;
 
 export interface MenuItem {
   title: string;
@@ -14,76 +26,89 @@ export interface MenuItem {
 interface SidebarProps {
   menuItems: MenuItem[];
   open: boolean;
+  collapsed?: boolean;
   onClose?: () => void;
+  userRoles: string[];
   variant?: 'permanent' | 'temporary';
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ menuItems, open, onClose, variant = 'permanent' }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  collapsed = false,
+  menuItems,
+  onClose,
+  open,
+  userRoles,
+  variant = 'permanent',
+}) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const userRole = useMemo(() => {
-    try {
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('auth_token');
-      if (!token) return null;
-      const payloadBase64 = token.split('.')[1];
-      const decodedPayload = JSON.parse(atob(payloadBase64));
-      return decodedPayload.role;
-    } catch {
-      return null;
-    }
-  }, []);
-
   const visibleMenuItems = useMemo(() => {
-    if (!userRole) return menuItems;
     return menuItems.filter(item => {
       if (!item.roles || item.roles.length === 0) return true;
-      return item.roles.includes(userRole);
+      return item.roles.some((role) => userRoles.includes(role));
     });
-  }, [menuItems, userRole]);
+  }, [menuItems, userRoles]);
 
   const content = (
-    <Box sx={{ overflow: 'auto', mt: 2 }}>
+    <Box sx={{ overflowX: 'hidden', overflowY: 'auto', mt: 2 }}>
       <List>
         {visibleMenuItems.map((item) => {
           const isSelected = location.pathname.startsWith(item.path);
           return (
             <ListItem key={item.path} disablePadding sx={{ display: 'block', mb: 0.5 }}>
-              <ListItemButton
-                selected={isSelected}
-                onClick={() => {
-                  navigate(item.path);
-                  if (variant === 'temporary' && onClose) {
-                    onClose();
-                  }
-                }}
-                sx={{
-                  minHeight: 48,
-                  px: 3,
-                  mx: 2,
-                  borderRadius: 2,
-                  '&.Mui-selected': {
-                    bgcolor: 'primary.main',
-                    color: 'primary.contrastText',
-                    '&:hover': {
-                      bgcolor: 'primary.dark',
-                    },
-                    '& .MuiListItemIcon-root': {
-                      color: 'primary.contrastText',
-                    },
-                  },
-                }}
-              >
-                <ListItemIcon
+              <Tooltip title={collapsed ? item.title : ''} placement="right">
+                <ListItemButton
+                  aria-label={item.title}
+                  selected={isSelected}
+                  onClick={() => {
+                    navigate(item.path);
+                    if (variant === 'temporary' && onClose) {
+                      onClose();
+                    }
+                  }}
                   sx={{
-                    minWidth: 40,
-                    color: isSelected ? 'inherit' : 'text.secondary',
+                    borderRadius: 2,
+                    justifyContent: collapsed ? 'center' : 'initial',
+                    minHeight: 48,
+                    mx: collapsed ? 1 : 2,
+                    px: collapsed ? 1.5 : 3,
+                    transition: (theme) => theme.transitions.create(['margin', 'padding'], {
+                      duration: theme.transitions.duration.shorter,
+                    }),
+                    '&.Mui-selected': {
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText',
+                      '&:hover': {
+                        bgcolor: 'primary.dark',
+                      },
+                      '& .MuiListItemIcon-root': {
+                        color: 'primary.contrastText',
+                      },
+                    },
                   }}
                 >
-                  <item.icon />
-                </ListItemIcon>
-                <ListItemText primary={<Typography sx={{ fontWeight: isSelected ? 600 : 500 }}>{item.title}</Typography>} />
-              </ListItemButton>
+                  <ListItemIcon
+                    sx={{
+                      color: isSelected ? 'inherit' : 'text.secondary',
+                      justifyContent: 'center',
+                      minWidth: collapsed ? 0 : 40,
+                      mr: collapsed ? 0 : 1,
+                    }}
+                  >
+                    <item.icon />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={<Typography sx={{ fontWeight: isSelected ? 600 : 500 }}>{item.title}</Typography>}
+                    sx={{
+                      opacity: collapsed ? 0 : 1,
+                      overflow: 'hidden',
+                      whiteSpace: 'nowrap',
+                      width: collapsed ? 0 : 'auto',
+                    }}
+                  />
+                </ListItemButton>
+              </Tooltip>
             </ListItem>
           );
         })}
@@ -96,18 +121,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ menuItems, open, onClose, vari
       variant={variant}
       open={open}
       onClose={onClose}
+      ModalProps={{ keepMounted: true }}
       sx={{
-        width: DRAWER_WIDTH,
+        width: variant === 'permanent'
+          ? (collapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH)
+          : 0,
         flexShrink: 0,
         '& .MuiDrawer-paper': {
-          width: DRAWER_WIDTH,
+          overflowX: 'hidden',
+          transition: (theme) => theme.transitions.create('width', {
+            duration: theme.transitions.duration.shorter,
+            easing: theme.transitions.easing.sharp,
+          }),
+          width: collapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
           boxSizing: 'border-box',
           borderRight: '1px solid',
           borderColor: 'divider',
         },
       }}
     >
-      <Toolbar /> {/* Spacer for AppBar */}
+      <Toolbar />
       {content}
     </Drawer>
   );

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
 import { adminKycService } from '../services/adminKycService';
-import { axiosClient } from '../../../shared/api/axiosClient';
 import type { KycRequestResponse } from '../services/adminKycService';
 
 export function KycQueuePage() {
@@ -9,21 +9,26 @@ export function KycQueuePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    adminKycService.getPendingKycQueue()
-      .then((data) => {
-        setQueue(data);
-        setLoading(false);
-      })
-      .catch((err: any) => {
-        if (err.response?.status === 401) {
-          setError('401');
-        } else {
-          setError('Không thể tải hàng đợi KYC. Vui lòng kiểm tra lại kết nối backend.');
-        }
-        setLoading(false);
-      });
+  const loadQueue = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      setQueue(await adminKycService.getPendingKycQueue());
+    } catch (requestError) {
+      setError(
+        isAxiosError(requestError) && requestError.response?.status === 401
+          ? 'Phiên đăng nhập đã hết hạn. Hệ thống đang chuyển về trang đăng nhập.'
+          : 'Không thể tải hàng đợi KYC. Vui lòng kiểm tra lại kết nối backend.',
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadQueue();
+  }, [loadQueue]);
 
   if (loading) {
     return (
@@ -34,46 +39,12 @@ export function KycQueuePage() {
     );
   }
 
-  if (error === '401') {
-    return (
-      <div className="bg-amber-50 border border-amber-200 text-amber-800 px-6 py-6 rounded-xl shadow-sm text-center max-w-lg mx-auto mt-10">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-100 text-amber-600 mb-4">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-        </div>
-        <h3 className="text-xl font-bold mb-2">Yêu cầu xác thực</h3>
-        <p className="mb-6 text-sm text-amber-700 leading-relaxed">
-          Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Vì hệ thống JWT chưa được kích hoạt hoàn toàn, vui lòng nhấn nút bên dưới để giả lập đăng nhập (Mock Session) cho Admin.
-        </p>
-        <button
-          onClick={async () => {
-            setLoading(true);
-            try {
-              await axiosClient.post('/v1/demo/login-admin');
-              setError(null);
-              const data = await adminKycService.getPendingKycQueue();
-              setQueue(data);
-            } catch {
-              setError('Không thể mock login. Vui lòng kiểm tra backend.');
-            } finally {
-              setLoading(false);
-            }
-          }}
-          className="inline-flex items-center justify-center px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg text-sm shadow transition hover:shadow-md w-full"
-        >
-          Tạo Mock Session (Đăng nhập Demo)
-        </button>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg shadow-sm">
         <p className="font-semibold">{error}</p>
         <button
-          onClick={() => { setLoading(true); setError(null); }}
+          onClick={() => void loadQueue()}
           className="mt-2 text-sm text-red-600 underline hover:text-red-800"
         >
           Thử lại

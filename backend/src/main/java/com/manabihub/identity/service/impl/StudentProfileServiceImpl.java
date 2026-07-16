@@ -67,15 +67,15 @@ public class StudentProfileServiceImpl implements StudentProfileService {
                 ));
 
         StudentProfile profile = studentProfileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.COMMON_NOT_FOUND,
-                        "Student profile not found",
-                        HttpStatus.NOT_FOUND
-                ));
+                .orElseGet(() -> StudentProfile.builder()
+                        .user(user)
+                        .build());
 
         studentProfileMapper.updateUser(user, request);
 
         studentProfileMapper.updateProfile(profile, request);
+
+        user.setStudentProfile(profile);
 
         try {
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { consumePostLoginRoute, storeAuthToken } from '../../shared/auth/authSession';
 
 export function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -13,28 +14,13 @@ export function AuthCallbackPage() {
       return;
     }
 
-    // Save token to localStorage (or your state management)
-    localStorage.setItem('auth_token', token);
-
-    try {
-      // Decode JWT payload (Base64Url decode)
-      const payloadBase64 = token.split('.')[1];
-      const decodedPayload = JSON.parse(atob(payloadBase64));
-
-      const role = decodedPayload.role;
-
-      // Redirect based on role (UC-02 returning user)
-      if (role === 'STUDENT') {
-        navigate('/student', { replace: true });
-      } else if (role === 'TEACHER') {
-        navigate('/teacher', { replace: true });
-      } else {
-        navigate('/', { replace: true });
-      }
-    } catch (e) {
-      setError('Invalid authentication token.');
-      console.error("Failed to decode token:", e);
+    const session = storeAuthToken('public', token);
+    if (!session) {
+      setError('Token đăng nhập không hợp lệ hoặc đã hết hạn.');
+      return;
     }
+
+    navigate(consumePostLoginRoute('public', session), { replace: true });
   }, [searchParams, navigate]);
 
   if (error) {
