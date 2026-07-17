@@ -550,11 +550,13 @@ function CourseDraftRow({
             {title}
           </Typography>
           <Chip color={
-            course.status === "SUBMITTED"
+            course.status === "PENDING"
+              ? "warning"
+              : course.status === "APPROVED"
                 ? "info"
-                : "warning"}
+                : "default"}
                 label={
-                  course.status === "SUBMITTED"
+                  course.status === "PENDING"
                       ? "Chờ duyệt"
                       : "Bản nháp"}
                 size="small" />

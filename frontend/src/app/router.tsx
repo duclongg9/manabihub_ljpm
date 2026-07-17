@@ -26,6 +26,8 @@ import { PublicLoginPage } from './pages/PublicLoginPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
 import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
+import { TeacherDashboardPage } from '../features/teacher/pages/TeacherDashboardPage';
+import { AdminDashboardPage } from '../features/admin/pages/AdminDashboardPage';
 
 export const router = createBrowserRouter([
   {
@@ -111,7 +113,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'dashboard',
-        element: <div>Teacher Dashboard Placeholder</div>,
+        element: <TeacherDashboardPage />,
       },
       {
         path: 'courses',
@@ -143,7 +145,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'wallet',
-        element: <div>Teacher Wallet Placeholder</div>,
+        element: <Navigate to="/teacher/dashboard" replace />,
       },
     ],
   },
@@ -157,7 +159,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'dashboard',
-        element: <div>Admin Dashboard Placeholder</div>,
+        element: <AdminDashboardPage />,
       },
       {
         path: 'notifications',
@@ -165,11 +167,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'settings',
-        element: <div>System Settings Placeholder</div>,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'users',
-        element: <div>User Management Placeholder</div>,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'kyc/review',
@@ -197,7 +199,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'finance',
-        element: <div>Finance Placeholder</div>,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
     ],
   },
