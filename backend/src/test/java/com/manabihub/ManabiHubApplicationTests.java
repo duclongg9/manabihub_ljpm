@@ -19,6 +19,8 @@ import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.service.TeacherKycService;
+import com.manabihub.learning.repository.CourseEnrollmentRepository;
+import com.manabihub.learning.repository.LessonProgressRepository;
 import com.manabihub.mock.repository.MockJlptRegistryRepository;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import com.manabihub.notification.repository.NotificationRepository;
@@ -110,6 +112,12 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private FinalTestRepository finalTestRepository;
+
+    @MockBean
+    private CourseEnrollmentRepository courseEnrollmentRepository;
+
+    @MockBean
+    private LessonProgressRepository lessonProgressRepository;
 
     @Test
     void contextLoads() {

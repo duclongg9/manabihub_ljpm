@@ -17,6 +17,8 @@ import { CourseApprovalQueuePage } from '../features/admin-course-approval/pages
 import { CourseApprovalDetailPage } from '../features/admin-course-approval/pages/CourseApprovalDetailPage';
 import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
 import { CourseDetailPage } from '../features/catalog/pages/CourseDetailPage';
+import { MyLearningPage } from '../features/learning/pages/MyLearningPage';
+import { CourseLearningPage } from '../features/learning/pages/CourseLearningPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
@@ -78,7 +80,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'dashboard',
-        element: <div>Student Dashboard Placeholder</div>,
+        element: <MyLearningPage />,
       },
       {
         path: 'profile',
@@ -94,7 +96,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'courses',
-        element: <div>Student Courses Placeholder</div>,
+        element: <MyLearningPage />,
+      },
+      {
+        path: 'courses/:courseId/learn',
+        element: <CourseLearningPage />,
       },
     ],
   },

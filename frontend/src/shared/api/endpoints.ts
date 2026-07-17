@@ -44,5 +44,12 @@ export const ENDPOINTS = {
   courseCategories: {
     list: '/v1/course-categories',
   },
+  LEARNING: {
+    MY_COURSES: '/v1/student/my-courses',
+    COURSE_LEARN: (courseId: string) => `/v1/student/courses/${courseId}/learn`,
+    COURSE_PROGRESS: (courseId: string) => `/v1/student/courses/${courseId}/progress`,
+    VIDEO_PROGRESS: (blockId: string) => `/v1/student/lessons/${blockId}/video-progress`,
+    MARK_COMPLETE: (blockId: string) => `/v1/student/lessons/${blockId}/complete`,
+  },
   ADMIN_LOGIN: '/admin/auth/login',
 };

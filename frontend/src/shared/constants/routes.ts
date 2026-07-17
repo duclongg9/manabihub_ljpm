@@ -10,6 +10,7 @@ export const ROUTES = {
   STUDENT: {
     DASHBOARD: '/student/dashboard',
     MY_COURSES: '/student/courses',
+    COURSE_LEARN: (courseId: string) => `/student/courses/${courseId}/learn`,
     PAYMENTS: '/student/payments',
     NOTIFICATIONS: '/student/notifications',
     PROFILE: '/student/profile',
