@@ -17,7 +17,6 @@ import {
   Paper,
   Radio,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -30,7 +29,7 @@ import { isAxiosError } from 'axios';
 import { learningService } from '../services/learningService';
 import type { CourseLearning, LearningLessonBlock, QuizQuestion } from '../types';
 import { ROUTES } from '../../../shared/constants/routes';
-
+import WritingLessonBlock from "../../writing/components/WritingBlock";
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
 
 export function CourseLearningPage() {
@@ -328,7 +327,12 @@ function BlockContent({ block, onVideoProgressSaved }: BlockContentProps) {
     case 'FLASHCARD':
       return <FlashcardBlock key={block.id} cards={block.flashcards} />;
     case 'WRITING':
-      return <WritingBlock key={block.id} prompt={block.writingPrompt} rubric={block.rubric} />;
+      return (
+          <WritingLessonBlock
+              key={block.id}
+              block={block}
+          />
+      );
     default:
       return null;
   }
@@ -507,35 +511,6 @@ function FlashcardBlock({ cards }: { cards: { front: string; back: string }[] })
           Thẻ sau
         </Button>
       </Stack>
-    </Stack>
-  );
-}
-
-function WritingBlock({ prompt, rubric }: { prompt?: string; rubric?: string }) {
-  const [draft, setDraft] = useState('');
-
-  return (
-    <Stack spacing={2}>
-      <Alert severity="info">Đề bài viết:</Alert>
-      <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-        {prompt}
-      </Typography>
-      {rubric && (
-        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>
-          Tiêu chí chấm: {rubric}
-        </Typography>
-      )}
-      <TextField
-        multiline
-        minRows={6}
-        fullWidth
-        placeholder="Viết bài của bạn tại đây (bài nộp writing sẽ được hỗ trợ trong chức năng riêng)..."
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      <Typography variant="caption" color="text.secondary">
-        Sau khi viết xong, hãy nhấn "Hoàn thành bài học" để ghi nhận tiến độ.
-      </Typography>
     </Stack>
   );
 }

@@ -86,4 +86,8 @@ public class LessonBlock {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    public boolean isWritingBlock() {
+        return type == LessonBlockType.WRITING;
+    }
 }

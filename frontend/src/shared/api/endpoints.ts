@@ -55,7 +55,11 @@ export const ENDPOINTS = {
 
   writing: {
 
-    submit: "/v1/student/writing/submit",
+    assignment: (lessonBlockId: string) =>
+        `/v1/student/writing/${lessonBlockId}`,
+
+    submit:
+        "/v1/student/writing/submit",
 
   },
 };

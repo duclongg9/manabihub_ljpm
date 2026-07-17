@@ -1,9 +1,19 @@
+/* ==========================
+   Common
+========================== */
+
 export interface ApiEnvelope<T> {
+
     success: boolean;
+
     messageCode: string;
+
     message: string;
+
     data: T;
+
     timestamp: string;
+
 }
 
 /* ==========================
@@ -27,8 +37,7 @@ export type WritingSubmissionStatus =
     | "SUBMITTED"
     | "SUGGESTION_PROCESSING"
     | "SUGGESTION_READY"
-    | "SUGGESTION_FAILED"
-    | "TEACHER_FEEDBACK_READY";
+    | "SUGGESTION_FAILED";
 
 /* ==========================
    Submission
@@ -107,5 +116,21 @@ export interface WritingResultResponse {
     submission: WritingSubmissionResponse;
 
     suggestion: AiWritingSuggestionResponse | null;
+
+}
+
+export interface WritingAssignmentResponse {
+
+    lessonBlockId: string;
+
+    title: string;
+
+    prompt: string;
+
+    rubric: string;
+
+    minCharacters: number;
+
+    maxCharacters: number;
 
 }

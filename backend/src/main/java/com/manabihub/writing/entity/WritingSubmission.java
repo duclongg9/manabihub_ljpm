@@ -12,7 +12,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -61,10 +60,9 @@ public class WritingSubmission {
     private StudentProfile student;
 
     /**
-     * Student writing.
+     * Student writing content.
      */
-    @Lob
-    @Column(nullable = false)
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
     /**
@@ -72,20 +70,35 @@ public class WritingSubmission {
      */
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 40)
+    @Column(name = "status", nullable = false, length = 40)
     private WritingSubmissionStatus status = WritingSubmissionStatus.SUBMITTED;
 
     /**
      * Submitted time.
      */
-    @Column(name = "submitted_at")
-    private Instant submittedAt;
+    @Builder.Default
+    @Column(name = "submitted_at", nullable = false)
+    private Instant submittedAt = Instant.now();
 
+    /**
+     * Created time.
+     */
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /**
+     * Updated time.
+     */
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    public boolean isProcessing() {
+        return status == WritingSubmissionStatus.SUGGESTION_PROCESSING;
+    }
+
+    public boolean isReady() {
+        return status == WritingSubmissionStatus.SUGGESTION_READY;
+    }
 }

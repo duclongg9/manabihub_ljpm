@@ -1,19 +1,26 @@
 package com.manabihub.writing.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.UUID;
-
+/**
+ * Yêu cầu nộp bài viết.
+ */
 @Getter
 @Setter
 public class SubmitWritingRequest {
 
-    @NotNull
-    private UUID lessonBlockId;
-
-    @NotBlank
+    /**
+     * Nội dung bài viết.
+     */
+    @NotBlank(message = "MSG-WRITE-001")
+    @Size(max = 10000, message = "MSG-WRITE-002")
     private String content;
+
+    /**
+     * Có yêu cầu AI gợi ý hay không.
+     */
+    private boolean requestAiSuggestion;
 }

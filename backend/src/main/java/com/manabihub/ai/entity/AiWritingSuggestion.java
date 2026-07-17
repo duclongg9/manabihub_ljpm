@@ -2,23 +2,15 @@ package com.manabihub.ai.entity;
 
 import com.manabihub.ai.enums.SuggestionStatus;
 import com.manabihub.writing.entity.WritingSubmission;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -39,8 +31,12 @@ public class AiWritingSuggestion {
     /**
      * Related writing submission.
      */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "writing_submission_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "writing_submission_id",
+            nullable = false,
+            unique = true
+    )
     private WritingSubmission writingSubmission;
 
     /**
@@ -58,31 +54,30 @@ public class AiWritingSuggestion {
     private SuggestionStatus suggestionStatus = SuggestionStatus.READY;
 
     /**
-     * Grammar suggestions (JSON).
+     * Grammar suggestions (JSONB).
      */
-    @Lob
-    @Column(name = "grammar_suggestions")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "grammar_suggestions", columnDefinition = "jsonb")
     private String grammarSuggestions;
 
     /**
-     * Vocabulary suggestions (JSON).
+     * Vocabulary suggestions (JSONB).
      */
-    @Lob
-    @Column(name = "vocabulary_suggestions")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "vocabulary_suggestions", columnDefinition = "jsonb")
     private String vocabularySuggestions;
 
     /**
-     * Structure suggestions (JSON).
+     * Structure suggestions (JSONB).
      */
-    @Lob
-    @Column(name = "structure_suggestions")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "structure_suggestions", columnDefinition = "jsonb")
     private String structureSuggestions;
 
     /**
      * AI revision guidance.
      */
-    @Lob
-    @Column(name = "revision_guidance")
+    @Column(name = "revision_guidance", columnDefinition = "TEXT")
     private String revisionGuidance;
 
     /**
@@ -99,17 +94,16 @@ public class AiWritingSuggestion {
     private Boolean official = false;
 
     /**
-     * Raw provider response.
+     * Raw provider response (JSONB).
      */
-    @Lob
-    @Column(name = "raw_response")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_response", columnDefinition = "jsonb")
     private String rawResponse;
 
     /**
      * Failure reason if AI request failed.
      */
-    @Lob
-    @Column(name = "failure_reason")
+    @Column(name = "failure_reason", columnDefinition = "TEXT")
     private String failureReason;
 
     @CreationTimestamp
