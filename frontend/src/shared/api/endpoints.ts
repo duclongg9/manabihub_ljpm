@@ -52,4 +52,10 @@ export const ENDPOINTS = {
     MARK_COMPLETE: (blockId: string) => `/v1/student/lessons/${blockId}/complete`,
   },
   ADMIN_LOGIN: '/admin/auth/login',
+
+  writing: {
+
+    submit: "/v1/student/writing/submit",
+
+  },
 };
