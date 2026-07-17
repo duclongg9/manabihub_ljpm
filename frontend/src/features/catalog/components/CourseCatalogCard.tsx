@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardActionArea,
   CardContent,
-  CardMedia,
   Chip,
   Stack,
   Typography,
@@ -11,6 +10,7 @@ import {
 } from '@mui/material';
 import SchoolIcon from '@mui/icons-material/School';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
 import { useNavigate } from 'react-router-dom';
 import type { PublicCourseSummary } from '../types/catalogTypes';
 
@@ -28,6 +28,7 @@ const JLPT_COLORS: Record<string, string> = {
 
 export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) => {
   const navigate = useNavigate();
+  const [imageFailed, setImageFailed] = useState(false);
 
   const formatPrice = (price: number, currency: string) => {
     if (price === 0) return 'Miễn phí';
@@ -61,20 +62,30 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
         onClick={handleClick}
         sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
       >
-        <CardMedia
-          component="img"
-          height="160"
-          image={course.thumbnailUrl || '/placeholder-course.png'}
-          alt={course.title}
-          sx={{
-            objectFit: 'cover',
-            bgcolor: 'grey.200',
-          }}
-          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-            e.currentTarget.src = '';
-            e.currentTarget.style.display = 'none';
-          }}
-        />
+        {course.thumbnailUrl && !imageFailed ? (
+          <Box
+            component="img"
+            src={course.thumbnailUrl}
+            alt={course.title}
+            onError={() => setImageFailed(true)}
+            sx={{ width: '100%', height: 160, objectFit: 'cover', bgcolor: 'grey.100' }}
+          />
+        ) : (
+          <Box
+            role="img"
+            aria-label={`Chưa có ảnh bìa cho ${course.title}`}
+            sx={{
+              height: 160,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'grey.100',
+              color: 'text.disabled',
+            }}
+          >
+            <ImageNotSupportedOutlinedIcon sx={{ fontSize: 48 }} />
+          </Box>
+        )}
 
         <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1, p: 2 }}>
           {/* JLPT Level + Category */}
