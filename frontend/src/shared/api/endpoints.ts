@@ -25,6 +25,10 @@ export const ENDPOINTS = {
     student: '/v1/student/profile',
     teacher: '/v1/teacher/profile',
   },
+  student: {
+    dashboardStats: '/v1/student/dashboard/stats',
+    courses: '/v1/student/courses',
+  },
   teacherCourses: {
     drafts: '/v1/teacher/courses/drafts',
     draftDetail: (id: string) => `/v1/teacher/courses/drafts/${id}`,
