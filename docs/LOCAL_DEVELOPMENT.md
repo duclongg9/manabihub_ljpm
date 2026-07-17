@@ -64,7 +64,7 @@ When the database is running via `dev-db-up.ps1`, you can connect to it using th
 
 ## Important Notes
 
-- **AI Writing is Suggestion-Only**: AI features in ManabiHub are for providing preliminary suggestions (grammar, vocabulary) and are NOT used for official grading, scoring, course completion, or refund decisions.
+- **AI Writing is Suggestion-Only**: AI features in ManabiHub provide preliminary language and revision suggestions. Teacher feedback remains the authoritative learning record, and AI output never determines course completion or refund decisions.
 - **Admin Roles**: The system uses three distinct internal roles:
   - `SYSTEM_ADMIN`: System configuration, internal account management, audit logs.
   - `COURSE_MANAGER`: Teacher KYC review, course publication approval, content moderation.
