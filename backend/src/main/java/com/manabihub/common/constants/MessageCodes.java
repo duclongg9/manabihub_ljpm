@@ -205,4 +205,10 @@ public final class MessageCodes {
     public static final String SYSTEM_MAINTENANCE = "SYSTEM_MAINTENANCE";
     public static final String SYSTEM_RATE_LIMITED = "SYSTEM_RATE_LIMITED";
 
+    // ──────────────────────────────────────────────
+    // WRITING — AI Writing Assessment
+    // ──────────────────────────────────────────────
+    public static final String MSG_WRITE_001 = "MSG-WRITE-001"; // Writing content too short
+    public static final String MSG_WRITE_002 = "MSG-WRITE-002"; // Writing submitted
+    public static final String MSG_WRITE_003 = "MSG-WRITE-003"; // Writing submission failed
 }
