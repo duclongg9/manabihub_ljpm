@@ -5,6 +5,7 @@ import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.dto.request.CreateCourseDraftRequest;
 import com.manabihub.course.dto.response.CourseDraftResponse;
 import com.manabihub.course.dto.response.PublicCourseDetailResponse;
+import com.manabihub.course.dto.response.PublicCourseSummaryResponse;
 import com.manabihub.course.dto.response.PublicModuleResponse;
 import com.manabihub.course.dto.response.PublicLessonBlockResponse;
 import com.manabihub.course.entity.Course;
@@ -14,6 +15,7 @@ import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.repository.PublicCourseSpecification;
 import com.manabihub.course.service.CourseService;
 import com.manabihub.course.service.CourseValidationService;
 import com.manabihub.course.dto.response.ValidationResultResponse;
@@ -22,6 +24,8 @@ import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -274,8 +278,6 @@ public class CourseServiceImpl implements CourseService {
                         .avatarUrl(course.getTeacher().getUser() != null ? course.getTeacher().getUser().getAvatarUrl() : null)
                         .bio(course.getTeacher().getBio())
                         .build())
-                .averageRating(0.0) // Mocked as 0 for now until Review module is ready
-                .totalReviews(0) // Mocked as 0 for now until Review module is ready
                 .isEnrolled(isEnrolled)
                 .totalDurationMinutes(totalDurationMinutes)
                 .totalLessons(totalLessons)
@@ -479,6 +481,53 @@ public class CourseServiceImpl implements CourseService {
 
     private String blankToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PublicCourseSummaryResponse> searchPublicCourses(
+            String keyword,
+            String category,
+            com.manabihub.course.enums.JlptLevel jlptLevel,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Pageable pageable
+    ) {
+        var spec = PublicCourseSpecification.buildSearch(keyword, category, jlptLevel, minPrice, maxPrice);
+        Page<Course> coursePage = courseRepository.findAll(spec, pageable);
+
+        return coursePage.map(this::toSummaryResponse);
+    }
+
+    private PublicCourseSummaryResponse toSummaryResponse(Course course) {
+        int totalLessons = 0;
+        for (CourseModule module : course.getModules()) {
+            totalLessons += module.getBlocks().size();
+        }
+
+        String teacherName = null;
+        String teacherAvatarUrl = null;
+        if (course.getTeacher() != null) {
+            teacherName = course.getTeacher().getDisplayName();
+            if (course.getTeacher().getUser() != null) {
+                teacherAvatarUrl = course.getTeacher().getUser().getAvatarUrl();
+            }
+        }
+
+        return PublicCourseSummaryResponse.builder()
+                .id(course.getId())
+                .title(course.getTitle())
+                .slug(course.getSlug())
+                .thumbnailUrl(course.getThumbnailUrl())
+                .jlptLevel(course.getJlptLevel())
+                .category(course.getCategory())
+                .price(course.getPrice())
+                .currency(course.getCurrency())
+                .teacherName(teacherName)
+                .teacherAvatarUrl(teacherAvatarUrl)
+                .totalLessons(totalLessons)
+                .publishedAt(course.getPublishedAt())
+                .build();
     }
 
 }

@@ -44,5 +44,8 @@ export const ENDPOINTS = {
   courseCategories: {
     list: '/v1/course-categories',
   },
+  publicCourses: {
+    list: '/v1/public/courses',
+  },
   ADMIN_LOGIN: '/admin/auth/login',
 };
