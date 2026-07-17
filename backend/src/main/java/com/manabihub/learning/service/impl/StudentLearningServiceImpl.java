@@ -1,6 +1,8 @@
 package com.manabihub.learning.service.impl;
 
 import com.manabihub.common.response.PageResponse;
+import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
@@ -14,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +28,9 @@ import java.util.UUID;
 @Slf4j
 public class StudentLearningServiceImpl implements StudentLearningService {
 
+    private static final List<EnrollmentStatus> LEARNING_STATUSES =
+            List.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED);
+
     private final EnrollmentRepository enrollmentRepository;
     private final StudentProfileRepository studentProfileRepository;
 
@@ -32,15 +38,15 @@ public class StudentLearningServiceImpl implements StudentLearningService {
     @Transactional(readOnly = true)
     public StudentDashboardStatsResponse getDashboardStats(UUID userId) {
         StudentProfile profile = studentProfileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new com.manabihub.common.exception.BusinessException(
-                        com.manabihub.common.constants.MessageCodes.COMMON_BAD_REQUEST,
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COMMON_NOT_FOUND,
                         "Student profile not found for user",
-                        org.springframework.http.HttpStatus.BAD_REQUEST));
+                        HttpStatus.NOT_FOUND));
 
         UUID studentId = profile.getId();
-        int total = enrollmentRepository.countByStudentId(studentId);
         int active = enrollmentRepository.countByStudentIdAndStatus(studentId, EnrollmentStatus.ACTIVE);
         int completed = enrollmentRepository.countByStudentIdAndStatus(studentId, EnrollmentStatus.COMPLETED);
+        int total = active + completed;
 
         return StudentDashboardStatsResponse.builder()
                 .totalEnrolledCourses(total)
@@ -53,14 +59,14 @@ public class StudentLearningServiceImpl implements StudentLearningService {
     @Transactional(readOnly = true)
     public PageResponse<StudentCourseSummaryResponse> getEnrolledCourses(UUID userId, Pageable pageable) {
         StudentProfile profile = studentProfileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new com.manabihub.common.exception.BusinessException(
-                        com.manabihub.common.constants.MessageCodes.COMMON_BAD_REQUEST,
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COMMON_NOT_FOUND,
                         "Student profile not found for user",
-                        org.springframework.http.HttpStatus.BAD_REQUEST));
+                        HttpStatus.NOT_FOUND));
 
         Page<Enrollment> enrollmentsPage = enrollmentRepository.findByStudentIdAndStatusIn(
-                profile.getId(), 
-                List.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED), 
+                profile.getId(),
+                LEARNING_STATUSES,
                 pageable);
 
         Page<StudentCourseSummaryResponse> responsePage = enrollmentsPage.map(this::mapToSummaryResponse);

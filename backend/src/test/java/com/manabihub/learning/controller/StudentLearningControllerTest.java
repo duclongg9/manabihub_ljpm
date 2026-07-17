@@ -67,9 +67,11 @@ class StudentLearningControllerTest {
         mockMvc.perform(get("/api/v1/student/dashboard/stats")
                         .with(jwt().jwt(builder -> builder.subject(userId.toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalEnrolledCourses", is(5)))
-                .andExpect(jsonPath("$.activeCourses", is(3)))
-                .andExpect(jsonPath("$.completedCourses", is(2)));
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.messageCode", is("COMMON_SUCCESS")))
+                .andExpect(jsonPath("$.data.totalEnrolledCourses", is(5)))
+                .andExpect(jsonPath("$.data.activeCourses", is(3)))
+                .andExpect(jsonPath("$.data.completedCourses", is(2)));
     }
 
     @Test
@@ -117,9 +119,11 @@ class StudentLearningControllerTest {
         mockMvc.perform(get("/api/v1/student/courses")
                         .with(jwt().jwt(builder -> builder.subject(userId.toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(1)))
-                .andExpect(jsonPath("$.content[0].courseTitle", is("Test Course")))
-                .andExpect(jsonPath("$.content[0].enrollmentStatus", is("ACTIVE")));
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.messageCode", is("COMMON_SUCCESS")))
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].courseTitle", is("Test Course")))
+                .andExpect(jsonPath("$.data.content[0].enrollmentStatus", is("ACTIVE")));
     }
 
     @Test

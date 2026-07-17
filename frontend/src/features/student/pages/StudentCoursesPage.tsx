@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Box, Typography, Grid, CircularProgress, Alert, Pagination, Paper, Button } from '@mui/material';
 import SchoolIcon from '@mui/icons-material/School';
+import { useNavigate } from 'react-router-dom';
 import { useStudentCourses } from '../hooks/useStudentCourses';
 import { StudentCourseCard } from '../components/StudentCourseCard';
 import type { StudentCourseSummary } from '../types/studentTypes';
 
 export const StudentCoursesPage: React.FC = () => {
+  const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const pageSize = 12;
 
@@ -51,11 +53,11 @@ export const StudentCoursesPage: React.FC = () => {
           <Typography color="text.secondary" sx={{ mb: 4 }}>
             Start your learning journey by exploring our wide range of courses.
           </Typography>
-          <Button 
-            variant="contained" 
-            size="large" 
+          <Button
+            variant="contained"
+            size="large"
             color="primary"
-            onClick={() => window.location.href = '/courses'}
+            onClick={() => navigate('/courses')}
             sx={{ px: 4, py: 1.5, borderRadius: 2, fontWeight: 'bold' }}
           >
             Explore Courses
@@ -73,11 +75,11 @@ export const StudentCoursesPage: React.FC = () => {
 
           {totalPages > 1 && (
             <Box sx={{ mt: 6, display: 'flex', justifyContent: 'center' }}>
-              <Pagination 
-                count={totalPages} 
-                page={page + 1} 
-                onChange={handlePageChange} 
-                color="primary" 
+              <Pagination
+                count={totalPages}
+                page={page + 1}
+                onChange={handlePageChange}
+                color="primary"
                 size="large"
               />
             </Box>

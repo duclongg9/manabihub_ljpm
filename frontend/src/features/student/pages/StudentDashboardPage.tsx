@@ -1,11 +1,13 @@
 import React from 'react';
-import { Box, Typography, Grid, Paper, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, Grid, Paper, CircularProgress, Alert, Button } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { useStudentStats } from '../hooks/useStudentStats';
 import SchoolIcon from '@mui/icons-material/School';
 import PlayCircleOutlinedIcon from '@mui/icons-material/PlayCircleOutlined';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 
 export const StudentDashboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const { data: stats, isLoading, isError, error } = useStudentStats();
 
   if (isLoading) {
@@ -49,9 +51,23 @@ export const StudentDashboardPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
-      <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold' }}>
-        Dashboard
-      </Typography>
+      <Box
+        sx={{
+          mb: 4,
+          display: 'flex',
+          alignItems: { xs: 'stretch', sm: 'center' },
+          justifyContent: 'space-between',
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: 2,
+        }}
+      >
+        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+          Dashboard
+        </Typography>
+        <Button variant="contained" onClick={() => navigate('/student/courses')}>
+          View My Learning
+        </Button>
+      </Box>
 
       <Grid container spacing={3}>
         {statCards.map((card, index) => (
