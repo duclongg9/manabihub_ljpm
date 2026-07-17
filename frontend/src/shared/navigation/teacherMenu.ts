@@ -3,7 +3,6 @@ import { ROLES } from '../constants/roles';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import WalletIcon from '@mui/icons-material/Wallet';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 export const TEACHER_MENU = [
@@ -24,12 +23,6 @@ export const TEACHER_MENU = [
     path: ROUTES.TEACHER.KYC,
     icon: VerifiedUserIcon,
     roles: [ROLES.STUDENT, ROLES.TEACHER],
-  },
-  {
-    title: 'Ví & Thanh toán',
-    path: ROUTES.TEACHER.WALLET,
-    icon: WalletIcon,
-    roles: [ROLES.TEACHER],
   },
   {
     title: 'Hồ sơ',

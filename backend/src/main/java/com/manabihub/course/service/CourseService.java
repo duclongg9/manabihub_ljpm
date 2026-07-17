@@ -17,6 +17,8 @@ public interface CourseService {
 
     List<CourseDraftResponse> listMyDrafts();
 
+    com.manabihub.course.dto.response.TeacherDashboardResponse getTeacherDashboardStats();
+
     CourseDraftResponse updateDraft(UUID draftId, CreateCourseDraftRequest request);
 
     void deleteDraft(UUID draftId);

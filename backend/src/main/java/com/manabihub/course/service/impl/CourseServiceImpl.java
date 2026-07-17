@@ -113,6 +113,40 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public com.manabihub.course.dto.response.TeacherDashboardResponse getTeacherDashboardStats() {
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+
+        List<Course> allCourses = courseRepository.findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(
+                teacherProfile.getId(), CourseStatus.ARCHIVED);
+
+        long totalCourses = allCourses.size();
+        long draftOrCorrection = allCourses.stream()
+                .filter(c -> c.getStatus() == CourseStatus.DRAFT || c.getStatus() == CourseStatus.FORCED_DRAFT || c.getStatus() == CourseStatus.REJECTED)
+                .count();
+        long pendingApproval = allCourses.stream()
+                .filter(c -> c.getStatus() == CourseStatus.PENDING)
+                .count();
+        long published = allCourses.stream()
+                .filter(c -> c.getStatus() == CourseStatus.PUBLISHED)
+                .count();
+
+        List<CourseDraftResponse> recentCourses = allCourses.stream()
+                .limit(4)
+                .map(this::toResponse)
+                .toList();
+
+        return com.manabihub.course.dto.response.TeacherDashboardResponse.builder()
+                .totalCourses(totalCourses)
+                .draftOrCorrection(draftOrCorrection)
+                .pendingApproval(pendingApproval)
+                .published(published)
+                .recentCourses(recentCourses)
+                .build();
+    }
+
+    @Override
     public CourseDraftResponse updateDraft(UUID draftId, CreateCourseDraftRequest request) {
         UUID currentUserId = currentUserService.getCurrentUserId();
         TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
