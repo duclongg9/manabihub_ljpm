@@ -13,6 +13,8 @@ export const ROUTES = {
     PAYMENTS: '/student/payments',
     NOTIFICATIONS: '/student/notifications',
     PROFILE: '/student/profile',
+    AI_CHAT: (courseId: string, lessonBlockId: string) =>
+      `/student/courses/${courseId}/lesson-blocks/${lessonBlockId}/ai-chat`,
   },
   TEACHER: {
     DASHBOARD: '/teacher/dashboard',

@@ -12,11 +12,7 @@ public class AiChatContextBuilder {
     private static final int MAX_CONTEXT_LENGTH = 12_000;
 
     public AiChatContext build(Course course, LessonBlock lessonBlock) {
-        String blockContent = firstNonBlank(
-                lessonBlock.getContent(),
-                lessonBlock.getWritingPrompt(),
-                "No text content is available for this lesson block."
-        );
+        String blockContent = buildLessonContent(lessonBlock);
 
         return new AiChatContext(
                 course.getId(),
@@ -29,13 +25,29 @@ public class AiChatContextBuilder {
         );
     }
 
-    private String firstNonBlank(String... values) {
-        for (String value : values) {
-            if (StringUtils.hasText(value)) {
-                return value;
-            }
+    private String buildLessonContent(LessonBlock lessonBlock) {
+        StringBuilder content = new StringBuilder();
+        appendSection(content, "Lesson text", lessonBlock.getContent());
+        appendSection(content, "Quiz question", lessonBlock.getQuizQuestion());
+        appendSection(content, "Quiz options", lessonBlock.getQuizOptionsJson());
+        appendSection(content, "Flashcards", lessonBlock.getFlashcardsJson());
+        appendSection(content, "Writing prompt", lessonBlock.getWritingPrompt());
+        appendSection(content, "Writing rubric", lessonBlock.getRubric());
+
+        if (content.isEmpty()) {
+            return "No text content is available for this lesson block.";
         }
-        return "";
+        return content.toString();
+    }
+
+    private void appendSection(StringBuilder target, String label, String value) {
+        if (!StringUtils.hasText(value)) {
+            return;
+        }
+        if (!target.isEmpty()) {
+            target.append("\n\n");
+        }
+        target.append(label).append(":\n").append(value.trim());
     }
 
     private String truncate(String value, int maxLength) {

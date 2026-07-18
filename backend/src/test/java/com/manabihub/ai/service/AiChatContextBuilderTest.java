@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AiChatContextBuilderTest {
 
@@ -49,7 +50,36 @@ class AiChatContextBuilderTest {
         AiChatContext context = contextBuilder.build(course, currentBlock);
 
         assertEquals(currentBlock.getId(), context.lessonBlockId());
-        assertEquals("Use wa for the topic.", context.lessonContent());
+        assertEquals("Lesson text:\nUse wa for the topic.", context.lessonContent());
         assertFalse(context.lessonContent().contains("UNRELATED_BLOCK_CONTENT"));
+    }
+
+    @Test
+    void build_UsesStructuredBlockContentWithoutExposingQuizAnswer() {
+        Course course = Course.builder()
+                .id(UUID.randomUUID())
+                .title("N5 Review")
+                .build();
+        CourseModule module = CourseModule.builder()
+                .id(UUID.randomUUID())
+                .course(course)
+                .title("Review")
+                .orderIndex(1)
+                .build();
+        LessonBlock quizBlock = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .module(module)
+                .title("Particle quiz")
+                .quizQuestion("Choose the topic marker")
+                .quizOptionsJson("[\"wa\",\"o\"]")
+                .quizAnswer("SECRET_CORRECT_ANSWER")
+                .orderIndex(1)
+                .build();
+
+        AiChatContext context = contextBuilder.build(course, quizBlock);
+
+        assertTrue(context.lessonContent().contains("Choose the topic marker"));
+        assertTrue(context.lessonContent().contains("[\"wa\",\"o\"]"));
+        assertFalse(context.lessonContent().contains("SECRET_CORRECT_ANSWER"));
     }
 }

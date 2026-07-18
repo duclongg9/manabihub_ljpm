@@ -35,6 +35,7 @@ export interface PublicCourseDetail {
   prerequisites?: string;
   targetStudents?: string;
   publishedAt?: string;
+  aiSupported: boolean;
   teacher: PublicTeacherProfile;
   isEnrolled: boolean;
   totalDurationMinutes: number;

@@ -26,11 +26,12 @@ public class PublicCourseDetailResponse {
     private String prerequisites;
     private String targetStudents;
     private Instant publishedAt;
+    private Boolean aiSupported;
 
     // Teacher Info
     private TeacherDto teacher;
 
-    // Enrollment mock
+    // Enrollment is resolved from the authenticated public session when present.
     private Boolean isEnrolled;
 
     // Aggregation

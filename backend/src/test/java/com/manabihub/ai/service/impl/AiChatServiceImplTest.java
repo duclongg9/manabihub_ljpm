@@ -148,6 +148,56 @@ class AiChatServiceImplTest {
     }
 
     @Test
+    void getEligibility_WhenStudentIsNotEnrolled_ReturnsUnavailable() {
+        when(courseRepository.checkEnrollmentExists(courseId, userId)).thenReturn(false);
+
+        AiChatEligibilityResponse response = service.getEligibility(courseId, lessonBlockId);
+
+        assertFalse(response.eligible());
+        assertEquals(MessageCodes.MSG_AI_008, response.unavailableCode());
+        verifyNoInteractions(aiChatProvider);
+    }
+
+    @Test
+    void getEligibility_WhenCourseIsBelowPriceFloor_ReturnsUnavailable() {
+        course.setPrice(new BigDecimal("99999.99"));
+
+        AiChatEligibilityResponse response = service.getEligibility(courseId, lessonBlockId);
+
+        assertFalse(response.eligible());
+        assertEquals(MessageCodes.MSG_AI_008, response.unavailableCode());
+        verifyNoInteractions(aiChatProvider);
+    }
+
+    @Test
+    void getEligibility_WhenCourseDoesNotSupportAi_ReturnsUnavailable() {
+        course.setAiSupported(false);
+
+        AiChatEligibilityResponse response = service.getEligibility(courseId, lessonBlockId);
+
+        assertFalse(response.eligible());
+        assertEquals(MessageCodes.MSG_AI_008, response.unavailableCode());
+        verifyNoInteractions(aiChatProvider);
+    }
+
+    @Test
+    void getEligibility_WhenChatbotSettingIsDisabled_ReturnsUnavailable() {
+        when(aiChatSettingsService.getSettings()).thenReturn(new AiChatSettingsService.AiChatSettings(
+                true,
+                false,
+                new BigDecimal("100000"),
+                10,
+                50
+        ));
+
+        AiChatEligibilityResponse response = service.getEligibility(courseId, lessonBlockId);
+
+        assertFalse(response.eligible());
+        assertEquals(MessageCodes.MSG_AI_008, response.unavailableCode());
+        verifyNoInteractions(aiChatProvider);
+    }
+
+    @Test
     void getEligibility_WhenLessonBlockIsNotInCourse_ReturnsNotFound() {
         UUID unrelatedBlockId = UUID.randomUUID();
         when(lessonBlockRepository.findByIdAndCourseId(unrelatedBlockId, courseId)).thenReturn(Optional.empty());

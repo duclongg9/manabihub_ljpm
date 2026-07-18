@@ -83,7 +83,14 @@ export function AiChatPanel({ courseId, lessonBlockId }: AiChatPanelProps) {
   }
 
   if (eligibility.isError) {
-    return <Alert severity="error">Unable to check AI chat availability for this lesson.</Alert>;
+    return (
+      <Alert
+        severity="error"
+        action={<Button color="inherit" size="small" onClick={() => eligibility.refetch()}>Retry</Button>}
+      >
+        Unable to check AI chat availability for this lesson.
+      </Alert>
+    );
   }
 
   const available = eligibility.data?.eligible === true;
@@ -114,7 +121,11 @@ export function AiChatPanel({ courseId, lessonBlockId }: AiChatPanelProps) {
         </Box>
       ) : (
         <Stack spacing={2} sx={{ p: 2 }}>
-          <Box sx={{ minHeight: 280, maxHeight: 400, overflowY: 'auto', display: 'grid', alignContent: 'start', gap: 1.25 }}>
+          <Box
+            role="log"
+            aria-live="polite"
+            sx={{ minHeight: 280, maxHeight: 400, overflowY: 'auto', display: 'grid', alignContent: 'start', gap: 1.25 }}
+          >
             {messages.length === 0 ? (
               <Typography variant="body2" color="text.secondary">Ask a question about this lesson.</Typography>
             ) : messages.map((message) => (

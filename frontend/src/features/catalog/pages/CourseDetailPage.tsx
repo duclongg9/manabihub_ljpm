@@ -115,7 +115,11 @@ export const CourseDetailPage = () => {
               <div className="flex justify-between items-center mb-4 text-sm text-slate-600">
                 <span>{course.modules.length} phần • {course.totalLessons || course.modules.reduce((acc, m) => acc + m.blocks.length, 0)} bài học</span>
               </div>
-              <CurriculumAccordion modules={course.modules} />
+              <CurriculumAccordion
+                modules={course.modules}
+                courseId={course.id}
+                showAiChatAction={course.isEnrolled && course.aiSupported}
+              />
             </div>
 
             {/* Prerequisites */}
