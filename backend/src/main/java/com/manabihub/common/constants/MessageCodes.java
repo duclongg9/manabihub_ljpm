@@ -119,6 +119,8 @@ public final class MessageCodes {
     public static final String MSG_GOAL_004 = "MSG-GOAL-004";
     public static final String MSG_CATALOG_001 = "MSG-CATALOG-001";
     public static final String MSG_WRITE_005 = "MSG-WRITE-005";
+    public static final String WRITING_SUBMISSION_NOT_FOUND = "WRITING_SUBMISSION_NOT_FOUND";
+    public static final String TEACHER_FEEDBACK_SUBMITTED = "TEACHER_FEEDBACK_SUBMITTED";
     // ──────────────────────────────────────────────
     // CONTENT — lesson / content management
     // ──────────────────────────────────────────────

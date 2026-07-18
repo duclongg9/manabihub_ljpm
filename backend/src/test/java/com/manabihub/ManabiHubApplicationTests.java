@@ -25,6 +25,9 @@ import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.course.repository.CourseApprovalDecisionRepository;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.writing.repository.AiWritingSuggestionRepository;
+import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
+import com.manabihub.writing.repository.WritingSubmissionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -114,6 +117,15 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private EnrollmentRepository enrollmentRepository;
+
+    @MockBean
+    private WritingSubmissionRepository writingSubmissionRepository;
+
+    @MockBean
+    private AiWritingSuggestionRepository aiWritingSuggestionRepository;
+
+    @MockBean
+    private TeacherWritingFeedbackRepository teacherWritingFeedbackRepository;
 
     @Test
     void contextLoads() {

@@ -19,6 +19,8 @@ export const ROUTES = {
     COURSES: '/teacher/courses',
     COURSE_CREATE: '/teacher/courses/new',
     COURSE_BUILDER: (draftId: string) => `/teacher/courses/${draftId}/builder`,
+    WRITING_REVIEWS: '/teacher/writing-reviews',
+    WRITING_REVIEW_DETAIL: (submissionId: string) => `/teacher/writing-reviews/${submissionId}`,
     KYC: '/teacher/kyc',
     WALLET: '/teacher/wallet',
     NOTIFICATIONS: '/teacher/notifications',

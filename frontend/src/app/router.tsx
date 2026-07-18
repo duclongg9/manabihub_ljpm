@@ -28,6 +28,8 @@ import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
 import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
 import { TeacherDashboardPage } from '../features/teacher/pages/TeacherDashboardPage';
 import { AdminDashboardPage } from '../features/admin/pages/AdminDashboardPage';
+import { TeacherWritingReviewsPage } from '../features/writing-review/pages/TeacherWritingReviewsPage';
+import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages/TeacherWritingReviewDetailPage';
 
 export const router = createBrowserRouter([
   {
@@ -130,6 +132,14 @@ export const router = createBrowserRouter([
       {
         path: 'courses/:courseId/final-test',
         element: <FinalTestConfigPage />,
+      },
+      {
+        path: 'writing-reviews',
+        element: <TeacherWritingReviewsPage />,
+      },
+      {
+        path: 'writing-reviews/:submissionId',
+        element: <TeacherWritingReviewDetailPage />,
       },
       {
         path: 'profile',
