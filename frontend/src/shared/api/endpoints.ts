@@ -28,6 +28,11 @@ export const ENDPOINTS = {
   teacherDashboard: {
     stats: '/v1/teacher/dashboard',
   },
+  teacherWriting: {
+    submissions: '/v1/teacher/writing-submissions',
+    detail: (submissionId: string) => `/v1/teacher/writing-submissions/${submissionId}`,
+    feedback: (submissionId: string) => `/v1/teacher/writing-submissions/${submissionId}/feedback`,
+  },
   student: {
     dashboardStats: '/v1/student/dashboard/stats',
     courses: '/v1/student/courses',
