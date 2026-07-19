@@ -37,6 +37,11 @@ export const ENDPOINTS = {
     dashboardStats: '/v1/student/dashboard/stats',
     courses: '/v1/student/courses',
   },
+  studentWriting: {
+    assignment: (lessonBlockId: string) =>
+        `/v1/student/writing/assignment/${lessonBlockId}`,
+    submit: "/v1/student/writing/submit",
+  },
   teacherCourses: {
     drafts: '/v1/teacher/courses/drafts',
     draftDetail: (id: string) => `/v1/teacher/courses/drafts/${id}`,
