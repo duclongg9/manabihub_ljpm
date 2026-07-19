@@ -203,4 +203,11 @@ public final class MessageCodes {
     public static final String SYSTEM_MAINTENANCE = "SYSTEM_MAINTENANCE";
     public static final String SYSTEM_RATE_LIMITED = "SYSTEM_RATE_LIMITED";
 
+    // ──────────────────────────────────────────────
+    // WRITING — writing assignment
+    // ──────────────────────────────────────────────
+    public static final String MSG_WRITE_001 = "MSG-WRITE-001"; // Writing lesson not found
+    public static final String MSG_WRITE_002 = "MSG-WRITE-002"; // Student not enrolled
+    public static final String MSG_WRITE_003 = "MSG-WRITE-003"; // Invalid lesson block type
+    public static final String MSG_WRITE_004 = "MSG-WRITE-004"; // Student profile not found
 }
