@@ -113,15 +113,4 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
             WHERE ws.id = :submissionId
             """, nativeQuery = true)
     Optional<String> findLessonTitle(@Param("submissionId") UUID submissionId);
-
-    Optional<WritingSubmission> findByIdAndStudent_Id(
-            UUID submissionId,
-            UUID studentId
-    );
-
-    Optional<WritingSubmission>
-    findTopByEnrollment_IdAndLessonBlockIdOrderBySubmittedAtDesc(
-            UUID enrollmentId,
-            UUID lessonBlockId
-    );
 }

@@ -30,8 +30,6 @@ import { TeacherDashboardPage } from '../features/teacher/pages/TeacherDashboard
 import { AdminDashboardPage } from '../features/admin/pages/AdminDashboardPage';
 import { TeacherWritingReviewsPage } from '../features/writing-review/pages/TeacherWritingReviewsPage';
 import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages/TeacherWritingReviewDetailPage';
-import { WritingAssignmentPage } from "../features/writing/pages/WritingAssignmentPage";
-
 
 export const router = createBrowserRouter([
   {
@@ -104,10 +102,6 @@ export const router = createBrowserRouter([
       {
         path: 'courses',
         element: <StudentCoursesPage />,
-      },
-      {
-        path: "writing/:lessonBlockId",
-        element: <WritingAssignmentPage />,
       },
     ],
   },
