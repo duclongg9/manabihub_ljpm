@@ -60,4 +60,14 @@ export const ENDPOINTS = {
     list: '/v1/public/courses',
   },
   ADMIN_LOGIN: '/admin/auth/login',
+  FLASHCARD: {
+    GET: (lessonBlockId: string) =>
+        `/student/flashcards/${lessonBlockId}`,
+
+    REVIEW:
+        "/student/flashcards/review",
+
+    SUMMARY: (lessonBlockId: string) =>
+        `/student/flashcards/${lessonBlockId}/summary`,
+  },
 };

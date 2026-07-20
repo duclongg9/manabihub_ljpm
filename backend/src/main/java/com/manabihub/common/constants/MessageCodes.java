@@ -146,6 +146,10 @@ public final class MessageCodes {
     public static final String LEARNING_NOT_ENROLLED = "LEARNING_NOT_ENROLLED";
     public static final String LEARNING_ALREADY_ENROLLED = "LEARNING_ALREADY_ENROLLED";
     public static final String LEARNING_PROGRESS_UPDATED = "LEARNING_PROGRESS_UPDATED";
+    public static final String LEARNING_LESSON_COMPLETED = "LEARNING_LESSON_COMPLETED";
+    public static final String LEARNING_LESSON_CONTENT_UNAVAILABLE = "LEARNING_LESSON_CONTENT_UNAVAILABLE";
+    public static final String LEARNING_INVALID_BLOCK_TYPE = "LEARNING_INVALID_BLOCK_TYPE";
+    public static final String LEARNING_INVALID_VIDEO_POSITION = "LEARNING_INVALID_VIDEO_POSITION";
 
     // ──────────────────────────────────────────────
     // AI — AI-related operations
@@ -203,4 +207,10 @@ public final class MessageCodes {
     public static final String SYSTEM_MAINTENANCE = "SYSTEM_MAINTENANCE";
     public static final String SYSTEM_RATE_LIMITED = "SYSTEM_RATE_LIMITED";
 
+    // FLASHCARD
+    public static final String MSG_FLASH_001 = "MSG-FLASH-001";
+    public static final String MSG_FLASH_002 = "MSG-FLASH-002";
+    public static final String MSG_FLASH_003 = "MSG-FLASH-003";
+    public static final String MSG_FLASH_004 = "MSG-FLASH-004";
+    public static final String MSG_FLASH_005 = "MSG-FLASH-005";
 }
