@@ -28,7 +28,8 @@ public final class PublicCourseSpecification {
             String category,
             JlptLevel jlptLevel,
             BigDecimal minPrice,
-            BigDecimal maxPrice
+            BigDecimal maxPrice,
+            Double rating
     ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -60,6 +61,11 @@ public final class PublicCourseSpecification {
             }
             if (maxPrice != null) {
                 predicates.add(cb.lessThanOrEqualTo(root.get("price"), maxPrice));
+            }
+
+            // Rating filter
+            if (rating != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("averageRating"), BigDecimal.valueOf(rating)));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

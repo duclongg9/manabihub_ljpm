@@ -83,7 +83,7 @@ class PublicCourseControllerTest {
         );
 
         when(courseService.searchPublicCourses(
-                isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
         )).thenReturn(page);
 
         mockMvc.perform(get("/api/v1/public/courses"))
@@ -105,7 +105,7 @@ class PublicCourseControllerTest {
         );
 
         when(courseService.searchPublicCourses(
-                eq("kanji"), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+                eq("kanji"), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
         )).thenReturn(emptyPage);
 
         mockMvc.perform(get("/api/v1/public/courses")
@@ -115,7 +115,7 @@ class PublicCourseControllerTest {
                 .andExpect(jsonPath("$.data.totalElements", is(0)));
 
         verify(courseService).searchPublicCourses(
-                eq("kanji"), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+                eq("kanji"), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
         );
     }
 
@@ -129,7 +129,7 @@ class PublicCourseControllerTest {
 
         when(courseService.searchPublicCourses(
                 eq("grammar"), eq("grammar"), eq(JlptLevel.N3),
-                eq(new BigDecimal("100000")), eq(new BigDecimal("500000")),
+                eq(new BigDecimal("100000")), eq(new BigDecimal("500000")), isNull(),
                 any(Pageable.class)
         )).thenReturn(emptyPage);
 
@@ -153,7 +153,7 @@ class PublicCourseControllerTest {
         );
 
         when(courseService.searchPublicCourses(
-                isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
         )).thenReturn(emptyPage);
 
         mockMvc.perform(get("/api/v1/public/courses"))
@@ -172,7 +172,7 @@ class PublicCourseControllerTest {
         );
 
         when(courseService.searchPublicCourses(
-                isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+                isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
         )).thenReturn(page);
 
         mockMvc.perform(get("/api/v1/public/courses")

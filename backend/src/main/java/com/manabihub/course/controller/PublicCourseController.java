@@ -39,6 +39,7 @@ public class PublicCourseController {
             @RequestParam(required = false) JlptLevel jlptLevel,
             @RequestParam(required = false) @Min(value = 0, message = "Min price must be non-negative") BigDecimal minPrice,
             @RequestParam(required = false) @Min(value = 0, message = "Max price must be non-negative") BigDecimal maxPrice,
+            @RequestParam(required = false) @Min(value = 0, message = "Rating must be at least 0") @Max(value = 5, message = "Rating must be at most 5") Double rating,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page index must not be less than zero") int page,
             @RequestParam(defaultValue = "12") @Min(value = 1, message = "Page size must not be less than one") @Max(value = 50, message = "Page size must not be greater than 50") int size,
             @RequestParam(defaultValue = "publishedAt,desc") String sort
@@ -53,7 +54,7 @@ public class PublicCourseController {
 
         Pageable pageable = buildPageable(page, size, sort);
         Page<PublicCourseSummaryResponse> result = courseService.searchPublicCourses(
-                keyword, category, jlptLevel, minPrice, maxPrice, pageable
+                keyword, category, jlptLevel, minPrice, maxPrice, rating, pageable
         );
         return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "Success", PageResponse.from(result));
     }

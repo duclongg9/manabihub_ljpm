@@ -13,6 +13,8 @@ export interface PublicCourseSummary {
   teacherAvatarUrl?: string;
   totalLessons: number;
   publishedAt?: string;
+  averageRating?: number;
+  totalReviews?: number;
 }
 
 // ─── Catalog Filter Params ───────────────────────────────────────
@@ -23,6 +25,7 @@ export interface CourseCatalogFilters {
   jlptLevel?: string;
   minPrice?: number;
   maxPrice?: number;
+  rating?: number;
 }
 
 export type CourseCatalogParams = CourseCatalogFilters & {

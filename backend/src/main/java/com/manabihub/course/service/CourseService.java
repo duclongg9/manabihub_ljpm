@@ -33,6 +33,7 @@ public interface CourseService {
             JlptLevel jlptLevel,
             BigDecimal minPrice,
             BigDecimal maxPrice,
+            Double rating,
             Pageable pageable
     );
 }

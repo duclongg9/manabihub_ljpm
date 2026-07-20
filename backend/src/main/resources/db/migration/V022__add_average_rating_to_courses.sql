@@ -1,0 +1,1 @@
+ALTER TABLE courses ADD COLUMN average_rating NUMERIC(3,2) DEFAULT 0.0;
