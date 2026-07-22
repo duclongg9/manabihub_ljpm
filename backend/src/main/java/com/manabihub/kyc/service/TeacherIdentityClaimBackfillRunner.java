@@ -4,8 +4,11 @@ import com.manabihub.audit.service.SecurityAuditService;
 import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.KycRequest;
 import com.manabihub.kyc.domain.TeacherIdentityClaim;
+import com.manabihub.kyc.domain.TeacherKycStatus;
+import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
+import com.manabihub.kyc.repository.TeacherProfileRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -30,17 +33,20 @@ public class TeacherIdentityClaimBackfillRunner {
 
     private final KycRequestRepository kycRequestRepository;
     private final TeacherIdentityClaimRepository claimRepository;
+    private final TeacherProfileRepository teacherProfileRepository;
     private final TeacherIdentityClaimService claimService;
     private final SecurityAuditService securityAuditService;
 
     public TeacherIdentityClaimBackfillRunner(
             KycRequestRepository kycRequestRepository,
             TeacherIdentityClaimRepository claimRepository,
+            TeacherProfileRepository teacherProfileRepository,
             TeacherIdentityClaimService claimService,
             SecurityAuditService securityAuditService
     ) {
         this.kycRequestRepository = kycRequestRepository;
         this.claimRepository = claimRepository;
+        this.teacherProfileRepository = teacherProfileRepository;
         this.claimService = claimService;
         this.securityAuditService = securityAuditService;
     }
@@ -111,9 +117,15 @@ public class TeacherIdentityClaimBackfillRunner {
                 }
             } else {
                 // MULTIPLE HISTORICAL TEACHERS HAVE THE SAME CCCD!
-                // FAIL CLOSED / QUARANTINE: Do NOT claim for either profile silently!
-                log.warn("Historical duplicate CCCD detected across {} teachers for fingerprint. Quarantining profiles.", teacherIds.size());
+                // STRICT FAIL-CLOSED QUARANTINE: Revoke publishing & KYC status, do NOT claim for either profile!
+                log.warn("Historical duplicate CCCD detected across {} teachers for fingerprint. Revoking rights and quarantining profiles.", teacherIds.size());
                 for (UUID teacherId : teacherIds) {
+                    teacherProfileRepository.findById(teacherId).ifPresent(profile -> {
+                        profile.setKycStatus(TeacherKycStatus.REJECTED);
+                        profile.setCanPublishCourse(false);
+                        teacherProfileRepository.save(profile);
+                    });
+
                     securityAuditService.logBackfillQuarantineAudit(teacherId, teacherIds.size());
                     quarantinedCount++;
                 }

@@ -149,8 +149,7 @@ public class TeacherIdentityClaimService implements InitializingBean {
         try {
             claimRepository.saveAndFlush(claim);
         } catch (DataIntegrityViolationException ex) {
-            String causeMsg = getRootCauseMessage(ex).toLowerCase();
-            if (causeMsg.contains(CONSTRAINT_UK_FINGERPRINT) || causeMsg.contains("identity_fingerprint")) {
+            if (isFingerprintUniqueConstraintViolation(ex)) {
                 securityAuditService.logDuplicateIdentityAudit(teacherId, actorUser.getId(), ipAddress, userAgent);
                 throw new BusinessException(
                         MessageCodes.MSG_KYC_008,
@@ -158,16 +157,30 @@ public class TeacherIdentityClaimService implements InitializingBean {
                         HttpStatus.CONFLICT
                 );
             }
-            // Rethrow any other database error (e.g. FK, NOT NULL)
+            // Rethrow any other database error (e.g. FK, NOT NULL, type mismatch)
             throw ex;
         }
     }
 
-    private String getRootCauseMessage(Throwable ex) {
+    private boolean isFingerprintUniqueConstraintViolation(DataIntegrityViolationException ex) {
         Throwable cause = ex;
-        while (cause.getCause() != null && cause.getCause() != cause) {
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException cve) {
+                String constraintName = cve.getConstraintName();
+                if (constraintName != null && CONSTRAINT_UK_FINGERPRINT.equalsIgnoreCase(constraintName)) {
+                    return true;
+                }
+            }
+            if (cause instanceof java.sql.SQLException sqlEx) {
+                if ("23505".equals(sqlEx.getSQLState())) {
+                    String msg = sqlEx.getMessage();
+                    if (msg != null && msg.toLowerCase().contains(CONSTRAINT_UK_FINGERPRINT.toLowerCase())) {
+                        return true;
+                    }
+                }
+            }
             cause = cause.getCause();
         }
-        return cause.getMessage() == null ? "" : cause.getMessage();
+        return false;
     }
 }

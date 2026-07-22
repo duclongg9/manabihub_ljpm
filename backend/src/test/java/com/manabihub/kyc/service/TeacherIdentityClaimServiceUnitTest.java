@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 
+import java.sql.SQLException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -148,8 +149,15 @@ class TeacherIdentityClaimServiceUnitTest {
 
         when(claimRepository.findByIdentityFingerprint(any())).thenReturn(Optional.empty());
         when(claimRepository.findByTeacherId(teacherId)).thenReturn(Optional.empty());
+
+        org.hibernate.exception.ConstraintViolationException cve = new org.hibernate.exception.ConstraintViolationException(
+                "duplicate key value violates unique constraint uk_teacher_identity_claims_fingerprint",
+                new SQLException("duplicate key value violates unique constraint uk_teacher_identity_claims_fingerprint", "23505"),
+                "uk_teacher_identity_claims_fingerprint"
+        );
+
         when(claimRepository.saveAndFlush(any())).thenThrow(
-                new DataIntegrityViolationException("duplicate key value violates unique constraint uk_teacher_identity_claims_fingerprint")
+                new DataIntegrityViolationException("Constraint violation", cve)
         );
 
         BusinessException ex = assertThrows(
@@ -172,8 +180,15 @@ class TeacherIdentityClaimServiceUnitTest {
 
         when(claimRepository.findByIdentityFingerprint(any())).thenReturn(Optional.empty());
         when(claimRepository.findByTeacherId(teacherId)).thenReturn(Optional.empty());
+
+        org.hibernate.exception.ConstraintViolationException cve = new org.hibernate.exception.ConstraintViolationException(
+                "foreign key constraint violation fk_teacher_id",
+                new SQLException("foreign key constraint violation fk_teacher_id", "23503"),
+                "fk_teacher_id"
+        );
+
         when(claimRepository.saveAndFlush(any())).thenThrow(
-                new DataIntegrityViolationException("foreign key constraint violation fk_teacher_id")
+                new DataIntegrityViolationException("FK violation", cve)
         );
 
         assertThrows(

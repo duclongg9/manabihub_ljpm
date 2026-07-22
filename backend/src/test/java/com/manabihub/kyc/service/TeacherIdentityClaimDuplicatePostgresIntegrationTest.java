@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -38,20 +39,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration",
-        "manabihub.kyc.identity-secret=test-only-identity-secret-key-32chars-minimum-length"
-})
+@SpringBootTest
+@ActiveProfiles("test")
 class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
 
     @Autowired
@@ -84,27 +77,24 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
     @MockBean
     private NationalIdRegistryPort nationalIdRegistryPort;
 
-    private String cccdRawWithSpaces;
-    private String cccdNormalized;
-
     @BeforeEach
     void setUp() {
-        cccdRawWithSpaces = "099 888 777 666";
-        cccdNormalized = "099888777666";
-
-        // Registry always receives clean 12-digit string
-        when(nationalIdRegistryPort.findActiveByIdNumber(eq(cccdNormalized)))
-                .thenReturn(Optional.of(new NationalIdRecordDto(cccdNormalized, "Nguyen Van A", LocalDate.of(1990, 1, 1))));
+        when(nationalIdRegistryPort.findActiveByIdNumber(anyString()))
+                .thenAnswer(invocation -> {
+                    String id = invocation.getArgument(0);
+                    return Optional.of(new NationalIdRecordDto(id, "Nguyen Van A", LocalDate.of(1990, 1, 1)));
+                });
     }
 
-    private AppUser createTestUser(String email, String fullName) {
+    private AppUser createTestUser(String emailPrefix, String fullName) {
         AppUser user = new AppUser();
         user.setId(UUID.randomUUID());
-        user.setEmail(email);
+        user.setEmail(emailPrefix + "_" + UUID.randomUUID() + "@test.com");
         user.setFullName(fullName);
         user.setProvider("LOCAL");
         user.setUserStatus(UserStatus.ACTIVE);
         entityManager.persist(user);
+        entityManager.flush();
         return user;
     }
 
@@ -129,47 +119,65 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         return new KycIdentityVerificationRequest("sess-1", "tx-1", sdkResult);
     }
 
+    private String generateUniqueCccdDigits() {
+        long num = Math.abs(UUID.randomUUID().getLeastSignificantBits() % 1000000000L);
+        return String.format("099%09d", num);
+    }
+
     @Test
     void testEndToEndDuplicateProtectionAndAuditPersistence() {
         TransactionTemplate tx1 = new TransactionTemplate(transactionManager);
         tx1.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
-        // 1. Teacher A registers identity with formatted CCCD ("099 888 777 666") in TX 1
-        UUID userAId = tx1.execute(status -> {
-            AppUser userA = createTestUser("teacherA@test.com", "Nguyen Van A");
-            TeacherProfile profileA = createTestProfile(userA);
+        String cccdNormalized = generateUniqueCccdDigits();
+        String cccdRawWithSpaces = cccdNormalized.substring(0, 3) + " " + cccdNormalized.substring(3, 6) + " " + cccdNormalized.substring(6, 9) + " " + cccdNormalized.substring(9, 12);
 
+        // 1. Create & commit Teacher A in a committed transaction so actor_user_id FK exists for audit logs
+        UUID userAId = tx1.execute(status -> {
+            AppUser userA = createTestUser("teacherA", "Nguyen Van A");
+            TeacherProfile profileA = createTestProfile(userA);
+            return userA.getId();
+        });
+
+        // 2. Teacher A registers identity with formatted CCCD
+        tx1.executeWithoutResult(status -> {
             KycIdentityVerificationRequest reqA = createMockSdkRequest(cccdRawWithSpaces, "Nguyen Van A");
-            KycIdentityVerificationResponse respA = teacherKycService.verifyIdentity(userA.getId(), reqA, "127.0.0.1", "TestAgent");
+            KycIdentityVerificationResponse respA = teacherKycService.verifyIdentity(userAId, reqA, "127.0.0.1", "TestAgent");
 
             assertNotNull(respA);
+            TeacherProfile profileA = teacherProfileRepository.findByUserId(userAId).orElseThrow();
             assertTrue(claimRepository.findByTeacherId(profileA.getId()).isPresent());
-            return userA.getId();
         });
 
         // Verify registry received clean 12-digit string
         verify(nationalIdRegistryPort).findActiveByIdNumber(cccdNormalized);
 
-        // 2. Teacher A retries with same CCCD -> Idempotent success
+        // 3. Teacher A retries with same CCCD -> Idempotent success
         tx1.executeWithoutResult(status -> {
             KycIdentityVerificationRequest reqA = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
             KycIdentityVerificationResponse retryRespA = teacherKycService.verifyIdentity(userAId, reqA, "127.0.0.1", "TestAgent");
             assertNotNull(retryRespA);
         });
 
-        // 3. Teacher B attempts to use Teacher A's CCCD in separate TX 2
+        // 4. Create & commit Teacher B user in committed transaction so REQUIRES_NEW audit log can reference actor_user_id FK
+        UUID userBId = tx1.execute(status -> {
+            AppUser userB = createTestUser("teacherB", "Nguyen Van A");
+            TeacherProfile profileB = createTestProfile(userB);
+            return userB.getId();
+        });
+
+        // 5. Teacher B attempts to use Teacher A's CCCD in separate TX 2
         TransactionTemplate tx2 = new TransactionTemplate(transactionManager);
         tx2.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
         UUID teacherBId = tx2.execute(status -> {
-            AppUser userB = createTestUser("teacherB@test.com", "Nguyen Van A");
-            TeacherProfile profileB = createTestProfile(userB);
+            TeacherProfile profileB = teacherProfileRepository.findByUserId(userBId).orElseThrow();
 
-            KycIdentityVerificationRequest reqB = createMockSdkRequest("099-888-777-666", "Nguyen Van A");
+            KycIdentityVerificationRequest reqB = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
 
             BusinessException ex = assertThrows(
                     BusinessException.class,
-                    () -> teacherKycService.verifyIdentity(userB.getId(), reqB, "127.0.0.1", "TestAgent")
+                    () -> teacherKycService.verifyIdentity(userBId, reqB, "127.0.0.1", "TestAgent")
             );
 
             // Assert 409 Conflict + MSG-KYC-008
@@ -186,7 +194,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             return profileB.getId();
         });
 
-        // 4. Assert Security Audit Log committed & persisted in DB despite TX 2 rollback!
+        // 6. Assert Security Audit Log committed & persisted in DB despite TX 2 rollback!
         List<AuditLog> auditLogs = auditLogRepository.findAll();
         AuditLog duplicateAudit = auditLogs.stream()
                 .filter(a -> "KYC_DUPLICATE_IDENTITY_DETECTED".equals(a.getAction()))
@@ -204,11 +212,13 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
+        String cccd = generateUniqueCccdDigits();
+
         tx.executeWithoutResult(status -> {
-            AppUser userA = createTestUser("user1@test.com", "User 1");
+            AppUser userA = createTestUser("user1", "User 1");
             TeacherProfile profileA = createTestProfile(userA);
 
-            String fingerprint = claimService.generateFingerprint("111222333444");
+            String fingerprint = claimService.generateFingerprint(cccd);
 
             TeacherIdentityClaim claim1 = TeacherIdentityClaim.builder()
                     .teacherId(profileA.getId())
@@ -216,7 +226,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
                     .build();
             claimRepository.saveAndFlush(claim1);
 
-            AppUser userB = createTestUser("user2@test.com", "User 2");
+            AppUser userB = createTestUser("user2", "User 2");
             TeacherProfile profileB = createTestProfile(userB);
 
             // Directly save conflicting claim in DB to trigger UK constraint
@@ -234,40 +244,59 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
     }
 
     @Test
-    void testHistoricalBackfillQuarantinesLegacyDuplicateCCCDs() {
+    void testHistoricalBackfillQuarantinesLegacyDuplicateCCCDsFailClosed() {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
+        String cccd = generateUniqueCccdDigits();
+        String cccdFormatted = cccd.substring(0, 3) + " " + cccd.substring(3, 6) + " " + cccd.substring(6, 9) + " " + cccd.substring(9, 12);
+
         tx.executeWithoutResult(status -> {
             // Create two legacy profiles with identical CCCD in verificationPayload
-            AppUser legacyUser1 = createTestUser("legacy1@test.com", "Legacy User 1");
+            AppUser legacyUser1 = createTestUser("legacy1", "Legacy User 1");
             TeacherProfile legacyProfile1 = createTestProfile(legacyUser1);
+            legacyProfile1.setKycStatus(TeacherKycStatus.PENDING);
+            legacyProfile1.setCanPublishCourse(true);
+            teacherProfileRepository.save(legacyProfile1);
 
             KycRequest req1 = new KycRequest();
             req1.setTeacherProfile(legacyProfile1);
             req1.setStatus(KycRequestStatus.DRAFT);
             req1.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
-            req1.setVerificationPayload(Map.of("identityOcr", Map.of("idNumber", "888777666555")));
+            req1.setVerificationPayload(Map.of("identityOcr", Map.of("idNumber", cccd)));
             kycRequestRepository.save(req1);
 
-            AppUser legacyUser2 = createTestUser("legacy2@test.com", "Legacy User 2");
+            AppUser legacyUser2 = createTestUser("legacy2", "Legacy User 2");
             TeacherProfile legacyProfile2 = createTestProfile(legacyUser2);
+            legacyProfile2.setKycStatus(TeacherKycStatus.PENDING);
+            legacyProfile2.setCanPublishCourse(true);
+            teacherProfileRepository.save(legacyProfile2);
 
             KycRequest req2 = new KycRequest();
             req2.setTeacherProfile(legacyProfile2);
             req2.setStatus(KycRequestStatus.DRAFT);
             req2.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
-            req2.setVerificationPayload(Map.of("identityOcr", Map.of("idNumber", "888 777 666 555")));
+            req2.setVerificationPayload(Map.of("identityOcr", Map.of("idNumber", cccdFormatted)));
             kycRequestRepository.save(req2);
 
             // Execute backfill
             backfillRunner.backfillExistingIdentityClaims();
 
-            String fingerprint = claimService.generateFingerprint("888777666555");
+            String fingerprint = claimService.generateFingerprint(cccd);
             // Fail closed: Neither profile is automatically claimed
             assertTrue(claimRepository.findByIdentityFingerprint(fingerprint).isEmpty());
             assertTrue(claimRepository.findByTeacherId(legacyProfile1.getId()).isEmpty());
             assertTrue(claimRepository.findByTeacherId(legacyProfile2.getId()).isEmpty());
+
+            // Assert FAIL-CLOSED: Rights revoked (kycStatus set to REJECTED and canPublishCourse set to false)
+            TeacherProfile updatedProfile1 = teacherProfileRepository.findById(legacyProfile1.getId()).orElseThrow();
+            TeacherProfile updatedProfile2 = teacherProfileRepository.findById(legacyProfile2.getId()).orElseThrow();
+
+            assertEquals(TeacherKycStatus.REJECTED, updatedProfile1.getKycStatus());
+            assertFalse(updatedProfile1.isCanPublishCourse());
+
+            assertEquals(TeacherKycStatus.REJECTED, updatedProfile2.getKycStatus());
+            assertFalse(updatedProfile2.isCanPublishCourse());
 
             // Quarantine audit log created for both
             List<AuditLog> quarantineAudits = auditLogRepository.findAll().stream()
@@ -284,11 +313,13 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
+        String cccd = generateUniqueCccdDigits();
+
         tx.executeWithoutResult(status -> {
-            AppUser user = createTestUser("pii@test.com", "Nguyen Van A");
+            AppUser user = createTestUser("pii", "Nguyen Van A");
             TeacherProfile profile = createTestProfile(user);
 
-            KycIdentityVerificationRequest req = createMockSdkRequest("012345678901", "Nguyen Van A");
+            KycIdentityVerificationRequest req = createMockSdkRequest(cccd, "Nguyen Van A");
             teacherKycService.verifyIdentity(user.getId(), req, "127.0.0.1", "TestAgent");
 
             KycStatusResponse statusResp = teacherKycService.getStatus(user.getId());
@@ -304,7 +335,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             Map<String, Object> ocr = (Map<String, Object>) payload.get("identityOcr");
             assertNotNull(ocr);
             String idNum = String.valueOf(ocr.get("idNumber"));
-            assertFalse(idNum.contains("012345678901"), "Teacher response must NOT contain raw CCCD");
+            assertFalse(idNum.contains(cccd), "Teacher response must NOT contain raw CCCD");
             assertTrue(idNum.contains("*"), "idNumber must be masked in teacher response");
 
             status.setRollbackOnly();
