@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(StudentAiChatController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, com.manabihub.security.DummyFilterConfig.class})
 class StudentAiChatControllerSecurityTest {
 
     @Autowired

@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(TeacherKycController.class)
 @AutoConfigureMockMvc
-@Import({SecurityConfig.class, com.manabihub.common.exception.GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, com.manabihub.common.exception.GlobalExceptionHandler.class, com.manabihub.security.DummyFilterConfig.class})
 class TeacherKycControllerSecurityTest {
 
     @Autowired
@@ -63,7 +63,8 @@ class TeacherKycControllerSecurityTest {
 
         mockMvc.perform(get("/api/v1/teacher/kyc/status")
                         .header("X-Demo-User-Id", forgedUserId)
-                        .with(jwt().jwt(jwt -> jwt.subject(authenticatedUserId.toString()))))
+                        .with(jwt().jwt(jwt -> jwt.subject(authenticatedUserId.toString()))
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isOk());
 
         verify(teacherKycService).getStatus(authenticatedUserId);
@@ -95,7 +96,8 @@ class TeacherKycControllerSecurityTest {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/teacher/kyc/identity-verifications")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content(requestJson)
-                        .with(jwt().jwt(jwt -> jwt.subject(authenticatedUserId.toString()))))
+                        .with(jwt().jwt(jwt -> jwt.subject(authenticatedUserId.toString()))
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isConflict())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.messageCode").value("MSG-KYC-008"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Số CCCD này đã được sử dụng bởi một tài khoản giáo viên khác"));

@@ -47,9 +47,11 @@ public class SecurityConfig {
     @Value("${CORS_ALLOWED_ORIGINS:*}")
     private List<String> allowedOrigins;
 
-    /** Null in @WebMvcTest slices that lack a DataSource/JdbcTemplate. */
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private TeacherEligibilityFilter teacherEligibilityFilter;
+    private final TeacherEligibilityFilter teacherEligibilityFilter;
+
+    public SecurityConfig(TeacherEligibilityFilter teacherEligibilityFilter) {
+        this.teacherEligibilityFilter = teacherEligibilityFilter;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -89,9 +91,7 @@ public class SecurityConfig {
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(
                         jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
-        if (teacherEligibilityFilter != null) {
-            http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
-        }
+        http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }
@@ -179,12 +179,4 @@ public class SecurityConfig {
         return jwtAuthenticationConverter;
     }
 
-    @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnBean(org.springframework.jdbc.core.JdbcTemplate.class)
-    public TeacherEligibilityFilter teacherEligibilityFilter(
-            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
-            com.fasterxml.jackson.databind.ObjectMapper objectMapper
-    ) {
-        return new TeacherEligibilityFilter(jdbcTemplate, objectMapper);
-    }
 }

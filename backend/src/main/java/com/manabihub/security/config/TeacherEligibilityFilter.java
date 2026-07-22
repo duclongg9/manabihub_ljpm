@@ -33,10 +33,12 @@ import java.util.UUID;
  * response is returned immediately.
  */
 @Slf4j
+@Component
 @RequiredArgsConstructor
 public class TeacherEligibilityFilter extends OncePerRequestFilter {
 
     private static final String TEACHER_PATH_PREFIX = "/api/v1/teacher/";
+    private static final String KYC_PATH_PREFIX = "/api/v1/teacher/kyc";
     private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
 
     private static final String COUNT_TEACHER_ROLE_SQL =
@@ -48,6 +50,9 @@ public class TeacherEligibilityFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
+        if (path.startsWith(KYC_PATH_PREFIX)) {
+            return true;
+        }
         return !path.startsWith(TEACHER_PATH_PREFIX);
     }
 

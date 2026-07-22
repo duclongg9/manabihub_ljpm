@@ -29,12 +29,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.manabihub.kyc.controller.TeacherKycController;
+import com.manabihub.kyc.service.TeacherKycService;
+import com.manabihub.identity.service.CurrentUserService;
+import com.manabihub.kyc.dto.KycStatusResponse;
+import com.manabihub.kyc.domain.TeacherKycStatus;
+
 /**
- * Integration test verifying the {@link TeacherEligibilityFilter} correctly gates
- * all {@code /api/v1/teacher/**} endpoints based on live database role checks,
- * even when the JWT still carries a stale {@code ROLE_TEACHER} claim.
+ * WebMvc test verifying the {@link TeacherEligibilityFilter} correctly gates
+ * all {@code /api/v1/teacher/**} endpoints based on role checks.
+ *
+ * Note: This test uses a mocked {@link JdbcTemplate} to simulate database
+ * responses for eligibility checks, it is NOT a full PostgreSQL end-to-end test.
  */
-@WebMvcTest({TeacherDashboardController.class, TeacherWritingReviewController.class})
+
+@WebMvcTest({TeacherDashboardController.class, TeacherWritingReviewController.class, TeacherKycController.class})
 @Import({SecurityConfig.class, TeacherEligibilityFilter.class})
 class TeacherEligibilityFilterIntegrationTest {
 
@@ -46,6 +55,12 @@ class TeacherEligibilityFilterIntegrationTest {
 
     @MockBean
     private TeacherWritingReviewService teacherWritingReviewService;
+
+    @MockBean
+    private TeacherKycService teacherKycService;
+
+    @MockBean
+    private CurrentUserService currentUserService;
 
     @MockBean
     private CustomOAuth2UserService customOAuth2UserService;
@@ -163,5 +178,23 @@ class TeacherEligibilityFilterIntegrationTest {
                         .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "STUDENT"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isForbidden());
+    }
+
+    // ──────────────────────────────────────────────
+    // Student accessing KYC endpoint → 200 (exempt from filter, allowed by @PreAuthorize)
+    // ──────────────────────────────────────────────
+
+    @Test
+    void student_kycEndpointReturns200() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        
+        when(teacherKycService.getStatus(userId)).thenReturn(null);
+
+        mockMvc.perform(get("/api/v1/teacher/kyc/status")
+                        .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "STUDENT"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk());
     }
 }
