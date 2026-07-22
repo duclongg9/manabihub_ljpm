@@ -270,13 +270,13 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
 
         // 1. Create and commit Teacher A and Teacher B
         UUID userAId = tx1.execute(status -> {
-            AppUser userA = createTestUser("raceA", "Teacher A");
+            AppUser userA = createTestUser("raceA", "Nguyen Van A");
             createTestProfile(userA);
             return userA.getId();
         });
 
         UUID userBId = tx1.execute(status -> {
-            AppUser userB = createTestUser("raceB", "Teacher B");
+            AppUser userB = createTestUser("raceB", "Nguyen Van A");
             createTestProfile(userB);
             return userB.getId();
         });
@@ -291,7 +291,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         Future<?> f1 = executor.submit(() -> {
             try {
                 startLatch.await();
-                KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Teacher A");
+                KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
                 KycIdentityVerificationResponse resp = teacherKycService.verifyIdentity(userAId, req, "127.0.0.1", "Thread-1");
                 outcomeA.set(resp);
             } catch (Throwable t) {
@@ -302,7 +302,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         Future<?> f2 = executor.submit(() -> {
             try {
                 startLatch.await();
-                KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Teacher B");
+                KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
                 KycIdentityVerificationResponse resp = teacherKycService.verifyIdentity(userBId, req, "127.0.0.1", "Thread-2");
                 outcomeB.set(resp);
             } catch (Throwable t) {
@@ -318,8 +318,8 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         executor.shutdown();
 
         // 3. Assert EXACTLY ONE thread succeeded and EXACTLY ONE thread failed with HTTP 409 Conflict / MSG-KYC-008
-        boolean aSuccess = outcomeA.get() instanceof KycIdentityVerificationResponse;
-        boolean bSuccess = outcomeB.get() instanceof KycIdentityVerificationResponse;
+        boolean aSuccess = isVerificationSuccess(outcomeA.get());
+        boolean bSuccess = isVerificationSuccess(outcomeB.get());
 
         if (!(aSuccess ^ bSuccess)) {
             fail("Concurrency race assertion failed! aSuccess=" + aSuccess + " [outcomeA=" + outcomeA.get() + "], bSuccess=" + bSuccess + " [outcomeB=" + outcomeB.get() + "]");
@@ -350,6 +350,13 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
                 .anyMatch(a -> losingProfile.getId().equals(a.getTargetId()));
 
         assertTrue(auditFound, "Security audit log must be persisted for the losing thread in concurrency race");
+    }
+
+    private boolean isVerificationSuccess(Object outcome) {
+        if (outcome instanceof KycIdentityVerificationResponse resp) {
+            return resp.request() != null && IdentityVerificationStatus.VERIFIED == resp.request().identityStatus();
+        }
+        return false;
     }
 
     @Test
