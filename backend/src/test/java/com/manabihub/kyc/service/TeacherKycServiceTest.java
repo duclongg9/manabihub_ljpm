@@ -42,6 +42,8 @@ class TeacherKycServiceTest {
     @Mock
     private JlptRegistryPort jlptRegistryPort;
     @Mock
+    private TeacherIdentityClaimService teacherIdentityClaimService;
+    @Mock
     private EntityManager entityManager;
 
     private TeacherKycService teacherKycService;
@@ -55,6 +57,7 @@ class TeacherKycServiceTest {
                 auditLogRepository,
                 nationalIdRegistryPort,
                 jlptRegistryPort,
+                teacherIdentityClaimService,
                 entityManager,
                 "storage/kyc"
         );

@@ -69,6 +69,7 @@ public class TeacherKycService {
     private final AuditLogRepository auditLogRepository;
     private final NationalIdRegistryPort nationalIdRegistryPort;
     private final JlptRegistryPort jlptRegistryPort;
+    private final TeacherIdentityClaimService teacherIdentityClaimService;
     private final EntityManager entityManager;
     private final Path storageRoot;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -80,6 +81,7 @@ public class TeacherKycService {
             AuditLogRepository auditLogRepository,
             NationalIdRegistryPort nationalIdRegistryPort,
             JlptRegistryPort jlptRegistryPort,
+            TeacherIdentityClaimService teacherIdentityClaimService,
             EntityManager entityManager,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
@@ -89,6 +91,7 @@ public class TeacherKycService {
         this.auditLogRepository = auditLogRepository;
         this.nationalIdRegistryPort = nationalIdRegistryPort;
         this.jlptRegistryPort = jlptRegistryPort;
+        this.teacherIdentityClaimService = teacherIdentityClaimService;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
     }
@@ -168,6 +171,17 @@ public class TeacherKycService {
                         failureReasons.add("Ngày sinh trên CCCD không hợp lệ");
                     }
                 }
+            }
+
+            if (verified) {
+                // Check identity claim duplicate before marking identity as verified
+                teacherIdentityClaimService.processIdentityClaim(
+                        teacherProfile.getId(),
+                        idNumber,
+                        user,
+                        ipAddress,
+                        userAgent
+                );
             }
         }
 

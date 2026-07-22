@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(TeacherKycController.class)
 @AutoConfigureMockMvc
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, com.manabihub.common.exception.GlobalExceptionHandler.class})
 class TeacherKycControllerSecurityTest {
 
     @Autowired
@@ -68,5 +68,36 @@ class TeacherKycControllerSecurityTest {
 
         verify(teacherKycService).getStatus(authenticatedUserId);
         verify(teacherKycService, never()).getStatus(forgedUserId);
+    }
+
+    @Test
+    void verifyIdentity_Returns409Conflict_WhenDuplicateCccdDetected() throws Exception {
+        UUID authenticatedUserId = UUID.randomUUID();
+        when(currentUserService.getCurrentUserId()).thenReturn(authenticatedUserId);
+        when(teacherKycService.verifyIdentity(org.mockito.ArgumentMatchers.eq(authenticatedUserId), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new com.manabihub.common.exception.BusinessException(
+                        com.manabihub.common.constants.MessageCodes.MSG_KYC_008,
+                        "Số CCCD này đã được sử dụng bởi một tài khoản giáo viên khác",
+                        org.springframework.http.HttpStatus.CONFLICT
+                ));
+
+        String requestJson = """
+                {
+                    "providerSessionId": "sess-1",
+                    "providerTransactionId": "tx-1",
+                    "sdkResult": {
+                        "idNumber": "012345678901",
+                        "fullName": "Nguyen Van A"
+                    }
+                }
+                """;
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/teacher/kyc/identity-verifications")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .with(jwt().jwt(jwt -> jwt.subject(authenticatedUserId.toString()))))
+                .andExpect(status().isConflict())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.messageCode").value("MSG-KYC-008"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Số CCCD này đã được sử dụng bởi một tài khoản giáo viên khác"));
     }
 }
