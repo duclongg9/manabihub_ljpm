@@ -306,6 +306,7 @@ public class CourseServiceImpl implements CourseService {
                 .prerequisites(course.getPrerequisites())
                 .targetStudents(course.getTargetStudents())
                 .publishedAt(course.getPublishedAt())
+                .aiSupported(course.isAiSupported())
                 .teacher(PublicCourseDetailResponse.TeacherDto.builder()
                         .id(course.getTeacher().getId())
                         .name(course.getTeacher().getDisplayName())

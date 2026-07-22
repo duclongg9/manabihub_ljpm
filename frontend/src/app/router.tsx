@@ -30,6 +30,7 @@ import { TeacherDashboardPage } from '../features/teacher/pages/TeacherDashboard
 import { AdminDashboardPage } from '../features/admin/pages/AdminDashboardPage';
 import { TeacherWritingReviewsPage } from '../features/writing-review/pages/TeacherWritingReviewsPage';
 import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages/TeacherWritingReviewDetailPage';
+import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 
 export const router = createBrowserRouter([
   {
@@ -102,6 +103,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses',
         element: <StudentCoursesPage />,
+      },
+      {
+        path: 'courses/:courseId/lesson-blocks/:lessonBlockId/ai-chat',
+        element: <StudentAiChatPage />,
       },
     ],
   },

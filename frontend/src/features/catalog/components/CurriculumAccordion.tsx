@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Accordion, AccordionSummary, AccordionDetails, Typography } from '@mui/material';
+import { Accordion, AccordionSummary, AccordionDetails, Button, Tooltip, Typography } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import OndemandVideoIcon from '@mui/icons-material/OndemandVideo';
 import DescriptionIcon from '@mui/icons-material/Description';
 import QuizIcon from '@mui/icons-material/Quiz';
@@ -8,13 +9,17 @@ import StyleIcon from '@mui/icons-material/Style';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../shared/constants/routes';
 import type { PublicModule, PublicLessonBlock } from '../types/courseDetailTypes';
 
 interface CurriculumAccordionProps {
   modules: PublicModule[];
+  courseId: string;
+  showAiChatAction: boolean;
 }
 
-export const CurriculumAccordion = ({ modules }: CurriculumAccordionProps) => {
+export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: CurriculumAccordionProps) => {
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
 
   const handleToggleAccordion = (id: string) => {
@@ -105,9 +110,25 @@ export const CurriculumAccordion = ({ modules }: CurriculumAccordionProps) => {
                       {getBlockIcon(block.type)}
                       <span className="text-sm text-slate-700 group-hover:text-indigo-700 transition-colors">{block.title}</span>
                     </div>
-                    {block.durationMinutes && (
-                      <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded-md">{block.durationMinutes} phút</span>
-                    )}
+                    <div className="flex flex-wrap items-center justify-end gap-2 ml-3">
+                      {block.durationMinutes && (
+                        <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded-md">{block.durationMinutes} phút</span>
+                      )}
+                      {showAiChatAction && (
+                        <Tooltip title="Ask the AI assistant about this lesson">
+                          <Button
+                            component={Link}
+                            to={ROUTES.STUDENT.AI_CHAT(courseId, block.id)}
+                            size="small"
+                            startIcon={<SmartToyOutlinedIcon />}
+                            onClick={(event) => event.stopPropagation()}
+                            sx={{ minWidth: 96, textTransform: 'none' }}
+                          >
+                            Ask AI
+                          </Button>
+                        </Tooltip>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {module.blocks.length === 0 && (
