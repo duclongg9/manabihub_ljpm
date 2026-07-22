@@ -51,8 +51,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @Testcontainers(disabledWithoutDocker = true)
@@ -117,11 +117,10 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        when(nationalIdRegistryPort.findActiveByIdNumber(anyString()))
-                .thenAnswer(invocation -> {
-                    String id = invocation.getArgument(0);
-                    return Optional.of(new NationalIdRecordDto(id, "Nguyen Van A", LocalDate.of(1990, 1, 1)));
-                });
+        doAnswer(invocation -> {
+            String id = invocation.getArgument(0);
+            return Optional.of(new NationalIdRecordDto(id, "Nguyen Van A", LocalDate.of(1990, 1, 1)));
+        }).when(nationalIdRegistryPort).findActiveByIdNumber(anyString());
     }
 
     private AppUser createTestUser(String emailPrefix, String fullName) {
@@ -270,12 +269,16 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         String cccdNormalized = generateUniqueCccdDigits();
 
         // 1. Create and commit Teacher A and Teacher B
-        UUID userAId = tx1.execute(status -> createTestUser("raceA", "Teacher A").getId());
-        UUID userBId = tx1.execute(status -> createTestUser("raceB", "Teacher B").getId());
+        UUID userAId = tx1.execute(status -> {
+            AppUser userA = createTestUser("raceA", "Teacher A");
+            createTestProfile(userA);
+            return userA.getId();
+        });
 
-        tx1.executeWithoutResult(status -> {
-            createTestProfile(entityManager.find(AppUser.class, userAId));
-            createTestProfile(entityManager.find(AppUser.class, userBId));
+        UUID userBId = tx1.execute(status -> {
+            AppUser userB = createTestUser("raceB", "Teacher B");
+            createTestProfile(userB);
+            return userB.getId();
         });
 
         // 2. Setup 2 threads to race unblocked by a CountDownLatch
@@ -318,9 +321,20 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         boolean aSuccess = outcomeA.get() instanceof KycIdentityVerificationResponse;
         boolean bSuccess = outcomeB.get() instanceof KycIdentityVerificationResponse;
 
+        Throwable errA = outcomeA.get() instanceof Throwable ? (Throwable) outcomeA.get() : null;
+        Throwable errB = outcomeB.get() instanceof Throwable ? (Throwable) outcomeB.get() : null;
+
+        if (!aSuccess && !bSuccess) {
+            fail("Both threads failed in race test! Thread A error: " + errA + ", Thread B error: " + errB, errA != null ? errA : errB);
+        }
+
         assertTrue(aSuccess ^ bSuccess, "Exactly one thread must succeed in concurrent claim race");
 
         Throwable failure = (Throwable) (aSuccess ? outcomeB.get() : outcomeA.get());
+        while (failure.getCause() != null && !(failure instanceof BusinessException)) {
+            failure = failure.getCause();
+        }
+
         assertTrue(failure instanceof BusinessException, "Losing thread must throw BusinessException");
         BusinessException busEx = (BusinessException) failure;
         assertEquals(MessageCodes.MSG_KYC_008, busEx.getMessageCode());
