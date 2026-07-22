@@ -354,7 +354,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
 
     private boolean isVerificationSuccess(Object outcome) {
         if (outcome instanceof KycIdentityVerificationResponse resp) {
-            return resp.request() != null && IdentityVerificationStatus.VERIFIED == resp.request().identityStatus();
+            return resp.request() != null && "VERIFIED".equals(resp.request().identityStatus());
         }
         return false;
     }
