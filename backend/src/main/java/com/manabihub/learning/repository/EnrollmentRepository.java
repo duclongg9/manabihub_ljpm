@@ -8,8 +8,9 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.UUID;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
@@ -20,4 +21,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             UUID studentId,
             List<EnrollmentStatus> statuses,
             Pageable pageable);
+
+    // UC-10: study course lessons — resolve the current student's enrollment for a course.
+    Optional<Enrollment> findByStudent_IdAndCourse_Id(UUID studentId, UUID courseId);
 }

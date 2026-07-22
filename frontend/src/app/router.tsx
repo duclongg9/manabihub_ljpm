@@ -19,6 +19,7 @@ import { CourseApprovalQueuePage } from '../features/admin-course-approval/pages
 import { CourseApprovalDetailPage } from '../features/admin-course-approval/pages/CourseApprovalDetailPage';
 import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
 import { CourseDetailPage } from '../features/catalog/pages/CourseDetailPage';
+import { CourseLearningPage } from '../features/learning/pages/CourseLearningPage';
 import { CourseCatalogPage } from '../features/catalog/pages/CourseCatalogPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
@@ -103,6 +104,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses',
         element: <StudentCoursesPage />,
+      },
+      {
+        path: 'courses/:courseId/learn',
+        element: <CourseLearningPage />,
       },
       {
         path: 'courses/:courseId/lesson-blocks/:lessonBlockId/ai-chat',

@@ -33,6 +33,10 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
     navigate(`/courses/${course.courseId}`);
   };
 
+  const handleStudyCourse = () => {
+    navigate(`/student/courses/${course.courseId}/learn`);
+  };
+
   return (
     <Card
       sx={{
@@ -108,15 +112,26 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
               color={getStatusColor(course.enrollmentStatus)}
               variant="outlined"
             />
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              onClick={handleViewCourse}
-              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-            >
-              View Course
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                size="small"
+                onClick={handleViewCourse}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+              >
+                View Course
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                size="small"
+                onClick={handleStudyCourse}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+              >
+                Study
+              </Button>
+            </Box>
           </Box>
         </Box>
       </CardContent>
