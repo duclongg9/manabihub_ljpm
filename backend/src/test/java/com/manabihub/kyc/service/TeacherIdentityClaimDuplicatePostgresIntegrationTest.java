@@ -33,7 +33,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -63,20 +62,12 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        if (DockerClientFactory.instance().isDockerAvailable()) {
-            postgresContainer = new PostgreSQLContainer<>("postgres:17-alpine");
-            postgresContainer.start();
-            registry.add("spring.datasource.url", postgresContainer::getJdbcUrl);
-            registry.add("spring.datasource.username", postgresContainer::getUsername);
-            registry.add("spring.datasource.password", postgresContainer::getPassword);
-            registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        } else {
-            // Fallback to local PostgreSQL cluster when Docker Desktop is absent
-            registry.add("spring.datasource.url", () -> "jdbc:postgresql://127.0.0.1:5439/manabihub_test");
-            registry.add("spring.datasource.username", () -> "postgres");
-            registry.add("spring.datasource.password", () -> "");
-            registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        }
+        postgresContainer = new PostgreSQLContainer<>("postgres:17-alpine");
+        postgresContainer.start();
+        registry.add("spring.datasource.url", postgresContainer::getJdbcUrl);
+        registry.add("spring.datasource.username", postgresContainer::getUsername);
+        registry.add("spring.datasource.password", postgresContainer::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.PostgreSQLDialect");
         registry.add("spring.flyway.enabled", () -> "true");

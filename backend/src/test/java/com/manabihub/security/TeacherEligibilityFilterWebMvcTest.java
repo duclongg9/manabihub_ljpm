@@ -1,14 +1,17 @@
 package com.manabihub.security;
 
 import com.manabihub.common.response.PageResponse;
+import com.manabihub.course.controller.TeacherDashboardController;
+import com.manabihub.course.dto.response.TeacherDashboardResponse;
+import com.manabihub.course.service.CourseService;
+import com.manabihub.identity.service.CurrentUserService;
+import com.manabihub.kyc.controller.TeacherKycController;
+import com.manabihub.kyc.service.TeacherKycService;
 import com.manabihub.security.config.SecurityConfig;
 import com.manabihub.security.config.TeacherEligibilityFilter;
 import com.manabihub.security.oauth2.CustomOAuth2UserService;
 import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
 import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
-import com.manabihub.course.controller.TeacherDashboardController;
-import com.manabihub.course.dto.response.TeacherDashboardResponse;
-import com.manabihub.course.service.CourseService;
 import com.manabihub.writing.controller.TeacherWritingReviewController;
 import com.manabihub.writing.dto.response.WritingSubmissionSummaryResponse;
 import com.manabihub.writing.service.TeacherWritingReviewService;
@@ -21,31 +24,36 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.manabihub.kyc.controller.TeacherKycController;
-import com.manabihub.kyc.service.TeacherKycService;
-import com.manabihub.identity.service.CurrentUserService;
-import com.manabihub.kyc.dto.KycStatusResponse;
-import com.manabihub.kyc.domain.TeacherKycStatus;
-
 /**
- * WebMvc test verifying the {@link TeacherEligibilityFilter} correctly gates
- * all {@code /api/v1/teacher/**} endpoints based on role checks.
+ * WebMvc coverage for the HTTP/security behavior of {@link TeacherEligibilityFilter}.
  *
- * Note: This test uses a mocked {@link JdbcTemplate} to simulate database
- * responses for eligibility checks, it is NOT a full PostgreSQL end-to-end test.
+ * This class uses a mocked {@link JdbcTemplate}; PostgreSQL role revocation is
+ * covered separately by TeacherIdentityClaimDuplicatePostgresIntegrationTest.
  */
-
-@WebMvcTest({TeacherDashboardController.class, TeacherWritingReviewController.class, TeacherKycController.class})
+@WebMvcTest({
+        TeacherDashboardController.class,
+        TeacherWritingReviewController.class,
+        TeacherKycController.class
+})
 @Import({SecurityConfig.class, TeacherEligibilityFilter.class})
-class TeacherEligibilityFilterIntegrationTest {
+class TeacherEligibilityFilterWebMvcTest {
+
+    private static final UUID TEACHER_ROLE_ID =
+            UUID.fromString("a0000000-0000-0000-0000-000000000002");
+    private static final String COUNT_TEACHER_ROLE_SQL =
+            "SELECT COUNT(*) FROM user_roles WHERE user_id = ? AND role_id = ?";
 
     @Autowired
     private MockMvc mockMvc;
@@ -74,26 +82,19 @@ class TeacherEligibilityFilterIntegrationTest {
     @MockBean
     private JdbcTemplate jdbcTemplate;
 
-    private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
-
-    // ──────────────────────────────────────────────
-    // Active Teacher — DB role exists → 200
-    // ──────────────────────────────────────────────
-
     @Test
     void activeTeacher_dashboardReturns200() throws Exception {
         UUID userId = UUID.randomUUID();
-
-        // DB has TEACHER role
-        when(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM user_roles WHERE user_id = ? AND role_id = ?",
-                Integer.class, userId, TEACHER_ROLE_ID))
-                .thenReturn(1);
+        mockTeacherRoleCount(userId, 1);
 
         when(courseService.getTeacherDashboardStats())
                 .thenReturn(TeacherDashboardResponse.builder()
-                        .totalCourses(0).draftOrCorrection(0).pendingApproval(0).published(0)
-                        .recentCourses(java.util.List.of()).build());
+                        .totalCourses(0)
+                        .draftOrCorrection(0)
+                        .pendingApproval(0)
+                        .published(0)
+                        .recentCourses(List.of())
+                        .build());
 
         mockMvc.perform(get("/api/v1/teacher/dashboard")
                         .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "TEACHER"))
@@ -104,22 +105,19 @@ class TeacherEligibilityFilterIntegrationTest {
     @Test
     void activeTeacher_writingSubmissionsReturns200() throws Exception {
         UUID userId = UUID.randomUUID();
-
-        when(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM user_roles WHERE user_id = ? AND role_id = ?",
-                Integer.class, userId, TEACHER_ROLE_ID))
-                .thenReturn(1);
+        mockTeacherRoleCount(userId, 1);
 
         PageResponse<WritingSubmissionSummaryResponse> page =
                 PageResponse.<WritingSubmissionSummaryResponse>builder()
-                        .content(java.util.List.of())
-                        .page(0).size(10).totalElements(0).totalPages(0)
-                        .first(true).last(true).build();
-        when(teacherWritingReviewService.listSubmissions(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()))
-                .thenReturn(page);
+                        .content(List.of())
+                        .page(0)
+                        .size(10)
+                        .totalElements(0)
+                        .totalPages(0)
+                        .first(true)
+                        .last(true)
+                        .build();
+        when(teacherWritingReviewService.listSubmissions(any(), any(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/v1/teacher/writing-submissions")
                         .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "TEACHER"))
@@ -127,36 +125,24 @@ class TeacherEligibilityFilterIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    // ──────────────────────────────────────────────
-    // Quarantined Teacher — DB role revoked, JWT still carries ROLE_TEACHER → 403
-    // ──────────────────────────────────────────────
-
     @Test
     void quarantinedTeacher_staleJwt_dashboardReturns403() throws Exception {
         UUID userId = UUID.randomUUID();
-
-        // DB role REVOKED (quarantine)
-        when(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM user_roles WHERE user_id = ? AND role_id = ?",
-                Integer.class, userId, TEACHER_ROLE_ID))
-                .thenReturn(0);
+        mockTeacherRoleCount(userId, 0);
 
         mockMvc.perform(get("/api/v1/teacher/dashboard")
                         .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "TEACHER"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.messageCode").value("AUTH_FORBIDDEN"))
-                .andExpect(jsonPath("$.message").value("Teacher eligibility revoked — account quarantined"));
+                .andExpect(jsonPath("$.message")
+                        .value("Teacher access is not available for this account."));
     }
 
     @Test
     void quarantinedTeacher_staleJwt_writingReviewReturns403() throws Exception {
         UUID userId = UUID.randomUUID();
-
-        when(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM user_roles WHERE user_id = ? AND role_id = ?",
-                Integer.class, userId, TEACHER_ROLE_ID))
-                .thenReturn(0);
+        mockTeacherRoleCount(userId, 0);
 
         mockMvc.perform(get("/api/v1/teacher/writing-submissions")
                         .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "TEACHER"))
@@ -165,36 +151,90 @@ class TeacherEligibilityFilterIntegrationTest {
                 .andExpect(jsonPath("$.messageCode").value("AUTH_FORBIDDEN"));
     }
 
-    // ──────────────────────────────────────────────
-    // Student accessing Teacher endpoint → 403 (existing @PreAuthorize)
-    // ──────────────────────────────────────────────
+    @Test
+    void quarantinedTeacher_contextPathStillReturns403() throws Exception {
+        UUID userId = UUID.randomUUID();
+        mockTeacherRoleCount(userId, 0);
+
+        mockMvc.perform(get("/manabihub/api/v1/teacher/dashboard")
+                        .contextPath("/manabihub")
+                        .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "TEACHER"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void student_teacherDashboardReturns403() throws Exception {
         UUID userId = UUID.randomUUID();
+        mockTeacherRoleCount(userId, 0);
 
-        // Student has no TEACHER role in DB (won't even be checked because @PreAuthorize catches first)
         mockMvc.perform(get("/api/v1/teacher/dashboard")
                         .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "STUDENT"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isForbidden());
     }
 
-    // ──────────────────────────────────────────────
-    // Student accessing KYC endpoint → 200 (exempt from filter, allowed by @PreAuthorize)
-    // ──────────────────────────────────────────────
+    @Test
+    void student_writingReviewReturns403() throws Exception {
+        UUID userId = UUID.randomUUID();
+        mockTeacherRoleCount(userId, 0);
+
+        mockMvc.perform(get("/api/v1/teacher/writing-submissions")
+                        .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "STUDENT"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
-    void student_kycEndpointReturns200() throws Exception {
+    void student_kycEndpointReturns200WithoutTeacherRoleLookup() throws Exception {
         UUID userId = UUID.randomUUID();
-
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
-        
         when(teacherKycService.getStatus(userId)).thenReturn(null);
 
         mockMvc.perform(get("/api/v1/teacher/kyc/status")
                         .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "STUDENT"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isOk());
+
+        verifyNoInteractions(jdbcTemplate);
+    }
+
+    @Test
+    void student_kycLookalikePathIsNotExemptFromTeacherGate() throws Exception {
+        UUID userId = UUID.randomUUID();
+        mockTeacherRoleCount(userId, 0);
+
+        mockMvc.perform(get("/api/v1/teacher/kyc-admin")
+                        .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "STUDENT"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void teacherEndpoint_invalidJwtSubjectReturns403WithoutRoleLookup() throws Exception {
+        mockMvc.perform(get("/api/v1/teacher/dashboard")
+                        .with(jwt().jwt(j -> j.subject("not-a-uuid").claim("role", "TEACHER"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(jdbcTemplate);
+    }
+
+    @Test
+    void teacherEndpoint_nonJwtAuthenticationReturns403WithoutRoleLookup() throws Exception {
+        mockMvc.perform(get("/api/v1/teacher/dashboard")
+                        .with(user("teacher").roles("TEACHER")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(jdbcTemplate);
+    }
+
+    private void mockTeacherRoleCount(UUID userId, int count) {
+        when(jdbcTemplate.queryForObject(
+                COUNT_TEACHER_ROLE_SQL,
+                Integer.class,
+                userId,
+                TEACHER_ROLE_ID
+        )).thenReturn(count);
     }
 }

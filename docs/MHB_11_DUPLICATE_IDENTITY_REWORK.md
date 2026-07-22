@@ -41,7 +41,14 @@ MHB-11 Rework prevents the exact same National ID (CCCD) from being claimed or r
   - Both/all conflicting teacher profiles are quarantined fail-closed: course publishing rights are revoked (`canPublishCourse = false`), status is set to `kycStatus = REJECTED`, and the derived `TEACHER` database role is deleted from `user_roles` table so role-based authorization endpoints (Teacher Dashboard, Writing Review, etc.) immediately block quarantined accounts.
   - A security audit event (`KYC_BACKFILL_DUPLICATE_QUARANTINED`) is logged for each quarantined teacher profile.
 
-### E. Explicit Database Constraints & Exception Mapping
+### E. Live Teacher Authorization After Quarantine
+- `TeacherEligibilityFilter` runs after bearer-token authentication for operational `/api/v1/teacher/**` APIs.
+- The filter checks the live `user_roles` grant on every operational Teacher request, so a previously issued JWT cannot retain Teacher access after quarantine.
+- `/api/v1/teacher/kyc` and its descendants are deliberately excluded because authenticated Students use those endpoints before receiving the TEACHER role.
+- `TeacherKycController` explicitly allows only `STUDENT` or `TEACHER` roles.
+- The filter is mandatory in the API security chain and its servlet-container auto-registration is disabled to avoid duplicate execution.
+
+### F. Explicit Database Constraints & Exception Mapping
 - **Flyway Migration `V023` (Baseline V001 Intact)**:
   - `V001__init_baseline.sql` restored byte-for-byte to preserve checksum integrity across existing databases.
   - `teacher_identity_claims` table created in `V023` with explicit constraint name:
@@ -56,7 +63,7 @@ MHB-11 Rework prevents the exact same National ID (CCCD) from being claimed or r
 ## 3. Verification & Test Evidence
 
 - **Testcontainers & Reproducible Test Provisioning**:
-  - `TeacherIdentityClaimDuplicatePostgresIntegrationTest`: Provisions a real PostgreSQL 17 container dynamically using Testcontainers (`postgres:17-alpine`) with fallback to local PostgreSQL when Docker is absent.
+  - `TeacherIdentityClaimDuplicatePostgresIntegrationTest`: Provisions a real PostgreSQL 17 container dynamically using Testcontainers (`postgres:17-alpine`). The class is skipped when Docker is unavailable; GitHub Actions provides Docker and executes it.
   - Flyway migrations `V001` through `V023` executed successfully on PostgreSQL 17.
   - Hibernate schema validation (`hibernate.ddl-auto: validate`) verified clean against PostgreSQL schema.
 - **True Multi-Threaded Concurrency Race Test**:
@@ -65,5 +72,6 @@ MHB-11 Rework prevents the exact same National ID (CCCD) from being claimed or r
 - **Unit & Integration Test Suite**:
   - `TeacherIdentityClaimServiceUnitTest`: Verified secret fail-fast validation, CCCD normalization, HMAC fingerprinting, and structured exception matching.
   - `TeacherIdentityClaimDuplicatePostgresIntegrationTest`: Verified end-to-end duplicate protection, 2-thread concurrency race, `REQUIRES_NEW` audit log persistence across transaction rollbacks, PII redaction, fail-closed historical duplicate quarantine, and database `TEACHER` role revocation.
-  - **Total Tests Executed**: **96 / 96** (`./mvnw test`).
-- **Whitespace & Formatting Verification**: `git diff --check origin/develop...HEAD` executed with 0 errors.
+  - `TeacherEligibilityFilterWebMvcTest`: WebMvc coverage with a mocked `JdbcTemplate` verifies active Teacher access, stale-token denial after role revocation, Student denial on operational Teacher APIs, Student access to KYC APIs, context-path handling, and fail-closed malformed authentication. PostgreSQL role deletion remains covered by the separate PostgreSQL integration test above.
+  - Local result without Docker: **107 discovered, 102 passed, 5 PostgreSQL tests skipped** (`./mvnw test`). GitHub Actions runs the PostgreSQL tests with Docker.
+- **Whitespace & Formatting Verification**: Run `git diff --check origin/develop...HEAD` before merge.

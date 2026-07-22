@@ -11,7 +11,6 @@ import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Page;
@@ -47,7 +46,7 @@ public class TeacherIdentityClaimBackfillRunner {
             TeacherProfileRepository teacherProfileRepository,
             TeacherIdentityClaimService claimService,
             SecurityAuditService securityAuditService,
-            @Autowired(required = false) EntityManager entityManager
+            EntityManager entityManager
     ) {
         this.kycRequestRepository = kycRequestRepository;
         this.claimRepository = claimRepository;
@@ -146,11 +145,6 @@ public class TeacherIdentityClaimBackfillRunner {
     }
 
     private void revokeTeacherRole(UUID userId) {
-        if (entityManager == null) {
-            throw new IllegalStateException(
-                    "EntityManager required for TEACHER role revocation but was not injected. "
-                    + "Cannot safely quarantine user " + userId);
-        }
         int deleted = entityManager.createNativeQuery(
                 "DELETE FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
         ).setParameter("userId", userId)

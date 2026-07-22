@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * Database-backed eligibility gate for all {@code /api/v1/teacher/**} endpoints.
+ * Database-backed eligibility gate for operational {@code /api/v1/teacher/**}
+ * endpoints. Teacher-candidate KYC endpoints are excluded because students use
+ * them before the TEACHER role is granted.
  * <p>
  * JWT tokens are stateless and may carry a stale {@code ROLE_TEACHER} claim
  * after quarantine revokes the database role. This filter runs <b>after</b>
@@ -37,8 +39,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TeacherEligibilityFilter extends OncePerRequestFilter {
 
-    private static final String TEACHER_PATH_PREFIX = "/api/v1/teacher/";
-    private static final String KYC_PATH_PREFIX = "/api/v1/teacher/kyc";
+    private static final String TEACHER_PATH = "/api/v1/teacher";
+    private static final String KYC_PATH = TEACHER_PATH + "/kyc";
     private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
 
     private static final String COUNT_TEACHER_ROLE_SQL =
@@ -49,11 +51,11 @@ public class TeacherEligibilityFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        if (path.startsWith(KYC_PATH_PREFIX)) {
-            return true;
-        }
-        return !path.startsWith(TEACHER_PATH_PREFIX);
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        String path = contextPath.isEmpty() ? requestUri : requestUri.substring(contextPath.length());
+        return !matchesPathOrDescendant(path, TEACHER_PATH)
+                || matchesPathOrDescendant(path, KYC_PATH);
     }
 
     @Override
@@ -62,40 +64,45 @@ public class TeacherEligibilityFilter extends OncePerRequestFilter {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        // If not authenticated yet (anonymous), let the chain handle 401
-        if (authentication == null || !authentication.isAuthenticated()
-                || !(authentication.getPrincipal() instanceof Jwt jwt)) {
+        // Let Spring Security produce the authentication response for anonymous callers.
+        if (authentication == null || !authentication.isAuthenticated()) {
             filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (!(authentication.getPrincipal() instanceof Jwt jwt)) {
+            log.warn("Teacher endpoint access denied: authenticated principal is not a JWT.");
+            writeForbiddenResponse(request, response);
             return;
         }
 
         UUID userId;
         try {
             userId = UUID.fromString(jwt.getSubject());
-        } catch (IllegalArgumentException ex) {
-            filterChain.doFilter(request, response);
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            log.warn("Teacher endpoint access denied: JWT subject is not a valid user ID.");
+            writeForbiddenResponse(request, response);
             return;
         }
 
         Integer count = jdbcTemplate.queryForObject(COUNT_TEACHER_ROLE_SQL, Integer.class, userId, TEACHER_ROLE_ID);
 
         if (count == null || count == 0) {
-            log.warn("Teacher eligibility check FAILED for user {} on {}. "
-                    + "JWT carries TEACHER role but database role revoked (quarantined).",
+            log.warn("Teacher endpoint access denied for user {} on {}: live TEACHER role is absent.",
                     userId, request.getRequestURI());
 
-            writeQuarantineResponse(request, response);
+            writeForbiddenResponse(request, response);
             return;
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private void writeQuarantineResponse(HttpServletRequest request, HttpServletResponse response)
+    private void writeForbiddenResponse(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
         ApiResponse<Void> body = ApiResponse.error(
                 MessageCodes.AUTH_FORBIDDEN,
-                "Teacher eligibility revoked — account quarantined",
+                "Teacher access is not available for this account.",
                 request.getRequestURI()
         );
 
@@ -103,5 +110,9 @@ public class TeacherEligibilityFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
         objectMapper.writeValue(response.getOutputStream(), body);
+    }
+
+    private boolean matchesPathOrDescendant(String path, String root) {
+        return path.equals(root) || path.startsWith(root + "/");
     }
 }
