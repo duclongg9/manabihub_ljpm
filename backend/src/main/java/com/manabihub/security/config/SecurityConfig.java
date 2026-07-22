@@ -30,6 +30,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+
 import javax.crypto.spec.SecretKeySpec;
 import java.util.List;
 import java.util.UUID;
@@ -44,6 +46,10 @@ public class SecurityConfig {
 
     @Value("${CORS_ALLOWED_ORIGINS:*}")
     private List<String> allowedOrigins;
+
+    /** Null in @WebMvcTest slices that lack a DataSource/JdbcTemplate. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private TeacherEligibilityFilter teacherEligibilityFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -82,6 +88,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(
                         jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+
+        if (teacherEligibilityFilter != null) {
+            http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
+        }
 
         return http.build();
     }
@@ -167,5 +177,14 @@ public class SecurityConfig {
         JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
         return jwtAuthenticationConverter;
+    }
+
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnBean(org.springframework.jdbc.core.JdbcTemplate.class)
+    public TeacherEligibilityFilter teacherEligibilityFilter(
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper
+    ) {
+        return new TeacherEligibilityFilter(jdbcTemplate, objectMapper);
     }
 }

@@ -147,17 +147,16 @@ public class TeacherIdentityClaimBackfillRunner {
 
     private void revokeTeacherRole(UUID userId) {
         if (entityManager == null) {
-            return;
+            throw new IllegalStateException(
+                    "EntityManager required for TEACHER role revocation but was not injected. "
+                    + "Cannot safely quarantine user " + userId);
         }
-        try {
-            entityManager.createNativeQuery(
-                    "DELETE FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
-            ).setParameter("userId", userId)
-             .setParameter("roleId", TEACHER_ROLE_ID)
-             .executeUpdate();
-        } catch (Exception ex) {
-            log.warn("Failed to revoke TEACHER role for user {}: {}", userId, ex.getMessage());
-        }
+        int deleted = entityManager.createNativeQuery(
+                "DELETE FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
+        ).setParameter("userId", userId)
+         .setParameter("roleId", TEACHER_ROLE_ID)
+         .executeUpdate();
+        log.info("Revoked TEACHER role for user {}: {} row(s) deleted from user_roles.", userId, deleted);
     }
 
     private String extractIdNumber(Map<String, Object> payload) {
