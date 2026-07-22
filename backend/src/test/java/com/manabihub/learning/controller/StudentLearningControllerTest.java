@@ -4,6 +4,7 @@ import com.manabihub.common.response.PageResponse;
 import com.manabihub.learning.dto.response.StudentCourseSummaryResponse;
 import com.manabihub.learning.dto.response.StudentDashboardStatsResponse;
 import com.manabihub.learning.enums.EnrollmentStatus;
+import com.manabihub.learning.service.LearningService;
 import com.manabihub.learning.service.StudentLearningService;
 import com.manabihub.security.config.SecurityConfig;
 import com.manabihub.security.oauth2.CustomOAuth2UserService;
@@ -43,6 +44,9 @@ class StudentLearningControllerTest {
 
     @MockBean
     private StudentLearningService studentLearningService;
+
+    @MockBean
+    private LearningService learningService;
 
     @MockBean
     private CustomOAuth2UserService customOAuth2UserService;

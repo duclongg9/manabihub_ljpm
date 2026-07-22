@@ -27,6 +27,7 @@ import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.course.repository.CourseApprovalDecisionRepository;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.repository.LessonProgressRepository;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
 import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
@@ -131,6 +132,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private EnrollmentRepository enrollmentRepository;
+
+    @MockBean
+    private LessonProgressRepository lessonProgressRepository;
 
     @MockBean
     private WritingSubmissionRepository writingSubmissionRepository;
