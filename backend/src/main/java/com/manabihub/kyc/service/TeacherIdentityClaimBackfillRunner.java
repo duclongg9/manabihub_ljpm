@@ -9,7 +9,9 @@ import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Page;
@@ -30,25 +32,29 @@ import java.util.UUID;
 public class TeacherIdentityClaimBackfillRunner {
 
     private static final int PAGE_SIZE = 100;
+    private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
 
     private final KycRequestRepository kycRequestRepository;
     private final TeacherIdentityClaimRepository claimRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final TeacherIdentityClaimService claimService;
     private final SecurityAuditService securityAuditService;
+    private final EntityManager entityManager;
 
     public TeacherIdentityClaimBackfillRunner(
             KycRequestRepository kycRequestRepository,
             TeacherIdentityClaimRepository claimRepository,
             TeacherProfileRepository teacherProfileRepository,
             TeacherIdentityClaimService claimService,
-            SecurityAuditService securityAuditService
+            SecurityAuditService securityAuditService,
+            @Autowired(required = false) EntityManager entityManager
     ) {
         this.kycRequestRepository = kycRequestRepository;
         this.claimRepository = claimRepository;
         this.teacherProfileRepository = teacherProfileRepository;
         this.claimService = claimService;
         this.securityAuditService = securityAuditService;
+        this.entityManager = entityManager;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -117,13 +123,17 @@ public class TeacherIdentityClaimBackfillRunner {
                 }
             } else {
                 // MULTIPLE HISTORICAL TEACHERS HAVE THE SAME CCCD!
-                // STRICT FAIL-CLOSED QUARANTINE: Revoke publishing & KYC status, do NOT claim for either profile!
-                log.warn("Historical duplicate CCCD detected across {} teachers for fingerprint. Revoking rights and quarantining profiles.", teacherIds.size());
+                // STRICT FAIL-CLOSED QUARANTINE: Revoke publishing rights, KYC status, and TEACHER database role!
+                log.warn("Historical duplicate CCCD detected across {} teachers for fingerprint. Revoking rights and TEACHER role.", teacherIds.size());
                 for (UUID teacherId : teacherIds) {
                     teacherProfileRepository.findById(teacherId).ifPresent(profile -> {
                         profile.setKycStatus(TeacherKycStatus.REJECTED);
                         profile.setCanPublishCourse(false);
                         teacherProfileRepository.save(profile);
+
+                        if (profile.getUser() != null && profile.getUser().getId() != null) {
+                            revokeTeacherRole(profile.getUser().getId());
+                        }
                     });
 
                     securityAuditService.logBackfillQuarantineAudit(teacherId, teacherIds.size());
@@ -133,6 +143,21 @@ public class TeacherIdentityClaimBackfillRunner {
         }
 
         log.info("Identity claim backfill finished. Backfilled: {}, Quarantined conflicting profiles: {}.", backfilledCount, quarantinedCount);
+    }
+
+    private void revokeTeacherRole(UUID userId) {
+        if (entityManager == null) {
+            return;
+        }
+        try {
+            entityManager.createNativeQuery(
+                    "DELETE FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
+            ).setParameter("userId", userId)
+             .setParameter("roleId", TEACHER_ROLE_ID)
+             .executeUpdate();
+        } catch (Exception ex) {
+            log.warn("Failed to revoke TEACHER role for user {}: {}", userId, ex.getMessage());
+        }
     }
 
     private String extractIdNumber(Map<String, Object> payload) {

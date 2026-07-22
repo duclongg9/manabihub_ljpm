@@ -38,12 +38,13 @@ MHB-11 Rework prevents the exact same National ID (CCCD) from being claimed or r
   - `TeacherIdentityClaimBackfillRunner` queries `kyc_requests` in pages of 100 ordered by `createdAt ASC`.
 - **Quarantine / Fail-Closed on Historical Conflicts**:
   - If multiple historical teacher profiles share the exact same CCCD fingerprint in legacy data, the backfill **DOES NOT** select one profile arbitrarily.
-  - Both/all conflicting teacher profiles are quarantined fail-closed: course publishing rights are revoked (`canPublishCourse = false`) and status is set to `kycStatus = REJECTED` so they cannot publish courses or retain verified capabilities until manual admin resolution.
+  - Both/all conflicting teacher profiles are quarantined fail-closed: course publishing rights are revoked (`canPublishCourse = false`), status is set to `kycStatus = REJECTED`, and the derived `TEACHER` database role is deleted from `user_roles` table so role-based authorization endpoints (Teacher Dashboard, Writing Review, etc.) immediately block quarantined accounts.
   - A security audit event (`KYC_BACKFILL_DUPLICATE_QUARANTINED`) is logged for each quarantined teacher profile.
 
 ### E. Explicit Database Constraints & Exception Mapping
-- **Database Migration (`V023`)**:
-  - `teacher_identity_claims` table created with explicit constraint name:
+- **Flyway Migration `V023` (Baseline V001 Intact)**:
+  - `V001__init_baseline.sql` restored byte-for-byte to preserve checksum integrity across existing databases.
+  - `teacher_identity_claims` table created in `V023` with explicit constraint name:
     `CONSTRAINT uk_teacher_identity_claims_fingerprint UNIQUE (identity_fingerprint)`.
 - **Precise Structured Exception Handling**:
   - `TeacherIdentityClaimService` inspects structured `ConstraintViolationException.getConstraintName()` and `SQLException.getSQLState()` (`23505`) metadata.
@@ -54,12 +55,15 @@ MHB-11 Rework prevents the exact same National ID (CCCD) from being claimed or r
 
 ## 3. Verification & Test Evidence
 
-- **Real PostgreSQL 17 Integration Test Execution**:
-  - `TeacherIdentityClaimDuplicatePostgresIntegrationTest`: Executed against REAL PostgreSQL 17 cluster (`jdbc:postgresql://127.0.0.1:5439/manabihub_test`).
+- **Testcontainers & Reproducible Test Provisioning**:
+  - `TeacherIdentityClaimDuplicatePostgresIntegrationTest`: Provisions a real PostgreSQL 17 container dynamically using Testcontainers (`postgres:17-alpine`) with fallback to local PostgreSQL when Docker is absent.
   - Flyway migrations `V001` through `V023` executed successfully on PostgreSQL 17.
   - Hibernate schema validation (`hibernate.ddl-auto: validate`) verified clean against PostgreSQL schema.
+- **True Multi-Threaded Concurrency Race Test**:
+  - `testConcurrentRace_TwoThreadsAttemptSameIdentity`: Two parallel threads unblocked simultaneously by `CountDownLatch`.
+  - Verifies that EXACTLY ONE thread succeeds while EXACTLY ONE thread receives HTTP 409 + `MSG-KYC-008`, EXACTLY ONE claim is persisted in DB, and durable security audit log (`KYC_DUPLICATE_IDENTITY_DETECTED`) is stored for the losing attempt.
 - **Unit & Integration Test Suite**:
   - `TeacherIdentityClaimServiceUnitTest`: Verified secret fail-fast validation, CCCD normalization, HMAC fingerprinting, and structured exception matching.
-  - `TeacherIdentityClaimDuplicatePostgresIntegrationTest`: Verified end-to-end duplicate protection, idempotent re-verification for the same teacher, HTTP 409 + MSG-KYC-008 for different teachers, `REQUIRES_NEW` audit log persistence across transaction rollbacks, PII redaction, and fail-closed historical duplicate quarantine.
-  - **Total Tests Passed**: **95 / 95** (`./mvnw test`).
+  - `TeacherIdentityClaimDuplicatePostgresIntegrationTest`: Verified end-to-end duplicate protection, 2-thread concurrency race, `REQUIRES_NEW` audit log persistence across transaction rollbacks, PII redaction, fail-closed historical duplicate quarantine, and database `TEACHER` role revocation.
+  - **Total Tests Executed**: **96 / 96** (`./mvnw test`).
 - **Whitespace & Formatting Verification**: `git diff --check origin/develop...HEAD` executed with 0 errors.

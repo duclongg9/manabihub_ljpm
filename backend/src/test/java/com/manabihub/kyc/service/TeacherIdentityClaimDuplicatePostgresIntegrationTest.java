@@ -28,15 +28,26 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.DockerClientFactory;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -44,8 +55,35 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
+@Testcontainers(disabledWithoutDocker = true)
 @ActiveProfiles("test")
 class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
+
+    private static PostgreSQLContainer<?> postgresContainer;
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        if (DockerClientFactory.instance().isDockerAvailable()) {
+            postgresContainer = new PostgreSQLContainer<>("postgres:17-alpine");
+            postgresContainer.start();
+            registry.add("spring.datasource.url", postgresContainer::getJdbcUrl);
+            registry.add("spring.datasource.username", postgresContainer::getUsername);
+            registry.add("spring.datasource.password", postgresContainer::getPassword);
+            registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        } else {
+            // Fallback to local PostgreSQL cluster when Docker Desktop is absent
+            registry.add("spring.datasource.url", () -> "jdbc:postgresql://127.0.0.1:5439/manabihub_test");
+            registry.add("spring.datasource.username", () -> "postgres");
+            registry.add("spring.datasource.password", () -> "");
+            registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        }
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.PostgreSQLDialect");
+        registry.add("spring.flyway.enabled", () -> "true");
+        registry.add("spring.flyway.locations", () -> "classpath:db/migration");
+    }
+
+    private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
 
     @Autowired
     private TeacherKycService teacherKycService;
@@ -106,6 +144,23 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         profile.setKycStatus(TeacherKycStatus.NOT_SUBMITTED);
         profile.setCanPublishCourse(false);
         return teacherProfileRepository.save(profile);
+    }
+
+    private void grantTeacherRole(UUID userId) {
+        entityManager.createNativeQuery(
+                "INSERT INTO user_roles (user_id, role_id) VALUES (:userId, :roleId) ON CONFLICT DO NOTHING"
+        ).setParameter("userId", userId)
+         .setParameter("roleId", TEACHER_ROLE_ID)
+         .executeUpdate();
+    }
+
+    private long countTeacherRoles(UUID userId) {
+        Number count = (Number) entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
+        ).setParameter("userId", userId)
+         .setParameter("roleId", TEACHER_ROLE_ID)
+         .getSingleResult();
+        return count.longValue();
     }
 
     private KycIdentityVerificationRequest createMockSdkRequest(String idNumber, String name) {
@@ -208,6 +263,87 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
     }
 
     @Test
+    void testConcurrentRace_TwoThreadsAttemptSameIdentity() throws Exception {
+        TransactionTemplate tx1 = new TransactionTemplate(transactionManager);
+        tx1.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        String cccdNormalized = generateUniqueCccdDigits();
+
+        // 1. Create and commit Teacher A and Teacher B
+        UUID userAId = tx1.execute(status -> createTestUser("raceA", "Teacher A").getId());
+        UUID userBId = tx1.execute(status -> createTestUser("raceB", "Teacher B").getId());
+
+        tx1.executeWithoutResult(status -> {
+            createTestProfile(entityManager.find(AppUser.class, userAId));
+            createTestProfile(entityManager.find(AppUser.class, userBId));
+        });
+
+        // 2. Setup 2 threads to race unblocked by a CountDownLatch
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        AtomicReference<Object> outcomeA = new AtomicReference<>();
+        AtomicReference<Object> outcomeB = new AtomicReference<>();
+
+        Future<?> f1 = executor.submit(() -> {
+            try {
+                startLatch.await();
+                KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Teacher A");
+                KycIdentityVerificationResponse resp = teacherKycService.verifyIdentity(userAId, req, "127.0.0.1", "Thread-1");
+                outcomeA.set(resp);
+            } catch (Throwable t) {
+                outcomeA.set(t);
+            }
+        });
+
+        Future<?> f2 = executor.submit(() -> {
+            try {
+                startLatch.await();
+                KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Teacher B");
+                KycIdentityVerificationResponse resp = teacherKycService.verifyIdentity(userBId, req, "127.0.0.1", "Thread-2");
+                outcomeB.set(resp);
+            } catch (Throwable t) {
+                outcomeB.set(t);
+            }
+        });
+
+        // Release both threads simultaneously
+        startLatch.countDown();
+
+        f1.get(10, TimeUnit.SECONDS);
+        f2.get(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // 3. Assert EXACTLY ONE thread succeeded and EXACTLY ONE thread failed with HTTP 409 Conflict / MSG-KYC-008
+        boolean aSuccess = outcomeA.get() instanceof KycIdentityVerificationResponse;
+        boolean bSuccess = outcomeB.get() instanceof KycIdentityVerificationResponse;
+
+        assertTrue(aSuccess ^ bSuccess, "Exactly one thread must succeed in concurrent claim race");
+
+        Throwable failure = (Throwable) (aSuccess ? outcomeB.get() : outcomeA.get());
+        assertTrue(failure instanceof BusinessException, "Losing thread must throw BusinessException");
+        BusinessException busEx = (BusinessException) failure;
+        assertEquals(MessageCodes.MSG_KYC_008, busEx.getMessageCode());
+        assertEquals(HttpStatus.CONFLICT, busEx.getHttpStatus());
+
+        // 4. Assert database contains EXACTLY ONE claim row for this fingerprint
+        String fingerprint = claimService.generateFingerprint(cccdNormalized);
+        assertTrue(claimRepository.findByIdentityFingerprint(fingerprint).isPresent());
+        assertEquals(1, claimRepository.findAll().stream().filter(c -> fingerprint.equals(c.getIdentityFingerprint())).count());
+
+        // 5. Assert durable security audit log persisted for the losing attempt
+        UUID losingUserId = aSuccess ? userBId : userAId;
+        TeacherProfile losingProfile = teacherProfileRepository.findByUserId(losingUserId).orElseThrow();
+
+        List<AuditLog> auditLogs = auditLogRepository.findAll();
+        boolean auditFound = auditLogs.stream()
+                .filter(a -> "KYC_DUPLICATE_IDENTITY_DETECTED".equals(a.getAction()))
+                .anyMatch(a -> losingProfile.getId().equals(a.getTargetId()));
+
+        assertTrue(auditFound, "Security audit log must be persisted for the losing thread in concurrency race");
+    }
+
+    @Test
     void testDirectDatabaseUniqueConstraintViolationHandling() {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -244,7 +380,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
     }
 
     @Test
-    void testHistoricalBackfillQuarantinesLegacyDuplicateCCCDsFailClosed() {
+    void testHistoricalBackfillQuarantinesLegacyDuplicateCCCDsFailClosedAndRevokesTeacherRole() {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
@@ -252,12 +388,14 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         String cccdFormatted = cccd.substring(0, 3) + " " + cccd.substring(3, 6) + " " + cccd.substring(6, 9) + " " + cccd.substring(9, 12);
 
         tx.executeWithoutResult(status -> {
-            // Create two legacy profiles with identical CCCD in verificationPayload
+            // Create two legacy profiles with identical CCCD in verificationPayload and seed TEACHER database roles
             AppUser legacyUser1 = createTestUser("legacy1", "Legacy User 1");
             TeacherProfile legacyProfile1 = createTestProfile(legacyUser1);
             legacyProfile1.setKycStatus(TeacherKycStatus.PENDING);
             legacyProfile1.setCanPublishCourse(true);
             teacherProfileRepository.save(legacyProfile1);
+            grantTeacherRole(legacyUser1.getId());
+            assertEquals(1, countTeacherRoles(legacyUser1.getId()), "Teacher 1 must have TEACHER database role prior to backfill");
 
             KycRequest req1 = new KycRequest();
             req1.setTeacherProfile(legacyProfile1);
@@ -271,6 +409,8 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             legacyProfile2.setKycStatus(TeacherKycStatus.PENDING);
             legacyProfile2.setCanPublishCourse(true);
             teacherProfileRepository.save(legacyProfile2);
+            grantTeacherRole(legacyUser2.getId());
+            assertEquals(1, countTeacherRoles(legacyUser2.getId()), "Teacher 2 must have TEACHER database role prior to backfill");
 
             KycRequest req2 = new KycRequest();
             req2.setTeacherProfile(legacyProfile2);
@@ -297,6 +437,10 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
 
             assertEquals(TeacherKycStatus.REJECTED, updatedProfile2.getKycStatus());
             assertFalse(updatedProfile2.isCanPublishCourse());
+
+            // Assert TEACHER database role revoked from user_roles table for both users!
+            assertEquals(0, countTeacherRoles(legacyUser1.getId()), "TEACHER role must be revoked from user_roles during quarantine");
+            assertEquals(0, countTeacherRoles(legacyUser2.getId()), "TEACHER role must be revoked from user_roles during quarantine");
 
             // Quarantine audit log created for both
             List<AuditLog> quarantineAudits = auditLogRepository.findAll().stream()
