@@ -5,9 +5,8 @@
 
 CREATE TABLE teacher_identity_claims (
     teacher_id UUID PRIMARY KEY REFERENCES teacher_profiles(id) ON DELETE CASCADE,
-    identity_fingerprint VARCHAR(64) NOT NULL UNIQUE,
+    identity_fingerprint VARCHAR(64) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_teacher_identity_claims_fingerprint UNIQUE (identity_fingerprint)
 );
-
-CREATE INDEX idx_teacher_identity_claims_fingerprint ON teacher_identity_claims(identity_fingerprint);

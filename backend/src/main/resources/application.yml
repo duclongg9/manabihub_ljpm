@@ -34,7 +34,7 @@ management:
 
 manabihub:
   kyc:
-    identity-secret: ${KYC_IDENTITY_SECRET:manabihub-kyc-identity-hmac-secret-default-key}
+    identity-secret: ${KYC_IDENTITY_SECRET:}
   ai:
     chat:
       base-url: ${AI_CHAT_PROVIDER_BASE_URL:}

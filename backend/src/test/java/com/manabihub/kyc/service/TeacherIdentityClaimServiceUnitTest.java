@@ -9,7 +9,6 @@ import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,7 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class TeacherIdentityClaimServiceTest {
+class TeacherIdentityClaimServiceUnitTest {
 
     @Mock
     private TeacherIdentityClaimRepository claimRepository;
@@ -31,7 +30,7 @@ class TeacherIdentityClaimServiceTest {
     private SecurityAuditService securityAuditService;
 
     private TeacherIdentityClaimService claimService;
-    private final String testSecret = "test-secret-key-1234567890";
+    private final String testSecret = "test-secret-key-1234567890-32chars-min-length";
 
     @BeforeEach
     void setUp() {
@@ -40,6 +39,24 @@ class TeacherIdentityClaimServiceTest {
                 securityAuditService,
                 testSecret
         );
+        claimService.afterPropertiesSet();
+    }
+
+    @Test
+    void secretValidation_FailsFast_WhenMissingOrTooShort() {
+        TeacherIdentityClaimService emptySecretService = new TeacherIdentityClaimService(
+                claimRepository,
+                securityAuditService,
+                ""
+        );
+        assertThrows(IllegalStateException.class, emptySecretService::afterPropertiesSet);
+
+        TeacherIdentityClaimService shortSecretService = new TeacherIdentityClaimService(
+                claimRepository,
+                securityAuditService,
+                "short-secret"
+        );
+        assertThrows(IllegalStateException.class, shortSecretService::afterPropertiesSet);
     }
 
     @Test
@@ -123,7 +140,7 @@ class TeacherIdentityClaimServiceTest {
     }
 
     @Test
-    void processIdentityClaim_HandlesRaceCondition_DataIntegrityViolation() {
+    void processIdentityClaim_HandlesExplicitFingerprintConstraintViolation() {
         UUID teacherId = UUID.randomUUID();
         AppUser user = new AppUser();
         user.setId(UUID.randomUUID());
@@ -131,7 +148,9 @@ class TeacherIdentityClaimServiceTest {
 
         when(claimRepository.findByIdentityFingerprint(any())).thenReturn(Optional.empty());
         when(claimRepository.findByTeacherId(teacherId)).thenReturn(Optional.empty());
-        when(claimRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("Unique constraint violation"));
+        when(claimRepository.saveAndFlush(any())).thenThrow(
+                new DataIntegrityViolationException("duplicate key value violates unique constraint uk_teacher_identity_claims_fingerprint")
+        );
 
         BusinessException ex = assertThrows(
                 BusinessException.class,
@@ -142,5 +161,26 @@ class TeacherIdentityClaimServiceTest {
         assertEquals(HttpStatus.CONFLICT, ex.getHttpStatus());
 
         verify(securityAuditService).logDuplicateIdentityAudit(teacherId, user.getId(), "127.0.0.1", "TestAgent");
+    }
+
+    @Test
+    void processIdentityClaim_RethrowsUnrelatedDatabaseErrors() {
+        UUID teacherId = UUID.randomUUID();
+        AppUser user = new AppUser();
+        user.setId(UUID.randomUUID());
+        String cccd = "012345678901";
+
+        when(claimRepository.findByIdentityFingerprint(any())).thenReturn(Optional.empty());
+        when(claimRepository.findByTeacherId(teacherId)).thenReturn(Optional.empty());
+        when(claimRepository.saveAndFlush(any())).thenThrow(
+                new DataIntegrityViolationException("foreign key constraint violation fk_teacher_id")
+        );
+
+        assertThrows(
+                DataIntegrityViolationException.class,
+                () -> claimService.processIdentityClaim(teacherId, cccd, user, "127.0.0.1", "TestAgent")
+        );
+
+        verifyNoInteractions(securityAuditService);
     }
 }

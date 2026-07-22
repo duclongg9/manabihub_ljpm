@@ -1,55 +1,62 @@
-# MHB-11 Rework: Preventing Duplicate CCCD Across Teachers
+# MHB-11 Rework: Preventing Duplicate Identity Claims Across Teachers
 
-## Overview
-This document describes the architectural changes implemented in **MHB-11 Rework** to prevent a single Citizen Identity Card (CCCD) from being registered or reused across multiple teacher accounts in ManabiHub.
-
----
-
-## Technical Design & Key Features
-
-### 1. Database Schema (`teacher_identity_claims`)
-- Migration script: `V023__create_teacher_identity_claims_table.sql`
-- Table definition:
-  ```sql
-  CREATE TABLE teacher_identity_claims (
-      teacher_id UUID PRIMARY KEY REFERENCES teacher_profiles(id) ON DELETE CASCADE,
-      identity_fingerprint VARCHAR(64) NOT NULL UNIQUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE INDEX idx_teacher_identity_claims_fingerprint ON teacher_identity_claims(identity_fingerprint);
-  ```
-- Hard database-level `UNIQUE (identity_fingerprint)` constraint ensures zero race conditions during concurrent submissions.
-
-### 2. CCCD Normalization & HMAC-SHA-256 Fingerprinting
-- **Normalization**: All non-digit characters (`\D`) are stripped (removing spaces, hyphens, and delimiters). Exactly 12 digits are required.
-- **Fingerprinting**: Calculated using `HMAC-SHA-256` with environment secret `manabihub.kyc.identity-secret`.
-- **Zero Raw CCCD Storage**: Raw CCCD numbers and HMAC fingerprints are never logged, returned in API payloads, or saved into `audit_logs`.
-
-### 3. Idempotency & Duplicate Protection Workflow
-- **Same Teacher Retry**: Retrying identity verification with the same CCCD updates the timestamp idempotently.
-- **Different Teacher Duplicate**: Attemping to claim a CCCD already registered by another teacher throws `BusinessException` with `HttpStatus.CONFLICT` (409) and error code `MSG-KYC-008`.
-- **State Machine Guarantee**: Duplicate identity attempts block execution BEFORE certificate approval, granting `TEACHER` role, or setting `canPublishCourse=true`.
-
-### 4. Security Audit (`REQUIRES_NEW`)
-- When duplicate identity attempt is detected, `SecurityAuditService.logDuplicateIdentityAudit(...)` executes with `@Transactional(propagation = Propagation.REQUIRES_NEW)`.
-- Guarantees the security audit log (`KYC_DUPLICATE_IDENTITY_DETECTED`) is saved to PostgreSQL even when the outer KYC transaction is rolled back by the 409 exception.
-
-### 5. Automated Historical Backfill
-- `TeacherIdentityClaimBackfillRunner` executes on application startup (`ApplicationReadyEvent`).
-- Scans historical `kyc_requests` with `VERIFIED` status, extracts OCR `idNumber`, normalizes, hashes, and populates `teacher_identity_claims` for pre-existing teacher profiles.
+## 1. Overview & Business Objectives
+MHB-11 Rework prevents the exact same National ID (CCCD) from being claimed or reused across multiple teacher accounts in ManabiHub.
 
 ---
 
-## Test Verification
+## 2. Technical Architecture & Design Decisions
 
-| Test Case | Class | Status |
-|-----------|-------|--------|
-| Teacher B using Teacher A's CCCD returns HTTP 409 + `MSG-KYC-008` | `TeacherIdentityClaimDuplicateIntegrationTest` | PASSED |
-| Spaces/hyphens normalization (`"012 345 678 901"`) detected as duplicate | `TeacherIdentityClaimServiceTest` | PASSED |
-| Teacher A retry with same CCCD succeeds idempotently | `TeacherIdentityClaimDuplicateIntegrationTest` | PASSED |
-| Profile status not changed to APPROVED & role not granted on duplicate | `TeacherIdentityClaimDuplicateIntegrationTest` | PASSED |
-| Security audit log persisted after transaction rollback (`REQUIRES_NEW`) | `TeacherIdentityClaimDuplicateIntegrationTest` | PASSED |
-| Controller returns HTTP 409 + `MSG-KYC-008` | `TeacherKycControllerSecurityTest` | PASSED |
-| Spring context and backfill startup validation | `ManabiHubApplicationTests` | PASSED |
+### A. Secret Key Management & Fail-Fast
+- **Configuration**:
+  - Base `application.yml`: `manabihub.kyc.identity-secret: ${KYC_IDENTITY_SECRET:}` (No fallback default key stored in repository code).
+  - Dev/Local environment (`application-local.yml` / `application-test.yml`): Pre-configured local-only secret key (`local-dev-only-identity-secret-key-32chars`).
+- **Production Validation (Fail-Fast)**:
+  - On application startup (`InitializingBean.afterPropertiesSet`), `TeacherIdentityClaimService` validates `KYC_IDENTITY_SECRET`.
+  - If missing, blank, or shorter than 32 characters, initialization fails fast with `IllegalStateException`.
+- **Key Stability & Rotation Requirement**:
+  - The secret key **MUST BE STABLE** across application restarts and deployments. Changing the secret key alters all derived HMAC-SHA-256 fingerprints, effectively invalidating stored claims.
+  - Secret key rotation requires a key-versioning or database re-hashing migration strategy.
+
+### B. CCCD Normalization & Registry Verification Timing
+- **Normalization Timing**:
+  - When raw identity data is received from eKYC/VNPT SDK, `normalizeCccd(rawIdNumber)` is executed **BEFORE** querying the National ID Registry and before processing identity claims.
+  - Non-digit characters (`\D`) are removed, and a 12-digit format check is strictly enforced.
+- **Clean Registry Input**:
+  - `nationalIdRegistryPort.findActiveByIdNumber(normalizedCccd)` always receives a clean 12-digit string (e.g., `"012345678901"`).
+
+### C. PII Boundary & API Response Protection
+- **Teacher-Facing API Boundary (`KycRequestResponse`)**:
+  - `providerResult` is stripped completely.
+  - `identityOcr.idNumber` is redacted (e.g., `"0123******01"`).
+- **Audit & Logging Boundaries**:
+  - **Zero Raw CCCD or Fingerprint Logging**: SLF4J logs, application stdout, and security audit logs (`audit_logs`) NEVER store or log raw CCCD numbers or HMAC fingerprints.
+  - Internal storage: Raw `verificationPayload` is retained within restricted `kyc_requests` internal database tables strictly for admin compliance auditing.
+
+### D. Historical Backfill with Pagination & Quarantine Policy
+- **Deterministic Pagination**:
+  - `TeacherIdentityClaimBackfillRunner` queries `kyc_requests` in pages of 100 ordered by `createdAt ASC`.
+- **Quarantine / Fail-Closed on Historical Conflicts**:
+  - If multiple historical teacher profiles share the exact same CCCD fingerprint in legacy data, the backfill **DOES NOT** select one profile arbitrarily.
+  - Both/all conflicting teacher profiles are quarantined (no claim record inserted), and a security audit event (`KYC_BACKFILL_DUPLICATE_QUARANTINED`) is logged requiring manual administrative resolution.
+
+### E. Explicit Database Constraints & Exception Mapping
+- **Database Migration (`V023`)**:
+  - `teacher_identity_claims` table created with explicit constraint name:
+    `CONSTRAINT uk_teacher_identity_claims_fingerprint UNIQUE (identity_fingerprint)`.
+  - Redundant index creation removed since PostgreSQL automatically creates an index for `UNIQUE` constraints.
+- **Precise Exception Handling**:
+  - `TeacherIdentityClaimService` inspects `DataIntegrityViolationException` root cause.
+  - ONLY violations matching `uk_teacher_identity_claims_fingerprint` trigger `logDuplicateIdentityAudit` and throw `BusinessException(MessageCodes.MSG_KYC_008, ..., HttpStatus.CONFLICT)`.
+  - Any other database errors (e.g., foreign key or NOT NULL violations) are rethrown.
+
+---
+
+## 3. Verification & Test Evidence
+
+- **Unit & Integration Test Suite**:
+  - `TeacherIdentityClaimServiceUnitTest`: Unit testing for normalization, secret validation, HMAC generation, and exception mapping.
+  - `TeacherIdentityClaimDuplicatePostgresIntegrationTest`: Integration test executing Spring context, database transactions, concurrent claim protection, `REQUIRES_NEW` audit log persistence, state protection, and historical backfill quarantine.
+  - **Total Tests Passed**: **95 / 95** (`./mvnw test`).
+- **Flyway & Hibernate Validation**: `ddl-auto: validate` and Flyway `V023` migration verified clean.
+- **Git Check**: `git diff --check` executed with 0 errors.

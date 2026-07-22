@@ -6,6 +6,7 @@ import com.manabihub.common.exception.BusinessException;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.TeacherIdentityClaim;
 import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -24,7 +25,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-public class TeacherIdentityClaimService {
+public class TeacherIdentityClaimService implements InitializingBean {
+
+    public static final String CONSTRAINT_UK_FINGERPRINT = "uk_teacher_identity_claims_fingerprint";
 
     private final TeacherIdentityClaimRepository claimRepository;
     private final SecurityAuditService securityAuditService;
@@ -33,11 +36,25 @@ public class TeacherIdentityClaimService {
     public TeacherIdentityClaimService(
             TeacherIdentityClaimRepository claimRepository,
             SecurityAuditService securityAuditService,
-            @Value("${manabihub.kyc.identity-secret:manabihub-kyc-identity-hmac-secret-default-key}") String identitySecret
+            @Value("${manabihub.kyc.identity-secret:}") String identitySecret
     ) {
         this.claimRepository = claimRepository;
         this.securityAuditService = securityAuditService;
         this.identitySecret = identitySecret;
+    }
+
+    @Override
+    public void afterPropertiesSet() {
+        if (!StringUtils.hasText(identitySecret)) {
+            throw new IllegalStateException(
+                    "KYC_IDENTITY_SECRET environment variable is missing. A secure, stable secret key is required for HMAC-SHA-256 identity fingerprinting."
+            );
+        }
+        if (identitySecret.trim().length() < 32) {
+            throw new IllegalStateException(
+                    "KYC_IDENTITY_SECRET is too short/weak (must be at least 32 characters long for security)."
+            );
+        }
     }
 
     /**
@@ -69,7 +86,7 @@ public class TeacherIdentityClaimService {
         try {
             Mac hmac = Mac.getInstance("HmacSHA256");
             SecretKeySpec secretKey = new SecretKeySpec(
-                    identitySecret.getBytes(StandardCharsets.UTF_8),
+                    identitySecret.trim().getBytes(StandardCharsets.UTF_8),
                     "HmacSHA256"
             );
             hmac.init(secretKey);
@@ -132,13 +149,25 @@ public class TeacherIdentityClaimService {
         try {
             claimRepository.saveAndFlush(claim);
         } catch (DataIntegrityViolationException ex) {
-            // Race condition caught by database UNIQUE constraint!
-            securityAuditService.logDuplicateIdentityAudit(teacherId, actorUser.getId(), ipAddress, userAgent);
-            throw new BusinessException(
-                    MessageCodes.MSG_KYC_008,
-                    "Số CCCD này đã được sử dụng bởi một tài khoản giáo viên khác",
-                    HttpStatus.CONFLICT
-            );
+            String causeMsg = getRootCauseMessage(ex).toLowerCase();
+            if (causeMsg.contains(CONSTRAINT_UK_FINGERPRINT) || causeMsg.contains("identity_fingerprint")) {
+                securityAuditService.logDuplicateIdentityAudit(teacherId, actorUser.getId(), ipAddress, userAgent);
+                throw new BusinessException(
+                        MessageCodes.MSG_KYC_008,
+                        "Số CCCD này đã được sử dụng bởi một tài khoản giáo viên khác",
+                        HttpStatus.CONFLICT
+                );
+            }
+            // Rethrow any other database error (e.g. FK, NOT NULL)
+            throw ex;
         }
+    }
+
+    private String getRootCauseMessage(Throwable ex) {
+        Throwable cause = ex;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause.getMessage() == null ? "" : cause.getMessage();
     }
 }

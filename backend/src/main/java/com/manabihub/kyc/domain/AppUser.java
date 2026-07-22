@@ -32,4 +32,11 @@ public class AppUser {
     @Enumerated(EnumType.STRING)
     @Column(name = "user_status", nullable = false)
     private UserStatus userStatus;
+
+    @Column(name = "provider")
+    private String provider = "LOCAL";
+
+    @org.hibernate.annotations.CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private java.time.Instant createdAt;
 }

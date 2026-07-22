@@ -48,4 +48,30 @@ public class SecurityAuditService {
 
         auditLogRepository.save(auditLog);
     }
+
+    /**
+     * Logs security audit when historical duplicate identity claims are quarantined during backfill.
+     * REQUIRES_NEW transaction ensures log persistence. No PII is logged.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logBackfillQuarantineAudit(UUID teacherId, int conflictingTeacherCount) {
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("SYSTEM")
+                .actorRoleCode("SYSTEM")
+                .action("KYC_BACKFILL_DUPLICATE_QUARANTINED")
+                .targetType("TEACHER_PROFILE")
+                .targetId(teacherId)
+                .afterValue(Map.of(
+                        "reason", "Historical duplicate identity claim quarantined during startup backfill",
+                        "conflictingTeachers", conflictingTeacherCount,
+                        "resolutionRequired", "MANUAL_ADMIN_RESOLUTION_REQUIRED"
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-22",
+                        "module", "HISTORICAL_BACKFILL"
+                ))
+                .build();
+
+        auditLogRepository.save(auditLog);
+    }
 }
