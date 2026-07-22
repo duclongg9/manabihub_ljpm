@@ -321,14 +321,9 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         boolean aSuccess = outcomeA.get() instanceof KycIdentityVerificationResponse;
         boolean bSuccess = outcomeB.get() instanceof KycIdentityVerificationResponse;
 
-        Throwable errA = outcomeA.get() instanceof Throwable ? (Throwable) outcomeA.get() : null;
-        Throwable errB = outcomeB.get() instanceof Throwable ? (Throwable) outcomeB.get() : null;
-
-        if (!aSuccess && !bSuccess) {
-            fail("Both threads failed in race test! Thread A error: " + errA + ", Thread B error: " + errB, errA != null ? errA : errB);
+        if (!(aSuccess ^ bSuccess)) {
+            fail("Concurrency race assertion failed! aSuccess=" + aSuccess + " [outcomeA=" + outcomeA.get() + "], bSuccess=" + bSuccess + " [outcomeB=" + outcomeB.get() + "]");
         }
-
-        assertTrue(aSuccess ^ bSuccess, "Exactly one thread must succeed in concurrent claim race");
 
         Throwable failure = (Throwable) (aSuccess ? outcomeB.get() : outcomeA.get());
         while (failure.getCause() != null && !(failure instanceof BusinessException)) {
