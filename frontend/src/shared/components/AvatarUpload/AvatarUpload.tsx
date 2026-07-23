@@ -9,14 +9,14 @@ interface AvatarUploadProps {
         file: File
     ) => void;
 
+    disabled?: boolean;
 }
 
 export default function AvatarUpload({
 
                                          avatarUrl,
-
                                          onSelect,
-
+                                         disabled = false,
                                      }: AvatarUploadProps) {
 
     function handleChange(
@@ -56,6 +56,7 @@ export default function AvatarUpload({
                 component="label"
                 variant="outlined"
                 startIcon={<CameraAltOutlinedIcon/>}
+                disabled={disabled}
                 sx={{
                     mt: 2,
                 }}
@@ -67,6 +68,7 @@ export default function AvatarUpload({
                     hidden
                     type="file"
                     accept="image/*"
+                    disabled={disabled}
                     onChange={handleChange}
                 />
 

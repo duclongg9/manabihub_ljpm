@@ -77,12 +77,7 @@ export async function uploadAvatar(file: File) {
 
     const response = await axiosClient.post<ApiEnvelope<string>>(
         "/api/v1/users/avatar",
-        formData,
-        {
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
-        }
+        formData
     );
 
     return response.data.data;

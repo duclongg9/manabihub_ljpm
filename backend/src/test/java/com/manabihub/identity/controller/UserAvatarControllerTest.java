@@ -17,11 +17,15 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,20 +50,27 @@ class UserAvatarControllerTest {
 
     private AppUser studentUser;
     private AppUser adminUser;
-    private Path tempAvatarDir;
+    @TempDir
+    static Path tempAvatarDir;
+
+    @DynamicPropertySource
+    static void registerProperties(DynamicPropertyRegistry registry) {
+        registry.add("manabihub.user.avatar-storage-root", () -> tempAvatarDir.toAbsolutePath().toString());
+    }
+
+    private static final byte[] VALID_PNG = new byte[]{ (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x00 };
+    private static final byte[] VALID_JPEG = new byte[]{ (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
     @BeforeEach
     void setUp() throws Exception {
-        appUserRepository.deleteAll();
-
         studentUser = AppUser.builder()
-                .email("student_avatar_test@example.com")
+                .email("student_avatar_test_" + UUID.randomUUID() + "@example.com")
                 .fullName("Student Name")
                 .build();
         studentUser = appUserRepository.save(studentUser);
 
         adminUser = AppUser.builder()
-                .email("admin_avatar_test@example.com")
+                .email("admin_avatar_test_" + UUID.randomUUID() + "@example.com")
                 .fullName("Admin Name")
                 .build();
         adminUser = appUserRepository.save(adminUser);
@@ -67,7 +78,8 @@ class UserAvatarControllerTest {
 
     @AfterEach
     void tearDown() {
-        appUserRepository.deleteAll();
+        if (studentUser != null) appUserRepository.delete(studentUser);
+        if (adminUser != null) appUserRepository.delete(adminUser);
     }
 
     @Test
@@ -80,7 +92,7 @@ class UserAvatarControllerTest {
                 "file",
                 "test.png",
                 "image/png",
-                "dummy image content".getBytes()
+                VALID_PNG
         );
 
         mockMvc.perform(multipart("/api/v1/users/avatar")
@@ -96,9 +108,29 @@ class UserAvatarControllerTest {
     }
 
     @Test
+    @DisplayName("Upload avatar - Success for TEACHER")
+    @WithMockUser(roles = {"TEACHER"})
+    void uploadAvatar_Success_Teacher() throws Exception {
+        when(currentUserService.getCurrentUserId()).thenReturn(studentUser.getId());
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.jpg",
+                "image/jpeg",
+                VALID_JPEG
+        );
+
+        mockMvc.perform(multipart("/api/v1/users/avatar")
+                        .file(file)
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.startsWith("/uploads/user-avatars/")));
+    }
+
+    @Test
     @DisplayName("Upload avatar - Unauthenticated returns 401")
     void uploadAvatar_Unauthenticated_401() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "test.png", "image/png", "img".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "test.png", "image/png", VALID_PNG);
 
         mockMvc.perform(multipart("/api/v1/users/avatar")
                         .file(file))
@@ -111,11 +143,47 @@ class UserAvatarControllerTest {
     void uploadAvatar_Admin_403() throws Exception {
         when(currentUserService.getCurrentUserId()).thenReturn(adminUser.getId());
 
-        MockMultipartFile file = new MockMultipartFile("file", "test.png", "image/png", "img".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "test.png", "image/png", VALID_PNG);
 
         mockMvc.perform(multipart("/api/v1/users/avatar")
                         .file(file))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Upload avatar - Oversize file returns 400")
+    @WithMockUser(roles = {"STUDENT"})
+    void uploadAvatar_Oversize_400() throws Exception {
+        when(currentUserService.getCurrentUserId()).thenReturn(studentUser.getId());
+
+        byte[] bigFile = new byte[3 * 1024 * 1024]; // 3MB
+        System.arraycopy(VALID_PNG, 0, bigFile, 0, VALID_PNG.length);
+
+        MockMultipartFile file = new MockMultipartFile("file", "test.png", "image/png", bigFile);
+
+        mockMvc.perform(multipart("/api/v1/users/avatar")
+                        .file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messageCode").value(MessageCodes.COMMON_BAD_REQUEST));
+    }
+
+    @Test
+    @DisplayName("Upload avatar - MIME spoofing returns 400")
+    @WithMockUser(roles = {"STUDENT"})
+    void uploadAvatar_Spoofing_400() throws Exception {
+        when(currentUserService.getCurrentUserId()).thenReturn(studentUser.getId());
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.png",
+                "image/png", // valid content type, fake extension, but invalid bytes
+                "this is actually a text file with no magic bytes".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/v1/users/avatar")
+                        .file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messageCode").value(MessageCodes.COMMON_BAD_REQUEST));
     }
 
     @Test
@@ -128,7 +196,7 @@ class UserAvatarControllerTest {
                 "file",
                 "test.pdf",
                 "application/pdf",
-                "dummy pdf content".getBytes()
+                VALID_PNG // valid magic bytes, but invalid content type
         );
 
         mockMvc.perform(multipart("/api/v1/users/avatar")

@@ -9,6 +9,7 @@ import {LoadingState} from "../../shared/components/LoadingState/LoadingState";
 import AvatarUpload from "../../shared/components/AvatarUpload/AvatarUpload";
 
 import {getMyStudentProfile, updateMyStudentProfile, uploadAvatar} from "./profileApi";
+import {resolvePublicAssetUrl} from "../../shared/utils/assetUtils";
 
 export default function StudentProfilePage() {
 
@@ -239,6 +240,18 @@ export default function StudentProfilePage() {
     }
 
     async function handleAvatar(file: File) {
+        if (file.size > 2 * 1024 * 1024) {
+            setSnackbar({ open: true, message: "File size exceeds 2MB", severity: "error" });
+            return;
+        }
+
+        const validTypes = ["image/jpeg", "image/png", "image/webp"];
+        if (!validTypes.includes(file.type)) {
+            setSnackbar({ open: true, message: "Invalid file type. Only JPEG, PNG, and WebP are allowed", severity: "error" });
+            return;
+        }
+
+        const previousAvatarUrl = form.avatarUrl;
         const preview = URL.createObjectURL(file);
         setForm(prev => ({ ...prev, avatarUrl: preview }));
 
@@ -249,6 +262,7 @@ export default function StudentProfilePage() {
             setSnackbar({ open: true, message: "Avatar uploaded successfully", severity: "success" });
         } catch (error) {
             console.error("Avatar upload failed:", error);
+            setForm(prev => ({ ...prev, avatarUrl: previousAvatarUrl }));
             setSnackbar({ open: true, message: "Failed to upload avatar", severity: "error" });
         } finally {
             setSaving(false);
@@ -305,8 +319,9 @@ export default function StudentProfilePage() {
                     <CardContent sx={{p: 5}}>
 
                         <AvatarUpload
-                            avatarUrl={form.avatarUrl}
+                            avatarUrl={resolvePublicAssetUrl(form.avatarUrl) || ""}
                             onSelect={handleAvatar}
+                            disabled={saving}
                         />
 
                         <TextField

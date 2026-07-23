@@ -86,6 +86,7 @@ public class SecurityConfig {
                                 "/api/v1/course-categories",
                                 "/api/v1/public/courses/**",
                                 "/uploads/course-thumbnails/**",
+                                "/uploads/user-avatars/**",
                                 "/api/admin/auth/login")
                         .permitAll()
                         .anyRequest().authenticated())
