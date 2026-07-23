@@ -1,5 +1,6 @@
 package com.manabihub.identity.controller;
 
+import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.repository.AppUserRepository;
@@ -7,6 +8,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,11 +26,17 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 import java.util.UUID;
-import org.junit.jupiter.api.io.TempDir;
+import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,6 +55,9 @@ class UserAvatarControllerTest {
 
     @MockBean
     private CurrentUserService currentUserService;
+
+    @MockBean
+    private AuditLogService auditLogService;
 
     private AppUser studentUser;
     private AppUser adminUser;
@@ -231,5 +242,70 @@ class UserAvatarControllerTest {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(avatarUrl))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType(MediaType.IMAGE_PNG_VALUE));
+    }
+
+    @Test
+    @DisplayName("Upload avatar - Rollback deletes new file and keeps database value")
+    @WithMockUser(roles = {"STUDENT"})
+    void uploadAvatar_Rollback_DeletesNewFile() throws Exception {
+        when(currentUserService.getCurrentUserId()).thenReturn(studentUser.getId());
+        Set<String> filesBeforeUpload = storedFileNames();
+        doThrow(new RuntimeException("forced audit failure"))
+                .when(auditLogService)
+                .logUserAction(any(), any(), any(), any(), any(), any(), any(), any());
+
+        mockMvc.perform(multipart("/api/v1/users/avatar")
+                        .file(validPngFile()))
+                .andExpect(status().isInternalServerError());
+
+        assertEquals(filesBeforeUpload, storedFileNames());
+        assertNull(appUserRepository.findById(studentUser.getId()).orElseThrow().getAvatarUrl());
+    }
+
+    @Test
+    @DisplayName("Upload avatar - Commit deletes previous local avatar")
+    @WithMockUser(roles = {"STUDENT"})
+    void uploadAvatar_Commit_DeletesPreviousLocalAvatar() throws Exception {
+        Path oldAvatar = tempAvatarDir.resolve("old-local-avatar.png");
+        Files.write(oldAvatar, VALID_PNG);
+        studentUser.setAvatarUrl("/uploads/user-avatars/old-local-avatar.png");
+        studentUser = appUserRepository.saveAndFlush(studentUser);
+        when(currentUserService.getCurrentUserId()).thenReturn(studentUser.getId());
+
+        mockMvc.perform(multipart("/api/v1/users/avatar")
+                        .file(validPngFile()))
+                .andExpect(status().isOk());
+
+        assertFalse(Files.exists(oldAvatar));
+    }
+
+    @Test
+    @DisplayName("Upload avatar - Commit preserves external avatar source")
+    @WithMockUser(roles = {"STUDENT"})
+    void uploadAvatar_Commit_PreservesExternalAvatarSource() throws Exception {
+        Path similarlyPrefixedFile = tempAvatarDir.resolve("backup").resolve("external-avatar.png");
+        Files.createDirectories(similarlyPrefixedFile.getParent());
+        Files.write(similarlyPrefixedFile, VALID_PNG);
+        studentUser.setAvatarUrl("/uploads/user-avatars-backup/external-avatar.png");
+        studentUser = appUserRepository.saveAndFlush(studentUser);
+        when(currentUserService.getCurrentUserId()).thenReturn(studentUser.getId());
+
+        mockMvc.perform(multipart("/api/v1/users/avatar")
+                        .file(validPngFile()))
+                .andExpect(status().isOk());
+
+        assertTrue(Files.exists(similarlyPrefixedFile));
+    }
+
+    private Set<String> storedFileNames() throws IOException {
+        try (var paths = Files.list(tempAvatarDir)) {
+            return paths.filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .collect(Collectors.toSet());
+        }
+    }
+
+    private MockMultipartFile validPngFile() {
+        return new MockMultipartFile("file", "avatar.png", "image/png", VALID_PNG);
     }
 }

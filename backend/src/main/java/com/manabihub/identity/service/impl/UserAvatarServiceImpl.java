@@ -21,9 +21,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -37,9 +37,7 @@ public class UserAvatarServiceImpl implements UserAvatarService {
     private final Path storageRoot;
     private final String publicPathPrefix;
 
-
-
-    private static final long MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+    private static final long MAX_FILE_SIZE = 2L * 1024 * 1024;
 
     public UserAvatarServiceImpl(
             AppUserRepository appUserRepository,
@@ -144,16 +142,23 @@ public class UserAvatarServiceImpl implements UserAvatarService {
                         log.error("Failed to delete new avatar file on rollback: {}", targetPath, e);
                     }
                 } else if (status == STATUS_COMMITTED) {
-                    if (StringUtils.hasText(oldAvatarUrl) && oldAvatarUrl.startsWith(publicPathPrefix)) {
+                    if (StringUtils.hasText(oldAvatarUrl)
+                            && oldAvatarUrl.startsWith(publicPathPrefix + "/")) {
                         String oldFilename = oldAvatarUrl.substring(publicPathPrefix.length() + 1);
-                        Path oldPath = storageRoot.resolve(oldFilename).normalize();
-                        if (oldPath.startsWith(storageRoot)) {
-                            try {
+                        try {
+                            Path filenamePath = Path.of(oldFilename);
+                            boolean isSingleFilename = StringUtils.hasText(oldFilename)
+                                    && !filenamePath.isAbsolute()
+                                    && filenamePath.getNameCount() == 1
+                                    && !".".equals(oldFilename)
+                                    && !"..".equals(oldFilename);
+                            if (isSingleFilename) {
+                                Path oldPath = storageRoot.resolve(filenamePath).normalize();
                                 Files.deleteIfExists(oldPath);
                                 log.debug("Deleted old avatar file: {}", oldPath);
-                            } catch (IOException e) {
-                                log.warn("Failed to delete old avatar file after commit: {}", oldPath, e);
                             }
+                        } catch (IOException | InvalidPathException e) {
+                            log.warn("Failed to delete old avatar file after commit", e);
                         }
                     }
                 }

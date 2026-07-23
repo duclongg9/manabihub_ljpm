@@ -16,7 +16,7 @@ export function resolvePublicAssetUrl(url?: string | null): string | undefined {
   } else if (baseUrl.endsWith('/')) {
     baseUrl = baseUrl.substring(0, baseUrl.length - 1);
   }
-  
+
   if (!url.startsWith('/')) {
     url = '/' + url;
   }
