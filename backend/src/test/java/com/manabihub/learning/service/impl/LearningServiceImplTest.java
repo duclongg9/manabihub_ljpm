@@ -112,6 +112,7 @@ class LearningServiceImplTest {
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
         when(studentProfileRepository.findByUser_Id(currentUserId)).thenReturn(Optional.of(studentProfile));
         when(enrollmentRepository.findByStudent_IdAndCourse_Id(studentId, courseId)).thenReturn(Optional.of(enrollment));
+        lenient().when(enrollmentRepository.findByIdForUpdate(enrollmentId)).thenReturn(Optional.of(enrollment));
     }
 
     private LessonBlockProgress completedProgress(LessonBlock block) {

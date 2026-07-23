@@ -192,7 +192,8 @@ public class LearningServiceImpl implements LearningService {
         // Acquire PESSIMISTIC_WRITE lock on the enrollment row to serialize
         // concurrent reviews for the same enrollment, preventing lost completions
         // or duplicate LessonBlockProgress rows.
-        enrollmentRepository.findByIdForUpdate(enrollment.getId());
+        enrollmentRepository.findByIdForUpdate(enrollment.getId())
+                .orElseThrow(() -> new BusinessException(MessageCodes.LEARNING_NOT_ENROLLED, "Enrollment not found", HttpStatus.FORBIDDEN));
 
         flashcardProgressRepository.upsertStatus(enrollment.getId(), lessonBlockId, request.cardIndex(), request.status());
 

@@ -38,6 +38,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -125,15 +126,24 @@ public class LearningServiceConcurrencyPostgresTest {
         int threads = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         List<Future<LessonProgressResponse>> futures = new ArrayList<>();
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
 
-        for (int i = 0; i < threads; i++) {
-            futures.add(executor.submit(() ->
-                    learningService.reviewFlashcard(flashcardBlock.getId(),
-                            new ReviewFlashcardRequest(0, FlashcardStatus.REMEMBERED))));
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(executor.submit(() -> {
+                    readyLatch.countDown();
+                    startLatch.await();
+                    return learningService.reviewFlashcard(flashcardBlock.getId(),
+                            new ReviewFlashcardRequest(0, FlashcardStatus.REMEMBERED));
+                }));
+            }
+
+            assertTrue(readyLatch.await(5, TimeUnit.SECONDS), "Workers did not become ready in time");
+            startLatch.countDown();
+        } finally {
+            executor.shutdownNow();
         }
-
-        executor.shutdown();
-        assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS), "Executor must complete within timeout");
 
         List<Throwable> errors = new ArrayList<>();
         for (Future<LessonProgressResponse> f : futures) {
@@ -159,17 +169,26 @@ public class LearningServiceConcurrencyPostgresTest {
         int threads = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         List<Future<LessonProgressResponse>> futures = new ArrayList<>();
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
 
-        for (int i = 0; i < threads; i++) {
-            int cardIndex = i % 2;
-            FlashcardStatus status = cardIndex == 0 ? FlashcardStatus.REMEMBERED : FlashcardStatus.NEEDS_REVIEW;
-            futures.add(executor.submit(() ->
-                    learningService.reviewFlashcard(flashcardBlock.getId(),
-                            new ReviewFlashcardRequest(cardIndex, status))));
+        try {
+            for (int i = 0; i < threads; i++) {
+                int cardIndex = i % 2;
+                FlashcardStatus status = cardIndex == 0 ? FlashcardStatus.REMEMBERED : FlashcardStatus.NEEDS_REVIEW;
+                futures.add(executor.submit(() -> {
+                    readyLatch.countDown();
+                    startLatch.await();
+                    return learningService.reviewFlashcard(flashcardBlock.getId(),
+                            new ReviewFlashcardRequest(cardIndex, status));
+                }));
+            }
+
+            assertTrue(readyLatch.await(5, TimeUnit.SECONDS), "Workers did not become ready in time");
+            startLatch.countDown();
+        } finally {
+            executor.shutdownNow();
         }
-
-        executor.shutdown();
-        assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS), "Executor must complete within timeout");
 
         List<Throwable> errors = new ArrayList<>();
         for (Future<LessonProgressResponse> f : futures) {
