@@ -598,7 +598,7 @@ public class LearningServiceImpl implements LearningService {
 
         // 3. Status Check & Pre-saving (In a new transaction to persist SUGGESTION_PROCESSING state before provider call)
         boolean canProcess = transactionTemplate.execute(status -> {
-            WritingSubmission currentSub = writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockIdForUpdate(submissionId, enrollment.getId(), lessonBlockId)
+            WritingSubmission currentSub = writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockIdForUpdate(submissionId, preCheckSub.getEnrollment().getId(), lessonBlockId)
                     .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Submission not found", HttpStatus.NOT_FOUND));
 
             if (currentSub.getStatus() == WritingSubmissionStatus.SUGGESTION_PROCESSING ||
@@ -618,6 +618,7 @@ public class LearningServiceImpl implements LearningService {
 
         // 4. Provider Call
         WritingSubmission submission = writingSubmissionRepository.findById(submissionId).orElseThrow();
+        LessonBlock block = lessonBlockRepository.findById(lessonBlockId).orElseThrow();
         try {
             AiWritingAssistanceProvider.Result result = aiWritingAssistanceProvider.generate(
                     block.getWritingPrompt(),
