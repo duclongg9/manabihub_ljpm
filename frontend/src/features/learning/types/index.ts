@@ -88,7 +88,19 @@ export interface AiWritingSuggestionResponse {
   vocabularySuggestions: VocabularySuggestion[];
   structureSuggestions: StructureSuggestion[];
   revisionGuidance?: string;
+  official: false;
+  failureReason?: string;
   createdAt: string;
+}
+
+export interface TeacherWritingFeedback {
+  id: string;
+  score?: number;
+  comment?: string;
+  rubricResult?: Record<string, unknown>;
+  official: true;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface WritingSubmissionDetail {
@@ -98,5 +110,5 @@ export interface WritingSubmissionDetail {
   status: 'DRAFT' | 'SUBMITTED' | 'SUGGESTION_PROCESSING' | 'SUGGESTION_READY' | 'SUGGESTION_FAILED' | 'TEACHER_FEEDBACK_READY';
   submittedAt: string;
   aiSuggestion?: AiWritingSuggestionResponse;
-  teacherFeedback?: unknown;
+  teacherFeedback?: TeacherWritingFeedback;
 }

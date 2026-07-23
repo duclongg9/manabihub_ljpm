@@ -28,6 +28,7 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
+import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import { isAxiosError } from 'axios';
 import ReactPlayer from 'react-player';
 import DOMPurify from 'dompurify';
@@ -942,6 +943,35 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   </Box>
                 )}
               </Stack>
+            )}
+          </Box>
+
+          <Divider />
+
+          <Box>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+              <SchoolOutlinedIcon color="primary" />
+              <Typography variant="h6">Đánh giá chính thức từ giáo viên</Typography>
+              {submission.teacherFeedback?.official && (
+                <Chip label="Chính thức" size="small" color="primary" variant="outlined" />
+              )}
+            </Stack>
+
+            {!submission.teacherFeedback ? (
+              <Typography variant="body2" color="text.secondary">
+                Giáo viên chưa gửi đánh giá chính thức cho bài viết này.
+              </Typography>
+            ) : (
+              <Paper variant="outlined" sx={{ p: 2, borderLeft: 4, borderLeftColor: 'primary.main' }}>
+                {submission.teacherFeedback.score != null && (
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+                    Điểm: {submission.teacherFeedback.score}
+                  </Typography>
+                )}
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {submission.teacherFeedback.comment || 'Giáo viên chưa để lại nhận xét.'}
+                </Typography>
+              </Paper>
             )}
           </Box>
         </Stack>

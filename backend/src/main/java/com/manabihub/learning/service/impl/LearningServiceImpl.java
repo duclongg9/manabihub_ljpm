@@ -36,6 +36,8 @@ import com.manabihub.writing.entity.WritingSubmission;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
 import com.manabihub.writing.entity.AiWritingSuggestion;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
+import com.manabihub.writing.entity.TeacherWritingFeedback;
+import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
 import com.manabihub.ai.repository.AiUsageLogRepository;
 import com.manabihub.ai.service.AiChatSettingsService;
 import com.manabihub.ai.service.AiUsageLogService;
@@ -44,6 +46,7 @@ import com.manabihub.writing.enums.WritingSubmissionStatus;
 import com.manabihub.writing.dto.request.WritingSubmissionRequest;
 import com.manabihub.writing.dto.response.StudentWritingSubmissionResponse;
 import com.manabihub.writing.dto.response.AiWritingSuggestionResponse;
+import com.manabihub.writing.dto.response.TeacherWritingFeedbackResponse;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.manabihub.ai.provider.AiWritingAssistanceProvider;
@@ -90,6 +93,7 @@ public class LearningServiceImpl implements LearningService {
     private final ObjectMapper objectMapper;
     private final WritingSubmissionRepository writingSubmissionRepository;
     private final AiWritingSuggestionRepository aiWritingSuggestionRepository;
+    private final TeacherWritingFeedbackRepository teacherWritingFeedbackRepository;
     private final AiChatSettingsService aiChatSettingsService;
     private final AiUsageLogService aiUsageLogService;
     private final TransactionTemplate transactionTemplate;
@@ -706,6 +710,19 @@ public class LearningServiceImpl implements LearningService {
                 suggestion.getCreatedAt()
         );
 
+        TeacherWritingFeedback feedback = teacherWritingFeedbackRepository
+                .findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submission.getId())
+                .orElse(null);
+        TeacherWritingFeedbackResponse feedbackResponse = feedback == null ? null : new TeacherWritingFeedbackResponse(
+                feedback.getId(),
+                feedback.getScore(),
+                feedback.getComment(),
+                feedback.getRubricResult(),
+                feedback.isOfficial(),
+                feedback.getCreatedAt(),
+                feedback.getUpdatedAt()
+        );
+
         return new StudentWritingSubmissionResponse(
                 submission.getId(),
                 submission.getLessonBlockId(),
@@ -713,7 +730,7 @@ public class LearningServiceImpl implements LearningService {
                 submission.getStatus(),
                 submission.getSubmittedAt(),
                 suggestionResponse,
-                null
+                feedbackResponse
         );
     }
 }
