@@ -29,6 +29,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -261,6 +262,17 @@ class StudentLearningControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
                 .andExpect(jsonPath("$.data.status", is("IN_PROGRESS")));
+    }
+
+    @Test
+    void reviewFlashcard_missingCardIndex_badRequest() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/student/lessons/{lessonBlockId}/flashcards/review", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"REMEMBERED\"}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(learningService);
     }
 
     @Test
