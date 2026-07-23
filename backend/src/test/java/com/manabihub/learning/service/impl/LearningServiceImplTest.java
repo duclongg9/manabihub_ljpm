@@ -56,6 +56,7 @@ class LearningServiceImplTest {
     @Mock private StudentProfileRepository studentProfileRepository;
     @Mock private EnrollmentRepository enrollmentRepository;
     @Mock private LessonBlockProgressRepository lessonBlockProgressRepository;
+    @Mock private com.manabihub.learning.repository.FlashcardProgressRepository flashcardProgressRepository;
     @Mock private CurrentUserService currentUserService;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -603,4 +604,77 @@ class LearningServiceImplTest {
         assertTrue(response.courseCompleted());
     }
 
+    // ==========================================
+    // 5. reviewFlashcard Tests
+    // ==========================================
+
+    @Test
+    @DisplayName("Review Flashcard - Wrong Type")
+    void testReviewFlashcard_WrongType() {
+        mockActiveEnrollment();
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+
+        com.manabihub.learning.dto.request.ReviewFlashcardRequest request = new com.manabihub.learning.dto.request.ReviewFlashcardRequest(0, com.manabihub.learning.enums.FlashcardStatus.REMEMBERED);
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.reviewFlashcard(blockVideoId, request));
+
+        assertEquals(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, exception.getMessageCode());
+    }
+
+    @Test
+    @DisplayName("Review Flashcard - Invalid Index")
+    void testReviewFlashcard_InvalidIndex() {
+        mockActiveEnrollment();
+        LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
+                .flashcardsJson("[{\"front\":\"A\",\"back\":\"B\"}]").module(courseModule).build();
+        when(lessonBlockRepository.findById(fb.getId())).thenReturn(Optional.of(fb));
+
+        com.manabihub.learning.dto.request.ReviewFlashcardRequest request = new com.manabihub.learning.dto.request.ReviewFlashcardRequest(1, com.manabihub.learning.enums.FlashcardStatus.REMEMBERED);
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.reviewFlashcard(fb.getId(), request));
+
+        assertEquals(MessageCodes.LEARNING_INVALID_FLASHCARD_INDEX, exception.getMessageCode());
+    }
+
+    @Test
+    @DisplayName("Review Flashcard - Success - In Progress")
+    void testReviewFlashcard_Success_InProgress() {
+        mockActiveEnrollment();
+        LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
+                .flashcardsJson("[{\"front\":\"A\",\"back\":\"B\"}, {\"front\":\"C\",\"back\":\"D\"}]").module(courseModule).build();
+        when(lessonBlockRepository.findById(fb.getId())).thenReturn(Optional.of(fb));
+        when(flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollmentId, fb.getId())).thenReturn(1);
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, fb.getId())).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        com.manabihub.learning.dto.request.ReviewFlashcardRequest request = new com.manabihub.learning.dto.request.ReviewFlashcardRequest(0, com.manabihub.learning.enums.FlashcardStatus.REMEMBERED);
+        LessonProgressResponse response = learningService.reviewFlashcard(fb.getId(), request);
+
+        assertEquals(LessonProgressStatus.IN_PROGRESS, response.status());
+        assertNull(response.completedAt());
+        verify(flashcardProgressRepository).upsertStatus(enrollmentId, fb.getId(), 0, com.manabihub.learning.enums.FlashcardStatus.REMEMBERED);
+    }
+
+    @Test
+    @DisplayName("Review Flashcard - Success - Completed")
+    void testReviewFlashcard_Success_Completed() {
+        mockActiveEnrollment();
+        LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
+                .flashcardsJson("[{\"front\":\"A\",\"back\":\"B\"}, {\"front\":\"C\",\"back\":\"D\"}]").module(courseModule).build();
+        when(lessonBlockRepository.findById(fb.getId())).thenReturn(Optional.of(fb));
+        when(flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollmentId, fb.getId())).thenReturn(2);
+        LessonBlockProgress existingProgress = LessonBlockProgress.builder().id(UUID.randomUUID())
+                .enrollmentId(enrollmentId).lessonBlockId(fb.getId()).status(LessonProgressStatus.IN_PROGRESS).build();
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, fb.getId())).thenReturn(Optional.of(existingProgress));
+        when(lessonBlockProgressRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        com.manabihub.learning.dto.request.ReviewFlashcardRequest request = new com.manabihub.learning.dto.request.ReviewFlashcardRequest(1, com.manabihub.learning.enums.FlashcardStatus.NEEDS_REVIEW);
+        LessonProgressResponse response = learningService.reviewFlashcard(fb.getId(), request);
+
+        assertEquals(LessonProgressStatus.COMPLETED, response.status());
+        assertNotNull(response.completedAt());
+        verify(flashcardProgressRepository).upsertStatus(enrollmentId, fb.getId(), 1, com.manabihub.learning.enums.FlashcardStatus.NEEDS_REVIEW);
+    }
 }

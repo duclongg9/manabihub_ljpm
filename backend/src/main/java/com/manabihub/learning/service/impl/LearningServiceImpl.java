@@ -189,6 +189,11 @@ public class LearningServiceImpl implements LearningService {
             throw new BusinessException(MessageCodes.LEARNING_INVALID_FLASHCARD_INDEX, "Invalid card index", HttpStatus.BAD_REQUEST);
         }
 
+        // Acquire PESSIMISTIC_WRITE lock on the enrollment row to serialize
+        // concurrent reviews for the same enrollment, preventing lost completions
+        // or duplicate LessonBlockProgress rows.
+        enrollmentRepository.findByIdForUpdate(enrollment.getId());
+
         flashcardProgressRepository.upsertStatus(enrollment.getId(), lessonBlockId, request.cardIndex(), request.status());
 
         int classifiedCount = flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollment.getId(), lessonBlockId);

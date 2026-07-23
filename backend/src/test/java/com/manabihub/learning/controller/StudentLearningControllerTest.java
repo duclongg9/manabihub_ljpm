@@ -163,7 +163,7 @@ class StudentLearningControllerTest {
                                                 "Quiz 1",
                                                 null, null, null, null, null,
                                                 List.of(new com.manabihub.learning.dto.response.StudentQuizQuestionResponse("Q1", List.of("A", "B"))),
-                                                List.of(), null, null, 1, true,
+                                                List.of(), null, null, null, 1, true,
                                                 com.manabihub.learning.enums.LessonProgressStatus.NOT_STARTED,
                                                 null, null, false
                                         )
