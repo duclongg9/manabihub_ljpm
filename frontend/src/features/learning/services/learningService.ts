@@ -1,5 +1,6 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
+import { isAxiosError } from 'axios';
 import type {
   CourseLearning,
   CourseProgressSummary,
@@ -7,6 +8,7 @@ import type {
   FinalTestEligibility,
   FinalTestSubmissionResult,
   LessonProgress,
+  LearningCertificate,
   QuizSubmissionResult,
   WritingSubmissionDetail,
 } from '../types';
@@ -19,6 +21,23 @@ export const learningService = {
 
   getCourseProgress: async (courseId: string): Promise<CourseProgressSummary> => {
     const response = await axiosClient.get(ENDPOINTS.LEARNING.COURSE_PROGRESS(courseId));
+    return response.data.data;
+  },
+
+  getCertificate: async (courseId: string): Promise<LearningCertificate | null> => {
+    try {
+      const response = await axiosClient.get(ENDPOINTS.LEARNING.CERTIFICATE(courseId));
+      return response.data.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  generateCertificate: async (courseId: string): Promise<LearningCertificate> => {
+    const response = await axiosClient.post(ENDPOINTS.LEARNING.CERTIFICATE(courseId));
     return response.data.data;
   },
 

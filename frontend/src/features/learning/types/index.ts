@@ -123,6 +123,16 @@ export interface CertificateEligibility {
   reasons: string[];
 }
 
+export interface LearningCertificate {
+  id: string;
+  enrollmentId: string;
+  courseId: string;
+  certificateNumber: string;
+  studentName: string;
+  courseTitle: string;
+  issuedAt: string;
+}
+
 export interface CourseProgressSummary {
   courseId: string;
   courseTitle: string;
