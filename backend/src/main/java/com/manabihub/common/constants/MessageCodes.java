@@ -150,6 +150,7 @@ public final class MessageCodes {
     public static final String LEARNING_LESSON_CONTENT_UNAVAILABLE = "LEARNING_LESSON_CONTENT_UNAVAILABLE";
     public static final String LEARNING_INVALID_BLOCK_TYPE = "LEARNING_INVALID_BLOCK_TYPE";
     public static final String LEARNING_INVALID_VIDEO_POSITION = "LEARNING_INVALID_VIDEO_POSITION";
+    public static final String LEARNING_INVALID_FLASHCARD_INDEX = "LEARNING_INVALID_FLASHCARD_INDEX";
 
     // ──────────────────────────────────────────────
     // AI — AI-related operations

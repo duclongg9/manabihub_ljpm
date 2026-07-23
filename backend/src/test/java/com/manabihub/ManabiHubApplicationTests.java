@@ -140,6 +140,9 @@ class ManabiHubApplicationTests {
     private WritingSubmissionRepository writingSubmissionRepository;
 
     @MockBean
+    private com.manabihub.learning.repository.FlashcardProgressRepository flashcardProgressRepository;
+
+    @MockBean
     private AiWritingSuggestionRepository aiWritingSuggestionRepository;
 
     @MockBean

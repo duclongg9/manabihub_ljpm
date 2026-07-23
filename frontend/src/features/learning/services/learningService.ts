@@ -15,6 +15,14 @@ export const learningService = {
     return response.data.data;
   },
 
+  reviewFlashcard: async (blockId: string, cardIndex: number, status: 'REMEMBERED' | 'NEEDS_REVIEW'): Promise<LessonProgress> => {
+    const response = await axiosClient.put(ENDPOINTS.LEARNING.FLASHCARD_REVIEW(blockId), {
+      cardIndex,
+      status,
+    });
+    return response.data.data;
+  },
+
   markLessonComplete: async (blockId: string): Promise<LessonProgress> => {
     const response = await axiosClient.post(ENDPOINTS.LEARNING.MARK_COMPLETE(blockId));
     return response.data.data;

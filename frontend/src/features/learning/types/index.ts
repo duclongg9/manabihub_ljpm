@@ -24,6 +24,7 @@ export interface LearningLessonBlock {
   quizOptions: string[];
   quizItems: QuizQuestion[];
   flashcards: FlashcardItem[];
+  flashcardStatuses?: ('REMEMBERED' | 'NEEDS_REVIEW' | null)[];
   writingPrompt?: string;
   rubric?: string;
   orderIndex: number;
