@@ -1,342 +1,263 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { 
-  Box, 
-  Container, 
-  Grid, 
-  Pagination, 
-  Typography, 
-  Select, 
-  MenuItem, 
-  ToggleButtonGroup, 
-  ToggleButton, 
-  InputBase,
-  IconButton,
-  Paper,
-  Stack
+import React, { useCallback, useEffect, useMemo } from 'react';
+import {
+  Box,
+  Container,
+  Grid,
+  Pagination,
+  Stack,
+  Typography,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import LayoutGridIcon from '@mui/icons-material/GridView';
-import ListIcon from '@mui/icons-material/ViewList';
+import SearchOffIcon from '@mui/icons-material/SearchOff';
+import { useSearchParams } from 'react-router-dom';
+import { CourseCatalogCard } from '../components/CourseCatalogCard';
+import { CourseCatalogFiltersBar } from '../components/CourseCatalogFilters';
 import { useCourseCatalog } from '../hooks/useCourseCatalog';
 import { useCourseCategories } from '../hooks/useCourseCategories';
-import { CourseCatalogCard } from '../components/CourseCatalogCard';
-import { CourseCatalogFiltersSidebar } from '../components/CourseCatalogFilters';
-import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
 import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
 import { ErrorState } from '../../../shared/components/ErrorState/ErrorState';
+import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
 import type { CourseCatalogFilters } from '../types/catalogTypes';
-import SearchOffIcon from '@mui/icons-material/SearchOff';
-import type { SelectChangeEvent } from '@mui/material';
-import { useSearchParams } from 'react-router-dom';
 
 const PAGE_SIZE = 12;
+const DEFAULT_SORT = 'publishedAt,desc';
+const ALLOWED_SORTS = new Set([
+  DEFAULT_SORT,
+  'price,asc',
+  'price,desc',
+  'title,asc',
+]);
+const ALLOWED_JLPT_LEVELS = new Set(['N1', 'N2', 'N3', 'N4', 'N5']);
+
+interface CatalogQuery {
+  filters: CourseCatalogFilters;
+  page: number;
+  sort: string;
+}
+
+function cleanText(value: string | null): string | undefined {
+  const cleaned = value?.trim();
+  return cleaned || undefined;
+}
+
+function parseNonNegativeNumber(value: string | null): number | undefined {
+  if (value === null || value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function readCatalogQuery(params: URLSearchParams): CatalogQuery {
+  const keyword = cleanText(params.get('keyword'));
+  const category = cleanText(params.get('category'));
+  const requestedJlpt = cleanText(params.get('jlptLevel'))?.toUpperCase();
+  const jlptLevel =
+    requestedJlpt && ALLOWED_JLPT_LEVELS.has(requestedJlpt) ? requestedJlpt : undefined;
+  const minPrice = parseNonNegativeNumber(params.get('minPrice'));
+  const requestedMaxPrice = parseNonNegativeNumber(params.get('maxPrice'));
+  const maxPrice =
+    requestedMaxPrice !== undefined &&
+    (minPrice === undefined || requestedMaxPrice >= minPrice)
+      ? requestedMaxPrice
+      : undefined;
+
+  const requestedPage = Number(params.get('page'));
+  const page =
+    Number.isInteger(requestedPage) && requestedPage >= 1 ? requestedPage - 1 : 0;
+  const requestedSort = params.get('sort');
+  const sort = requestedSort && ALLOWED_SORTS.has(requestedSort) ? requestedSort : DEFAULT_SORT;
+
+  return {
+    filters: {
+      keyword,
+      category,
+      jlptLevel,
+      minPrice,
+      maxPrice,
+    },
+    page,
+    sort,
+  };
+}
+
+function buildCatalogParams(query: CatalogQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  const { filters, page, sort } = query;
+
+  if (filters.keyword) params.set('keyword', filters.keyword);
+  if (filters.category) params.set('category', filters.category);
+  if (filters.jlptLevel) params.set('jlptLevel', filters.jlptLevel);
+  if (filters.minPrice !== undefined) params.set('minPrice', String(filters.minPrice));
+  if (filters.maxPrice !== undefined) params.set('maxPrice', String(filters.maxPrice));
+  if (page > 0) params.set('page', String(page + 1));
+  if (sort !== DEFAULT_SORT) params.set('sort', sort);
+
+  return params;
+}
 
 export const CourseCatalogPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const rawQueryString = searchParams.toString();
+  const query = useMemo(
+    () => readCatalogQuery(new URLSearchParams(rawQueryString)),
+    [rawQueryString],
+  );
 
-  // Derive state from URL
-  const filters: CourseCatalogFilters = {
-    keyword: searchParams.get('keyword') || undefined,
-    category: searchParams.get('category') || undefined,
-    jlptLevel: searchParams.get('jlptLevel') || undefined,
-    minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
-    maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
-  };
-  const page = searchParams.get('page') ? Number(searchParams.get('page')) - 1 : 0;
-  const sort = searchParams.get('sort') || 'publishedAt,desc';
-  const viewMode = (searchParams.get('viewMode') as 'grid' | 'list') || 'grid';
-  
-  // Local state for search input (debounce-like)
-  const [searchInput, setSearchInput] = useState(filters.keyword || '');
+  const replaceQuery = useCallback(
+    (nextQuery: CatalogQuery) => {
+      setSearchParams(buildCatalogParams(nextQuery), { replace: true });
+    },
+    [setSearchParams],
+  );
 
-  // Keep search input in sync with URL if user navigates back/forward
   useEffect(() => {
-    setSearchInput(filters.keyword || '');
-  }, [filters.keyword]);
+    const canonicalQueryString = buildCatalogParams(query).toString();
+    if (canonicalQueryString !== rawQueryString) {
+      setSearchParams(new URLSearchParams(canonicalQueryString), { replace: true });
+    }
+  }, [query, rawQueryString, setSearchParams]);
 
-  const updateURL = useCallback((newFilters: CourseCatalogFilters, newPage: number, newSort: string, newViewMode: string) => {
-    const params = new URLSearchParams();
-    if (newFilters.keyword) params.set('keyword', newFilters.keyword);
-    if (newFilters.category) params.set('category', newFilters.category);
-    if (newFilters.jlptLevel) params.set('jlptLevel', newFilters.jlptLevel);
-    if (newFilters.minPrice) params.set('minPrice', newFilters.minPrice.toString());
-    if (newFilters.maxPrice) params.set('maxPrice', newFilters.maxPrice.toString());
-    if (newPage > 0) params.set('page', (newPage + 1).toString());
-    if (newSort !== 'publishedAt,desc') params.set('sort', newSort);
-    if (newViewMode !== 'grid') params.set('viewMode', newViewMode);
-    
-    setSearchParams(params, { replace: true });
-  }, [setSearchParams]);
-
-  const { data: categoriesData, isLoading: categoriesLoading } = useCourseCategories();
-
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading,
+    isSuccess: categoriesLoaded,
+  } = useCourseCategories();
+  const categories = categoriesData ?? [];
   const {
     data,
     isLoading,
     isError,
-    refetch,
     isFetching,
+    refetch,
   } = useCourseCatalog({
-    ...filters,
-    page,
+    ...query.filters,
+    page: query.page,
     size: PAGE_SIZE,
-    sort,
+    sort: query.sort,
   });
 
-  const handleFiltersChange = useCallback((newFilters: CourseCatalogFilters) => {
-    updateURL(newFilters, 0, sort, viewMode);
-  }, [sort, viewMode, updateURL]);
-
-  const handleSortChange = (e: SelectChangeEvent) => {
-    updateURL(filters, 0, e.target.value, viewMode);
-  };
-
-  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
-    updateURL(filters, value - 1, sort, viewMode);
-    window.scrollTo({ top: 350, behavior: 'smooth' });
-  };
-
-  const handleClearAll = () => {
-    setSearchInput('');
-    updateURL({}, 0, 'publishedAt,desc', viewMode);
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleFiltersChange({ ...filters, keyword: searchInput || undefined });
-  };
-
-  const handleViewModeChange = (
-    _event: React.MouseEvent<HTMLElement>,
-    newMode: 'grid' | 'list' | null,
-  ) => {
-    if (newMode !== null) {
-      updateURL(filters, page, sort, newMode);
+  useEffect(() => {
+    if (data && data.totalPages > 0 && query.page >= data.totalPages) {
+      replaceQuery({ ...query, page: data.totalPages - 1 });
     }
+  }, [data, query, replaceQuery]);
+
+  useEffect(() => {
+    const selectedCategory = query.filters.category;
+    if (
+      categoriesLoaded &&
+      selectedCategory &&
+      !categoriesData?.some((category) => category.code === selectedCategory)
+    ) {
+      replaceQuery({
+        ...query,
+        filters: { ...query.filters, category: undefined },
+        page: 0,
+      });
+    }
+  }, [categoriesData, categoriesLoaded, query, replaceQuery]);
+
+  const handleFiltersChange = useCallback(
+    (filters: CourseCatalogFilters) => {
+      replaceQuery({ filters, page: 0, sort: query.sort });
+    },
+    [query.sort, replaceQuery],
+  );
+
+  const handleSortChange = useCallback(
+    (sort: string) => {
+      replaceQuery({ filters: query.filters, page: 0, sort });
+    },
+    [query.filters, replaceQuery],
+  );
+
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
+    replaceQuery({ ...query, page: page - 1 });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <Box sx={{ bgcolor: 'grey.50', minHeight: '100vh', pb: 12 }}>
-      <style>
-        {`
-          @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes heartbeat {
-            0% { transform: scale(1); }
-            25% { transform: scale(1.2); }
-            50% { transform: scale(1); }
-            75% { transform: scale(1.2); }
-            100% { transform: scale(1.1); }
-          }
-        `}
-      </style>
-
-      {/* Search Hero */}
-      <Box 
-        sx={{ 
-          position: 'relative',
-          height: '35vh',
-          minHeight: 320,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-          bgcolor: 'grey.900'
-        }}
-      >
-        <Box 
-          component="img"
-          src="https://images.unsplash.com/photo-1528360983277-13d401cdc186?auto=format&fit=crop&q=80&w=2000"
-          alt=""
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            opacity: 0.3,
-          }}
-        />
-        <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(15,23,42,1), rgba(15,23,42,0.3))' }} />
-        
-        <Box sx={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 700, px: 3, textAlign: 'center' }}>
-          <Typography variant="h3" component="h1" sx={{ color: 'white', fontWeight: 800, mb: 4, letterSpacing: '-0.02em' }}>
-            Khám phá Khóa học
+    <Box component="main" sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}>
+        <Box sx={{ mb: 3 }}>
+          <Typography component="h1" variant="h4" sx={{ fontWeight: 800 }}>
+            Khóa học tiếng Nhật
           </Typography>
-          
-          <Paper 
-            component="form" 
-            onSubmit={handleSearchSubmit}
-            sx={{ 
-              p: '4px 8px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              width: '100%',
-              borderRadius: 8,
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
-              transition: 'all 0.3s ease',
-              '&:focus-within': {
-                bgcolor: 'white',
-                '& .search-icon': { color: 'primary.main' },
-                '& .MuiInputBase-input': { color: 'text.primary' },
-              }
-            }}
-          >
-            <IconButton sx={{ p: '12px', color: 'rgba(255, 255, 255, 0.7)' }} aria-label="search" className="search-icon">
-              <SearchIcon />
-            </IconButton>
-            <InputBase
-              sx={{ ml: 1, flex: 1, fontSize: '1.1rem', color: 'white', '.MuiInputBase-input': { py: 1.5, '&::placeholder': { color: 'rgba(255,255,255,0.6)', opacity: 1 } } }}
-              placeholder="Tìm kiếm khóa học, kỹ năng hoặc mục tiêu..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-          </Paper>
+          <Typography color="text.secondary" sx={{ mt: 0.75 }}>
+            Tìm khóa học đã xuất bản theo mục tiêu, trình độ và ngân sách của bạn.
+          </Typography>
         </Box>
-      </Box>
 
-      {/* Main Content */}
-      <Container maxWidth="xl" sx={{ mt: { xs: 4, md: 6 } }}>
-        <Grid container spacing={4}>
-          {/* Sidebar */}
-          <Grid size={{ xs: 12, md: 3 }}>
-            <CourseCatalogFiltersSidebar 
-              filters={filters} 
-              onFiltersChange={handleFiltersChange} 
-              categories={categoriesData || []} 
-              categoriesLoading={categoriesLoading} 
+        <CourseCatalogFiltersBar
+          filters={query.filters}
+          onFiltersChange={handleFiltersChange}
+          categories={categories}
+          categoriesLoading={categoriesLoading}
+          sort={query.sort}
+          onSortChange={handleSortChange}
+        />
+
+        <Stack
+          direction="row"
+          sx={{ my: 3, minHeight: 28, justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {data ? `${data.totalElements} khóa học` : 'Danh sách khóa học'}
+          </Typography>
+          {isFetching && !isLoading && (
+            <Typography variant="caption" color="text.secondary">
+              Đang cập nhật...
+            </Typography>
+          )}
+        </Stack>
+
+        {isLoading && <LoadingState message="Đang tải danh sách khóa học..." />}
+
+        {isError && (
+          <ErrorState
+            title="Không thể tải danh sách khóa học"
+            message="Vui lòng kiểm tra kết nối và thử lại."
+            onRetry={() => refetch()}
+          />
+        )}
+
+        {!isLoading && !isError && data?.content.length === 0 && (
+          <Box sx={{ py: 6, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+            <EmptyState
+              title="Không tìm thấy khóa học phù hợp"
+              description="Hãy thử từ khóa hoặc khoảng giá khác."
+              icon={<SearchOffIcon sx={{ fontSize: 56, color: 'text.secondary' }} />}
+              actionLabel="Xóa bộ lọc"
+              onAction={() => {
+                replaceQuery({ filters: {}, page: 0, sort: DEFAULT_SORT });
+              }}
             />
+          </Box>
+        )}
+
+        {!isLoading && !isError && data && data.content.length > 0 && (
+          <Grid
+            container
+            spacing={2.5}
+            sx={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 160ms ease' }}
+          >
+            {data.content.map((course) => (
+              <Grid key={course.id} size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>
+                <CourseCatalogCard course={course} />
+              </Grid>
+            ))}
           </Grid>
+        )}
 
-          {/* Results Area */}
-          <Grid size={{ xs: 12, md: 9 }}>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', mb: 4, gap: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1.1rem' }}>
-                {data ? `${data.totalElements} khóa học` : 'Đang tải...'}
-                {isFetching && <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>(Đang cập nhật...)</Typography>}
-              </Typography>
-              
-              <Stack direction="row" spacing={2}>
-                <Select
-                  value={sort}
-                  onChange={handleSortChange}
-                  size="small"
-                  sx={{ 
-                    bgcolor: 'white', 
-                    borderRadius: 2, 
-                    minWidth: 160,
-                    fontWeight: 600,
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                    '.MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.light' }
-                  }}
-                >
-                  <MenuItem value="publishedAt,desc">Mới nhất</MenuItem>
-                  <MenuItem value="price,asc">Giá: Thấp đến Cao</MenuItem>
-                  <MenuItem value="price,desc">Giá: Cao đến Thấp</MenuItem>
-                  <MenuItem value="title,asc">Tên A-Z</MenuItem>
-                </Select>
-
-                <ToggleButtonGroup
-                  value={viewMode}
-                  exclusive
-                  onChange={handleViewModeChange}
-                  size="small"
-                  sx={{ bgcolor: 'white', '.MuiToggleButtonGroup-grouped': { border: '1px solid', borderColor: 'divider' } }}
-                >
-                  <ToggleButton value="grid" aria-label="grid view">
-                    <LayoutGridIcon fontSize="small" />
-                  </ToggleButton>
-                  <ToggleButton value="list" aria-label="list view">
-                    <ListIcon fontSize="small" />
-                  </ToggleButton>
-                </ToggleButtonGroup>
-              </Stack>
-            </Box>
-
-            {/* Content States */}
-            {isLoading && (
-              <Box sx={{ py: 10 }}>
-                <LoadingState message="Đang tải danh sách khóa học..." />
-              </Box>
-            )}
-            
-            {isError && (
-              <Box sx={{ py: 10 }}>
-                <ErrorState
-                  title="Không thể tải danh sách khóa học"
-                  message="Đã xảy ra lỗi khi kết nối. Vui lòng thử lại."
-                  onRetry={() => refetch()}
-                />
-              </Box>
-            )}
-            
-            {!isLoading && !isError && data && data.content.length === 0 && (
-              <Box sx={{ py: 8, bgcolor: 'white', borderRadius: 3, border: '1px solid', borderColor: 'divider', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <EmptyState
-                  title="Không tìm thấy kết quả phù hợp"
-                  description="Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem thêm kết quả."
-                  icon={<SearchOffIcon sx={{ fontSize: 64, color: 'text.secondary' }} />}
-                  actionLabel="Xóa bộ lọc"
-                  onAction={handleClearAll}
-                />
-              </Box>
-            )}
-
-            {/* Grid */}
-            {!isLoading && !isError && data && data.content.length > 0 && (
-              <Box 
-                sx={{ 
-                  transition: 'opacity 0.3s ease',
-                  opacity: isFetching ? 0.6 : 1, // Smoothly dim while fetching new filters
-                  pointerEvents: isFetching ? 'none' : 'auto'
-                }}
-              >
-                <Grid container spacing={3}>
-                  {data.content.map((course, index) => (
-                    <Grid size={{ xs: 12, sm: viewMode === 'grid' ? 6 : 12, lg: viewMode === 'grid' ? 4 : 12 }} key={course.id}>
-                      <Box sx={{
-                        animation: 'fadeInUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both',
-                        animationDelay: `${index * 50}ms`
-                      }}>
-                        <CourseCatalogCard course={course} viewMode={viewMode} />
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
-              </Box>
-            )}
-
-            {/* Pagination: Now explicitly shown whenever data exists to prevent it from disappearing if totalPages is 1 */}
-            {!isLoading && !isError && data && (
-              <Box sx={{ mt: 8, display: 'flex', justifyContent: 'center' }}>
-                <Pagination
-                  count={data.totalPages || 1}
-                  page={page + 1}
-                  onChange={handlePageChange}
-                  shape="rounded"
-                  sx={{
-                    '& .MuiPaginationItem-root': {
-                      fontWeight: 'bold',
-                      color: 'text.secondary'
-                    },
-                    '& .Mui-selected': {
-                      bgcolor: 'transparent',
-                      color: 'text.primary',
-                      border: '1px solid #cbd5e1'
-                    }
-                  }}
-                />
-              </Box>
-            )}
-          </Grid>
-        </Grid>
+        {!isLoading && !isError && data && data.totalPages > 1 && (
+          <Box sx={{ mt: 5, display: 'flex', justifyContent: 'center' }}>
+            <Pagination
+              count={data.totalPages}
+              page={query.page + 1}
+              onChange={handlePageChange}
+              color="primary"
+              shape="rounded"
+            />
+          </Box>
+        )}
       </Container>
     </Box>
   );

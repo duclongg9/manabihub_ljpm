@@ -30,6 +30,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -182,5 +183,45 @@ class PublicCourseControllerTest {
                 .andExpect(jsonPath("$.data.page", is(1)))
                 .andExpect(jsonPath("$.data.size", is(6)))
                 .andExpect(jsonPath("$.data.first", is(false)));
+    }
+
+    @Test
+    void searchCourses_withNegativePage_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/public/courses")
+                        .param("page", "-1"))
+                .andExpect(status().isBadRequest());
+
+        verify(courseService, never()).searchPublicCourses(
+                any(), any(), any(), any(), any(), any(Pageable.class)
+        );
+    }
+
+    @Test
+    void searchCourses_withInvertedPriceRange_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/public/courses")
+                        .param("minPrice", "500000")
+                        .param("maxPrice", "100000"))
+                .andExpect(status().isBadRequest());
+
+        verify(courseService, never()).searchPublicCourses(
+                any(), any(), any(), any(), any(), any(Pageable.class)
+        );
+    }
+
+    @Test
+    void searchCourses_withUnsupportedSort_fallsBackToPublishedAtDescending() throws Exception {
+        Page<PublicCourseSummaryResponse> emptyPage = new PageImpl<>(Collections.emptyList());
+        when(courseService.searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+        )).thenReturn(emptyPage);
+
+        mockMvc.perform(get("/api/v1/public/courses")
+                        .param("sort", "teacher.passwordHash,asc"))
+                .andExpect(status().isOk());
+
+        verify(courseService).searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(),
+                eq(PageRequest.of(0, 12, Sort.by(Sort.Direction.DESC, "publishedAt")))
+        );
     }
 }

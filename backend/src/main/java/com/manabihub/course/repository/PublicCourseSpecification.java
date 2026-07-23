@@ -62,7 +62,6 @@ public final class PublicCourseSpecification {
                 predicates.add(cb.lessThanOrEqualTo(root.get("price"), maxPrice));
             }
 
-
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }

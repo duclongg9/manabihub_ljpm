@@ -1,215 +1,153 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Box,
   Card,
   CardActionArea,
   CardContent,
   Chip,
   Stack,
   Typography,
-  Box,
 } from '@mui/material';
-import BookIcon from '@mui/icons-material/MenuBook';
 import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 import type { PublicCourseSummary } from '../types/catalogTypes';
 
 interface CourseCatalogCardProps {
   course: PublicCourseSummary;
-  viewMode: 'grid' | 'list';
 }
 
-const JLPT_COLORS: Record<string, string> = {
-  N5: '#4caf50',
-  N4: '#8bc34a',
-  N3: '#ff9800',
-  N2: '#f44336',
-  N1: '#9c27b0',
-};
+function formatPrice(price: number, currency: string): string {
+  if (price === 0) return 'Miễn phí';
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: currency || 'VND',
+    maximumFractionDigits: 0,
+  }).format(price);
+}
 
-export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course, viewMode }) => {
+export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) => {
   const navigate = useNavigate();
   const [imageFailed, setImageFailed] = useState(false);
-
-  const formatPrice = (price: number, currency: string) => {
-    if (price === 0) return 'Miễn phí';
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: currency || 'VND',
-      maximumFractionDigits: 0,
-    }).format(price);
-  };
-
-  const isList = viewMode === 'list';
+  const thumbnailUrl = useMemo(
+    () => resolvePublicAssetUrl(course.thumbnailUrl),
+    [course.thumbnailUrl],
+  );
 
   return (
     <Card
       elevation={0}
       sx={{
         height: '100%',
-        display: 'flex',
-        flexDirection: isList ? { xs: 'column', sm: 'row' } : 'column',
-        borderRadius: 3,
         border: '1px solid',
         borderColor: 'divider',
-        transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease',
+        borderRadius: 1,
+        transition: 'transform 160ms ease, box-shadow 160ms ease',
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: '0 20px 40px -15px rgba(0,0,0,0.1)',
-          borderColor: 'primary.light',
-        },
-        '&:focus-within': {
-          borderColor: 'primary.main',
+          transform: 'translateY(-2px)',
+          boxShadow: 3,
         },
       }}
     >
       <CardActionArea
+        aria-label={`Xem khóa học ${course.title}`}
         onClick={() => navigate(`/courses/${course.slug || course.id}`)}
-        sx={{
-          display: 'flex',
-          flexDirection: isList ? { xs: 'column', sm: 'row' } : 'column',
-          alignItems: 'stretch',
-          height: '100%',
-          flexGrow: 1,
-          '&:focus-visible': {
-            outline: '3px solid',
-            outlineColor: 'primary.main',
-            outlineOffset: '2px',
-          },
-        }}
+        sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
       >
-        {/* Thumbnail Area */}
         <Box
           sx={{
             position: 'relative',
-            width: isList ? { xs: '100%', sm: 280 } : '100%',
-            flexShrink: 0,
-            paddingTop: isList ? { xs: '56.25%', sm: 0 } : '56.25%', // 16:9 aspect ratio
-            bgcolor: 'grey.50',
+            width: '100%',
+            aspectRatio: '16 / 9',
+            bgcolor: 'grey.100',
             overflow: 'hidden',
           }}
         >
-          {!imageFailed && course.thumbnailUrl ? (
+          {thumbnailUrl && !imageFailed ? (
             <Box
               component="img"
-              src={course.thumbnailUrl}
-              alt=""
+              src={thumbnailUrl}
+              alt={`Ảnh khóa học ${course.title}`}
               onError={() => setImageFailed(true)}
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                transition: 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                '.MuiCardActionArea-root:hover &': {
-                  transform: 'scale(1.05)',
-                },
-              }}
+              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
             <Box
               sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
                 width: '100%',
                 height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                display: 'grid',
+                placeItems: 'center',
                 color: 'text.disabled',
               }}
             >
-              <ImageNotSupportedOutlinedIcon sx={{ fontSize: 48, opacity: 0.5 }} />
+              <ImageNotSupportedOutlinedIcon sx={{ fontSize: 44 }} />
             </Box>
           )}
-
-          {/* Badges */}
-          <Box sx={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 1 }}>
-            {course.jlptLevel && (
-              <Chip
-                label={course.jlptLevel}
-                size="small"
-                sx={{
-                  bgcolor: JLPT_COLORS[course.jlptLevel] || 'grey.800',
-                  color: 'white',
-                  fontWeight: 800,
-                  fontSize: '0.7rem',
-                  backdropFilter: 'blur(4px)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                }}
-              />
-            )}
-          </Box>
-
+          {course.jlptLevel && (
+            <Chip
+              label={course.jlptLevel}
+              size="small"
+              color="primary"
+              sx={{ position: 'absolute', top: 10, left: 10, fontWeight: 700 }}
+            />
+          )}
         </Box>
 
-        {/* Content Area */}
         <CardContent
           sx={{
+            width: '100%',
             flexGrow: 1,
             display: 'flex',
             flexDirection: 'column',
-            p: 3,
-            '&:last-child': { pb: 3 }, // override MUI default
+            p: 2,
+            '&:last-child': { pb: 2 },
           }}
         >
           {course.category && (
-            <Typography
-              variant="overline"
-              sx={{ color: 'primary.main', fontWeight: 700, lineHeight: 1, mb: 1, display: 'block' }}
-            >
+            <Typography variant="caption" color="primary.main" sx={{ mb: 0.5, fontWeight: 700 }}>
               {course.category}
             </Typography>
           )}
-
           <Typography
-            variant="h6"
             component="h3"
+            variant="subtitle1"
             sx={{
               fontWeight: 700,
-              fontSize: isList ? '1.25rem' : '1.1rem',
               lineHeight: 1.4,
-              mb: 1,
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              color: 'text.primary',
-              '.MuiCardActionArea-root:hover &': {
-                color: 'primary.main',
-              },
             }}
           >
             {course.title}
           </Typography>
-
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontWeight: 500 }}>
-            {course.teacherName || 'Giảng viên ManabiHub'}
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+            {course.teacherName || 'Chưa cập nhật giảng viên'}
           </Typography>
 
-
-
-          <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ mt: 'auto', pt: 2, justifyContent: 'space-between', alignItems: 'flex-end' }}
+          >
             <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 800,
-                color: course.price === 0 ? 'success.main' : 'text.primary',
-                lineHeight: 1,
-              }}
+              variant="subtitle1"
+              sx={{ fontWeight: 800, color: course.price === 0 ? 'success.main' : 'text.primary' }}
             >
               {formatPrice(course.price, course.currency)}
             </Typography>
-
-            <Stack direction="row" spacing={0.5} sx={{ color: 'text.secondary', alignItems: 'center' }}>
-              <BookIcon sx={{ fontSize: 16 }} />
-              <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                {course.totalLessons} bài học
-              </Typography>
+            <Stack
+              direction="row"
+              spacing={0.5}
+              sx={{ alignItems: 'center', color: 'text.secondary' }}
+            >
+              <MenuBookIcon sx={{ fontSize: 17 }} />
+              <Typography variant="caption">{course.totalLessons} bài học</Typography>
             </Stack>
-          </Box>
+          </Stack>
         </CardContent>
       </CardActionArea>
     </Card>

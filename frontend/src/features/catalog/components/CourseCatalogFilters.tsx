@@ -1,192 +1,307 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
-  Typography,
-  Chip,
-  Slider,
-  Stack,
-  Card,
-  CardContent,
+  Button,
   Divider,
+  Drawer,
+  FormControl,
+  IconButton,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import SearchIcon from '@mui/icons-material/Search';
+import type { SelectChangeEvent } from '@mui/material';
 import type { CourseCatalogFilters, CourseCategory } from '../types/catalogTypes';
 
 const JLPT_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
 
-interface CourseCatalogFiltersSidebarProps {
+interface CourseCatalogFiltersBarProps {
   filters: CourseCatalogFilters;
   onFiltersChange: (filters: CourseCatalogFilters) => void;
   categories: CourseCategory[];
   categoriesLoading?: boolean;
+  sort: string;
+  onSortChange: (sort: string) => void;
 }
 
-export const CourseCatalogFiltersSidebar: React.FC<CourseCatalogFiltersSidebarProps> = ({
+function toPriceInput(value?: number): string {
+  return value === undefined ? '' : String(value);
+}
+
+function parsePrice(value: string): number | undefined {
+  if (value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = ({
   filters,
   onFiltersChange,
   categories,
   categoriesLoading,
+  sort,
+  onSortChange,
 }) => {
-  const [priceRange, setPriceRange] = useState<number[]>([
-    filters.minPrice || 0,
-    filters.maxPrice || 5000000
-  ]);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [keyword, setKeyword] = useState(filters.keyword ?? '');
+  const [minPrice, setMinPrice] = useState(toPriceInput(filters.minPrice));
+  const [maxPrice, setMaxPrice] = useState(toPriceInput(filters.maxPrice));
+  const [priceError, setPriceError] = useState('');
 
   useEffect(() => {
-    setPriceRange([
-      filters.minPrice || 0,
-      filters.maxPrice || 5000000
-    ]);
+    setKeyword(filters.keyword ?? '');
+  }, [filters.keyword]);
+
+  useEffect(() => {
+    setMinPrice(toPriceInput(filters.minPrice));
+    setMaxPrice(toPriceInput(filters.maxPrice));
   }, [filters.minPrice, filters.maxPrice]);
 
-  const handleChange = (field: keyof CourseCatalogFilters, value: string | number | undefined) => {
-    onFiltersChange({ ...filters, [field]: value });
-  };
-
-  const handlePriceChange = (_event: Event, newValue: number | number[]) => {
-    setPriceRange(newValue as number[]);
-  };
-
-  const handlePriceChangeCommitted = (_event: Event | React.SyntheticEvent | Event, newValue: number | number[]) => {
-    const [min, max] = newValue as number[];
+  const updateFilter = (field: keyof CourseCatalogFilters, value?: string) => {
     onFiltersChange({
       ...filters,
-      minPrice: min > 0 ? min : undefined,
-      maxPrice: max < 5000000 ? max : undefined,
+      [field]: value || undefined,
     });
   };
 
-  const formatPriceLabel = (value: number) => {
-    if (value === 5000000) return '5M+';
-    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-    return value.toString();
+  const submitKeyword = (event: React.FormEvent) => {
+    event.preventDefault();
+    onFiltersChange({
+      ...filters,
+      keyword: keyword.trim() || undefined,
+    });
   };
 
+  const applyPrice = () => {
+    const parsedMin = parsePrice(minPrice);
+    const parsedMax = parsePrice(maxPrice);
+    const hasInvalidValue =
+      (minPrice.trim() !== '' && parsedMin === undefined) ||
+      (maxPrice.trim() !== '' && parsedMax === undefined);
+
+    if (hasInvalidValue) {
+      setPriceError('Giá phải là số không âm.');
+      return;
+    }
+
+    if (parsedMin !== undefined && parsedMax !== undefined && parsedMin > parsedMax) {
+      setPriceError('Giá tối thiểu không được lớn hơn giá tối đa.');
+      return;
+    }
+
+    setPriceError('');
+    onFiltersChange({
+      ...filters,
+      minPrice: parsedMin,
+      maxPrice: parsedMax,
+    });
+    setDrawerOpen(false);
+  };
+
+  const clearFilters = () => {
+    setKeyword('');
+    setMinPrice('');
+    setMaxPrice('');
+    setPriceError('');
+    onFiltersChange({});
+    setDrawerOpen(false);
+  };
+
+  const handleSortChange = (event: SelectChangeEvent) => {
+    onSortChange(event.target.value);
+  };
+
+  const filterFields = (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))',
+        gap: 1.5,
+        alignItems: 'start',
+      }}
+    >
+      <FormControl fullWidth size="small">
+        <InputLabel id="catalog-category-label">Danh mục</InputLabel>
+        <Select
+          labelId="catalog-category-label"
+          value={filters.category ?? ''}
+          label="Danh mục"
+          disabled={categoriesLoading}
+          onChange={(event) => updateFilter('category', event.target.value)}
+        >
+          <MenuItem value="">Tất cả danh mục</MenuItem>
+          {categories.map((category) => (
+            <MenuItem key={category.id} value={category.code}>
+              {category.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <FormControl fullWidth size="small">
+        <InputLabel id="catalog-jlpt-label">Trình độ</InputLabel>
+        <Select
+          labelId="catalog-jlpt-label"
+          value={filters.jlptLevel ?? ''}
+          label="Trình độ"
+          onChange={(event) => updateFilter('jlptLevel', event.target.value)}
+        >
+          <MenuItem value="">Mọi cấp độ</MenuItem>
+          {JLPT_LEVELS.map((level) => (
+            <MenuItem key={level} value={level}>
+              JLPT {level}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.5}
+        sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}
+      >
+        <TextField
+          label="Giá từ"
+          type="number"
+          value={minPrice}
+          onChange={(event) => setMinPrice(event.target.value)}
+          size="small"
+          fullWidth
+          slotProps={{ htmlInput: { min: 0, step: 10000 } }}
+        />
+        <TextField
+          label="Giá đến"
+          type="number"
+          value={maxPrice}
+          onChange={(event) => setMaxPrice(event.target.value)}
+          size="small"
+          fullWidth
+          slotProps={{ htmlInput: { min: 0, step: 10000 } }}
+        />
+      </Stack>
+      {priceError && (
+        <Typography variant="caption" color="error">
+          {priceError}
+        </Typography>
+      )}
+
+      <Button variant="outlined" onClick={applyPrice}>
+        Áp dụng khoảng giá
+      </Button>
+
+      <FormControl fullWidth size="small">
+        <InputLabel id="catalog-sort-label">Sắp xếp</InputLabel>
+        <Select
+          labelId="catalog-sort-label"
+          value={sort}
+          label="Sắp xếp"
+          onChange={handleSortChange}
+        >
+          <MenuItem value="publishedAt,desc">Mới xuất bản</MenuItem>
+          <MenuItem value="price,asc">Giá thấp đến cao</MenuItem>
+          <MenuItem value="price,desc">Giá cao đến thấp</MenuItem>
+          <MenuItem value="title,asc">Tên A-Z</MenuItem>
+        </Select>
+      </FormControl>
+
+      <Button color="inherit" onClick={clearFilters}>
+        Xóa bộ lọc
+      </Button>
+    </Box>
+  );
+
   return (
-    <Box sx={{ width: '100%', position: { md: 'sticky' }, top: { md: 24 } }}>
-      <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-        <CardContent sx={{ p: 3 }}>
-          <Stack direction="row" spacing={1} sx={{ mb: 4, alignItems: 'center' }}>
-            <FilterListIcon color="action" />
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>Bộ lọc</Typography>
+    <Box>
+      <Stack
+        component="form"
+        onSubmit={submitKeyword}
+        direction="row"
+        spacing={1}
+        sx={{ mb: 2 }}
+      >
+        <TextField
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder="Tìm theo tên khóa học..."
+          size="small"
+          fullWidth
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+        <Button
+          type="submit"
+          variant="contained"
+          sx={{ minWidth: 112, whiteSpace: 'nowrap' }}
+        >
+          Tìm kiếm
+        </Button>
+        {isMobile && (
+          <IconButton
+            aria-label="Mở bộ lọc"
+            title="Bộ lọc"
+            onClick={() => setDrawerOpen(true)}
+            sx={{ border: '1px solid', borderColor: 'divider' }}
+          >
+            <FilterListIcon />
+          </IconButton>
+        )}
+      </Stack>
+
+      {!isMobile && (
+        <Box
+          sx={{
+            p: 2,
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+          }}
+        >
+          {filterFields}
+        </Box>
+      )}
+
+      <Drawer
+        anchor="bottom"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        slotProps={{ paper: { sx: { maxHeight: '88vh', borderRadius: '8px 8px 0 0' } } }}
+      >
+        <Box sx={{ p: 2.5 }}>
+          <Stack
+            direction="row"
+            sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <Typography variant="h6">Bộ lọc khóa học</Typography>
+            <IconButton
+              aria-label="Đóng bộ lọc"
+              title="Đóng"
+              onClick={() => setDrawerOpen(false)}
+            >
+              <CloseIcon />
+            </IconButton>
           </Stack>
-
-          {/* Categories */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="overline" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 2 }}>
-              Danh mục
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              <Chip
-                label="Tất cả"
-                onClick={() => handleChange('category', undefined)}
-                color={!filters.category ? 'primary' : 'default'}
-                variant={!filters.category ? 'filled' : 'outlined'}
-                sx={{ 
-                  fontWeight: 600, 
-                  borderRadius: 2,
-                  transition: 'all 0.2s',
-                  '&:focus-visible': { outline: '2px solid primary.main', outlineOffset: '2px' },
-                  ...( !filters.category && { boxShadow: '0 2px 8px rgba(0,0,0,0.1)' } )
-                }}
-              />
-              {!categoriesLoading && categories.map((cat) => (
-                <Chip
-                  key={cat.id}
-                  label={cat.name}
-                  onClick={() => handleChange('category', cat.code)}
-                  color={filters.category === cat.code ? 'primary' : 'default'}
-                  variant={filters.category === cat.code ? 'filled' : 'outlined'}
-                  sx={{ 
-                    fontWeight: 600, 
-                    borderRadius: 2,
-                    transition: 'all 0.2s',
-                    '&:focus-visible': { outline: '2px solid primary.main', outlineOffset: '2px' },
-                    ...( filters.category === cat.code && { boxShadow: '0 2px 8px rgba(0,0,0,0.1)' } )
-                  }}
-                />
-              ))}
-            </Box>
-          </Box>
-
-          <Divider sx={{ my: 3 }} />
-
-          {/* JLPT Levels */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="overline" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 2 }}>
-              Trình độ JLPT
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              <Chip
-                label="Mọi cấp độ"
-                onClick={() => handleChange('jlptLevel', undefined)}
-                color={!filters.jlptLevel ? 'primary' : 'default'}
-                variant={!filters.jlptLevel ? 'filled' : 'outlined'}
-                sx={{ fontWeight: 600, borderRadius: 2 }}
-              />
-              {JLPT_LEVELS.map((level) => (
-                <Chip
-                  key={level}
-                  label={level}
-                  onClick={() => handleChange('jlptLevel', level)}
-                  color={filters.jlptLevel === level ? 'primary' : 'default'}
-                  variant={filters.jlptLevel === level ? 'filled' : 'outlined'}
-                  sx={{ fontWeight: 600, borderRadius: 2 }}
-                />
-              ))}
-            </Box>
-          </Box>
-
-          <Divider sx={{ my: 3 }} />
-
-          {/* Price Range */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="overline" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 2 }}>
-              Khoảng giá
-            </Typography>
-            <Box sx={{ px: 1 }}>
-              <Slider
-                value={priceRange}
-                onChange={handlePriceChange}
-                onChangeCommitted={handlePriceChangeCommitted}
-                valueLabelDisplay="auto"
-                valueLabelFormat={formatPriceLabel}
-                min={0}
-                max={5000000}
-                step={100000}
-                sx={{
-                  '& .MuiSlider-thumb': {
-                    width: 28, // Slightly larger thumb for better tactile feel
-                    height: 28,
-                    backgroundColor: '#fff',
-                    border: '2px solid currentColor',
-                    boxShadow: '0px 2px 6px rgba(0,0,0,0.15)',
-                    transition: 'box-shadow 0.2s ease, width 0.2s, height 0.2s',
-                    '&:hover, &.Mui-focusVisible': {
-                      boxShadow: '0px 0px 0px 8px rgba(15, 23, 42, 0.1)',
-                    },
-                    '&.Mui-active': {
-                      width: 32,
-                      height: 32,
-                      boxShadow: '0px 0px 0px 12px rgba(15, 23, 42, 0.2)',
-                    }
-                  },
-                  '& .MuiSlider-track': {
-                    transition: 'background-color 0.2s ease',
-                  }
-                }}
-              />
-              <Stack direction="row" sx={{ mt: 1, justifyContent: 'space-between' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Miễn phí</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>5.000.000đ+</Typography>
-              </Stack>
-            </Box>
-          </Box>
-
-
-        </CardContent>
-      </Card>
+          <Divider sx={{ my: 2 }} />
+          {filterFields}
+        </Box>
+      </Drawer>
     </Box>
   );
 };

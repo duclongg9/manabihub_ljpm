@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Container, Typography, Paper, Button, IconButton } from '@mui/material';
+import {
+  Box,
+  Button,
+  Container,
+  Grid,
+  Paper,
+  Typography,
+} from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArticleIcon from '@mui/icons-material/Article';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -9,34 +16,28 @@ import ChromeReaderModeIcon from '@mui/icons-material/ChromeReaderMode';
 import EditIcon from '@mui/icons-material/Edit';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
-import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
 
 const CATEGORIES = [
-  { id: 'jlptLevel=N5', name: 'JLPT N5', count: '12+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'jlptLevel=N4', name: 'JLPT N4', count: '15+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'jlptLevel=N3', name: 'JLPT N3', count: '20+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'jlptLevel=N2', name: 'JLPT N2', count: '18+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'jlptLevel=N1', name: 'JLPT N1', count: '8+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'category=vocabulary', name: 'Từ vựng (Goi)', count: '25+', icon: <TextSnippetIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
-  { id: 'category=grammar', name: 'Ngữ pháp (Bunpou)', count: '22+', icon: <MenuBookIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
-  { id: 'category=jlpt-prep', name: 'Luyện thi JLPT', count: '30+', icon: <HeadphonesIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
-  { id: 'category=conversation', name: 'Giao tiếp', count: '15+', icon: <ChromeReaderModeIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
-  { id: 'category=kanji', name: 'Hán tự (Kanji)', count: '10+', icon: <EditIcon sx={{ fontSize: 32, color: '#8b5cf6' }} /> },
-  { id: 'category=business-japanese', name: 'Tiếng Nhật Thương mại', count: '12+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N5', name: 'JLPT N5', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N4', name: 'JLPT N4', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N3', name: 'JLPT N3', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N2', name: 'JLPT N2', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N1', name: 'JLPT N1', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'category=vocabulary', name: 'Từ vựng (Goi)', icon: <TextSnippetIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
+  { id: 'category=grammar', name: 'Ngữ pháp (Bunpou)', icon: <MenuBookIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
+  { id: 'category=jlpt-prep', name: 'Luyện thi JLPT', icon: <HeadphonesIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
+  { id: 'category=conversation', name: 'Giao tiếp', icon: <ChromeReaderModeIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
+  { id: 'category=kanji', name: 'Hán tự (Kanji)', icon: <EditIcon sx={{ fontSize: 32, color: '#8b5cf6' }} /> },
+  { id: 'category=business-japanese', name: 'Tiếng Nhật Thương mại', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
 ];
 
 export const TopCategories: React.FC = () => {
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  const itemsToShow = 4;
-  const maxIndex = CATEGORIES.length - itemsToShow;
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -51,36 +52,19 @@ export const TopCategories: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Auto-play slider
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [maxIndex]);
-
-  const handleNext = () => setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
-  const handlePrev = () => setCurrentIndex((prev) => (prev <= 0 ? maxIndex : prev - 1));
-
   return (
-    <Box ref={sectionRef} sx={{ py: 10, bgcolor: '#ffffff' }}>
+    <Box ref={sectionRef} sx={{ py: 10, bgcolor: '#ffffff', overflowX: 'hidden' }}>
       <Container disableGutters sx={{ maxWidth: { md: '1157px' }, px: { xs: 3, md: 0 }, margin: '0 auto' }}>
 
-        {/* ======================================= */}
-        {/* TOP BLOCK: CATEGORIES */}
-        {/* ======================================= */}
         <Box sx={{ mb: { xs: 10, md: 14 } }}>
-
-          {/* Header area (1133 x 164.22) */}
           <Box
             sx={{
-              width: { md: '1133px' },
-              height: { md: '164.22px' },
               display: 'flex',
               flexDirection: { xs: 'column', md: 'row' },
-              alignItems: { xs: 'flex-start', md: 'center' },
+              alignItems: { xs: 'flex-start', md: 'flex-end' },
               justifyContent: 'space-between',
-              mb: 4
+              gap: 3,
+              mb: 4,
             }}
           >
             <Box>
@@ -91,90 +75,56 @@ export const TopCategories: React.FC = () => {
                 </Typography>
               </Box>
               <Typography variant="h3" sx={{ fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.3, fontSize: { xs: '2rem', md: '2.5rem' } }}>
-                Khám phá các danh mục hàng đầu
+                Khám phá các danh mục học tập
               </Typography>
             </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mt: { xs: 3, md: 0 } }}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <IconButton onClick={handlePrev} sx={{ border: '1px solid #e2e8f0', bgcolor: '#f8fafc', '&:hover': { bgcolor: '#e2e8f0' } }}>
-                  <KeyboardArrowLeftIcon />
-                </IconButton>
-                <IconButton onClick={handleNext} sx={{ border: '1px solid #e2e8f0', bgcolor: '#f8fafc', '&:hover': { bgcolor: '#e2e8f0' } }}>
-                  <KeyboardArrowRightIcon />
-                </IconButton>
-              </Box>
-
-              <Button
-                variant="contained"
-                endIcon={<ArrowForwardIcon />}
-                onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
-                sx={{
-                  bgcolor: '#2563eb',
-                  py: 1.5,
-                  px: 3,
-                  fontWeight: 600,
-                  borderRadius: 1,
-                  boxShadow: 'none',
-                  textTransform: 'uppercase',
-                  '&:hover': {
-                    bgcolor: '#1d4ed8',
-                    boxShadow: '0 4px 14px rgba(37,99,235,0.4)'
-                  }
-                }}
-              >
-                XEM TẤT CẢ DANH MỤC
-              </Button>
-            </Box>
-          </Box>
-
-          {/* Slider area (1133 x 284.95) */}
-          <Box
-            sx={{
-              width: { md: '1133px' },
-              height: { md: '284.95px' },
-              overflow: 'hidden',
-              position: 'relative'
-            }}
-          >
-            <Box
+            <Button
+              variant="contained"
+              endIcon={<ArrowForwardIcon />}
+              onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
               sx={{
-                display: 'flex',
-                transition: 'transform 0.5s ease-in-out',
-                transform: `translateX(-${currentIndex * (100 / itemsToShow)}%)`,
-                height: '100%'
+                bgcolor: '#2563eb',
+                py: 1.5,
+                px: 3,
+                fontWeight: 600,
+                borderRadius: 1,
+                boxShadow: 'none',
+                textTransform: 'uppercase',
+                '&:hover': {
+                  bgcolor: '#1d4ed8',
+                  boxShadow: '0 4px 14px rgba(37,99,235,0.4)'
+                }
               }}
             >
-              {CATEGORIES.map((cat, index) => (
-                <Box
-                  key={cat.id + index}
+              XEM TẤT CẢ DANH MỤC
+            </Button>
+          </Box>
+
+          <Grid container spacing={2}>
+            {CATEGORIES.map((category) => (
+              <Grid key={category.id} size={{ xs: 12, sm: 6, md: 3 }}>
+                <Paper
+                  elevation={0}
                   sx={{
-                    minWidth: { xs: '100%', sm: '50%', md: `${100 / itemsToShow}%` },
-                    px: 1.5,
-                    height: '100%'
+                    p: 2.5,
+                    minHeight: 190,
+                    textAlign: 'center',
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    transition: 'transform 160ms ease, box-shadow 160ms ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: 3,
+                    },
                   }}
                 >
-                  <Paper
-                    elevation={0}
+                  <Box
                     sx={{
-                      p: 3,
-                      textAlign: 'center',
-                      borderRadius: 3,
-                      border: '1px solid #f1f5f9',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                      transition: 'all 0.3s ease',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      height: '100%',
-                      '&:hover': {
-                        borderColor: '#bfdbfe',
-                        boxShadow: '0 10px 25px rgba(37, 99, 235, 0.1)',
-                        transform: 'translateY(-5px)'
-                      }
-                    }}
-                  >
-                    <Box sx={{
                       mb: 2,
                       display: 'flex',
                       alignItems: 'center',
@@ -183,39 +133,27 @@ export const TopCategories: React.FC = () => {
                       height: 64,
                       borderRadius: '50%',
                       bgcolor: '#eff6ff'
-                    }}>
-                      {cat.icon}
-                    </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5, fontSize: '1.05rem' }}>
-                      {cat.name}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
-                      {cat.count} Khóa học
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      endIcon={<ArrowForwardIcon fontSize="small" />}
-                      sx={{
-                        fontWeight: 600,
-                        bgcolor: '#2563eb',
-                        boxShadow: 'none',
-                        mt: 'auto',
-                        py: 1,
-                        '&:hover': {
-                          bgcolor: '#1d4ed8',
-                          boxShadow: 'none'
-                        }
-                      }}
-                      onClick={() => navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?${cat.id}`)}
-                    >
-                      XEM THÊM
-                    </Button>
-                  </Paper>
-                </Box>
-              ))}
-            </Box>
-          </Box>
+                    }}
+                  >
+                    {category.icon}
+                  </Box>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{ fontWeight: 700, color: '#1e293b', mb: 2 }}
+                  >
+                    {category.name}
+                  </Typography>
+                  <Button
+                    endIcon={<ArrowForwardIcon fontSize="small" />}
+                    sx={{ mt: 'auto', fontWeight: 700 }}
+                    onClick={() => navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?${category.id}`)}
+                  >
+                    Xem khóa học
+                  </Button>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
         </Box>
 
         {/* ======================================= */}
@@ -275,7 +213,7 @@ export const TopCategories: React.FC = () => {
 
             <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.7, mb: 2 }}>
               Bạn muốn nâng cao kiến thức và kỹ năng của mình? Bạn muốn học những khóa học chất lượng<br />
-              từ những chuyên gia hàng đầu trong ngành? Hãy ghé thăm Website Bán Khóa học của chúng tôi!
+              từ các giảng viên tiếng Nhật? Hãy khám phá các khóa học đang có trên ManabiHub.
             </Typography>
 
             <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.7, mb: 4 }}>
@@ -299,8 +237,8 @@ export const TopCategories: React.FC = () => {
               />
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 {[
-                  'Được tiếp cận hơn 1000 khóa học hàng đầu',
-                  'Các chủ đề phổ biến để tìm hiểu ngay bây giờ',
+                  'Tìm khóa học phù hợp với trình độ và mục tiêu',
+                  'Học theo nội dung và lộ trình của từng khóa học',
                   'Tìm người hướng dẫn phù hợp cho bạn'
                 ].map((item, i) => (
                   <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start' }}>
