@@ -84,7 +84,7 @@ export interface StructureSuggestion {
 export interface AiWritingSuggestionResponse {
   id: string;
   provider: string;
-  status: string;
+  status: 'PROCESSING' | 'READY' | 'FAILED';
   grammarSuggestions: GrammarSuggestion[];
   vocabularySuggestions: VocabularySuggestion[];
   structureSuggestions: StructureSuggestion[];
@@ -97,11 +97,9 @@ export interface WritingSubmissionDetail {
   courseId: string;
   courseTitle: string;
   lessonTitle: string;
-  studentName: string;
-  studentEmail: string;
   content: string;
-  status: string;
+  status: 'SUBMITTED' | 'PROCESSING' | 'COMPLETED';
   submittedAt: string;
   aiSuggestion?: AiWritingSuggestionResponse;
-  teacherFeedback?: any;
+  teacherFeedback?: unknown;
 }

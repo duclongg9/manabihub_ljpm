@@ -297,7 +297,7 @@ public class LearningServiceConcurrencyPostgresTest {
     void testConcurrentWritingSubmission() throws Exception {
         int threads = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
-        List<Future<WritingSubmissionDetailResponse>> futures = new ArrayList<>();
+        List<Future<com.manabihub.writing.dto.response.StudentWritingSubmissionResponse>> futures = new ArrayList<>();
         CountDownLatch readyLatch = new CountDownLatch(threads);
         CountDownLatch startLatch = new CountDownLatch(1);
 
@@ -315,7 +315,7 @@ public class LearningServiceConcurrencyPostgresTest {
 
             int successCount = 0;
             int errorCount = 0;
-            for (Future<WritingSubmissionDetailResponse> f : futures) {
+            for (Future<com.manabihub.writing.dto.response.StudentWritingSubmissionResponse> f : futures) {
                 try {
                     f.get(30, TimeUnit.SECONDS);
                     successCount++;

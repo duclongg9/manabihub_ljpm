@@ -4,7 +4,7 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.common.response.PageResponse;
 import com.manabihub.writing.dto.request.WritingSubmissionRequest;
-import com.manabihub.writing.dto.response.WritingSubmissionDetailResponse;
+import com.manabihub.writing.dto.response.StudentWritingSubmissionResponse;
 import com.manabihub.learning.dto.request.ReviewFlashcardRequest;
 import com.manabihub.learning.dto.request.SaveVideoProgressRequest;
 import com.manabihub.learning.dto.response.CourseLearningResponse;
@@ -102,7 +102,7 @@ public class StudentLearningController {
     // ── UC-14: Writing Assignments ─────────────────────────────────────────
 
     @GetMapping("/lessons/{lessonBlockId}/writing-submissions/me")
-    public ApiResponse<WritingSubmissionDetailResponse> getWritingSubmission(@PathVariable UUID lessonBlockId) {
+    public ApiResponse<StudentWritingSubmissionResponse> getWritingSubmission(@PathVariable UUID lessonBlockId) {
         return ApiResponse.success(
                 MessageCodes.COMMON_SUCCESS,
                 "Writing submission retrieved successfully",
@@ -110,7 +110,7 @@ public class StudentLearningController {
     }
 
     @PostMapping("/lessons/{lessonBlockId}/writing-submissions")
-    public ApiResponse<WritingSubmissionDetailResponse> submitWriting(
+    public ApiResponse<StudentWritingSubmissionResponse> submitWriting(
             @PathVariable UUID lessonBlockId,
             @Valid @RequestBody WritingSubmissionRequest request) {
         return ApiResponse.success(
@@ -120,7 +120,7 @@ public class StudentLearningController {
     }
 
     @PostMapping("/lessons/{lessonBlockId}/writing-submissions/{submissionId}/ai-assistance")
-    public ApiResponse<WritingSubmissionDetailResponse> requestAiWritingAssistance(
+    public ApiResponse<StudentWritingSubmissionResponse> requestAiWritingAssistance(
             @PathVariable UUID lessonBlockId,
             @PathVariable UUID submissionId) {
         return ApiResponse.success(

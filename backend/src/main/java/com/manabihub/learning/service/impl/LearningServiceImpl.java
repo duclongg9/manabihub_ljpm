@@ -1,4 +1,4 @@
-package com.manabihub.learning.service.impl;
+﻿package com.manabihub.learning.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -49,10 +49,13 @@ import com.manabihub.ai.repository.AiUsageLogRepository;
 import com.manabihub.ai.provider.AiWritingAssistanceProvider;
 import com.manabihub.ai.enums.AiUsageRequestStatus;
 import com.manabihub.ai.provider.AiChatProviderException;
+import com.manabihub.ai.service.AiChatSettingsService;
+import com.manabihub.ai.service.AiUsageLogService;
 import com.manabihub.writing.enums.WritingSubmissionStatus;
 import com.manabihub.writing.dto.request.WritingSubmissionRequest;
-import com.manabihub.writing.dto.response.WritingSubmissionDetailResponse;
+import com.manabihub.writing.dto.response.StudentWritingSubmissionResponse;
 import com.manabihub.writing.dto.response.AiWritingSuggestionResponse;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -87,6 +90,9 @@ public class LearningServiceImpl implements LearningService {
     private final AiWritingSuggestionRepository aiWritingSuggestionRepository;
     private final AiUsageLogRepository aiUsageLogRepository;
     private final AiWritingAssistanceProvider aiWritingAssistanceProvider;
+    private final AiChatSettingsService aiChatSettingsService;
+    private final AiUsageLogService aiUsageLogService;
+    private final TransactionTemplate transactionTemplate;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
 
@@ -108,7 +114,7 @@ public class LearningServiceImpl implements LearningService {
                     0,
                     0.0,
                     false,
-                    List.of("Khoá học chưa có nội dung bài học.")
+                    List.of("KhoÃ¡ há»c chÆ°a cÃ³ ná»™i dung bÃ i há»c.")
             );
         }
 
@@ -373,7 +379,7 @@ public class LearningServiceImpl implements LearningService {
         boolean contentAvailable = isContentAvailable(block);
         if (!contentAvailable) {
             log.warn("[{}] Lesson block {} in course {} is missing required content", MessageCodes.LEARNING_LESSON_CONTENT_UNAVAILABLE, block.getId(), module.getCourse().getId());
-            warnings.add("Bài học \"" + block.getTitle() + "\" hiện chưa có đủ nội dung.");
+            warnings.add("BÃ i há»c \"" + block.getTitle() + "\" hiá»‡n chÆ°a cÃ³ Ä‘á»§ ná»™i dung.");
         }
 
         List<String> quizOptions = readJsonList(block.getQuizOptionsJson(), QUIZ_OPTIONS_TYPE);
@@ -484,10 +490,10 @@ public class LearningServiceImpl implements LearningService {
         }
     }
 
-    // ── Writing Assignment Methods ─────────────────────────────────────────
+    // â”€â”€ Writing Assignment Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Override
-    public WritingSubmissionDetailResponse getWritingSubmission(UUID lessonBlockId) {
+    public StudentWritingSubmissionResponse getWritingSubmission(UUID lessonBlockId) {
         LessonBlock block = resolveLessonBlock(lessonBlockId);
         Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
 
@@ -502,18 +508,15 @@ public class LearningServiceImpl implements LearningService {
 
     @Override
     @Transactional
-    public WritingSubmissionDetailResponse submitWriting(UUID lessonBlockId, WritingSubmissionRequest request) {
+    public StudentWritingSubmissionResponse submitWriting(UUID lessonBlockId, WritingSubmissionRequest request) {
         LessonBlock block = resolveLessonBlock(lessonBlockId);
-        Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+        // Pessimistic lock enrollment to prevent race conditions during submission processing
+        Enrollment enrollment = enrollmentRepository.findByIdForUpdate(resolveActiveEnrollment(block.getModule().getCourse().getId()).getId())
+                .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Enrollment not found", HttpStatus.NOT_FOUND));
 
         if (block.getType() != LessonBlockType.WRITING) {
             throw new BusinessException(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Not a writing block", HttpStatus.BAD_REQUEST);
         }
-
-        writingSubmissionRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), lessonBlockId)
-                .ifPresent(s -> {
-                    throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "You have already submitted this assignment.", HttpStatus.BAD_REQUEST);
-                });
 
         WritingSubmission submission = WritingSubmission.builder()
                 .enrollment(enrollment)
@@ -522,16 +525,17 @@ public class LearningServiceImpl implements LearningService {
                 .legacyLessonId(null)
                 .content(request.content())
                 .status(WritingSubmissionStatus.SUBMITTED)
+                .submittedAt(Instant.now())
                 .build();
 
         try {
             submission = writingSubmissionRepository.saveAndFlush(submission);
         } catch (DataIntegrityViolationException e) {
-            throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "You have already submitted this assignment.", HttpStatus.BAD_REQUEST);
-        }
-
-        if (block.getModule().getCourse().getPrice().doubleValue() < 500000) {
-            throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "Course must be priced at least 500,000 VND to use AI features", HttpStatus.BAD_REQUEST);
+            String msg = e.getMostSpecificCause().getMessage();
+            if (msg != null && msg.contains("uq_writing_submissions_enrollment_block")) {
+                throw new BusinessException(MessageCodes.COMMON_CONFLICT, "You have already submitted this assignment.", HttpStatus.CONFLICT);
+            }
+            throw e;
         }
 
         // Upsert progress to COMPLETED
@@ -542,7 +546,7 @@ public class LearningServiceImpl implements LearningService {
                         .lessonBlockId(block.getId())
                         .status(LessonProgressStatus.IN_PROGRESS)
                         .build());
-        
+
         progress.setStatus(LessonProgressStatus.COMPLETED);
         if (progress.getCompletedAt() == null) {
             progress.setCompletedAt(Instant.now());
@@ -553,44 +557,70 @@ public class LearningServiceImpl implements LearningService {
     }
 
     @Override
-    @Transactional(noRollbackFor = AiChatProviderException.class)
-    public WritingSubmissionDetailResponse requestAiWritingAssistance(UUID lessonBlockId, UUID submissionId) {
+    public StudentWritingSubmissionResponse requestAiWritingAssistance(UUID lessonBlockId, UUID submissionId) {
         LessonBlock block = resolveLessonBlock(lessonBlockId);
         Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
-        
+        UUID currentUserId = currentUserService.getCurrentUserId();
+
         WritingSubmission submission = writingSubmissionRepository.findById(submissionId)
-                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Submission not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Submission not found", HttpStatus.NOT_FOUND));
 
         if (!submission.getEnrollment().getId().equals(enrollment.getId()) || !submission.getLessonBlockId().equals(lessonBlockId)) {
-            throw new BusinessException("FORBIDDEN", "Forbidden access to this submission", HttpStatus.FORBIDDEN);
+            throw new BusinessException(MessageCodes.AUTH_FORBIDDEN, "Forbidden access to this submission", HttpStatus.FORBIDDEN);
         }
 
         Course course = enrollment.getCourse();
-        if (!course.isAiSupported() || course.getPrice().compareTo(new java.math.BigDecimal("500000")) < 0) {
-            throw new BusinessException("AI_NOT_ELIGIBLE", "AI writing assistance is not available for this course.", HttpStatus.FORBIDDEN);
+        AiChatSettingsService.AiChatSettings settings = aiChatSettingsService.getSettings();
+
+        // 1. Validate Eligibility
+        if (!settings.aiEnabled() || !settings.aiWritingEnabled() || !course.isAiSupported()) {
+            aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.BLOCKED, null, 0, 0, "Feature disabled");
+            throw new BusinessException(MessageCodes.AI_NOT_AVAILABLE_FOR_COURSE, "AI writing assistance is not available for this course.", HttpStatus.FORBIDDEN);
         }
 
-        // Check if already processed
-        AiWritingSuggestion existingSuggestion = aiWritingSuggestionRepository.findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submissionId).orElse(null);
-        if (existingSuggestion != null && "SUGGESTION_READY".equals(existingSuggestion.getStatus())) {
-            return mapToWritingSubmissionDetailResponse(submission); // Already processed
+        if (course.getPrice().compareTo(settings.priceFloor()) < 0) {
+            aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.BLOCKED, null, 0, 0, "Price floor not met");
+            throw new BusinessException(MessageCodes.AI_NOT_AVAILABLE_FOR_COURSE, "AI writing assistance is unavailable for this course plan.", HttpStatus.FORBIDDEN);
         }
 
-        if (existingSuggestion == null) {
-            existingSuggestion = AiWritingSuggestion.builder()
-                    .writingSubmission(submission)
-                    .provider("openai-compatible")
-                    .status("SUGGESTION_PROCESSING")
-                    .grammarSuggestions(objectMapper.createArrayNode())
-                    .vocabularySuggestions(objectMapper.createArrayNode())
-                    .structureSuggestions(objectMapper.createArrayNode())
-                    .build();
-            existingSuggestion = aiWritingSuggestionRepository.saveAndFlush(existingSuggestion);
-        } else {
-            existingSuggestion.setStatus("SUGGESTION_PROCESSING");
-            aiWritingSuggestionRepository.saveAndFlush(existingSuggestion);
+        // 2. Rate Limits
+        Instant oneMinuteAgo = Instant.now().minusSeconds(60);
+        long requestsLastMinute = aiUsageLogRepository.countByUserIdAndFeatureCodeAndRequestStatusAndCreatedAtAfter(
+                currentUserId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.SUCCESS, oneMinuteAgo);
+
+        if (requestsLastMinute >= settings.rateLimitPerMinute()) {
+            aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.BLOCKED, null, 0, 0, "Rate limit exceeded (minute)");
+            throw new BusinessException(MessageCodes.SYSTEM_RATE_LIMITED, "Too many AI requests. Please wait a moment.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
+        // 3. Status Check & Pre-saving (In a new transaction to persist SUGGESTION_PROCESSING state before provider call)
+        AiWritingSuggestion existingSuggestion = transactionTemplate.execute(status -> {
+            AiWritingSuggestion suggestion = aiWritingSuggestionRepository.findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submissionId).orElse(null);
+            if (suggestion != null && "READY".equals(suggestion.getStatus())) {
+                return suggestion; // Already processed
+            }
+
+            if (suggestion == null) {
+                suggestion = AiWritingSuggestion.builder()
+                        .writingSubmission(submission)
+                        .provider("openai-compatible")
+                        .status("PROCESSING")
+                        .grammarSuggestions(objectMapper.createArrayNode())
+                        .vocabularySuggestions(objectMapper.createArrayNode())
+                        .structureSuggestions(objectMapper.createArrayNode())
+                        .official(false)
+                        .build();
+            } else {
+                suggestion.setStatus("PROCESSING");
+            }
+            return aiWritingSuggestionRepository.saveAndFlush(suggestion);
+        });
+
+        if (existingSuggestion != null && "READY".equals(existingSuggestion.getStatus())) {
+            return mapToWritingSubmissionDetailResponse(submission);
+        }
+
+        // 4. Provider call (No transaction blocking)
         try {
             AiWritingAssistanceProvider.Result result = aiWritingAssistanceProvider.generate(
                     block.getWritingPrompt(),
@@ -598,49 +628,35 @@ public class LearningServiceImpl implements LearningService {
                     submission.getContent()
             );
 
-            existingSuggestion.setGrammarSuggestions(result.grammarSuggestions());
-            existingSuggestion.setVocabularySuggestions(result.vocabularySuggestions());
-            existingSuggestion.setStructureSuggestions(result.structureSuggestions());
-            existingSuggestion.setRevisionGuidance(result.revisionGuidance());
-            existingSuggestion.setStatus("SUGGESTION_READY");
-            existingSuggestion.setProvider(result.provider());
-            aiWritingSuggestionRepository.save(existingSuggestion);
+            transactionTemplate.executeWithoutResult(status -> {
+                AiWritingSuggestion suggestion = aiWritingSuggestionRepository.findById(existingSuggestion.getId()).orElseThrow();
+                suggestion.setGrammarSuggestions(result.grammarSuggestions());
+                suggestion.setVocabularySuggestions(result.vocabularySuggestions());
+                suggestion.setStructureSuggestions(result.structureSuggestions());
+                suggestion.setRevisionGuidance(result.revisionGuidance());
+                suggestion.setStatus("READY");
+                suggestion.setProvider(result.provider());
+                aiWritingSuggestionRepository.save(suggestion);
+            });
 
-            AiUsageLog usageLog = AiUsageLog.builder()
-                    .userId(currentUserService.getCurrentUserId())
-                    .courseId(course.getId())
-                    .lessonBlockId(lessonBlockId)
-                    .writingSubmissionId(submissionId)
-                    .featureCode("AI_WRITING_ASSISTANCE")
-                    .provider(result.provider())
-                    .requestStatus(AiUsageRequestStatus.SUCCESS)
-                    .inputTokens(result.inputTokens())
-                    .outputTokens(result.outputTokens())
-                    .build();
-            aiUsageLogRepository.save(usageLog);
+            aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.SUCCESS, result.provider(), result.inputTokens(), result.outputTokens(), null);
 
         } catch (AiChatProviderException e) {
-            existingSuggestion.setStatus("SUGGESTION_FAILED");
-            aiWritingSuggestionRepository.save(existingSuggestion);
+            transactionTemplate.executeWithoutResult(status -> {
+                AiWritingSuggestion suggestion = aiWritingSuggestionRepository.findById(existingSuggestion.getId()).orElseThrow();
+                suggestion.setStatus("FAILED");
+                suggestion.setFailureReason(e.getMessage());
+                aiWritingSuggestionRepository.save(suggestion);
+            });
 
-            AiUsageLog usageLog = AiUsageLog.builder()
-                    .userId(currentUserService.getCurrentUserId())
-                    .courseId(course.getId())
-                    .lessonBlockId(lessonBlockId)
-                    .writingSubmissionId(submissionId)
-                    .featureCode("AI_WRITING_ASSISTANCE")
-                    .requestStatus(AiUsageRequestStatus.FAILED)
-                    .failureReason(e.getMessage())
-                    .build();
-            aiUsageLogRepository.save(usageLog);
-
-            throw new BusinessException("AI_ASSISTANCE_FAILED", "Unable to get AI suggestions at this time. Please try again.", HttpStatus.SERVICE_UNAVAILABLE);
+            aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.FAILED, null, 0, 0, e.getMessage());
+            throw new BusinessException(MessageCodes.MSG_AI_002, "Unable to get AI suggestions at this time. Please try again.", HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         return mapToWritingSubmissionDetailResponse(submission);
     }
 
-    private WritingSubmissionDetailResponse mapToWritingSubmissionDetailResponse(WritingSubmission submission) {
+    private StudentWritingSubmissionResponse mapToWritingSubmissionDetailResponse(WritingSubmission submission) {
         AiWritingSuggestion suggestion = aiWritingSuggestionRepository.findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submission.getId()).orElse(null);
         AiWritingSuggestionResponse suggestionResponse = suggestion == null ? null : new AiWritingSuggestionResponse(
                 suggestion.getId(),
@@ -655,18 +671,16 @@ public class LearningServiceImpl implements LearningService {
                 suggestion.getCreatedAt()
         );
 
-        return new WritingSubmissionDetailResponse(
+        return new StudentWritingSubmissionResponse(
                 submission.getId(),
                 submission.getEnrollment().getCourse().getId(),
                 submission.getEnrollment().getCourse().getTitle(),
                 "Writing Assignment",
-                submission.getStudent().getDisplayName(),
-                submission.getStudent().getUser().getEmail(),
                 submission.getContent(),
                 submission.getStatus(),
-                submission.getCreatedAt(), // wait, we need submittedAt which might be createdAt
+                submission.getSubmittedAt(),
                 suggestionResponse,
-                null // teacherFeedback is out of scope here
+                null
         );
     }
 }

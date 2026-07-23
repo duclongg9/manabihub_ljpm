@@ -6,7 +6,7 @@ import com.manabihub.learning.dto.response.CourseLearningResponse;
 import com.manabihub.learning.dto.response.CourseProgressSummaryResponse;
 import com.manabihub.learning.dto.response.LessonProgressResponse;
 import com.manabihub.writing.dto.request.WritingSubmissionRequest;
-import com.manabihub.writing.dto.response.WritingSubmissionDetailResponse;
+import com.manabihub.writing.dto.response.StudentWritingSubmissionResponse;
 
 import java.util.UUID;
 
@@ -22,9 +22,9 @@ public interface LearningService {
 
     CourseProgressSummaryResponse getCourseProgress(UUID courseId);
 
-    WritingSubmissionDetailResponse getWritingSubmission(UUID lessonBlockId);
+    StudentWritingSubmissionResponse getWritingSubmission(UUID lessonBlockId);
 
-    WritingSubmissionDetailResponse submitWriting(UUID lessonBlockId, WritingSubmissionRequest request);
+    StudentWritingSubmissionResponse submitWriting(UUID lessonBlockId, WritingSubmissionRequest request);
 
-    WritingSubmissionDetailResponse requestAiWritingAssistance(UUID lessonBlockId, UUID submissionId);
+    StudentWritingSubmissionResponse requestAiWritingAssistance(UUID lessonBlockId, UUID submissionId);
 }

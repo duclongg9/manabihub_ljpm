@@ -830,7 +830,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
             {!submission.aiSuggestion ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Typography variant="body2" color="text.secondary">
-                  Bạn có thể yêu cầu AI hỗ trợ chấm điểm và đưa ra gợi ý cải thiện cho bài viết của mình.
+                  Bạn có thể yêu cầu AI hỗ trợ nhận xét sơ bộ và đưa ra gợi ý cải thiện cho bài viết của mình.
                 </Typography>
                 <Button
                   variant="outlined"
@@ -840,14 +840,14 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   {aiRequesting ? 'Đang phân tích...' : 'Yêu cầu AI hỗ trợ'}
                 </Button>
               </Stack>
-            ) : submission.aiSuggestion.status === 'SUGGESTION_FAILED' ? (
+            ) : submission.aiSuggestion.status === 'FAILED' ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Alert severity="error">Phân tích bằng AI thất bại. Bạn có muốn thử lại?</Alert>
                 <Button variant="outlined" onClick={handleRequestAi} disabled={aiRequesting}>
                   {aiRequesting ? 'Đang thử lại...' : 'Thử lại'}
                 </Button>
               </Stack>
-            ) : submission.aiSuggestion.status === 'SUGGESTION_PROCESSING' ? (
+            ) : submission.aiSuggestion.status === 'PROCESSING' ? (
               <Stack spacing={2} sx={{ alignItems: 'center' }}>
                 <CircularProgress size={24} />
                 <Typography variant="body2" color="text.secondary">
