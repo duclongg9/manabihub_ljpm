@@ -37,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(properties = {
         "manabihub.kyc.identity-secret=test-secret-key-1234567890-32chars-min-length",
@@ -153,6 +154,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private SystemSettingRepository systemSettingRepository;
+
+    @MockBean
+    private TransactionTemplate transactionTemplate;
 
     @Test
     void contextLoads() {

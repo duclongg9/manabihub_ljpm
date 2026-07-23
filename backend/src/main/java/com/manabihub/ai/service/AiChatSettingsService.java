@@ -20,6 +20,7 @@ public class AiChatSettingsService {
         return new AiChatSettings(
                 getBoolean("AI_ENABLED", false),
                 getBoolean("AI_CHATBOT_ENABLED", false),
+                getBoolean("AI_WRITING_ENABLED", false),
                 getDecimal("AI_SUPPORT_PRICE_FLOOR", FAIL_CLOSED_PRICE_FLOOR),
                 Math.max(1, providerProperties.getRateLimitPerMinute()),
                 Math.max(1, providerProperties.getDailyLimit())
@@ -49,6 +50,7 @@ public class AiChatSettingsService {
     public record AiChatSettings(
             boolean aiEnabled,
             boolean chatbotEnabled,
+            boolean aiWritingEnabled,
             BigDecimal priceFloor,
             int rateLimitPerMinute,
             int dailyLimit

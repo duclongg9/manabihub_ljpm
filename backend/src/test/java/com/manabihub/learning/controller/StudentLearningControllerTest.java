@@ -360,4 +360,56 @@ class StudentLearningControllerTest {
                         .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void submitWriting_success() throws Exception {
+        UUID lessonBlockId = UUID.randomUUID();
+        com.manabihub.writing.dto.response.StudentWritingSubmissionResponse response = new com.manabihub.writing.dto.response.StudentWritingSubmissionResponse(
+                UUID.randomUUID(), UUID.randomUUID(), "Content",
+                com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED, Instant.now(), null, null
+        );
+
+        when(learningService.submitWriting(eq(lessonBlockId), any())).thenReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/student/lessons/{lessonBlockId}/writing-submissions", lessonBlockId)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"My essay\"}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.status", is("SUBMITTED")));
+    }
+
+    @Test
+    void submitWriting_forbidden() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/student/lessons/{lessonBlockId}/writing-submissions", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"My essay\"}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void requestAiWritingAssistance_success() throws Exception {
+        UUID lessonBlockId = UUID.randomUUID();
+        UUID submissionId = UUID.randomUUID();
+        com.manabihub.writing.dto.response.StudentWritingSubmissionResponse response = new com.manabihub.writing.dto.response.StudentWritingSubmissionResponse(
+                submissionId, UUID.randomUUID(), "Content",
+                com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED, Instant.now(), null, null
+        );
+
+        when(learningService.requestAiWritingAssistance(lessonBlockId, submissionId)).thenReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/student/lessons/{lessonBlockId}/writing-submissions/{submissionId}/ai-assistance", lessonBlockId, submissionId)
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)));
+    }
+
+    @Test
+    void requestAiWritingAssistance_forbidden() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/student/lessons/{lessonBlockId}/writing-submissions/{submissionId}/ai-assistance", UUID.randomUUID(), UUID.randomUUID())
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
 }

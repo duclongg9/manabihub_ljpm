@@ -185,6 +185,7 @@ class AiChatServiceImplTest {
         when(aiChatSettingsService.getSettings()).thenReturn(new AiChatSettingsService.AiChatSettings(
                 true,
                 false,
+                true,
                 new BigDecimal("100000"),
                 10,
                 50
@@ -347,6 +348,7 @@ class AiChatServiceImplTest {
 
     private AiChatSettingsService.AiChatSettings settings() {
         return new AiChatSettingsService.AiChatSettings(
+                true,
                 true,
                 true,
                 new BigDecimal("100000"),

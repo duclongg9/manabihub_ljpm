@@ -60,6 +60,14 @@ class LearningServiceImplTest {
     @Mock private CurrentUserService currentUserService;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
+    @Mock private com.manabihub.writing.repository.WritingSubmissionRepository writingSubmissionRepository;
+    @Mock private com.manabihub.writing.repository.AiWritingSuggestionRepository aiWritingSuggestionRepository;
+    @Mock private com.manabihub.ai.repository.AiUsageLogRepository aiUsageLogRepository;
+    @Mock private com.manabihub.ai.service.AiChatSettingsService aiChatSettingsService;
+    @Mock private com.manabihub.ai.service.AiUsageLogService aiUsageLogService;
+    @Mock private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+    @Mock private com.manabihub.ai.provider.AiWritingAssistanceProvider aiWritingAssistanceProvider;
+
     @InjectMocks
     private LearningServiceImpl learningService;
 
@@ -105,6 +113,16 @@ class LearningServiceImplTest {
                 .content("Noi dung bai doc").orderIndex(2).module(courseModule).build();
         quizBlock = LessonBlock.builder().id(blockQuizId).type(LessonBlockType.QUIZ).title("Quiz 1")
                 .quizQuestion("Cau hoi?").quizOptionsJson("[\"A\",\"B\"]").quizAnswer("A").orderIndex(3).module(courseModule).build();
+
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(inv -> {
+            org.springframework.transaction.support.TransactionCallback<Object> callback = inv.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+        lenient().doAnswer(inv -> {
+            java.util.function.Consumer<org.springframework.transaction.TransactionStatus> callback = inv.getArgument(0);
+            callback.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
     }
 
     private void mockActiveEnrollment() {
@@ -677,5 +695,90 @@ class LearningServiceImplTest {
         assertEquals(LessonProgressStatus.COMPLETED, response.status());
         assertNotNull(response.completedAt());
         verify(flashcardProgressRepository).upsertStatus(enrollmentId, fb.getId(), 1, com.manabihub.learning.enums.FlashcardStatus.NEEDS_REVIEW);
+    }
+
+    // --- Writing Assignment & AI Tests ---
+
+    @Test
+    @DisplayName("requestAiWritingAssistance - Forbidden - Another student's submission")
+    void testRequestAiWriting_Forbidden_OtherStudent() {
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+        mockActiveEnrollment();
+        UUID subId = UUID.randomUUID();
+        com.manabihub.writing.entity.WritingSubmission sub = com.manabihub.writing.entity.WritingSubmission.builder()
+                .enrollment(Enrollment.builder().id(UUID.randomUUID()).build())
+                .lessonBlockId(blockVideoId)
+                .build();
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(subId, enrollment.getId(), blockVideoId)).thenReturn(Optional.empty());
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                learningService.requestAiWritingAssistance(blockVideoId, subId));
+        assertEquals(MessageCodes.COMMON_NOT_FOUND, ex.getMessageCode());
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getHttpStatus());
+    }
+
+    @Test
+    @DisplayName("requestAiWritingAssistance - Rate Limit - Minute limit exceeded")
+    void testRequestAiWriting_MinuteRateLimit() {
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+        mockActiveEnrollment();
+        UUID subId = UUID.randomUUID();
+        com.manabihub.writing.entity.WritingSubmission sub = com.manabihub.writing.entity.WritingSubmission.builder()
+                .enrollment(enrollment).lessonBlockId(blockVideoId).status(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED).build();
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(subId, enrollment.getId(), blockVideoId)).thenReturn(Optional.of(sub));
+
+        when(currentUserService.getCurrentUserId()).thenReturn(currentUserId);
+
+        com.manabihub.ai.service.AiChatSettingsService.AiChatSettings settings = new com.manabihub.ai.service.AiChatSettingsService.AiChatSettings(
+                true, true, true, new java.math.BigDecimal("100000"), 5, 20);
+        when(aiChatSettingsService.getSettings()).thenReturn(settings);
+        course.setPrice(new java.math.BigDecimal("200000"));
+        course.setAiSupported(true);
+
+        when(aiUsageLogRepository.countByUserIdAndFeatureCodeAndRequestStatusAndCreatedAtAfter(
+                eq(currentUserId), eq("AI_WRITING_ASSISTANCE"), eq(com.manabihub.ai.enums.AiUsageRequestStatus.SUCCESS), any(Instant.class)
+        )).thenReturn(5L); // Reached minute limit
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                learningService.requestAiWritingAssistance(blockVideoId, subId));
+        assertEquals(MessageCodes.MSG_AI_001, ex.getMessageCode());
+    }
+
+    @Test
+    @DisplayName("requestAiWritingAssistance - Success")
+    void testRequestAiWriting_Success() throws Exception {
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+        mockActiveEnrollment();
+        UUID subId = UUID.randomUUID();
+        com.manabihub.writing.entity.WritingSubmission sub = com.manabihub.writing.entity.WritingSubmission.builder()
+                .id(subId).enrollment(enrollment).lessonBlockId(blockVideoId).content("Hello")
+                .status(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED)
+                .submittedAt(Instant.now()).build();
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(subId, enrollment.getId(), blockVideoId)).thenReturn(Optional.of(sub));
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockIdForUpdate(subId, enrollment.getId(), blockVideoId)).thenReturn(Optional.of(sub));
+        when(writingSubmissionRepository.findById(subId)).thenReturn(Optional.of(sub));
+        when(currentUserService.getCurrentUserId()).thenReturn(currentUserId);
+
+        com.manabihub.ai.service.AiChatSettingsService.AiChatSettings settings = new com.manabihub.ai.service.AiChatSettingsService.AiChatSettings(
+                true, true, true, new java.math.BigDecimal("100000"), 5, 20);
+        when(aiChatSettingsService.getSettings()).thenReturn(settings);
+        course.setPrice(new java.math.BigDecimal("200000"));
+        course.setAiSupported(true);
+
+        when(aiUsageLogRepository.countByUserIdAndFeatureCodeAndRequestStatusAndCreatedAtAfter(
+                any(), any(), any(), any()
+        )).thenReturn(0L);
+
+        com.fasterxml.jackson.databind.JsonNode mockNode = objectMapper.createArrayNode();
+        com.manabihub.ai.provider.AiWritingAssistanceProvider.Result mockResult = new com.manabihub.ai.provider.AiWritingAssistanceProvider.Result(
+                mockNode, mockNode, mockNode, "Good job", "provider", 10, 10
+        );
+        when(aiWritingAssistanceProvider.generate(any(), any(), any())).thenReturn(mockResult);
+
+        com.manabihub.writing.dto.response.StudentWritingSubmissionResponse res = learningService.requestAiWritingAssistance(blockVideoId, subId);
+
+        verify(aiWritingAssistanceProvider).generate(any(), any(), eq("Hello"));
+        verify(writingSubmissionRepository, atLeastOnce()).save(any());
+        verify(aiWritingSuggestionRepository, atLeastOnce()).save(any());
+        verify(aiUsageLogService).record(any(), any(), any(), any(), any(), eq(com.manabihub.ai.enums.AiUsageRequestStatus.SUCCESS), any(), any(), any(), any());
     }
 }

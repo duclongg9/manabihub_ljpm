@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -18,6 +19,8 @@ import {
   Radio,
   Stack,
   Typography,
+  TextField,
+  ListItem
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -160,6 +163,33 @@ export function CourseLearningPage() {
     [],
   );
 
+  const handleWritingProgressSaved = useCallback((blockId: string) => {
+    setLearning((prev) => {
+      if (!prev) return prev;
+      const newModules = prev.modules.map((m) => ({
+        ...m,
+        blocks: m.blocks.map((b) => {
+          if (b.id !== blockId) return b;
+          return {
+            ...b,
+            progressStatus: 'COMPLETED' as const,
+          };
+        }),
+      }));
+      const newCompleted = newModules
+        .flatMap((m) => m.blocks)
+        .filter((b) => b.progressStatus === 'COMPLETED').length;
+      const newTotal = newModules.flatMap((m) => m.blocks).length;
+      return {
+        ...prev,
+        modules: newModules,
+        completedLessons: newCompleted,
+        progressPercent: newTotal > 0 ? Math.round((newCompleted * 10000) / newTotal) / 100 : 0,
+        courseCompleted: newTotal > 0 && newCompleted === newTotal,
+      };
+    });
+  }, []);
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
@@ -277,7 +307,12 @@ export function CourseLearningPage() {
                 {!selectedBlock.contentAvailable ? (
                   <Alert severity="warning">Nội dung bài học hiện chưa sẵn sàng. Vui lòng quay lại sau.</Alert>
                 ) : (
-                  <BlockContent block={selectedBlock} onVideoProgressSaved={handleVideoProgressSaved} onFlashcardProgressSaved={handleFlashcardProgressSaved} />
+                  <BlockContent
+                    block={selectedBlock}
+                    onVideoProgressSaved={handleVideoProgressSaved}
+                    onFlashcardProgressSaved={handleFlashcardProgressSaved}
+                    onWritingProgressSaved={handleWritingProgressSaved}
+                  />
                 )}
 
                 <Divider sx={{ my: 2 }} />
@@ -351,9 +386,10 @@ interface BlockContentProps {
     status: 'REMEMBERED' | 'NEEDS_REVIEW',
     progressStatus: LearningLessonBlock['progressStatus'],
   ) => void;
+  onWritingProgressSaved: (blockId: string) => void;
 }
 
-function BlockContent({ block, onVideoProgressSaved, onFlashcardProgressSaved }: BlockContentProps) {
+function BlockContent({ block, onVideoProgressSaved, onFlashcardProgressSaved, onWritingProgressSaved }: BlockContentProps) {
   switch (block.type) {
     case 'VIDEO':
       return <VideoBlock key={block.id} block={block} onProgressSaved={onVideoProgressSaved} />;
@@ -369,7 +405,7 @@ function BlockContent({ block, onVideoProgressSaved, onFlashcardProgressSaved }:
     case 'FLASHCARD':
       return <FlashcardBlock key={block.id} block={block} onProgressSaved={onFlashcardProgressSaved} />;
     case 'WRITING':
-      return <WritingBlock key={block.id} prompt={block.writingPrompt} rubric={block.rubric} />;
+      return <WritingBlock key={block.id} block={block} onProgressSaved={() => onWritingProgressSaved(block.id)} />;
     default:
       return null;
   }
@@ -673,16 +709,242 @@ function FlashcardBlock({
   );
 }
 
-function WritingBlock({ prompt, rubric }: { prompt?: string; rubric?: string }) {
+function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; onProgressSaved: () => void }) {
+  const [submission, setSubmission] = useState<import('../types').WritingSubmissionDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [aiRequesting, setAiRequesting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    learningService
+      .getWritingSubmission(block.id)
+      .then((data) => {
+        if (!active) return;
+        setSubmission(data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error('Fetch submission error', err);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [block.id]);
+
+  const handleSubmit = async () => {
+    if (!content.trim() || content.length > 10000) return;
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const data = await learningService.submitWriting(block.id, content);
+      setSubmission(data);
+      onProgressSaved(); // mark COMPLETED
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setErrorMsg(err.response?.data?.message || 'Có lỗi xảy ra khi nộp bài.');
+      } else {
+        setErrorMsg('Có lỗi xảy ra khi nộp bài.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRequestAi = async () => {
+    if (!submission) return;
+    setAiRequesting(true);
+    setErrorMsg(null);
+    try {
+      const data = await learningService.requestAiWritingAssistance(block.id, submission.id);
+      setSubmission(data);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setErrorMsg(err.response?.data?.message || 'Có lỗi xảy ra khi yêu cầu AI.');
+      } else {
+        setErrorMsg('Có lỗi xảy ra khi yêu cầu AI.');
+      }
+      try {
+        const data = await learningService.getWritingSubmission(block.id);
+        setSubmission(data);
+      } catch {
+        // Ignore refetch errors
+      }
+    } finally {
+      setAiRequesting(false);
+    }
+  };
+
+  if (loading) {
+    return <CircularProgress size={24} />;
+  }
+
   return (
-    <Stack spacing={2}>
-      <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-        {prompt}
-      </Typography>
-      {rubric && (
-        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>
-          Tiêu chí chấm: {rubric}
+    <Stack spacing={3}>
+      <Box>
+        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 1, fontWeight: 500 }}>
+          {block.writingPrompt}
         </Typography>
+        {block.rubric && (
+          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>
+            Tiêu chí chấm: {block.rubric}
+          </Typography>
+        )}
+      </Box>
+
+      {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
+
+      {!submission ? (
+        <Stack spacing={2}>
+          <TextField
+            multiline
+            minRows={5}
+            maxRows={15}
+            fullWidth
+            placeholder="Viết câu trả lời của bạn ở đây..."
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            disabled={submitting}
+            error={content.length > 10000}
+            helperText={content.length > 10000 ? 'Bài viết quá dài (tối đa 10,000 ký tự).' : `${content.length}/10,000`}
+          />
+          <Box>
+            <Button
+              variant="contained"
+              onClick={handleSubmit}
+              disabled={submitting || !content.trim() || content.length > 10000}
+            >
+              {submitting ? 'Đang nộp...' : 'Nộp bài'}
+            </Button>
+          </Box>
+        </Stack>
+      ) : (
+        <Stack spacing={3}>
+          <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
+            <CardContent>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Bài làm của bạn (đã nộp)
+              </Typography>
+              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                {submission.content}
+              </Typography>
+            </CardContent>
+          </Card>
+
+          {/* AI Assistance Section */}
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Gợi ý từ AI
+            </Typography>
+
+            {submission.status === 'SUGGESTION_PROCESSING' ? (
+              <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
+                <Typography variant="body2" color="text.secondary">
+                  AI đang phân tích bài viết của bạn. Vui lòng đợi trong giây lát...
+                </Typography>
+                <CircularProgress size={24} />
+              </Stack>
+            ) : !submission.aiSuggestion ? (
+              <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Bạn có thể yêu cầu AI hỗ trợ nhận xét sơ bộ và đưa ra gợi ý cải thiện cho bài viết của mình.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  onClick={handleRequestAi}
+                  disabled={aiRequesting}
+                >
+                  {aiRequesting ? 'Đang phân tích...' : 'Yêu cầu AI hỗ trợ'}
+                </Button>
+              </Stack>
+            ) : submission.aiSuggestion.status === 'FAILED' ? (
+              <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
+                <Alert severity="error">Phân tích bằng AI thất bại. Bạn có muốn thử lại?</Alert>
+                <Button variant="outlined" onClick={handleRequestAi} disabled={aiRequesting}>
+                  {aiRequesting ? 'Đang thử lại...' : 'Thử lại'}
+                </Button>
+              </Stack>
+            ) : (
+              <Stack spacing={3}>
+                <Alert severity="info" icon={false}>
+                  <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                    *Gợi ý sơ bộ từ AI, không phải đánh giá chính thức.
+                  </Typography>
+                </Alert>
+
+                {submission.aiSuggestion.revisionGuidance && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Nhận xét sơ bộ</Typography>
+                    <Typography variant="body2">{submission.aiSuggestion.revisionGuidance}</Typography>
+                  </Box>
+                )}
+
+                {submission.aiSuggestion.grammarSuggestions?.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Ngữ pháp</Typography>
+                    <List dense>
+                      {submission.aiSuggestion.grammarSuggestions.map((item, i) => (
+                        <ListItem key={i} disableGutters>
+                          <ListItemText
+                            primary={
+                              <Typography variant="body2">
+                                <span style={{ textDecoration: 'line-through', color: 'red' }}>{item.error}</span>{' '}
+                                &rarr; <span style={{ color: 'green' }}>{item.correction}</span>
+                              </Typography>
+                            }
+                            secondary={item.explanation}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+
+                {submission.aiSuggestion.vocabularySuggestions?.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Từ vựng</Typography>
+                    <List dense>
+                      {submission.aiSuggestion.vocabularySuggestions.map((item, i) => (
+                        <ListItem key={i} disableGutters>
+                          <ListItemText
+                            primary={
+                              <Typography variant="body2">
+                                Thay thế <strong>{item.word}</strong> bằng <strong>{item.suggestion}</strong>
+                              </Typography>
+                            }
+                            secondary={item.explanation}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+
+                {submission.aiSuggestion.structureSuggestions?.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Cấu trúc & Mạch văn</Typography>
+                    <List dense>
+                      {submission.aiSuggestion.structureSuggestions.map((item, i) => (
+                        <ListItem key={i} disableGutters>
+                          <ListItemText
+                            primary={<Typography variant="body2">Vấn đề: {item.issue}</Typography>}
+                            secondary={`Gợi ý: ${item.suggestion}`}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+              </Stack>
+            )}
+          </Box>
+        </Stack>
       )}
     </Stack>
   );

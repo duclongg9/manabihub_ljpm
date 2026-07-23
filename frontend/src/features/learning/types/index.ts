@@ -63,3 +63,40 @@ export interface LessonProgress {
   completedAt?: string;
   updatedAt?: string;
 }
+
+export interface GrammarSuggestion {
+  error: string;
+  correction: string;
+  explanation: string;
+}
+
+export interface VocabularySuggestion {
+  word: string;
+  suggestion: string;
+  explanation: string;
+}
+
+export interface StructureSuggestion {
+  issue: string;
+  suggestion: string;
+}
+
+export interface AiWritingSuggestionResponse {
+  id: string;
+  status: 'READY' | 'FAILED';
+  grammarSuggestions: GrammarSuggestion[];
+  vocabularySuggestions: VocabularySuggestion[];
+  structureSuggestions: StructureSuggestion[];
+  revisionGuidance?: string;
+  createdAt: string;
+}
+
+export interface WritingSubmissionDetail {
+  id: string;
+  lessonBlockId: string;
+  content: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'SUGGESTION_PROCESSING' | 'SUGGESTION_READY' | 'SUGGESTION_FAILED' | 'TEACHER_FEEDBACK_READY';
+  submittedAt: string;
+  aiSuggestion?: AiWritingSuggestionResponse;
+  teacherFeedback?: unknown;
+}

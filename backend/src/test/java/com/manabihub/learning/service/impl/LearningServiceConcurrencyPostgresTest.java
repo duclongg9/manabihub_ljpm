@@ -23,6 +23,10 @@ import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.learning.repository.FlashcardProgressRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.LearningService;
+import com.manabihub.writing.dto.request.WritingSubmissionRequest;
+import com.manabihub.writing.dto.response.WritingSubmissionDetailResponse;
+import com.manabihub.writing.repository.WritingSubmissionRepository;
+import com.manabihub.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
 public class LearningServiceConcurrencyPostgresTest {
 
     private static final UUID DEMO_USER_ID = UUID.fromString("d0000000-0000-0000-0000-000000000001");
@@ -81,13 +85,19 @@ public class LearningServiceConcurrencyPostgresTest {
     @Autowired private EnrollmentRepository enrollmentRepository;
     @Autowired private LessonBlockProgressRepository lessonBlockProgressRepository;
     @Autowired private FlashcardProgressRepository flashcardProgressRepository;
+    @Autowired private WritingSubmissionRepository writingSubmissionRepository;
 
     @MockBean private CurrentUserService currentUserService;
+    @MockBean private com.manabihub.ai.provider.AiWritingAssistanceProvider aiWritingAssistanceProvider;
+    @Autowired private com.manabihub.ai.repository.AiUsageLogRepository aiUsageLogRepository;
+    @Autowired private com.manabihub.writing.repository.AiWritingSuggestionRepository aiWritingSuggestionRepository;
+    @MockBean private com.manabihub.ai.service.AiChatSettingsService aiChatSettingsService;
 
     private AppUser user;
     private Course course;
     private CourseModule module;
     private LessonBlock flashcardBlock;
+    private LessonBlock writingBlock;
     private Enrollment enrollment;
 
     @BeforeEach
@@ -118,7 +128,20 @@ public class LearningServiceConcurrencyPostgresTest {
                         .build()
         );
 
+        writingBlock = lessonBlockRepository.saveAndFlush(
+                LessonBlock.builder()
+                        .type(LessonBlockType.WRITING)
+                        .title("Writing Assignment")
+                        .module(module)
+                        .orderIndex(2)
+                        .writingPrompt("Test Prompt")
+                        .build()
+        );
+
         when(currentUserService.getCurrentUserId()).thenReturn(DEMO_USER_ID);
+        when(aiChatSettingsService.getSettings()).thenReturn(new com.manabihub.ai.service.AiChatSettingsService.AiChatSettings(
+                true, true, true, new java.math.BigDecimal("0"), 100, 1000
+        ));
     }
 
     @Test
@@ -274,5 +297,153 @@ public class LearningServiceConcurrencyPostgresTest {
 
         int count1 = flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollment.getId(), flashcardBlock.getId());
         assertEquals(0, count1, "Student 1 must have 0 rows");
+    }
+
+    @Test
+    @DisplayName("Concurrent writing submissions produce exactly 1 row and duplicate errors")
+    void testConcurrentWritingSubmission() throws Exception {
+        int threads = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        List<Future<com.manabihub.writing.dto.response.StudentWritingSubmissionResponse>> futures = new ArrayList<>();
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(executor.submit(() -> {
+                    readyLatch.countDown();
+                    startLatch.await();
+                    return learningService.submitWriting(writingBlock.getId(), new WritingSubmissionRequest("Concurrent test content"));
+                }));
+            }
+
+            assertTrue(readyLatch.await(5, TimeUnit.SECONDS), "Workers did not become ready in time");
+            startLatch.countDown();
+
+            int successCount = 0;
+            int errorCount = 0;
+            for (Future<com.manabihub.writing.dto.response.StudentWritingSubmissionResponse> f : futures) {
+                try {
+                    f.get(30, TimeUnit.SECONDS);
+                    successCount++;
+                } catch (Exception e) {
+                    errorCount++;
+                    Throwable cause = e.getCause();
+                    assertTrue(cause instanceof BusinessException, "Expected BusinessException, got " + cause);
+                }
+            }
+
+            assertEquals(1, successCount, "Exactly 1 request must succeed");
+            assertEquals(threads - 1, errorCount, "Other requests must fail");
+
+            long count = writingSubmissionRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).stream().count();
+            assertEquals(1, count, "Exactly 1 writing submission row should be present for this enrollment and block");
+
+            com.manabihub.writing.entity.WritingSubmission winner = writingSubmissionRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).get();
+            assertNotNull(winner.getSubmittedAt(), "submittedAt must not be null");
+            assertEquals(writingBlock.getId(), winner.getLessonBlockId(), "lessonBlockId must match");
+            assertNull(winner.getLegacyLessonId(), "legacyLessonId must be null");
+            assertEquals(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED, winner.getStatus(), "Status must be SUBMITTED");
+
+            com.manabihub.learning.entity.LessonBlockProgress progress = lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).orElseThrow();
+            assertEquals(com.manabihub.learning.enums.LessonProgressStatus.COMPLETED, progress.getStatus(), "Block progress must be COMPLETED");
+
+            com.manabihub.learning.entity.Enrollment freshEnrollment = enrollmentRepository.findById(enrollment.getId()).orElseThrow();
+            assertEquals(com.manabihub.learning.enums.EnrollmentStatus.ACTIVE, freshEnrollment.getStatus(), "Enrollment must remain ACTIVE");
+
+            executor.shutdown();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS), "Executor must terminate");
+        } finally {
+            startLatch.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("Provider failure durability on PostgreSQL")
+    void testProviderFailureDurability() {
+        learningService.submitWriting(writingBlock.getId(), new WritingSubmissionRequest("Test content"));
+        com.manabihub.writing.entity.WritingSubmission submission = writingSubmissionRepository
+                .findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).orElseThrow();
+
+        when(aiWritingAssistanceProvider.generate(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new com.manabihub.ai.provider.AiChatProviderException("HTTP 503 Provider Unavailable"));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                learningService.requestAiWritingAssistance(writingBlock.getId(), submission.getId())
+        );
+        assertEquals(com.manabihub.common.constants.MessageCodes.MSG_AI_002, ex.getMessageCode());
+
+        com.manabihub.writing.entity.WritingSubmission updatedSub = writingSubmissionRepository.findById(submission.getId()).orElseThrow();
+        assertEquals(com.manabihub.writing.enums.WritingSubmissionStatus.SUGGESTION_FAILED, updatedSub.getStatus());
+
+        com.manabihub.writing.entity.AiWritingSuggestion suggestion = aiWritingSuggestionRepository.findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submission.getId()).orElseThrow();
+        assertEquals("FAILED", suggestion.getStatus());
+        assertFalse(suggestion.isOfficial());
+        assertTrue(suggestion.getGrammarSuggestions().isArray());
+        assertTrue(suggestion.getVocabularySuggestions().isArray());
+        assertTrue(suggestion.getStructureSuggestions().isArray());
+        assertTrue(suggestion.getFailureReason().contains("Provider error"));
+
+        com.manabihub.ai.entity.AiUsageLog log = aiUsageLogRepository.findAll().stream()
+                .filter(l -> l.getLessonBlockId().equals(writingBlock.getId()))
+                .findFirst().orElseThrow();
+        assertEquals(com.manabihub.ai.enums.AiUsageRequestStatus.FAILED, log.getRequestStatus());
+    }
+
+    @Test
+    @DisplayName("Concurrent AI requests for same submission only call provider once")
+    void testConcurrentAiRequestsForSameSubmission() throws Exception {
+        learningService.submitWriting(writingBlock.getId(), new WritingSubmissionRequest("Test content"));
+        com.manabihub.writing.entity.WritingSubmission submission = writingSubmissionRepository
+                .findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).orElseThrow();
+
+        when(aiWritingAssistanceProvider.generate(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(inv -> {
+                    Thread.sleep(500); // simulate slow provider to force concurrency
+                    return new com.manabihub.ai.provider.AiWritingAssistanceProvider.Result(
+                            new com.fasterxml.jackson.databind.ObjectMapper().createArrayNode(),
+                            new com.fasterxml.jackson.databind.ObjectMapper().createArrayNode(),
+                            new com.fasterxml.jackson.databind.ObjectMapper().createArrayNode(),
+                            "Guidance", "provider", 10, 20
+                    );
+                });
+
+        int threads = 5;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        List<Future<com.manabihub.writing.dto.response.StudentWritingSubmissionResponse>> futures = new ArrayList<>();
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(executor.submit(() -> {
+                    readyLatch.countDown();
+                    startLatch.await();
+                    return learningService.requestAiWritingAssistance(writingBlock.getId(), submission.getId());
+                }));
+            }
+
+            assertTrue(readyLatch.await(5, TimeUnit.SECONDS), "Workers did not become ready in time");
+            startLatch.countDown();
+
+            for (Future<com.manabihub.writing.dto.response.StudentWritingSubmissionResponse> f : futures) {
+                try {
+                    f.get(30, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    // It's expected that some return response idempotently and some might succeed.
+                    // Wait, if it's already processing, it returns immediately with processing status.
+                }
+            }
+
+            org.mockito.Mockito.verify(aiWritingAssistanceProvider, org.mockito.Mockito.times(1))
+                    .generate(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+
+            executor.shutdown();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS), "Executor must terminate");
+        } finally {
+            startLatch.countDown();
+            executor.shutdownNow();
+        }
     }
 }

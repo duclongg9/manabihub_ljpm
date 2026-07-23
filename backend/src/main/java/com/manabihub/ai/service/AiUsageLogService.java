@@ -29,11 +29,28 @@ public class AiUsageLogService {
             Integer outputTokens,
             String failureReason
     ) {
+        record(userId, courseId, lessonBlockId, null, AI_CHATBOT_FEATURE, requestStatus, provider, inputTokens, outputTokens, failureReason);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void record(
+            UUID userId,
+            UUID courseId,
+            UUID lessonBlockId,
+            UUID writingSubmissionId,
+            String featureCode,
+            AiUsageRequestStatus requestStatus,
+            String provider,
+            Integer inputTokens,
+            Integer outputTokens,
+            String failureReason
+    ) {
         aiUsageLogRepository.save(AiUsageLog.builder()
                 .userId(userId)
                 .courseId(courseId)
                 .lessonBlockId(lessonBlockId)
-                .featureCode(AI_CHATBOT_FEATURE)
+                .writingSubmissionId(writingSubmissionId)
+                .featureCode(featureCode)
                 .provider(provider)
                 .requestStatus(requestStatus)
                 .inputTokens(inputTokens)

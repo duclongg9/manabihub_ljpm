@@ -41,6 +41,9 @@ public class AiUsageLog {
     @Column(name = "lesson_block_id")
     private UUID lessonBlockId;
 
+    @Column(name = "writing_submission_id")
+    private UUID writingSubmissionId;
+
     @Column(name = "feature_code", nullable = false)
     private String featureCode;
 

@@ -3,6 +3,8 @@ package com.manabihub.learning.controller;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.common.response.PageResponse;
+import com.manabihub.writing.dto.request.WritingSubmissionRequest;
+import com.manabihub.writing.dto.response.StudentWritingSubmissionResponse;
 import com.manabihub.learning.dto.request.ReviewFlashcardRequest;
 import com.manabihub.learning.dto.request.SaveVideoProgressRequest;
 import com.manabihub.learning.dto.response.CourseLearningResponse;
@@ -95,6 +97,36 @@ public class StudentLearningController {
                 MessageCodes.LEARNING_LESSON_COMPLETED,
                 "Lesson marked as completed.",
                 learningService.markLessonComplete(lessonBlockId));
+    }
+
+    // ── UC-14: Writing Assignments ─────────────────────────────────────────
+
+    @GetMapping("/lessons/{lessonBlockId}/writing-submissions/me")
+    public ApiResponse<StudentWritingSubmissionResponse> getWritingSubmission(@PathVariable UUID lessonBlockId) {
+        return ApiResponse.success(
+                MessageCodes.COMMON_SUCCESS,
+                "Writing submission retrieved successfully",
+                learningService.getWritingSubmission(lessonBlockId));
+    }
+
+    @PostMapping("/lessons/{lessonBlockId}/writing-submissions")
+    public ApiResponse<StudentWritingSubmissionResponse> submitWriting(
+            @PathVariable UUID lessonBlockId,
+            @Valid @RequestBody WritingSubmissionRequest request) {
+        return ApiResponse.success(
+                MessageCodes.COMMON_SUCCESS,
+                "Writing assignment submitted successfully",
+                learningService.submitWriting(lessonBlockId, request));
+    }
+
+    @PostMapping("/lessons/{lessonBlockId}/writing-submissions/{submissionId}/ai-assistance")
+    public ApiResponse<StudentWritingSubmissionResponse> requestAiWritingAssistance(
+            @PathVariable UUID lessonBlockId,
+            @PathVariable UUID submissionId) {
+        return ApiResponse.success(
+                MessageCodes.COMMON_SUCCESS,
+                "AI writing assistance requested successfully",
+                learningService.requestAiWritingAssistance(lessonBlockId, submissionId));
     }
 
     @GetMapping("/courses/{courseId}/progress")
