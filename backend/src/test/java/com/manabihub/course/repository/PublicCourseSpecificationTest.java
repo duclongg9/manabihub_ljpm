@@ -46,7 +46,7 @@ class PublicCourseSpecificationTest {
         when(cb.and(any(Predicate[].class))).thenReturn(predicate);
 
         Specification<Course> spec = PublicCourseSpecification.buildSearch(
-                null, null, null, null, null, null
+                null, null, null, null, null
         );
 
         Predicate result = spec.toPredicate(root, query, cb);
@@ -66,7 +66,7 @@ class PublicCourseSpecificationTest {
         when(cb.and(any(Predicate[].class))).thenReturn(predicate);
 
         Specification<Course> spec = PublicCourseSpecification.buildSearch(
-                "kanji", null, null, null, null, null
+                "kanji", null, null, null, null
         );
 
         Predicate result = spec.toPredicate(root, query, cb);
@@ -83,7 +83,7 @@ class PublicCourseSpecificationTest {
         when(cb.and(any(Predicate[].class))).thenReturn(predicate);
 
         Specification<Course> spec = PublicCourseSpecification.buildSearch(
-                null, "grammar", null, null, null, null
+                null, "grammar", null, null, null
         );
 
         Predicate result = spec.toPredicate(root, query, cb);
@@ -100,7 +100,7 @@ class PublicCourseSpecificationTest {
         when(cb.and(any(Predicate[].class))).thenReturn(predicate);
 
         Specification<Course> spec = PublicCourseSpecification.buildSearch(
-                null, null, JlptLevel.N3, null, null, null
+                null, null, JlptLevel.N3, null, null
         );
 
         Predicate result = spec.toPredicate(root, query, cb);
@@ -118,7 +118,7 @@ class PublicCourseSpecificationTest {
         when(cb.and(any(Predicate[].class))).thenReturn(predicate);
 
         Specification<Course> spec = PublicCourseSpecification.buildSearch(
-                null, null, null, new BigDecimal("100000"), new BigDecimal("500000"), null
+                null, null, null, new BigDecimal("100000"), new BigDecimal("500000")
         );
 
         Predicate result = spec.toPredicate(root, query, cb);

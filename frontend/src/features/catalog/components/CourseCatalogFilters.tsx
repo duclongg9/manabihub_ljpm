@@ -5,7 +5,6 @@ import {
   Chip,
   Slider,
   Stack,
-  Rating,
   Card,
   CardContent,
   Divider,
@@ -185,44 +184,7 @@ export const CourseCatalogFiltersSidebar: React.FC<CourseCatalogFiltersSidebarPr
             </Box>
           </Box>
 
-          <Divider sx={{ my: 3 }} />
 
-          {/* Rating */}
-          <Box>
-            <Typography variant="overline" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 2 }}>
-              Đánh giá tối thiểu
-            </Typography>
-            <Stack spacing={1}>
-              <Chip
-                label="Tất cả đánh giá"
-                onClick={() => handleChange('rating', undefined)}
-                color={!filters.rating ? 'primary' : 'default'}
-                variant={!filters.rating ? 'filled' : 'outlined'}
-                sx={{ fontWeight: 600, borderRadius: 2, alignSelf: 'flex-start' }}
-              />
-              {[4.5, 4.0, 3.5].map((rating) => (
-                <Box
-                  key={rating}
-                  onClick={() => handleChange('rating', rating)}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    p: 1,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    bgcolor: filters.rating === rating ? 'action.selected' : 'transparent',
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                >
-                  <Rating value={rating} readOnly precision={0.5} size="small" />
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                    {rating} trở lên
-                  </Typography>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
         </CardContent>
       </Card>
     </Box>

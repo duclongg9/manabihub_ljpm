@@ -8,7 +8,6 @@ import {
   Stack,
   Typography,
   Box,
-  Rating,
 } from '@mui/material';
 import BookIcon from '@mui/icons-material/MenuBook';
 import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
@@ -39,9 +38,6 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course, vi
       maximumFractionDigits: 0,
     }).format(price);
   };
-
-  const avgRating = course.averageRating || 0;
-  const totalReviews = course.totalReviews || 0;
 
   const isList = viewMode === 'list';
 
@@ -193,15 +189,7 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course, vi
             {course.teacherName || 'Giảng viên ManabiHub'}
           </Typography>
 
-          <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
-            <Typography variant="subtitle2" sx={{ color: 'warning.main', fontWeight: 700 }}>
-              {avgRating > 0 ? avgRating.toFixed(1) : 'Mới'}
-            </Typography>
-            <Rating value={avgRating} readOnly size="small" precision={0.5} sx={{ color: 'warning.main' }} />
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-              ({totalReviews})
-            </Typography>
-          </Stack>
+
 
           <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
             <Typography

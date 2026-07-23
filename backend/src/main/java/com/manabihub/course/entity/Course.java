@@ -95,10 +95,6 @@ public class Course {
     @Column(name = "ai_supported", nullable = false)
     private boolean aiSupported = false;
 
-    @Builder.Default
-    @Column(name = "average_rating", precision = 3, scale = 2)
-    private BigDecimal averageRating = BigDecimal.ZERO;
-
     @Column(name = "submitted_at")
     private Instant submittedAt;
 

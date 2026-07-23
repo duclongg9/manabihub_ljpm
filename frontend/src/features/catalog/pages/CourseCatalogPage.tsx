@@ -41,7 +41,6 @@ export const CourseCatalogPage: React.FC = () => {
     jlptLevel: searchParams.get('jlptLevel') || undefined,
     minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
     maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
-    rating: searchParams.get('rating') ? Number(searchParams.get('rating')) : undefined,
   };
   const page = searchParams.get('page') ? Number(searchParams.get('page')) - 1 : 0;
   const sort = searchParams.get('sort') || 'publishedAt,desc';
@@ -62,7 +61,6 @@ export const CourseCatalogPage: React.FC = () => {
     if (newFilters.jlptLevel) params.set('jlptLevel', newFilters.jlptLevel);
     if (newFilters.minPrice) params.set('minPrice', newFilters.minPrice.toString());
     if (newFilters.maxPrice) params.set('maxPrice', newFilters.maxPrice.toString());
-    if (newFilters.rating) params.set('rating', newFilters.rating.toString());
     if (newPage > 0) params.set('page', (newPage + 1).toString());
     if (newSort !== 'publishedAt,desc') params.set('sort', newSort);
     if (newViewMode !== 'grid') params.set('viewMode', newViewMode);

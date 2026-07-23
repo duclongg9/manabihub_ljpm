@@ -526,10 +526,9 @@ public class CourseServiceImpl implements CourseService {
             com.manabihub.course.enums.JlptLevel jlptLevel,
             BigDecimal minPrice,
             BigDecimal maxPrice,
-            Double rating,
             Pageable pageable
     ) {
-        var spec = PublicCourseSpecification.buildSearch(keyword, category, jlptLevel, minPrice, maxPrice, rating);
+        var spec = PublicCourseSpecification.buildSearch(keyword, category, jlptLevel, minPrice, maxPrice);
         Page<Course> coursePage = courseRepository.findAll(spec, pageable);
 
         return coursePage.map(this::toSummaryResponse);
@@ -563,8 +562,6 @@ public class CourseServiceImpl implements CourseService {
                 .teacherAvatarUrl(teacherAvatarUrl)
                 .totalLessons(totalLessons)
                 .publishedAt(course.getPublishedAt())
-                .averageRating(course.getAverageRating())
-                .totalReviews(0) // TODO: Map totalReviews when the entity has it
                 .build();
     }
 
