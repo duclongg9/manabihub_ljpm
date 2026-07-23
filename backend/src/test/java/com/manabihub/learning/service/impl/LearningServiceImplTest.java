@@ -223,7 +223,7 @@ class LearningServiceImplTest {
                 .thenReturn(List.of(completedProgress(videoBlock), completedProgress(textBlock), completedProgress(quizBlock)));
 
         CourseLearningResponse response = learningService.openOrResumeCourse(courseId);
-        assertEquals(blockVideoId, response.currentLessonBlockId());
+        assertNull(response.currentLessonBlockId());
         assertTrue(response.courseCompleted());
         assertEquals(3, response.completedLessons());
     }
@@ -460,7 +460,7 @@ class LearningServiceImplTest {
     @DisplayName("UTC06: QUIZ block completes fails via this endpoint")
     void testMarkLessonComplete_UTC06_QuizNoGrading() {
         when(lessonBlockRepository.findById(blockQuizId)).thenReturn(Optional.of(quizBlock));
-        
+
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             learningService.markLessonComplete(blockQuizId);
         });
@@ -484,7 +484,7 @@ class LearningServiceImplTest {
         assertEquals(LessonProgressStatus.COMPLETED, response.status());
         assertEquals(EnrollmentStatus.ACTIVE, enrollment.getStatus());
         assertNull(enrollment.getCompletedAt());
-        
+
     }
 
     @Test

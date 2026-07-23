@@ -17,7 +17,6 @@ import {
   Paper,
   Radio,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -27,6 +26,8 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import { isAxiosError } from 'axios';
+import ReactPlayer from 'react-player';
+import DOMPurify from 'dompurify';
 import { learningService } from '../services/learningService';
 import type { CourseLearning, LearningLessonBlock, QuizQuestion } from '../types';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -51,7 +52,7 @@ export function CourseLearningPage() {
       .then((data) => {
         if (!active) return;
         setLearning(data);
-        setSelectedBlockId(data.currentLessonBlockId ?? null);
+        setSelectedBlockId(data.currentLessonBlockId ?? data.modules[0]?.blocks[0]?.id ?? null);
       })
       .catch((err) => {
         if (!active) return;
@@ -151,7 +152,7 @@ export function CourseLearningPage() {
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(ROUTES.STUDENT.DASHBOARD)}>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(ROUTES.STUDENT.MY_COURSES)}>
           My Learning
         </Button>
         <Typography variant="h5" noWrap sx={{ fontWeight: 700, flexGrow: 1 }}>
@@ -282,9 +283,9 @@ export function CourseLearningPage() {
                 </Stack>
               </CardContent>
             </Card>
-          ) : (
+          ) : allBlocks.length === 0 ? (
             <Alert severity="info">Khoá học chưa có nội dung bài học.</Alert>
-          )}
+          ) : null}
         </Box>
       </Box>
     </Box>
@@ -323,9 +324,10 @@ function BlockContent({ block, onVideoProgressSaved }: BlockContentProps) {
       return <VideoBlock key={block.id} block={block} onProgressSaved={onVideoProgressSaved} />;
     case 'TEXT':
       return (
-        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-          {block.content}
-        </Typography>
+        <Box
+          sx={{ whiteSpace: 'pre-wrap', typography: 'body1' }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(block.content || '') }}
+        />
       );
     case 'QUIZ':
       return <QuizBlock key={block.id} questions={block.quizItems} />;
@@ -345,8 +347,9 @@ function VideoBlock({
   block: LearningLessonBlock;
   onProgressSaved: BlockContentProps['onVideoProgressSaved'];
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<HTMLVideoElement>(null);
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
+  const isReadyRef = useRef(false);
 
   const savePosition = useCallback(
     (positionSeconds: number) => {
@@ -361,17 +364,17 @@ function VideoBlock({
     [block.id, onProgressSaved],
   );
 
-  const handleLoadedMetadata = () => {
-    const video = videoRef.current;
-    if (video && block.lastVideoPositionSeconds && block.lastVideoPositionSeconds > 0) {
-      // SRS 5b: resume from the last valid position
+  const handleReady = () => {
+    const video = playerRef.current;
+    if (video && !isReadyRef.current && block.lastVideoPositionSeconds && block.lastVideoPositionSeconds > 0) {
+      isReadyRef.current = true;
       video.currentTime = Math.min(block.lastVideoPositionSeconds, video.duration || block.lastVideoPositionSeconds);
     }
   };
 
-  const handleTimeUpdate = () => {
-    const video = videoRef.current;
-    if (!video || video.paused) return;
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    if (video.paused) return;
     const position = Math.floor(video.currentTime);
     if (position - lastSavedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS) {
       savePosition(position);
@@ -379,9 +382,9 @@ function VideoBlock({
   };
 
   const handlePause = () => {
-    const video = videoRef.current;
-    if (!video || video.ended) return;
-    const position = Math.floor(video.currentTime);
+    const player = playerRef.current;
+    if (!player || player.ended) return;
+    const position = Math.floor(player.currentTime);
     if (position !== lastSavedRef.current) {
       savePosition(position);
     }
@@ -389,15 +392,19 @@ function VideoBlock({
 
   return (
     <Box>
-      <video
-        ref={videoRef}
-        src={block.videoUrl}
-        controls
-        style={{ width: '100%', maxHeight: 480, background: '#000', borderRadius: 8 }}
-        onLoadedMetadata={handleLoadedMetadata}
-        onTimeUpdate={handleTimeUpdate}
-        onPause={handlePause}
-      />
+      <Box sx={{ position: 'relative', paddingTop: '56.25%', background: '#000', borderRadius: 2, overflow: 'hidden' }}>
+        <ReactPlayer
+          ref={playerRef}
+          src={block.videoUrl}
+          controls
+          width="100%"
+          height="100%"
+          style={{ position: 'absolute', top: 0, left: 0 }}
+          onLoadedMetadata={handleReady}
+          onTimeUpdate={handleTimeUpdate}
+          onPause={handlePause}
+        />
+      </Box>
       {block.content && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
           {block.content}
@@ -445,9 +452,6 @@ function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
           </Stack>
         </Paper>
       ))}
-      <Alert severity="info" sx={{ alignSelf: 'flex-start' }}>
-        Lưu bài làm và chấm điểm sẽ được hỗ trợ trong phiên bản tới (MHB-27).
-      </Alert>
     </Stack>
   );
 }
@@ -513,11 +517,8 @@ function FlashcardBlock({ cards }: { cards: { front: string; back: string }[] })
 }
 
 function WritingBlock({ prompt, rubric }: { prompt?: string; rubric?: string }) {
-  const [draft, setDraft] = useState('');
-
   return (
     <Stack spacing={2}>
-      <Alert severity="info">Đề bài viết:</Alert>
       <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
         {prompt}
       </Typography>
@@ -526,17 +527,6 @@ function WritingBlock({ prompt, rubric }: { prompt?: string; rubric?: string }) 
           Tiêu chí chấm: {rubric}
         </Typography>
       )}
-      <TextField
-        multiline
-        minRows={6}
-        fullWidth
-        placeholder="Viết bài của bạn tại đây (bài nộp writing sẽ được hỗ trợ trong chức năng riêng)..."
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      <Typography variant="caption" color="text.secondary">
-        Sau khi viết xong, hãy nhấn "Hoàn thành bài học" để ghi nhận tiến độ.
-      </Typography>
     </Stack>
   );
 }

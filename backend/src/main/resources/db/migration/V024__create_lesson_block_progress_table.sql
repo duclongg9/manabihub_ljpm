@@ -14,7 +14,7 @@ CREATE TABLE lesson_block_progress (
     completed_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT uq_lesson_block_progress_enrollment_block UNIQUE (enrollment_id, lesson_block_id),
     CONSTRAINT chk_lesson_block_progress_video_position CHECK (last_video_position_seconds IS NULL OR last_video_position_seconds >= 0)
 );

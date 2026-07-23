@@ -46,7 +46,7 @@ export interface CourseLearning {
   courseTitle: string;
   enrollmentId: string;
   modules: LearningModule[];
-  currentLessonBlockId?: string;
+  currentLessonBlockId: string | null;
   totalLessons: number;
   completedLessons: number;
   progressPercent: number;

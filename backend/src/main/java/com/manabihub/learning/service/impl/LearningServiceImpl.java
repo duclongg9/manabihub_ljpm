@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.dto.response.FlashcardItemResponse;
-import com.manabihub.course.dto.response.QuizQuestionResponse;
+import com.manabihub.learning.dto.response.StudentQuizQuestionResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseModule;
 import com.manabihub.course.entity.LessonBlock;
@@ -101,7 +101,7 @@ public class LearningServiceImpl implements LearningService {
                 .filter(block -> !isCompleted(progressByBlockId.get(block.getId())))
                 .map(LessonBlock::getId)
                 .findFirst()
-                .orElse(allBlocks.get(0).getId());
+                .orElse(null);
         boolean courseCompleted = completedLessons == allBlocks.size();
 
         List<String> warnings = new ArrayList<>();
@@ -401,18 +401,16 @@ public class LearningServiceImpl implements LearningService {
         return Math.round(completed * 10000.0 / total) / 100.0;
     }
 
-    private List<QuizQuestionResponse> readQuizItems(LessonBlock block, List<String> fallbackOptions) {
+    private List<StudentQuizQuestionResponse> readQuizItems(LessonBlock block, List<String> fallbackOptions) {
         List<QuizQuestionResponse> quizItems = readJsonList(block.getQuizItemsJson(), QUIZ_ITEMS_TYPE);
         if (!quizItems.isEmpty()) {
             return quizItems.stream()
-                    .map(q -> new QuizQuestionResponse(q.question(), q.options(), null))
+                    .map(q -> new StudentQuizQuestionResponse(q.question(), q.options()))
                     .toList();
         }
-
-        if (StringUtils.hasText(block.getQuizQuestion())) {
-            return List.of(new QuizQuestionResponse(block.getQuizQuestion(), fallbackOptions, null));
+        if (StringUtils.hasText(block.getQuizQuestion()) && !fallbackOptions.isEmpty()) {
+            return List.of(new StudentQuizQuestionResponse(block.getQuizQuestion(), fallbackOptions));
         }
-
         return List.of();
     }
 
