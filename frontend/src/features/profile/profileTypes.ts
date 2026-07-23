@@ -44,8 +44,6 @@ export interface UpdateStudentProfileRequest {
 
     phoneNumber: string | null;
 
-    avatarUrl?: string | null;
-
     displayName: string;
 
     jlptGoal: string;
