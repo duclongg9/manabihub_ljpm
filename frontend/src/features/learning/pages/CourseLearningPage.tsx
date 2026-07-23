@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -745,8 +746,11 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
       setSubmission(data);
       onProgressSaved(); // mark COMPLETED
     } catch (err) {
-      const error = err as any;
-      setErrorMsg(error.response?.data?.message || 'Có lỗi xảy ra khi nộp bài.');
+      if (axios.isAxiosError(err)) {
+        setErrorMsg(err.response?.data?.message || 'Có lỗi xảy ra khi nộp bài.');
+      } else {
+        setErrorMsg('Có lỗi xảy ra khi nộp bài.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -760,12 +764,15 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
       const data = await learningService.requestAiWritingAssistance(block.id, submission.id);
       setSubmission(data);
     } catch (err) {
-      const error = err as any;
-      setErrorMsg(error.response?.data?.message || 'Có lỗi xảy ra khi yêu cầu AI.');
+      if (axios.isAxiosError(err)) {
+        setErrorMsg(err.response?.data?.message || 'Có lỗi xảy ra khi yêu cầu AI.');
+      } else {
+        setErrorMsg('Có lỗi xảy ra khi yêu cầu AI.');
+      }
       try {
         const data = await learningService.getWritingSubmission(block.id);
         setSubmission(data);
-      } catch (e) {
+      } catch {
         // Ignore refetch errors
       }
     } finally {
@@ -835,7 +842,14 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
               Gợi ý từ AI
             </Typography>
 
-            {!submission.aiSuggestion ? (
+            {submission.status === 'SUGGESTION_PROCESSING' ? (
+              <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
+                <Typography variant="body2" color="text.secondary">
+                  AI đang phân tích bài viết của bạn. Vui lòng đợi trong giây lát...
+                </Typography>
+                <CircularProgress size={24} />
+              </Stack>
+            ) : !submission.aiSuggestion ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Typography variant="body2" color="text.secondary">
                   Bạn có thể yêu cầu AI hỗ trợ nhận xét sơ bộ và đưa ra gợi ý cải thiện cho bài viết của mình.
@@ -854,13 +868,6 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                 <Button variant="outlined" onClick={handleRequestAi} disabled={aiRequesting}>
                   {aiRequesting ? 'Đang thử lại...' : 'Thử lại'}
                 </Button>
-              </Stack>
-            ) : submission.status === 'SUGGESTION_PROCESSING' ? (
-              <Stack spacing={2} sx={{ alignItems: 'center' }}>
-                <CircularProgress size={24} />
-                <Typography variant="body2" color="text.secondary">
-                  AI đang phân tích bài viết của bạn. Việc này có thể mất vài phút. Vui lòng tải lại trang sau...
-                </Typography>
               </Stack>
             ) : (
               <Stack spacing={3}>

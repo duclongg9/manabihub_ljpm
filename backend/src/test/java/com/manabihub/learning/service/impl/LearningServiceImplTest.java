@@ -699,8 +699,7 @@ class LearningServiceImplTest {
                 .enrollment(Enrollment.builder().id(UUID.randomUUID()).build())
                 .lessonBlockId(blockVideoId)
                 .build();
-        when(writingSubmissionRepository.findById(subId)).thenReturn(Optional.of(sub));
-
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(subId, enrollment.getId(), blockVideoId)).thenReturn(Optional.empty());
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 learningService.requestAiWritingAssistance(blockVideoId, subId));
         assertEquals(MessageCodes.COMMON_NOT_FOUND, ex.getMessageCode());
@@ -715,7 +714,8 @@ class LearningServiceImplTest {
         UUID subId = UUID.randomUUID();
         com.manabihub.writing.entity.WritingSubmission sub = com.manabihub.writing.entity.WritingSubmission.builder()
                 .enrollment(enrollment).lessonBlockId(blockVideoId).status(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED).build();
-        when(writingSubmissionRepository.findById(subId)).thenReturn(Optional.of(sub));
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(subId, enrollment.getId(), blockVideoId)).thenReturn(Optional.of(sub));
+
         when(currentUserService.getCurrentUserId()).thenReturn(currentUserId);
 
         com.manabihub.ai.service.AiChatSettingsService.AiChatSettings settings = new com.manabihub.ai.service.AiChatSettingsService.AiChatSettings(
@@ -743,6 +743,8 @@ class LearningServiceImplTest {
                 .id(subId).enrollment(enrollment).lessonBlockId(blockVideoId).content("Hello")
                 .status(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED)
                 .submittedAt(Instant.now()).build();
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(subId, enrollment.getId(), blockVideoId)).thenReturn(Optional.of(sub));
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockIdForUpdate(subId, enrollment.getId(), blockVideoId)).thenReturn(Optional.of(sub));
         when(writingSubmissionRepository.findById(subId)).thenReturn(Optional.of(sub));
         when(currentUserService.getCurrentUserId()).thenReturn(currentUserId);
 

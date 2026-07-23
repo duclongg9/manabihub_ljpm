@@ -561,12 +561,8 @@ public class LearningServiceImpl implements LearningService {
         Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
         UUID currentUserId = currentUserService.getCurrentUserId();
 
-        WritingSubmission submission = writingSubmissionRepository.findById(submissionId)
+        WritingSubmission preCheckSub = writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(submissionId, enrollment.getId(), lessonBlockId)
                 .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Submission not found", HttpStatus.NOT_FOUND));
-
-        if (!submission.getEnrollment().getId().equals(enrollment.getId()) || !submission.getLessonBlockId().equals(lessonBlockId)) {
-            throw new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Submission not found", HttpStatus.NOT_FOUND);
-        }
 
         Course course = enrollment.getCourse();
         AiChatSettingsService.AiChatSettings settings = aiChatSettingsService.getSettings();
@@ -599,8 +595,12 @@ public class LearningServiceImpl implements LearningService {
 
         // 3. Status Check & Pre-saving (In a new transaction to persist SUGGESTION_PROCESSING state before provider call)
         boolean canProcess = transactionTemplate.execute(status -> {
-            WritingSubmission currentSub = writingSubmissionRepository.findById(submissionId).orElseThrow();
-            if (currentSub.getStatus() == WritingSubmissionStatus.SUGGESTION_PROCESSING) {
+            WritingSubmission currentSub = writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockIdForUpdate(submissionId, enrollment.getId(), lessonBlockId)
+                    .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Submission not found", HttpStatus.NOT_FOUND));
+
+            if (currentSub.getStatus() == WritingSubmissionStatus.SUGGESTION_PROCESSING ||
+                currentSub.getStatus() == WritingSubmissionStatus.SUGGESTION_READY ||
+                currentSub.getStatus() == WritingSubmissionStatus.TEACHER_FEEDBACK_READY) {
                 return false;
             }
             currentSub.setStatus(WritingSubmissionStatus.SUGGESTION_PROCESSING);
@@ -609,10 +609,12 @@ public class LearningServiceImpl implements LearningService {
         });
 
         if (Boolean.FALSE.equals(canProcess)) {
-            return mapToWritingSubmissionDetailResponse(submission);
+            WritingSubmission currentSub = writingSubmissionRepository.findById(submissionId).orElseThrow();
+            return mapToWritingSubmissionDetailResponse(currentSub);
         }
 
         // 4. Provider Call
+        WritingSubmission submission = writingSubmissionRepository.findById(submissionId).orElseThrow();
         try {
             AiWritingAssistanceProvider.Result result = aiWritingAssistanceProvider.generate(
                     block.getWritingPrompt(),
@@ -649,13 +651,17 @@ public class LearningServiceImpl implements LearningService {
                 AiWritingSuggestion suggestion = AiWritingSuggestion.builder()
                         .writingSubmission(sub)
                         .status("FAILED")
-                        .failureReason(e.getMessage())
+                        .grammarSuggestions(objectMapper.createArrayNode())
+                        .vocabularySuggestions(objectMapper.createArrayNode())
+                        .structureSuggestions(objectMapper.createArrayNode())
+                        .failureReason("Provider error")
                         .official(false)
                         .build();
                 aiWritingSuggestionRepository.save(suggestion);
             });
 
-            aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.FAILED, null, 0, 0, e.getMessage());
+            aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.FAILED, null, 0, 0, "Provider error");
+            throw new BusinessException(MessageCodes.MSG_AI_002, "AI provider is unavailable", HttpStatus.SERVICE_UNAVAILABLE);
         } catch (Exception e) {
             transactionTemplate.executeWithoutResult(status -> {
                 WritingSubmission sub = writingSubmissionRepository.findById(submissionId).orElseThrow();
@@ -665,13 +671,17 @@ public class LearningServiceImpl implements LearningService {
                 AiWritingSuggestion suggestion = AiWritingSuggestion.builder()
                         .writingSubmission(sub)
                         .status("FAILED")
-                        .failureReason("Internal error: " + e.getMessage())
+                        .grammarSuggestions(objectMapper.createArrayNode())
+                        .vocabularySuggestions(objectMapper.createArrayNode())
+                        .structureSuggestions(objectMapper.createArrayNode())
+                        .failureReason("Internal error")
                         .official(false)
                         .build();
                 aiWritingSuggestionRepository.save(suggestion);
             });
 
-            aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.FAILED, null, 0, 0, e.getMessage());
+            aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.FAILED, null, 0, 0, "Internal error");
+            throw new BusinessException(MessageCodes.MSG_AI_002, "AI processing failed due to an internal error", HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         return mapToWritingSubmissionDetailResponse(writingSubmissionRepository.findById(submissionId).orElse(submission));
@@ -703,3 +713,4 @@ public class LearningServiceImpl implements LearningService {
         );
     }
 }
+
