@@ -71,6 +71,9 @@ export const ENDPOINTS = {
     VIDEO_PROGRESS: (blockId: string) => `/v1/student/lessons/${blockId}/video-progress`,
     MARK_COMPLETE: (blockId: string) => `/v1/student/lessons/${blockId}/complete`,
     FLASHCARD_REVIEW: (blockId: string) => `/v1/student/lessons/${blockId}/flashcards/review`,
+    WRITING_SUBMISSION_GET: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions/me`,
+    WRITING_SUBMISSION_POST: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions`,
+    WRITING_SUBMISSION_AI: (blockId: string, submissionId: string) => `/v1/student/lessons/${blockId}/writing-submissions/${submissionId}/ai-assistance`,
   },
   ADMIN_LOGIN: '/admin/auth/login',
 };

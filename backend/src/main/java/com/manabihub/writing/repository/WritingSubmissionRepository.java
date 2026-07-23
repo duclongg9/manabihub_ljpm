@@ -113,4 +113,9 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
             WHERE ws.id = :submissionId
             """, nativeQuery = true)
     Optional<String> findLessonTitle(@Param("submissionId") UUID submissionId);
+
+    @EntityGraph(attributePaths = {
+            "enrollment", "enrollment.course", "student", "student.user"
+    })
+    Optional<WritingSubmission> findByEnrollmentIdAndLessonBlockId(UUID enrollmentId, UUID lessonBlockId);
 }

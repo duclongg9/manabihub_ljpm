@@ -23,6 +23,10 @@ import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.learning.repository.FlashcardProgressRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.LearningService;
+import com.manabihub.writing.dto.request.WritingSubmissionRequest;
+import com.manabihub.writing.dto.response.WritingSubmissionDetailResponse;
+import com.manabihub.writing.repository.WritingSubmissionRepository;
+import com.manabihub.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -81,6 +85,7 @@ public class LearningServiceConcurrencyPostgresTest {
     @Autowired private EnrollmentRepository enrollmentRepository;
     @Autowired private LessonBlockProgressRepository lessonBlockProgressRepository;
     @Autowired private FlashcardProgressRepository flashcardProgressRepository;
+    @Autowired private WritingSubmissionRepository writingSubmissionRepository;
 
     @MockBean private CurrentUserService currentUserService;
 
@@ -88,6 +93,7 @@ public class LearningServiceConcurrencyPostgresTest {
     private Course course;
     private CourseModule module;
     private LessonBlock flashcardBlock;
+    private LessonBlock writingBlock;
     private Enrollment enrollment;
 
     @BeforeEach
@@ -115,6 +121,16 @@ public class LearningServiceConcurrencyPostgresTest {
                         .module(module)
                         .orderIndex(1)
                         .flashcardsJson("[{\"front\":\"A\",\"back\":\"B\"}, {\"front\":\"C\",\"back\":\"D\"}]")
+                        .build()
+        );
+
+        writingBlock = lessonBlockRepository.saveAndFlush(
+                LessonBlock.builder()
+                        .type(LessonBlockType.WRITING)
+                        .title("Writing Assignment")
+                        .module(module)
+                        .orderIndex(2)
+                        .writingPrompt("Test Prompt")
                         .build()
         );
 
@@ -274,5 +290,53 @@ public class LearningServiceConcurrencyPostgresTest {
 
         int count1 = flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollment.getId(), flashcardBlock.getId());
         assertEquals(0, count1, "Student 1 must have 0 rows");
+    }
+
+    @Test
+    @DisplayName("Concurrent writing submissions produce exactly 1 row and duplicate errors")
+    void testConcurrentWritingSubmission() throws Exception {
+        int threads = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        List<Future<WritingSubmissionDetailResponse>> futures = new ArrayList<>();
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(executor.submit(() -> {
+                    readyLatch.countDown();
+                    startLatch.await();
+                    return learningService.submitWriting(writingBlock.getId(), new WritingSubmissionRequest("Concurrent test content"));
+                }));
+            }
+
+            assertTrue(readyLatch.await(5, TimeUnit.SECONDS), "Workers did not become ready in time");
+            startLatch.countDown();
+
+            int successCount = 0;
+            int errorCount = 0;
+            for (Future<WritingSubmissionDetailResponse> f : futures) {
+                try {
+                    f.get(30, TimeUnit.SECONDS);
+                    successCount++;
+                } catch (Exception e) {
+                    errorCount++;
+                    Throwable cause = e.getCause();
+                    assertTrue(cause instanceof BusinessException, "Expected BusinessException, got " + cause);
+                }
+            }
+            
+            assertEquals(1, successCount, "Exactly 1 request must succeed");
+            assertEquals(threads - 1, errorCount, "Other requests must fail");
+
+            long count = writingSubmissionRepository.count();
+            assertEquals(1, count, "Exactly 1 writing submission row should be present");
+
+            executor.shutdown();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS), "Executor must terminate");
+        } finally {
+            startLatch.countDown();
+            executor.shutdownNow();
+        }
     }
 }

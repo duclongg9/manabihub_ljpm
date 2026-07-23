@@ -38,6 +38,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.dao.DataIntegrityViolationException;
+
+import com.manabihub.writing.entity.WritingSubmission;
+import com.manabihub.writing.repository.WritingSubmissionRepository;
+import com.manabihub.writing.entity.AiWritingSuggestion;
+import com.manabihub.writing.repository.AiWritingSuggestionRepository;
+import com.manabihub.ai.entity.AiUsageLog;
+import com.manabihub.ai.repository.AiUsageLogRepository;
+import com.manabihub.ai.provider.AiWritingAssistanceProvider;
+import com.manabihub.ai.enums.AiUsageRequestStatus;
+import com.manabihub.ai.provider.AiChatProviderException;
+import com.manabihub.writing.enums.WritingSubmissionStatus;
+import com.manabihub.writing.dto.request.WritingSubmissionRequest;
+import com.manabihub.writing.dto.response.WritingSubmissionDetailResponse;
+import com.manabihub.writing.dto.response.AiWritingSuggestionResponse;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -68,6 +83,10 @@ public class LearningServiceImpl implements LearningService {
     private final EnrollmentRepository enrollmentRepository;
     private final LessonBlockProgressRepository lessonBlockProgressRepository;
     private final FlashcardProgressRepository flashcardProgressRepository;
+    private final WritingSubmissionRepository writingSubmissionRepository;
+    private final AiWritingSuggestionRepository aiWritingSuggestionRepository;
+    private final AiUsageLogRepository aiUsageLogRepository;
+    private final AiWritingAssistanceProvider aiWritingAssistanceProvider;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
 
@@ -463,5 +482,191 @@ public class LearningServiceImpl implements LearningService {
         } catch (JsonProcessingException exception) {
             return List.of();
         }
+    }
+
+    // ── Writing Assignment Methods ─────────────────────────────────────────
+
+    @Override
+    public WritingSubmissionDetailResponse getWritingSubmission(UUID lessonBlockId) {
+        LessonBlock block = resolveLessonBlock(lessonBlockId);
+        Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+
+        if (block.getType() != LessonBlockType.WRITING) {
+            throw new BusinessException(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Not a writing block", HttpStatus.BAD_REQUEST);
+        }
+
+        return writingSubmissionRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), lessonBlockId)
+                .map(this::mapToWritingSubmissionDetailResponse)
+                .orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public WritingSubmissionDetailResponse submitWriting(UUID lessonBlockId, WritingSubmissionRequest request) {
+        LessonBlock block = resolveLessonBlock(lessonBlockId);
+        Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+
+        if (block.getType() != LessonBlockType.WRITING) {
+            throw new BusinessException(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Not a writing block", HttpStatus.BAD_REQUEST);
+        }
+
+        writingSubmissionRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), lessonBlockId)
+                .ifPresent(s -> {
+                    throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "You have already submitted this assignment.", HttpStatus.BAD_REQUEST);
+                });
+
+        WritingSubmission submission = WritingSubmission.builder()
+                .enrollment(enrollment)
+                .student(enrollment.getStudent())
+                .lessonBlockId(lessonBlockId)
+                .legacyLessonId(null)
+                .content(request.content())
+                .status(WritingSubmissionStatus.SUBMITTED)
+                .build();
+
+        try {
+            submission = writingSubmissionRepository.saveAndFlush(submission);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "You have already submitted this assignment.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (block.getModule().getCourse().getPrice().doubleValue() < 500000) {
+            throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "Course must be priced at least 500,000 VND to use AI features", HttpStatus.BAD_REQUEST);
+        }
+
+        // Upsert progress to COMPLETED
+        LessonBlockProgress progress = lessonBlockProgressRepository
+                .findByEnrollmentIdAndLessonBlockId(enrollment.getId(), block.getId())
+                .orElseGet(() -> LessonBlockProgress.builder()
+                        .enrollmentId(enrollment.getId())
+                        .lessonBlockId(block.getId())
+                        .status(LessonProgressStatus.IN_PROGRESS)
+                        .build());
+        
+        progress.setStatus(LessonProgressStatus.COMPLETED);
+        if (progress.getCompletedAt() == null) {
+            progress.setCompletedAt(Instant.now());
+        }
+        lessonBlockProgressRepository.save(progress);
+
+        return mapToWritingSubmissionDetailResponse(submission);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = AiChatProviderException.class)
+    public WritingSubmissionDetailResponse requestAiWritingAssistance(UUID lessonBlockId, UUID submissionId) {
+        LessonBlock block = resolveLessonBlock(lessonBlockId);
+        Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+        
+        WritingSubmission submission = writingSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "Submission not found", HttpStatus.NOT_FOUND));
+
+        if (!submission.getEnrollment().getId().equals(enrollment.getId()) || !submission.getLessonBlockId().equals(lessonBlockId)) {
+            throw new BusinessException("FORBIDDEN", "Forbidden access to this submission", HttpStatus.FORBIDDEN);
+        }
+
+        Course course = enrollment.getCourse();
+        if (!course.isAiSupported() || course.getPrice().compareTo(new java.math.BigDecimal("500000")) < 0) {
+            throw new BusinessException("AI_NOT_ELIGIBLE", "AI writing assistance is not available for this course.", HttpStatus.FORBIDDEN);
+        }
+
+        // Check if already processed
+        AiWritingSuggestion existingSuggestion = aiWritingSuggestionRepository.findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submissionId).orElse(null);
+        if (existingSuggestion != null && "SUGGESTION_READY".equals(existingSuggestion.getStatus())) {
+            return mapToWritingSubmissionDetailResponse(submission); // Already processed
+        }
+
+        if (existingSuggestion == null) {
+            existingSuggestion = AiWritingSuggestion.builder()
+                    .writingSubmission(submission)
+                    .provider("openai-compatible")
+                    .status("SUGGESTION_PROCESSING")
+                    .grammarSuggestions(objectMapper.createArrayNode())
+                    .vocabularySuggestions(objectMapper.createArrayNode())
+                    .structureSuggestions(objectMapper.createArrayNode())
+                    .build();
+            existingSuggestion = aiWritingSuggestionRepository.saveAndFlush(existingSuggestion);
+        } else {
+            existingSuggestion.setStatus("SUGGESTION_PROCESSING");
+            aiWritingSuggestionRepository.saveAndFlush(existingSuggestion);
+        }
+
+        try {
+            AiWritingAssistanceProvider.Result result = aiWritingAssistanceProvider.generate(
+                    block.getWritingPrompt(),
+                    block.getRubric(),
+                    submission.getContent()
+            );
+
+            existingSuggestion.setGrammarSuggestions(result.grammarSuggestions());
+            existingSuggestion.setVocabularySuggestions(result.vocabularySuggestions());
+            existingSuggestion.setStructureSuggestions(result.structureSuggestions());
+            existingSuggestion.setRevisionGuidance(result.revisionGuidance());
+            existingSuggestion.setStatus("SUGGESTION_READY");
+            existingSuggestion.setProvider(result.provider());
+            aiWritingSuggestionRepository.save(existingSuggestion);
+
+            AiUsageLog usageLog = AiUsageLog.builder()
+                    .userId(currentUserService.getCurrentUserId())
+                    .courseId(course.getId())
+                    .lessonBlockId(lessonBlockId)
+                    .writingSubmissionId(submissionId)
+                    .featureCode("AI_WRITING_ASSISTANCE")
+                    .provider(result.provider())
+                    .requestStatus(AiUsageRequestStatus.SUCCESS)
+                    .inputTokens(result.inputTokens())
+                    .outputTokens(result.outputTokens())
+                    .build();
+            aiUsageLogRepository.save(usageLog);
+
+        } catch (AiChatProviderException e) {
+            existingSuggestion.setStatus("SUGGESTION_FAILED");
+            aiWritingSuggestionRepository.save(existingSuggestion);
+
+            AiUsageLog usageLog = AiUsageLog.builder()
+                    .userId(currentUserService.getCurrentUserId())
+                    .courseId(course.getId())
+                    .lessonBlockId(lessonBlockId)
+                    .writingSubmissionId(submissionId)
+                    .featureCode("AI_WRITING_ASSISTANCE")
+                    .requestStatus(AiUsageRequestStatus.FAILED)
+                    .failureReason(e.getMessage())
+                    .build();
+            aiUsageLogRepository.save(usageLog);
+
+            throw new BusinessException("AI_ASSISTANCE_FAILED", "Unable to get AI suggestions at this time. Please try again.", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+
+        return mapToWritingSubmissionDetailResponse(submission);
+    }
+
+    private WritingSubmissionDetailResponse mapToWritingSubmissionDetailResponse(WritingSubmission submission) {
+        AiWritingSuggestion suggestion = aiWritingSuggestionRepository.findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submission.getId()).orElse(null);
+        AiWritingSuggestionResponse suggestionResponse = suggestion == null ? null : new AiWritingSuggestionResponse(
+                suggestion.getId(),
+                suggestion.getStatus(),
+                suggestion.getGrammarSuggestions(),
+                suggestion.getVocabularySuggestions(),
+                suggestion.getStructureSuggestions(),
+                suggestion.getRevisionGuidance(),
+                suggestion.getConfidenceLevel(),
+                suggestion.isOfficial(),
+                suggestion.getFailureReason(),
+                suggestion.getCreatedAt()
+        );
+
+        return new WritingSubmissionDetailResponse(
+                submission.getId(),
+                submission.getEnrollment().getCourse().getId(),
+                submission.getEnrollment().getCourse().getTitle(),
+                "Writing Assignment",
+                submission.getStudent().getDisplayName(),
+                submission.getStudent().getUser().getEmail(),
+                submission.getContent(),
+                submission.getStatus(),
+                submission.getCreatedAt(), // wait, we need submittedAt which might be createdAt
+                suggestionResponse,
+                null // teacherFeedback is out of scope here
+        );
     }
 }

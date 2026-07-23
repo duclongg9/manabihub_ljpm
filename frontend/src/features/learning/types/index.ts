@@ -63,3 +63,45 @@ export interface LessonProgress {
   completedAt?: string;
   updatedAt?: string;
 }
+
+export interface GrammarSuggestion {
+  error: string;
+  correction: string;
+  explanation: string;
+}
+
+export interface VocabularySuggestion {
+  word: string;
+  suggestion: string;
+  explanation: string;
+}
+
+export interface StructureSuggestion {
+  issue: string;
+  suggestion: string;
+}
+
+export interface AiWritingSuggestionResponse {
+  id: string;
+  provider: string;
+  status: string;
+  grammarSuggestions: GrammarSuggestion[];
+  vocabularySuggestions: VocabularySuggestion[];
+  structureSuggestions: StructureSuggestion[];
+  revisionGuidance?: string;
+  createdAt: string;
+}
+
+export interface WritingSubmissionDetail {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  lessonTitle: string;
+  studentName: string;
+  studentEmail: string;
+  content: string;
+  status: string;
+  submittedAt: string;
+  aiSuggestion?: AiWritingSuggestionResponse;
+  teacherFeedback?: any;
+}

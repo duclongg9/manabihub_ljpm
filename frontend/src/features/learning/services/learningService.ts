@@ -1,6 +1,6 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
-import type { CourseLearning, LessonProgress } from '../types';
+import type { CourseLearning, LessonProgress, WritingSubmissionDetail } from '../types';
 
 export const learningService = {
   openCourse: async (courseId: string): Promise<CourseLearning> => {
@@ -25,6 +25,21 @@ export const learningService = {
 
   markLessonComplete: async (blockId: string): Promise<LessonProgress> => {
     const response = await axiosClient.post(ENDPOINTS.LEARNING.MARK_COMPLETE(blockId));
+    return response.data.data;
+  },
+
+  getWritingSubmission: async (blockId: string): Promise<WritingSubmissionDetail | null> => {
+    const response = await axiosClient.get(ENDPOINTS.LEARNING.WRITING_SUBMISSION_GET(blockId));
+    return response.data.data;
+  },
+
+  submitWriting: async (blockId: string, content: string): Promise<WritingSubmissionDetail> => {
+    const response = await axiosClient.post(ENDPOINTS.LEARNING.WRITING_SUBMISSION_POST(blockId), { content });
+    return response.data.data;
+  },
+
+  requestAiWritingAssistance: async (blockId: string, submissionId: string): Promise<WritingSubmissionDetail> => {
+    const response = await axiosClient.post(ENDPOINTS.LEARNING.WRITING_SUBMISSION_AI(blockId, submissionId));
     return response.data.data;
   },
 };
