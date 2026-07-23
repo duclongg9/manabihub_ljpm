@@ -559,14 +559,15 @@ public class LearningServiceImpl implements LearningService {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public StudentWritingSubmissionResponse requestAiWritingAssistance(UUID lessonBlockId, UUID submissionId) {
-        LessonBlock block = resolveLessonBlock(lessonBlockId);
-        Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+        WritingSubmission preCheckSub = transactionTemplate.execute(status -> {
+            LessonBlock block = resolveLessonBlock(lessonBlockId);
+            Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+            return writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(submissionId, enrollment.getId(), lessonBlockId)
+                    .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Submission not found", HttpStatus.NOT_FOUND));
+        });
+
         UUID currentUserId = currentUserService.getCurrentUserId();
-
-        WritingSubmission preCheckSub = writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(submissionId, enrollment.getId(), lessonBlockId)
-                .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Submission not found", HttpStatus.NOT_FOUND));
-
-        Course course = enrollment.getCourse();
+        Course course = preCheckSub.getEnrollment().getCourse();
         AiChatSettingsService.AiChatSettings settings = aiChatSettingsService.getSettings();
 
         // 1. Validate Eligibility
