@@ -68,6 +68,8 @@ class LearningServiceImplTest {
     @Mock private com.manabihub.ai.service.AiUsageLogService aiUsageLogService;
     @Mock private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
     @Mock private com.manabihub.ai.provider.AiWritingAssistanceProvider aiWritingAssistanceProvider;
+    @Mock private com.manabihub.learning.service.StudentAssessmentService studentAssessmentService;
+    @Mock private com.manabihub.learning.service.CertificateEligibilityService certificateEligibilityService;
 
     @InjectMocks
     private LearningServiceImpl learningService;
