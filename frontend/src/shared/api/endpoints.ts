@@ -70,6 +70,7 @@ export const ENDPOINTS = {
     COURSE_PROGRESS: (courseId: string) => `/v1/student/courses/${courseId}/progress`,
     VIDEO_PROGRESS: (blockId: string) => `/v1/student/lessons/${blockId}/video-progress`,
     MARK_COMPLETE: (blockId: string) => `/v1/student/lessons/${blockId}/complete`,
+    FLASHCARD_REVIEW: (blockId: string) => `/v1/student/lessons/${blockId}/flashcards/review`,
   },
   ADMIN_LOGIN: '/admin/auth/login',
 };

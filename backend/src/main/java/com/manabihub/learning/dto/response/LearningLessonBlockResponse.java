@@ -3,6 +3,7 @@ package com.manabihub.learning.dto.response;
 import com.manabihub.course.dto.response.FlashcardItemResponse;
 import com.manabihub.learning.dto.response.StudentQuizQuestionResponse;
 import com.manabihub.course.enums.LessonBlockType;
+import com.manabihub.learning.enums.FlashcardStatus;
 import com.manabihub.learning.enums.LessonProgressStatus;
 
 import java.time.Instant;
@@ -21,6 +22,7 @@ public record LearningLessonBlockResponse(
         List<String> quizOptions,
         List<StudentQuizQuestionResponse> quizItems,
         List<FlashcardItemResponse> flashcards,
+        List<FlashcardStatus> flashcardStatuses,
         String writingPrompt,
         String rubric,
         int orderIndex,

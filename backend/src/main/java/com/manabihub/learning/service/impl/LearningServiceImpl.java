@@ -27,7 +27,9 @@ import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.entity.LessonBlockProgress;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.enums.LessonProgressStatus;
+import com.manabihub.learning.enums.FlashcardStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.repository.FlashcardProgressRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.LearningService;
 import lombok.RequiredArgsConstructor;
@@ -65,6 +67,7 @@ public class LearningServiceImpl implements LearningService {
     private final StudentProfileRepository studentProfileRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final LessonBlockProgressRepository lessonBlockProgressRepository;
+    private final FlashcardProgressRepository flashcardProgressRepository;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
 
@@ -98,16 +101,21 @@ public class LearningServiceImpl implements LearningService {
                 .filter(block -> isCompleted(progressByBlockId.get(block.getId())))
                 .count();
 
+        boolean courseCompleted = completedLessons == allBlocks.size();
         UUID currentLessonBlockId = allBlocks.stream()
                 .filter(block -> !isCompleted(progressByBlockId.get(block.getId())))
                 .map(LessonBlock::getId)
                 .findFirst()
                 .orElse(null);
-        boolean courseCompleted = completedLessons == allBlocks.size();
 
         List<String> warnings = new ArrayList<>();
+
+        Map<UUID, List<com.manabihub.learning.entity.FlashcardProgress>> flashcardProgressByBlockId = flashcardProgressRepository.findByEnrollmentId(enrollment.getId())
+                .stream()
+                .collect(Collectors.groupingBy(com.manabihub.learning.entity.FlashcardProgress::getLessonBlockId));
+
         List<LearningModuleResponse> moduleResponses = sortedModules(course).stream()
-                .map(module -> toModuleResponse(module, progressByBlockId, currentLessonBlockId, warnings))
+                .map(module -> toModuleResponse(module, progressByBlockId, currentLessonBlockId, warnings, flashcardProgressByBlockId))
                 .toList();
 
         return new CourseLearningResponse(
@@ -162,6 +170,40 @@ public class LearningServiceImpl implements LearningService {
         }
 
         lessonBlockProgressRepository.save(progress);
+        return toProgressResponse(progress);
+    }
+
+    @Override
+    @Transactional
+    public LessonProgressResponse reviewFlashcard(UUID lessonBlockId, com.manabihub.learning.dto.request.ReviewFlashcardRequest request) {
+        LessonBlock block = resolveLessonBlock(lessonBlockId);
+        Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+
+        if (block.getType() != LessonBlockType.FLASHCARD) {
+            throw new BusinessException(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Block is not a flashcard", HttpStatus.BAD_REQUEST);
+        }
+
+        List<FlashcardItemResponse> flashcards = readJsonList(block.getFlashcardsJson(), FLASHCARDS_TYPE);
+        int totalCards = flashcards.size();
+        if (request.cardIndex() < 0 || request.cardIndex() >= totalCards) {
+            throw new BusinessException(MessageCodes.LEARNING_INVALID_FLASHCARD_INDEX, "Invalid card index", HttpStatus.BAD_REQUEST);
+        }
+
+        flashcardProgressRepository.upsertStatus(enrollment.getId(), lessonBlockId, request.cardIndex(), request.status());
+
+        int classifiedCount = flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollment.getId(), lessonBlockId);
+
+        LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
+
+        if (classifiedCount >= totalCards) {
+            progress.setStatus(LessonProgressStatus.COMPLETED);
+            progress.setCompletedAt(Instant.now());
+        } else if (progress.getStatus() == LessonProgressStatus.NOT_STARTED) {
+            progress.setStatus(LessonProgressStatus.IN_PROGRESS);
+        }
+
+        progress = lessonBlockProgressRepository.save(progress);
+
         return toProgressResponse(progress);
     }
 
@@ -285,10 +327,11 @@ public class LearningServiceImpl implements LearningService {
             CourseModule module,
             Map<UUID, LessonBlockProgress> progressByBlockId,
             UUID currentLessonBlockId,
-            List<String> warnings
+            List<String> warnings,
+            Map<UUID, List<com.manabihub.learning.entity.FlashcardProgress>> flashcardProgressByBlockId
     ) {
         List<LearningLessonBlockResponse> blockResponses = sortedBlocks(module).stream()
-                .map(block -> toBlockResponse(module, block, progressByBlockId.get(block.getId()), currentLessonBlockId, warnings))
+                .map(block -> toBlockResponse(module, block, progressByBlockId.get(block.getId()), currentLessonBlockId, warnings, flashcardProgressByBlockId.getOrDefault(block.getId(), List.of())))
                 .toList();
 
         return new LearningModuleResponse(module.getId(), module.getTitle(), module.getOrderIndex(), blockResponses);
@@ -299,7 +342,8 @@ public class LearningServiceImpl implements LearningService {
             LessonBlock block,
             LessonBlockProgress progress,
             UUID currentLessonBlockId,
-            List<String> warnings
+            List<String> warnings,
+            List<com.manabihub.learning.entity.FlashcardProgress> flashcardProgresses
     ) {
         boolean contentAvailable = isContentAvailable(block);
         if (!contentAvailable) {
@@ -308,6 +352,17 @@ public class LearningServiceImpl implements LearningService {
         }
 
         List<String> quizOptions = readJsonList(block.getQuizOptionsJson(), QUIZ_OPTIONS_TYPE);
+
+        List<FlashcardItemResponse> flashcards = readJsonList(block.getFlashcardsJson(), FLASHCARDS_TYPE);
+        List<FlashcardStatus> flashcardStatuses = null;
+        if (block.getType() == LessonBlockType.FLASHCARD) {
+            Map<Integer, FlashcardStatus> statusMap = flashcardProgresses.stream()
+                    .collect(Collectors.toMap(com.manabihub.learning.entity.FlashcardProgress::getCardIndex, com.manabihub.learning.entity.FlashcardProgress::getStatus));
+            flashcardStatuses = new ArrayList<>();
+            for (int i = 0; i < flashcards.size(); i++) {
+                flashcardStatuses.add(statusMap.get(i));
+            }
+        }
 
         return new LearningLessonBlockResponse(
                 block.getId(),
@@ -320,7 +375,8 @@ public class LearningServiceImpl implements LearningService {
                 block.getQuizQuestion(),
                 quizOptions,
                 readQuizItems(block, quizOptions),
-                readJsonList(block.getFlashcardsJson(), FLASHCARDS_TYPE),
+                flashcards,
+                flashcardStatuses,
                 block.getWritingPrompt(),
                 block.getRubric(),
                 block.getOrderIndex(),

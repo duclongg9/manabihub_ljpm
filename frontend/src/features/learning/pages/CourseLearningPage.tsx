@@ -131,6 +131,35 @@ export function CourseLearningPage() {
     [updateBlock],
   );
 
+  const handleFlashcardProgressSaved = useCallback(
+    (blockId: string, cardIndex: number, status: 'REMEMBERED' | 'NEEDS_REVIEW', progressStatus: LearningLessonBlock['progressStatus']) => {
+      setLearning((prev) => {
+        if (!prev) return prev;
+        const modules = prev.modules.map((module) => ({
+          ...module,
+          blocks: module.blocks.map((block) => {
+            if (block.id !== blockId) return block;
+            const newStatuses = [...(block.flashcardStatuses || [])];
+            newStatuses[cardIndex] = status;
+            return { ...block, flashcardStatuses: newStatuses, progressStatus };
+          }),
+        }));
+
+        const blocks = modules.flatMap((module) => module.blocks);
+        const completedLessons = blocks.filter((block) => block.progressStatus === 'COMPLETED').length;
+        const totalLessons = blocks.length;
+        return {
+          ...prev,
+          modules,
+          completedLessons,
+          progressPercent: totalLessons === 0 ? 0 : Math.round((completedLessons * 10000) / totalLessons) / 100,
+          courseCompleted: totalLessons > 0 && completedLessons === totalLessons,
+        };
+      });
+    },
+    [],
+  );
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
@@ -248,7 +277,7 @@ export function CourseLearningPage() {
                 {!selectedBlock.contentAvailable ? (
                   <Alert severity="warning">Nội dung bài học hiện chưa sẵn sàng. Vui lòng quay lại sau.</Alert>
                 ) : (
-                  <BlockContent block={selectedBlock} onVideoProgressSaved={handleVideoProgressSaved} />
+                  <BlockContent block={selectedBlock} onVideoProgressSaved={handleVideoProgressSaved} onFlashcardProgressSaved={handleFlashcardProgressSaved} />
                 )}
 
                 <Divider sx={{ my: 2 }} />
@@ -316,9 +345,15 @@ interface BlockContentProps {
     positionSeconds: number,
     status: LearningLessonBlock['progressStatus'],
   ) => void;
+  onFlashcardProgressSaved: (
+    blockId: string,
+    cardIndex: number,
+    status: 'REMEMBERED' | 'NEEDS_REVIEW',
+    progressStatus: LearningLessonBlock['progressStatus'],
+  ) => void;
 }
 
-function BlockContent({ block, onVideoProgressSaved }: BlockContentProps) {
+function BlockContent({ block, onVideoProgressSaved, onFlashcardProgressSaved }: BlockContentProps) {
   switch (block.type) {
     case 'VIDEO':
       return <VideoBlock key={block.id} block={block} onProgressSaved={onVideoProgressSaved} />;
@@ -332,7 +367,7 @@ function BlockContent({ block, onVideoProgressSaved }: BlockContentProps) {
     case 'QUIZ':
       return <QuizBlock key={block.id} questions={block.quizItems} />;
     case 'FLASHCARD':
-      return <FlashcardBlock key={block.id} cards={block.flashcards} />;
+      return <FlashcardBlock key={block.id} block={block} onProgressSaved={onFlashcardProgressSaved} />;
     case 'WRITING':
       return <WritingBlock key={block.id} prompt={block.writingPrompt} rubric={block.rubric} />;
     default:
@@ -486,44 +521,107 @@ function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
   );
 }
 
-function FlashcardBlock({ cards }: { cards: { front: string; back: string }[] }) {
+function FlashcardBlock({
+  block,
+  onProgressSaved,
+}: {
+  block: LearningLessonBlock;
+  onProgressSaved: (
+    blockId: string,
+    cardIndex: number,
+    status: 'REMEMBERED' | 'NEEDS_REVIEW',
+    progressStatus: LearningLessonBlock['progressStatus'],
+  ) => void;
+}) {
+  const cards = block.flashcards || [];
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (cards.length === 0) {
     return <Alert severity="info">Bộ flashcard chưa có thẻ nào.</Alert>;
   }
 
+  const reviewedCount = (block.flashcardStatuses || []).filter((s) => s !== null && s !== undefined).length;
+
   const card = cards[index];
+  const currentStatus = block.flashcardStatuses?.[index];
+
+  const handleReview = async (status: 'REMEMBERED' | 'NEEDS_REVIEW') => {
+    if (saving) return;
+    setSaving(true);
+    setErrorMsg(null);
+    try {
+      const progress = await learningService.reviewFlashcard(block.id, index, status);
+      onProgressSaved(block.id, index, status, progress.status);
+      if (index < cards.length - 1) {
+        setIndex((prev) => prev + 1);
+        setFlipped(false);
+      }
+    } catch (error) {
+      console.error('Failed to save flashcard review', error);
+      setErrorMsg('Lỗi khi lưu kết quả. Vui lòng thử lại.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setFlipped((prev) => !prev);
+    }
+  };
 
   return (
     <Stack spacing={2} sx={{ alignItems: 'center' }}>
       <Paper
         variant="outlined"
         onClick={() => setFlipped((prev) => !prev)}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
         sx={{
           width: '100%',
           maxWidth: 480,
-          minHeight: 220,
+          minHeight: 240,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
           p: 3,
           bgcolor: flipped ? 'primary.50' : 'background.paper',
+          position: 'relative',
+          '&:focus': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 }
         }}
       >
-        <Typography variant="h5" sx={{ textAlign: 'center', whiteSpace: 'pre-wrap' }}>
+        {currentStatus && (
+          <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 600,
+                color: currentStatus === 'REMEMBERED' ? 'success.main' : 'warning.main',
+              }}
+            >
+              {currentStatus === 'REMEMBERED' ? 'Đã thuộc' : 'Cần ôn lại'}
+            </Typography>
+          </Box>
+        )}
+        <Typography variant="h5" sx={{ textAlign: 'center', whiteSpace: 'pre-wrap', mb: 2 }}>
           {flipped ? card.back : card.front}
         </Typography>
       </Paper>
+
       <Typography variant="caption" color="text.secondary">
-        Nhấn vào thẻ để lật · Thẻ {index + 1}/{cards.length}
+        Nhấn vào thẻ, Space, hoặc Enter để lật · Thẻ {index + 1}/{cards.length} (Đã ôn: {reviewedCount}/{cards.length})
       </Typography>
-      <Stack direction="row" spacing={2}>
+
+      <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          disabled={index === 0}
+          disabled={index === 0 || saving}
           onClick={() => {
             setIndex((prev) => prev - 1);
             setFlipped(false);
@@ -533,7 +631,7 @@ function FlashcardBlock({ cards }: { cards: { front: string; back: string }[] })
         </Button>
         <Button
           endIcon={<ArrowForwardIcon />}
-          disabled={index === cards.length - 1}
+          disabled={index === cards.length - 1 || saving}
           onClick={() => {
             setIndex((prev) => prev + 1);
             setFlipped(false);
@@ -542,6 +640,35 @@ function FlashcardBlock({ cards }: { cards: { front: string; back: string }[] })
           Thẻ sau
         </Button>
       </Stack>
+
+      {flipped && (
+        <Stack direction="row" spacing={2} sx={{ mt: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Button
+            variant="contained"
+            color="warning"
+            disabled={saving}
+            onClick={() => handleReview('NEEDS_REVIEW')}
+            startIcon={saving && <CircularProgress size={16} color="inherit" />}
+          >
+            Cần ôn lại
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            disabled={saving}
+            onClick={() => handleReview('REMEMBERED')}
+            startIcon={saving && <CircularProgress size={16} color="inherit" />}
+          >
+            Đã thuộc
+          </Button>
+        </Stack>
+      )}
+
+      {errorMsg && (
+        <Alert severity="error" sx={{ width: '100%', maxWidth: 480 }}>
+          {errorMsg}
+        </Alert>
+      )}
     </Stack>
   );
 }

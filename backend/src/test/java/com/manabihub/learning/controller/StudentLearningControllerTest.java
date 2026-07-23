@@ -240,6 +240,47 @@ class StudentLearningControllerTest {
     }
 
     @Test
+    void reviewFlashcard_success() throws Exception {
+        UUID lessonBlockId = UUID.randomUUID();
+        com.manabihub.learning.dto.request.ReviewFlashcardRequest request = new com.manabihub.learning.dto.request.ReviewFlashcardRequest(0, com.manabihub.learning.enums.FlashcardStatus.REMEMBERED);
+        com.manabihub.learning.dto.response.LessonProgressResponse response = new com.manabihub.learning.dto.response.LessonProgressResponse(
+                lessonBlockId,
+                UUID.randomUUID(),
+                com.manabihub.learning.enums.LessonProgressStatus.IN_PROGRESS,
+                null,
+                null,
+                null
+        );
+
+        when(learningService.reviewFlashcard(eq(lessonBlockId), any(com.manabihub.learning.dto.request.ReviewFlashcardRequest.class))).thenReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/student/lessons/{lessonBlockId}/flashcards/review", lessonBlockId)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"cardIndex\": 0, \"status\": \"REMEMBERED\"}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.status", is("IN_PROGRESS")));
+    }
+
+    @Test
+    void reviewFlashcard_unauthorized() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/student/lessons/{lessonBlockId}/flashcards/review", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"cardIndex\": 0, \"status\": \"REMEMBERED\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void reviewFlashcard_forbidden() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/student/lessons/{lessonBlockId}/flashcards/review", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"cardIndex\": 0, \"status\": \"REMEMBERED\"}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void markLessonComplete_success() throws Exception {
         UUID lessonBlockId = UUID.randomUUID();
         com.manabihub.learning.dto.response.LessonProgressResponse response = new com.manabihub.learning.dto.response.LessonProgressResponse(

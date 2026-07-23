@@ -3,6 +3,7 @@ package com.manabihub.learning.controller;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.common.response.PageResponse;
+import com.manabihub.learning.dto.request.ReviewFlashcardRequest;
 import com.manabihub.learning.dto.request.SaveVideoProgressRequest;
 import com.manabihub.learning.dto.response.CourseLearningResponse;
 import com.manabihub.learning.dto.response.CourseProgressSummaryResponse;
@@ -76,6 +77,16 @@ public class StudentLearningController {
                 MessageCodes.LEARNING_PROGRESS_UPDATED,
                 "Video progress saved.",
                 learningService.saveVideoProgress(lessonBlockId, request));
+    }
+
+    @PutMapping("/lessons/{lessonBlockId}/flashcards/review")
+    public ApiResponse<LessonProgressResponse> reviewFlashcard(
+            @PathVariable UUID lessonBlockId,
+            @Valid @RequestBody ReviewFlashcardRequest request) {
+        return ApiResponse.success(
+                MessageCodes.LEARNING_PROGRESS_UPDATED,
+                "Flashcard review saved.",
+                learningService.reviewFlashcard(lessonBlockId, request));
     }
 
     @PostMapping("/lessons/{lessonBlockId}/complete")
