@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.dto.response.FlashcardItemResponse;
+import com.manabihub.learning.dto.internal.InternalQuizQuestionDto;
 import com.manabihub.learning.dto.response.StudentQuizQuestionResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseModule;
@@ -39,7 +40,7 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
+
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,7 +55,7 @@ public class LearningServiceImpl implements LearningService {
 
     private static final TypeReference<List<String>> QUIZ_OPTIONS_TYPE = new TypeReference<>() {
     };
-    private static final TypeReference<List<QuizQuestionResponse>> QUIZ_ITEMS_TYPE = new TypeReference<>() {
+    private static final TypeReference<List<InternalQuizQuestionDto>> QUIZ_ITEMS_TYPE = new TypeReference<>() {
     };
     private static final TypeReference<List<FlashcardItemResponse>> FLASHCARDS_TYPE = new TypeReference<>() {
     };
@@ -256,31 +257,7 @@ public class LearningServiceImpl implements LearningService {
                 ));
     }
 
-    private void completeEnrollmentIfCourseFinished(Enrollment enrollment, LessonBlockProgress justCompleted) {
-        if (enrollment.getStatus() != EnrollmentStatus.ACTIVE) {
-            return;
-        }
 
-        List<LessonBlock> allBlocks = flattenBlocks(enrollment.getCourse());
-        if (allBlocks.isEmpty()) {
-            return;
-        }
-
-        Map<UUID, LessonBlockProgress> progressByBlockId = new HashMap<>(lessonBlockProgressRepository.findByEnrollmentId(enrollment.getId())
-                .stream()
-                .collect(Collectors.toMap(progress -> progress.getLessonBlockId(), Function.identity())));
-        progressByBlockId.put(justCompleted.getLessonBlockId(), justCompleted);
-        boolean justCompletedLastBlock = justCompleted != null && justCompleted.getLessonBlockId().equals(allBlocks.getLast().getId());
-
-        boolean allCompleted = allBlocks.stream()
-                .allMatch(block -> isCompleted(progressByBlockId.get(block.getId())));
-
-        if (allCompleted) {
-            enrollment.setStatus(EnrollmentStatus.COMPLETED);
-            enrollment.setCompletedAt(Instant.now());
-            enrollmentRepository.save(enrollment);
-        }
-    }
 
     private LessonBlock resolveLessonBlock(UUID lessonBlockId) {
         return lessonBlockRepository.findById(lessonBlockId)
@@ -402,7 +379,7 @@ public class LearningServiceImpl implements LearningService {
     }
 
     private List<StudentQuizQuestionResponse> readQuizItems(LessonBlock block, List<String> fallbackOptions) {
-        List<QuizQuestionResponse> quizItems = readJsonList(block.getQuizItemsJson(), QUIZ_ITEMS_TYPE);
+        List<InternalQuizQuestionDto> quizItems = readJsonList(block.getQuizItemsJson(), QUIZ_ITEMS_TYPE);
         if (!quizItems.isEmpty()) {
             return quizItems.stream()
                     .map(q -> new StudentQuizQuestionResponse(q.question(), q.options()))

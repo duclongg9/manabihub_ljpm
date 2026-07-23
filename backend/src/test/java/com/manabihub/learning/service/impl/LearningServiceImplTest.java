@@ -30,6 +30,8 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -455,16 +457,19 @@ class LearningServiceImplTest {
         assertEquals(firstCompletedAt, response.completedAt());
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(value = LessonBlockType.class, names = {"QUIZ", "FLASHCARD", "WRITING"})
     @Order(306)
-    @DisplayName("UTC06: QUIZ block completes fails via this endpoint")
-    void testMarkLessonComplete_UTC06_QuizNoGrading() {
-        when(lessonBlockRepository.findById(blockQuizId)).thenReturn(Optional.of(quizBlock));
+    @DisplayName("UTC06: Reject completion for interactive blocks (QUIZ, FLASHCARD, WRITING)")
+    void testMarkLessonComplete_UTC06_RejectInteractive(LessonBlockType blockType) {
+        LessonBlock interactiveBlock = LessonBlock.builder().id(UUID.randomUUID()).type(blockType).module(courseModule).build();
+        when(lessonBlockRepository.findById(interactiveBlock.getId())).thenReturn(Optional.of(interactiveBlock));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
-            learningService.markLessonComplete(blockQuizId);
+            learningService.markLessonComplete(interactiveBlock.getId());
         });
         assertEquals(MessageCodes.COMMON_BAD_REQUEST, ex.getMessageCode());
+        assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getHttpStatus());
     }
 
     @Test

@@ -142,4 +142,169 @@ class StudentLearningControllerTest {
                         .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void getCourseLearning_success() throws Exception {
+        UUID courseId = UUID.randomUUID();
+        com.manabihub.learning.dto.response.CourseLearningResponse mockResponse = new com.manabihub.learning.dto.response.CourseLearningResponse(
+                courseId,
+                "Test Course",
+                UUID.randomUUID(),
+                List.of(
+                        new com.manabihub.learning.dto.response.LearningModuleResponse(
+                                UUID.randomUUID(),
+                                "Module 1",
+                                1,
+                                List.of(
+                                        new com.manabihub.learning.dto.response.LearningLessonBlockResponse(
+                                                UUID.randomUUID(),
+                                                UUID.randomUUID(),
+                                                com.manabihub.course.enums.LessonBlockType.QUIZ,
+                                                "Quiz 1",
+                                                null, null, null, null, null,
+                                                List.of(new com.manabihub.learning.dto.response.StudentQuizQuestionResponse("Q1", List.of("A", "B"))),
+                                                List.of(), null, null, 1, true,
+                                                com.manabihub.learning.enums.LessonProgressStatus.NOT_STARTED,
+                                                null, null, false
+                                        )
+                                )
+                        )
+                ),
+                null,
+                1, 0, 0.0, false, List.of()
+        );
+
+        when(learningService.openOrResumeCourse(courseId)).thenReturn(mockResponse);
+
+        mockMvc.perform(get("/api/v1/student/courses/{courseId}/learn", courseId)
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.modules[0].blocks[0].quizItems[0].question", is("Q1")))
+                .andExpect(jsonPath("$.data.modules[0].blocks[0].quizItems[0].options", hasSize(2)))
+                .andExpect(jsonPath("$.data.modules[0].blocks[0].quizItems[0].answer").doesNotExist());
+    }
+
+    @Test
+    void getCourseLearning_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/student/courses/{courseId}/learn", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getCourseLearning_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/student/courses/{courseId}/learn", UUID.randomUUID())
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void saveVideoProgress_success() throws Exception {
+        UUID lessonBlockId = UUID.randomUUID();
+        com.manabihub.learning.dto.request.SaveVideoProgressRequest request = new com.manabihub.learning.dto.request.SaveVideoProgressRequest(120);
+        com.manabihub.learning.dto.response.LessonProgressResponse response = new com.manabihub.learning.dto.response.LessonProgressResponse(
+                lessonBlockId,
+                UUID.randomUUID(),
+                com.manabihub.learning.enums.LessonProgressStatus.IN_PROGRESS,
+                120,
+                null,
+                null
+        );
+
+        when(learningService.saveVideoProgress(eq(lessonBlockId), any(com.manabihub.learning.dto.request.SaveVideoProgressRequest.class))).thenReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/student/lessons/{lessonBlockId}/video-progress", lessonBlockId)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"positionSeconds\": 120}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.status", is("IN_PROGRESS")));
+    }
+
+    @Test
+    void saveVideoProgress_unauthorized() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/student/lessons/{lessonBlockId}/video-progress", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"positionSeconds\": 120}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void saveVideoProgress_forbidden() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/student/lessons/{lessonBlockId}/video-progress", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"positionSeconds\": 120}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void markLessonComplete_success() throws Exception {
+        UUID lessonBlockId = UUID.randomUUID();
+        com.manabihub.learning.dto.response.LessonProgressResponse response = new com.manabihub.learning.dto.response.LessonProgressResponse(
+                lessonBlockId,
+                UUID.randomUUID(),
+                com.manabihub.learning.enums.LessonProgressStatus.COMPLETED,
+                null,
+                Instant.now(),
+                null
+        );
+
+        when(learningService.markLessonComplete(lessonBlockId)).thenReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/student/lessons/{lessonBlockId}/complete", lessonBlockId)
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.status", is("COMPLETED")));
+    }
+
+    @Test
+    void markLessonComplete_unauthorized() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/student/lessons/{lessonBlockId}/complete", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void markLessonComplete_forbidden() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/student/lessons/{lessonBlockId}/complete", UUID.randomUUID())
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getCourseProgressSummary_success() throws Exception {
+        UUID courseId = UUID.randomUUID();
+        com.manabihub.learning.dto.response.CourseProgressSummaryResponse response = new com.manabihub.learning.dto.response.CourseProgressSummaryResponse(
+                courseId,
+                "Test Course",
+                10,
+                5,
+                50.0,
+                null, null, false
+        );
+
+        when(learningService.getCourseProgress(courseId)).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/student/courses/{courseId}/progress", courseId)
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.totalLessons", is(10)))
+                .andExpect(jsonPath("$.data.completedLessons", is(5)));
+    }
+
+    @Test
+    void getCourseProgressSummary_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/student/courses/{courseId}/progress", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getCourseProgressSummary_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/student/courses/{courseId}/progress", UUID.randomUUID())
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
 }

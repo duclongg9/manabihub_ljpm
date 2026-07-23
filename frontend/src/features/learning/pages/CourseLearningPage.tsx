@@ -283,7 +283,7 @@ export function CourseLearningPage() {
                 </Stack>
               </CardContent>
             </Card>
-          ) : allBlocks.length === 0 ? (
+          ) : learning.modules.length === 0 ? (
             <Alert severity="info">Khoá học chưa có nội dung bài học.</Alert>
           ) : null}
         </Box>
@@ -351,14 +351,23 @@ function VideoBlock({
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
   const isReadyRef = useRef(false);
 
+  const isSavingRef = useRef(false);
+
   const savePosition = useCallback(
     (positionSeconds: number) => {
-      lastSavedRef.current = positionSeconds;
+      if (isSavingRef.current) return;
+      isSavingRef.current = true;
       learningService
         .saveVideoProgress(block.id, positionSeconds)
-        .then((progress) => onProgressSaved(block.id, positionSeconds, progress.status))
+        .then((progress) => {
+          lastSavedRef.current = positionSeconds;
+          onProgressSaved(block.id, positionSeconds, progress.status);
+        })
         .catch(() => {
           // Non-fatal: keep playing; next tick will retry.
+        })
+        .finally(() => {
+          isSavingRef.current = false;
         });
     },
     [block.id, onProgressSaved],
@@ -415,8 +424,6 @@ function VideoBlock({
 }
 
 function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-
   if (questions.length === 0) {
     return <Alert severity="info">Bài trắc nghiệm chưa có câu hỏi.</Alert>;
   }
@@ -430,22 +437,21 @@ function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
           </Typography>
           <Stack>
             {question.options.map((option) => {
-              const isSelected = answers[index] === option;
               return (
                 <Stack
                   key={option}
                   direction="row"
-                  onClick={() => setAnswers((prev) => ({ ...prev, [index]: option }))}
                   sx={{
                     alignItems: 'center',
-                    cursor: 'pointer',
                     borderRadius: 1,
                     px: 1,
                     bgcolor: 'transparent',
                   }}
                 >
-                  <Radio checked={isSelected} size="small" />
-                  <Typography variant="body2">{option}</Typography>
+                  <Radio disabled size="small" />
+                  <Typography variant="body2" color="text.secondary">
+                    {option}
+                  </Typography>
                 </Stack>
               );
             })}
