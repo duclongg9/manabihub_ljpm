@@ -32,6 +32,7 @@ import { AdminDashboardPage } from '../features/admin/pages/AdminDashboardPage';
 import { TeacherWritingReviewsPage } from '../features/writing-review/pages/TeacherWritingReviewsPage';
 import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages/TeacherWritingReviewDetailPage';
 import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
+import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistPage';
 
 export const router = createBrowserRouter([
   {
@@ -104,6 +105,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses',
         element: <StudentCoursesPage />,
+      },
+      {
+        path: 'wishlist',
+        element: <StudentWishlistPage />,
       },
       {
         path: 'courses/:courseId/learn',

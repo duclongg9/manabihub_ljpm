@@ -7,6 +7,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import { Dialog, DialogContent, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 
 interface CourseStickyCardProps {
   course: PublicCourseDetail;
@@ -82,6 +83,8 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
             </p>
           </>
         )}
+
+        <WishlistToggleButton courseId={course.id} variant="button" />
 
         <div className="text-sm border-t border-slate-100 pt-6 mt-2">
           <h4 className="font-bold mb-4 text-slate-900 text-base">Khóa học này bao gồm:</h4>

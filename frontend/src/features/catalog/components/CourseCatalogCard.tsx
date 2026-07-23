@@ -12,6 +12,7 @@ import {
 import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
+import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 import type { PublicCourseSummary } from '../types/catalogTypes';
 
 interface CourseCatalogCardProps {
@@ -40,6 +41,7 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
       elevation={0}
       sx={{
         height: '100%',
+        position: 'relative',
         border: '1px solid',
         borderColor: 'divider',
         borderRadius: 1,
@@ -50,6 +52,7 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
         },
       }}
     >
+      <WishlistToggleButton courseId={course.id} variant="icon" />
       <CardActionArea
         aria-label={`Xem khóa học ${course.title}`}
         onClick={() => navigate(`/courses/${course.slug || course.id}`)}
