@@ -351,24 +351,48 @@ function VideoBlock({
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
   const isReadyRef = useRef(false);
 
+  const pendingPositionRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
 
   const savePosition = useCallback(
     (positionSeconds: number) => {
-      if (isSavingRef.current) return;
-      isSavingRef.current = true;
-      learningService
-        .saveVideoProgress(block.id, positionSeconds)
-        .then((progress) => {
-          lastSavedRef.current = positionSeconds;
-          onProgressSaved(block.id, positionSeconds, progress.status);
-        })
-        .catch(() => {
-          // Non-fatal: keep playing; next tick will retry.
-        })
-        .finally(() => {
-          isSavingRef.current = false;
-        });
+      pendingPositionRef.current = positionSeconds;
+
+      const flush = () => {
+        if (isSavingRef.current || pendingPositionRef.current === null) return;
+
+        const positionToSave = pendingPositionRef.current;
+        if (positionToSave === lastSavedRef.current) {
+          pendingPositionRef.current = null;
+          return;
+        }
+
+        isSavingRef.current = true;
+        pendingPositionRef.current = null;
+        let success = false;
+
+        learningService
+          .saveVideoProgress(block.id, positionToSave)
+          .then((progress) => {
+            lastSavedRef.current = positionToSave;
+            onProgressSaved(block.id, positionToSave, progress.status);
+            success = true;
+          })
+          .catch(() => {
+            // Non-fatal: keep playing; next tick will retry.
+            if (pendingPositionRef.current === null) {
+              pendingPositionRef.current = positionToSave;
+            }
+          })
+          .finally(() => {
+            isSavingRef.current = false;
+            if (success && pendingPositionRef.current !== null && pendingPositionRef.current !== lastSavedRef.current) {
+              flush();
+            }
+          });
+      };
+
+      flush();
     },
     [block.id, onProgressSaved],
   );
