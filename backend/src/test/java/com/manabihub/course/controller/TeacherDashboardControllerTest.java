@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TeacherDashboardController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, com.manabihub.security.DummyFilterConfig.class})
 @ActiveProfiles("test")
 public class TeacherDashboardControllerTest {
 

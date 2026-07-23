@@ -6,6 +6,7 @@ import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -30,6 +31,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+
 import javax.crypto.spec.SecretKeySpec;
 import java.util.List;
 import java.util.UUID;
@@ -44,6 +47,12 @@ public class SecurityConfig {
 
     @Value("${CORS_ALLOWED_ORIGINS:*}")
     private List<String> allowedOrigins;
+
+    private final TeacherEligibilityFilter teacherEligibilityFilter;
+
+    public SecurityConfig(TeacherEligibilityFilter teacherEligibilityFilter) {
+        this.teacherEligibilityFilter = teacherEligibilityFilter;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -82,6 +91,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(
                         jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+
+        http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }
@@ -168,4 +179,14 @@ public class SecurityConfig {
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
         return jwtAuthenticationConverter;
     }
+
+    @Bean
+    public FilterRegistrationBean<TeacherEligibilityFilter> teacherEligibilityFilterRegistration(
+            TeacherEligibilityFilter filter
+    ) {
+        FilterRegistrationBean<TeacherEligibilityFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
 }

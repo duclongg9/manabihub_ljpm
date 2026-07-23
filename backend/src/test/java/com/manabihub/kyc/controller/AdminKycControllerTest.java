@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 @WebMvcTest(AdminKycController.class)
+@org.springframework.context.annotation.Import(com.manabihub.security.DummyFilterConfig.class)
 @AutoConfigureMockMvc
 class AdminKycControllerTest {
 

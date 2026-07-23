@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TeacherWritingReviewController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, com.manabihub.security.DummyFilterConfig.class})
 class TeacherWritingReviewControllerTest {
 
     @Autowired

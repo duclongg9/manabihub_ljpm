@@ -17,6 +17,7 @@ import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.repository.UserRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.repository.KycDocumentRepository;
+import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.service.TeacherKycService;
@@ -30,17 +31,25 @@ import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
 import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest(properties = {
-        "spring.autoconfigure.exclude=" +
-                "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration," +
-                "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration," +
-                "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
+        "manabihub.kyc.identity-secret=test-secret-key-1234567890-32chars-min-length",
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
+                + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,"
+                + "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
 })
 class ManabiHubApplicationTests {
+
+    @MockBean
+    private JdbcTemplate jdbcTemplate;
+
+    @MockBean
+    private EntityManager entityManager;
 
     @MockBean
     private KycRequestRepository kycRequestRepository;
@@ -53,6 +62,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private KycDocumentRepository kycDocumentRepository;
+
+    @MockBean
+    private TeacherIdentityClaimRepository teacherIdentityClaimRepository;
 
     @MockBean
     private AuditLogRepository auditLogRepository;
