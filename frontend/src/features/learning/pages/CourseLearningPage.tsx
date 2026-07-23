@@ -305,10 +305,10 @@ export function CourseLearningPage() {
                 {!selectedBlock.contentAvailable ? (
                   <Alert severity="warning">Nội dung bài học hiện chưa sẵn sàng. Vui lòng quay lại sau.</Alert>
                 ) : (
-                  <BlockContent 
-                    block={selectedBlock} 
-                    onVideoProgressSaved={handleVideoProgressSaved} 
-                    onFlashcardProgressSaved={handleFlashcardProgressSaved} 
+                  <BlockContent
+                    block={selectedBlock}
+                    onVideoProgressSaved={handleVideoProgressSaved}
+                    onFlashcardProgressSaved={handleFlashcardProgressSaved}
                     onWritingProgressSaved={handleWritingProgressSaved}
                   />
                 )}
@@ -744,8 +744,9 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
       const data = await learningService.submitWriting(block.id, content);
       setSubmission(data);
       onProgressSaved(); // mark COMPLETED
-    } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Có lỗi xảy ra khi nộp bài.');
+    } catch (err) {
+      const error = err as any;
+      setErrorMsg(error.response?.data?.message || 'Có lỗi xảy ra khi nộp bài.');
     } finally {
       setSubmitting(false);
     }
@@ -758,8 +759,15 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
     try {
       const data = await learningService.requestAiWritingAssistance(block.id, submission.id);
       setSubmission(data);
-    } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Có lỗi xảy ra khi yêu cầu AI.');
+    } catch (err) {
+      const error = err as any;
+      setErrorMsg(error.response?.data?.message || 'Có lỗi xảy ra khi yêu cầu AI.');
+      try {
+        const data = await learningService.getWritingSubmission(block.id);
+        setSubmission(data);
+      } catch (e) {
+        // Ignore refetch errors
+      }
     } finally {
       setAiRequesting(false);
     }
@@ -826,7 +834,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
             <Typography variant="h6" gutterBottom>
               Gợi ý từ AI
             </Typography>
-            
+
             {!submission.aiSuggestion ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Typography variant="body2" color="text.secondary">
@@ -847,7 +855,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   {aiRequesting ? 'Đang thử lại...' : 'Thử lại'}
                 </Button>
               </Stack>
-            ) : submission.aiSuggestion.status === 'PROCESSING' ? (
+            ) : submission.status === 'SUGGESTION_PROCESSING' ? (
               <Stack spacing={2} sx={{ alignItems: 'center' }}>
                 <CircularProgress size={24} />
                 <Typography variant="body2" color="text.secondary">
@@ -861,14 +869,14 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                     *Gợi ý sơ bộ từ AI, không phải đánh giá chính thức.
                   </Typography>
                 </Alert>
-                
+
                 {submission.aiSuggestion.revisionGuidance && (
                   <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Đánh giá tổng quan</Typography>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Nhận xét sơ bộ</Typography>
                     <Typography variant="body2">{submission.aiSuggestion.revisionGuidance}</Typography>
                   </Box>
                 )}
-                
+
                 {submission.aiSuggestion.grammarSuggestions?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Ngữ pháp</Typography>
@@ -889,7 +897,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                     </List>
                   </Box>
                 )}
-                
+
                 {submission.aiSuggestion.vocabularySuggestions?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Từ vựng</Typography>
@@ -909,7 +917,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                     </List>
                   </Box>
                 )}
-                
+
                 {submission.aiSuggestion.structureSuggestions?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Cấu trúc & Mạch văn</Typography>

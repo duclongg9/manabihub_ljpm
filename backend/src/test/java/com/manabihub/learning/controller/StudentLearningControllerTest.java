@@ -365,7 +365,7 @@ class StudentLearningControllerTest {
     void submitWriting_success() throws Exception {
         UUID lessonBlockId = UUID.randomUUID();
         com.manabihub.writing.dto.response.StudentWritingSubmissionResponse response = new com.manabihub.writing.dto.response.StudentWritingSubmissionResponse(
-                UUID.randomUUID(), UUID.randomUUID(), "Course", "Writing", "Content",
+                UUID.randomUUID(), UUID.randomUUID(), "Content",
                 com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED, Instant.now(), null, null
         );
 
@@ -394,7 +394,7 @@ class StudentLearningControllerTest {
         UUID lessonBlockId = UUID.randomUUID();
         UUID submissionId = UUID.randomUUID();
         com.manabihub.writing.dto.response.StudentWritingSubmissionResponse response = new com.manabihub.writing.dto.response.StudentWritingSubmissionResponse(
-                submissionId, UUID.randomUUID(), "Course", "Writing", "Content",
+                submissionId, UUID.randomUUID(), "Content",
                 com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED, Instant.now(), null, null
         );
 

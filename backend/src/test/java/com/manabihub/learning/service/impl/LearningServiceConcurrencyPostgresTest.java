@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
 public class LearningServiceConcurrencyPostgresTest {
 
     private static final UUID DEMO_USER_ID = UUID.fromString("d0000000-0000-0000-0000-000000000001");
@@ -325,12 +325,24 @@ public class LearningServiceConcurrencyPostgresTest {
                     assertTrue(cause instanceof BusinessException, "Expected BusinessException, got " + cause);
                 }
             }
-            
+
             assertEquals(1, successCount, "Exactly 1 request must succeed");
             assertEquals(threads - 1, errorCount, "Other requests must fail");
 
-            long count = writingSubmissionRepository.count();
-            assertEquals(1, count, "Exactly 1 writing submission row should be present");
+            long count = writingSubmissionRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).stream().count();
+            assertEquals(1, count, "Exactly 1 writing submission row should be present for this enrollment and block");
+
+            com.manabihub.writing.entity.WritingSubmission winner = writingSubmissionRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).get();
+            assertNotNull(winner.getSubmittedAt(), "submittedAt must not be null");
+            assertEquals(writingBlock.getId(), winner.getLessonBlockId(), "lessonBlockId must match");
+            assertNull(winner.getLegacyLessonId(), "legacyLessonId must be null");
+            assertEquals(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED, winner.getStatus(), "Status must be SUBMITTED");
+
+            com.manabihub.learning.entity.LessonBlockProgress progress = lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).orElseThrow();
+            assertEquals(com.manabihub.learning.enums.LessonProgressStatus.COMPLETED, progress.getStatus(), "Block progress must be COMPLETED");
+
+            com.manabihub.learning.entity.Enrollment freshEnrollment = enrollmentRepository.findById(enrollment.getId()).orElseThrow();
+            assertEquals(com.manabihub.learning.enums.EnrollmentStatus.ACTIVE, freshEnrollment.getStatus(), "Enrollment must remain ACTIVE");
 
             executor.shutdown();
             assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS), "Executor must terminate");

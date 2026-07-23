@@ -49,10 +49,18 @@ public class AiWritingAssistanceProvider {
             String answer = extractAnswer(response);
             JsonNode jsonNode = objectMapper.readTree(answer);
 
+            JsonNode grammar = jsonNode.path("grammarSuggestions");
+            JsonNode vocab = jsonNode.path("vocabularySuggestions");
+            JsonNode structure = jsonNode.path("structureSuggestions");
+
+            if (!grammar.isArray() || !vocab.isArray() || !structure.isArray()) {
+                throw new AiChatProviderException("AI_PROVIDER_INVALID_SCHEMA");
+            }
+
             return new Result(
-                    jsonNode.path("grammarSuggestions"),
-                    jsonNode.path("vocabularySuggestions"),
-                    jsonNode.path("structureSuggestions"),
+                    grammar,
+                    vocab,
+                    structure,
                     jsonNode.path("revisionGuidance").asText(null),
                     "openai-compatible",
                     response.usage() == null ? null : response.usage().promptTokens(),
@@ -60,6 +68,8 @@ public class AiWritingAssistanceProvider {
             );
         } catch (RestClientException e) {
             throw new AiChatProviderException("AI_PROVIDER_REQUEST_FAILED", e);
+        } catch (AiChatProviderException e) {
+            throw e;
         } catch (Exception e) {
             throw new AiChatProviderException("AI_PROVIDER_INVALID_JSON", e);
         }
@@ -69,13 +79,13 @@ public class AiWritingAssistanceProvider {
         return """
                 You are ManabiHub's AI writing assistant. Your task is to provide preliminary suggestions for a student's writing assignment.
                 Do not output a final score, grade, pass/fail result, or determine completion. Provide constructive feedback only.
-                
+
                 Writing Prompt:
                 %s
-                
+
                 Rubric/Criteria:
                 %s
-                
+
                 Analyze the student's submission and return a JSON object with the following schema:
                 {
                   "grammarSuggestions": [ { "error": "...", "correction": "...", "explanation": "..." } ],
@@ -83,7 +93,7 @@ public class AiWritingAssistanceProvider {
                   "structureSuggestions": [ { "issue": "...", "suggestion": "..." } ],
                   "revisionGuidance": "Overall paragraph summarizing what the student did well and what to improve next."
                 }
-                
+
                 Ensure the output is strictly valid JSON. Do not include markdown blocks.
                 """.formatted(
                 StringUtils.hasText(writingPrompt) ? writingPrompt : "No prompt provided.",

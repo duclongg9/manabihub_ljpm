@@ -7,9 +7,7 @@ import java.util.UUID;
 
 public record StudentWritingSubmissionResponse(
         UUID id,
-        UUID courseId,
-        String courseTitle,
-        String lessonTitle,
+        UUID lessonBlockId,
         String content,
         WritingSubmissionStatus status,
         Instant submittedAt,

@@ -83,8 +83,7 @@ export interface StructureSuggestion {
 
 export interface AiWritingSuggestionResponse {
   id: string;
-  provider: string;
-  status: 'PROCESSING' | 'READY' | 'FAILED';
+  status: 'READY' | 'FAILED';
   grammarSuggestions: GrammarSuggestion[];
   vocabularySuggestions: VocabularySuggestion[];
   structureSuggestions: StructureSuggestion[];
@@ -94,11 +93,9 @@ export interface AiWritingSuggestionResponse {
 
 export interface WritingSubmissionDetail {
   id: string;
-  courseId: string;
-  courseTitle: string;
-  lessonTitle: string;
+  lessonBlockId: string;
   content: string;
-  status: 'SUBMITTED' | 'PROCESSING' | 'COMPLETED';
+  status: 'DRAFT' | 'SUBMITTED' | 'SUGGESTION_PROCESSING' | 'SUGGESTION_READY' | 'SUGGESTION_FAILED' | 'TEACHER_FEEDBACK_READY';
   submittedAt: string;
   aiSuggestion?: AiWritingSuggestionResponse;
   teacherFeedback?: unknown;
