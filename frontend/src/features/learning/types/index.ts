@@ -7,6 +7,63 @@ export interface QuizQuestion {
   options: string[];
 }
 
+export interface QuizSubmissionResult {
+  score: number;
+  passed: boolean;
+  correctCount: number;
+  totalQuestions: number;
+  progressStatus: LessonProgressStatus;
+  feedback: Array<{
+    questionIndex: number;
+    correct: boolean;
+    correctAnswer: string;
+  }>;
+}
+
+export interface FinalTestEligibility {
+  configured: boolean;
+  eligible: boolean;
+  reason?: 'FINAL_TEST_NOT_CONFIGURED' | 'FINAL_TEST_ALREADY_PASSED' | 'LESSONS_INCOMPLETE' | 'ATTEMPTS_EXHAUSTED';
+  finalTestId?: string;
+  totalLessons: number;
+  completedLessons: number;
+  attemptsUsed: number;
+  attemptsAllowed: number;
+  passed: boolean;
+}
+
+export interface FinalTestAttempt {
+  attemptId: string;
+  timeLimitMinutes: number;
+  passingScore: number;
+  attemptsRemaining: number;
+  startedAt: string;
+  expiresAt: string;
+  questions: Array<{
+    id: string;
+    content: string;
+    choices: Array<{
+      id: string;
+      content: string;
+    }>;
+  }>;
+}
+
+export interface FinalTestSubmissionResult {
+  attemptId: string;
+  score: number;
+  passed: boolean;
+  certificateBlocked: boolean;
+  correctCount: number;
+  totalQuestions: number;
+  feedback: Array<{
+    questionId: string;
+    correct: boolean;
+    explanation: string;
+    correctChoiceIds: string[];
+  }>;
+}
+
 export interface FlashcardItem {
   front: string;
   back: string;

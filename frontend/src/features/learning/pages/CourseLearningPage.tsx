@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
   Divider,
@@ -29,11 +30,20 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
+import AssignmentTurnedInOutlinedIcon from '@mui/icons-material/AssignmentTurnedInOutlined';
 import { isAxiosError } from 'axios';
 import ReactPlayer from 'react-player';
 import DOMPurify from 'dompurify';
 import { learningService } from '../services/learningService';
-import type { CourseLearning, LearningLessonBlock, QuizQuestion } from '../types';
+import type {
+  CourseLearning,
+  FinalTestAttempt,
+  FinalTestEligibility,
+  FinalTestSubmissionResult,
+  LearningLessonBlock,
+  QuizQuestion,
+  QuizSubmissionResult,
+} from '../types';
 import { ROUTES } from '../../../shared/constants/routes';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
@@ -191,6 +201,13 @@ export function CourseLearningPage() {
     });
   }, []);
 
+  const handleQuizProgressSaved = useCallback(
+    (blockId: string, status: LearningLessonBlock['progressStatus']) => {
+      updateBlock(blockId, { progressStatus: status });
+    },
+    [updateBlock],
+  );
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
@@ -246,6 +263,11 @@ export function CourseLearningPage() {
           ))}
         </Alert>
       )}
+
+      <FinalTestPanel
+        courseId={learning.courseId}
+        completedLessons={learning.completedLessons}
+      />
 
       <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
         <Paper variant="outlined" sx={{ width: { xs: '100%', md: 320 }, flexShrink: 0, alignSelf: 'flex-start' }}>
@@ -311,6 +333,7 @@ export function CourseLearningPage() {
                   <BlockContent
                     block={selectedBlock}
                     onVideoProgressSaved={handleVideoProgressSaved}
+                    onQuizProgressSaved={handleQuizProgressSaved}
                     onFlashcardProgressSaved={handleFlashcardProgressSaved}
                     onWritingProgressSaved={handleWritingProgressSaved}
                   />
@@ -387,10 +410,20 @@ interface BlockContentProps {
     status: 'REMEMBERED' | 'NEEDS_REVIEW',
     progressStatus: LearningLessonBlock['progressStatus'],
   ) => void;
+  onQuizProgressSaved: (
+    blockId: string,
+    progressStatus: LearningLessonBlock['progressStatus'],
+  ) => void;
   onWritingProgressSaved: (blockId: string) => void;
 }
 
-function BlockContent({ block, onVideoProgressSaved, onFlashcardProgressSaved, onWritingProgressSaved }: BlockContentProps) {
+function BlockContent({
+  block,
+  onVideoProgressSaved,
+  onQuizProgressSaved,
+  onFlashcardProgressSaved,
+  onWritingProgressSaved,
+}: BlockContentProps) {
   switch (block.type) {
     case 'VIDEO':
       return <VideoBlock key={block.id} block={block} onProgressSaved={onVideoProgressSaved} />;
@@ -402,7 +435,14 @@ function BlockContent({ block, onVideoProgressSaved, onFlashcardProgressSaved, o
         />
       );
     case 'QUIZ':
-      return <QuizBlock key={block.id} questions={block.quizItems} />;
+      return (
+        <QuizBlock
+          key={block.id}
+          blockId={block.id}
+          questions={block.quizItems}
+          onProgressSaved={onQuizProgressSaved}
+        />
+      );
     case 'FLASHCARD':
       return <FlashcardBlock key={block.id} block={block} onProgressSaved={onFlashcardProgressSaved} />;
     case 'WRITING':
@@ -519,13 +559,52 @@ function VideoBlock({
   );
 }
 
-function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
+function QuizBlock({
+  blockId,
+  questions,
+  onProgressSaved,
+}: {
+  blockId: string;
+  questions: QuizQuestion[];
+  onProgressSaved: BlockContentProps['onQuizProgressSaved'];
+}) {
+  const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ''));
+  const [result, setResult] = useState<QuizSubmissionResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   if (questions.length === 0) {
     return <Alert severity="info">Bài trắc nghiệm chưa có câu hỏi.</Alert>;
   }
 
+  const handleSubmit = async () => {
+    if (answers.some((answer) => !answer) || submitting) return;
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const nextResult = await learningService.submitQuiz(blockId, answers);
+      setResult(nextResult);
+      onProgressSaved(blockId, nextResult.progressStatus);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setErrorMsg(error.response?.data?.message || 'Không thể nộp bài trắc nghiệm.');
+      } else {
+        setErrorMsg('Không thể nộp bài trắc nghiệm.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <Stack spacing={2}>
+      {result && (
+        <Alert severity={result.passed ? 'success' : 'warning'}>
+          Kết quả: {result.score.toFixed(0)}% ({result.correctCount}/{result.totalQuestions} câu đúng).
+          {result.passed ? ' Bài học đã hoàn thành.' : ' Cần đạt tối thiểu 80% để hoàn thành bài học.'}
+        </Alert>
+      )}
+      {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
       {questions.map((question, index) => (
         <Paper key={index} variant="outlined" sx={{ p: 2 }}>
           <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
@@ -533,18 +612,33 @@ function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
           </Typography>
           <Stack>
             {question.options.map((option) => {
+              const feedback = result?.feedback.find((item) => item.questionIndex === index);
               return (
                 <Stack
                   key={option}
                   direction="row"
+                  onClick={() => {
+                    if (!submitting) {
+                      setAnswers((current) => current.map((value, answerIndex) => (
+                        answerIndex === index ? option : value
+                      )));
+                      setResult(null);
+                    }
+                  }}
                   sx={{
                     alignItems: 'center',
                     borderRadius: 1,
                     px: 1,
-                    bgcolor: 'transparent',
+                    cursor: submitting ? 'default' : 'pointer',
+                    bgcolor: feedback && option === feedback.correctAnswer ? 'success.50' : 'transparent',
                   }}
                 >
-                  <Radio disabled size="small" />
+                  <Radio
+                    checked={answers[index] === option}
+                    disabled={submitting}
+                    size="small"
+                    slotProps={{ input: { 'aria-label': option } }}
+                  />
                   <Typography variant="body2" color="text.secondary">
                     {option}
                   </Typography>
@@ -552,9 +646,265 @@ function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
               );
             })}
           </Stack>
+          {result?.feedback[index] && (
+            <Typography
+              variant="caption"
+              color={result.feedback[index].correct ? 'success.main' : 'warning.main'}
+            >
+              {result.feedback[index].correct
+                ? 'Trả lời đúng.'
+                : `Đáp án đúng: ${result.feedback[index].correctAnswer}`}
+            </Typography>
+          )}
         </Paper>
       ))}
+      <Box>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={submitting || answers.some((answer) => !answer)}
+        >
+          {submitting ? 'Đang chấm...' : 'Nộp bài trắc nghiệm'}
+        </Button>
+      </Box>
     </Stack>
+  );
+}
+
+function FinalTestPanel({
+  courseId,
+  completedLessons,
+}: {
+  courseId: string;
+  completedLessons: number;
+}) {
+  const [eligibility, setEligibility] = useState<FinalTestEligibility | null>(null);
+  const [attempt, setAttempt] = useState<FinalTestAttempt | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [result, setResult] = useState<FinalTestSubmissionResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+
+  const loadEligibility = useCallback(async () => {
+    try {
+      const value = await learningService.getFinalTestEligibility(courseId);
+      setEligibility(value);
+    } catch {
+      setErrorMsg('Không thể kiểm tra điều kiện làm Final Test.');
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId]);
+
+  useEffect(() => {
+    setLoading(true);
+    void loadEligibility();
+  }, [completedLessons, loadEligibility]);
+
+  useEffect(() => {
+    if (!attempt || result) return;
+    const updateTimer = () => {
+      setSecondsLeft(Math.max(0, Math.ceil((new Date(attempt.expiresAt).getTime() - Date.now()) / 1000)));
+    };
+    updateTimer();
+    const timer = window.setInterval(updateTimer, 1000);
+    return () => window.clearInterval(timer);
+  }, [attempt, result]);
+
+  useEffect(() => {
+    if (!attempt || result || secondsLeft !== 0) return;
+    if (new Date(attempt.expiresAt).getTime() > Date.now()) return;
+
+    setErrorMsg('Lượt thi đã hết thời gian. Hãy bắt đầu lượt tiếp theo nếu vẫn còn lượt.');
+    setAttempt(null);
+    void loadEligibility();
+  }, [attempt, loadEligibility, result, secondsLeft]);
+
+  const handleStart = async () => {
+    setWorking(true);
+    setErrorMsg(null);
+    try {
+      const value = await learningService.startFinalTest(courseId);
+      setSecondsLeft(Math.max(0, Math.ceil((new Date(value.expiresAt).getTime() - Date.now()) / 1000)));
+      setAttempt(value);
+      setAnswers({});
+      setResult(null);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setErrorMsg(error.response?.data?.message || 'Không thể bắt đầu Final Test.');
+      } else {
+        setErrorMsg('Không thể bắt đầu Final Test.');
+      }
+      await loadEligibility();
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const toggleChoice = (questionId: string, choiceId: string) => {
+    setAnswers((current) => {
+      const selected = current[questionId] || [];
+      return {
+        ...current,
+        [questionId]: selected.includes(choiceId)
+          ? selected.filter((value) => value !== choiceId)
+          : [...selected, choiceId],
+      };
+    });
+  };
+
+  const handleSubmit = async () => {
+    if (!attempt || working || secondsLeft <= 0) return;
+    setWorking(true);
+    setErrorMsg(null);
+    try {
+      const value = await learningService.submitFinalTest(
+        courseId,
+        attempt.attemptId,
+        attempt.questions.map((question) => ({
+          questionId: question.id,
+          selectedChoiceIds: answers[question.id] || [],
+        })),
+      );
+      setResult(value);
+      await loadEligibility();
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setErrorMsg(error.response?.data?.message || 'Không thể nộp Final Test.');
+      } else {
+        setErrorMsg('Không thể nộp Final Test.');
+      }
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const allAnswered = attempt?.questions.every((question) => (answers[question.id]?.length || 0) > 0) ?? false;
+  const reasonText: Record<string, string> = {
+    FINAL_TEST_NOT_CONFIGURED: 'Khoá học chưa cấu hình Final Test.',
+    FINAL_TEST_ALREADY_PASSED: 'Bạn đã vượt qua Final Test.',
+    LESSONS_INCOMPLETE: 'Hoàn thành tất cả bài học để mở Final Test.',
+    ATTEMPTS_EXHAUSTED: 'Bạn đã sử dụng hết số lần thi.',
+  };
+
+  if (loading) {
+    return <LinearProgress sx={{ mb: 2 }} />;
+  }
+
+  return (
+    <Box sx={{ borderBlock: '1px solid', borderColor: 'divider', py: 2, mb: 3 }}>
+      <Stack spacing={2}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1}
+          sx={{ alignItems: { xs: 'flex-start', sm: 'center' } }}
+        >
+          <AssignmentTurnedInOutlinedIcon color="primary" />
+          <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }}>
+            Final Test
+          </Typography>
+          {eligibility?.configured && (
+            <Chip
+              size="small"
+              label={`${eligibility.attemptsUsed}/${eligibility.attemptsAllowed} lượt đã dùng`}
+              variant="outlined"
+            />
+          )}
+        </Stack>
+
+        {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
+
+        {!attempt && eligibility && (
+          <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
+            <Alert severity={eligibility.passed ? 'success' : eligibility.eligible ? 'info' : 'warning'} sx={{ width: '100%' }}>
+              {eligibility.eligible
+                ? 'Bạn đã hoàn thành nội dung bắt buộc và có thể bắt đầu Final Test.'
+                : reasonText[eligibility.reason || ''] || 'Bạn chưa đủ điều kiện làm Final Test.'}
+            </Alert>
+            {eligibility.eligible && (
+              <Button variant="contained" onClick={handleStart} disabled={working}>
+                {working ? 'Đang bắt đầu...' : 'Bắt đầu Final Test'}
+              </Button>
+            )}
+          </Stack>
+        )}
+
+        {attempt && !result && (
+          <Stack spacing={2}>
+            <Alert severity={secondsLeft > 0 ? 'info' : 'error'}>
+              Điểm đạt: {attempt.passingScore}% · Thời gian còn lại: {Math.floor(secondsLeft / 60)}:
+              {String(secondsLeft % 60).padStart(2, '0')}
+            </Alert>
+            {attempt.questions.map((question, questionIndex) => (
+              <Paper key={question.id} variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  Câu {questionIndex + 1}: {question.content}
+                </Typography>
+                <Stack>
+                  {question.choices.map((choice) => (
+                    <Stack
+                      key={choice.id}
+                      direction="row"
+                      onClick={() => !working && toggleChoice(question.id, choice.id)}
+                      sx={{ alignItems: 'center', cursor: working ? 'default' : 'pointer' }}
+                    >
+                      <Checkbox
+                        checked={(answers[question.id] || []).includes(choice.id)}
+                        disabled={working}
+                        slotProps={{ input: { 'aria-label': choice.content } }}
+                      />
+                      <Typography variant="body2">{choice.content}</Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </Paper>
+            ))}
+            <Box>
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleSubmit}
+                disabled={working || !allAnswered || secondsLeft <= 0}
+              >
+                {working ? 'Đang chấm...' : 'Nộp Final Test'}
+              </Button>
+            </Box>
+          </Stack>
+        )}
+
+        {result && (
+          <Stack spacing={2}>
+            <Alert severity={result.passed ? 'success' : 'error'}>
+              Kết quả: {result.score.toFixed(0)}% ({result.correctCount}/{result.totalQuestions} câu đúng).
+              {result.passed
+                ? ' Bạn đã vượt qua Final Test.'
+                : ' Chưa đạt. Chứng chỉ vẫn bị khoá.'}
+            </Alert>
+            {result.feedback.map((item, index) => (
+              <Box key={item.questionId}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Câu {index + 1}: {item.correct ? 'Đúng' : 'Chưa đúng'}
+                </Typography>
+                {item.explanation && (
+                  <Typography variant="body2" color="text.secondary">
+                    {item.explanation}
+                  </Typography>
+                )}
+              </Box>
+            ))}
+            {!result.passed && eligibility?.eligible && (
+              <Box>
+                <Button variant="outlined" onClick={handleStart} disabled={working}>
+                  Thi lại
+                </Button>
+              </Box>
+            )}
+          </Stack>
+        )}
+      </Stack>
+    </Box>
   );
 }
 
