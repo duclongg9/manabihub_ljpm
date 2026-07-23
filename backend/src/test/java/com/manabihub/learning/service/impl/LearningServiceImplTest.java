@@ -62,6 +62,7 @@ class LearningServiceImplTest {
 
     @Mock private com.manabihub.writing.repository.WritingSubmissionRepository writingSubmissionRepository;
     @Mock private com.manabihub.writing.repository.AiWritingSuggestionRepository aiWritingSuggestionRepository;
+    @Mock private com.manabihub.writing.repository.TeacherWritingFeedbackRepository teacherWritingFeedbackRepository;
     @Mock private com.manabihub.ai.repository.AiUsageLogRepository aiUsageLogRepository;
     @Mock private com.manabihub.ai.service.AiChatSettingsService aiChatSettingsService;
     @Mock private com.manabihub.ai.service.AiUsageLogService aiUsageLogService;
@@ -698,6 +699,84 @@ class LearningServiceImplTest {
     }
 
     // --- Writing Assignment & AI Tests ---
+
+    @Test
+    @DisplayName("getWritingSubmission returns distinct non-official AI suggestion and official teacher feedback")
+    void testGetWritingSubmission_ReturnsBothFeedbackSources() {
+        UUID writingBlockId = UUID.randomUUID();
+        UUID submissionId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId)
+                .type(LessonBlockType.WRITING)
+                .title("Writing")
+                .module(courseModule)
+                .build();
+        com.manabihub.writing.entity.WritingSubmission submission =
+                com.manabihub.writing.entity.WritingSubmission.builder()
+                        .id(submissionId)
+                        .enrollment(enrollment)
+                        .lessonBlockId(writingBlockId)
+                        .content("My essay")
+                        .status(com.manabihub.writing.enums.WritingSubmissionStatus.TEACHER_FEEDBACK_READY)
+                        .submittedAt(Instant.now())
+                        .build();
+        com.manabihub.writing.entity.AiWritingSuggestion suggestion =
+                com.manabihub.writing.entity.AiWritingSuggestion.builder()
+                        .id(UUID.randomUUID())
+                        .writingSubmission(submission)
+                        .status("READY")
+                        .official(false)
+                        .createdAt(Instant.now())
+                        .build();
+        com.manabihub.writing.entity.TeacherWritingFeedback feedback =
+                com.manabihub.writing.entity.TeacherWritingFeedback.builder()
+                        .id(UUID.randomUUID())
+                        .writingSubmission(submission)
+                        .score(new java.math.BigDecimal("8.50"))
+                        .comment("Good revision.")
+                        .official(true)
+                        .createdAt(Instant.now())
+                        .build();
+
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        mockActiveEnrollment();
+        when(writingSubmissionRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, writingBlockId))
+                .thenReturn(Optional.of(submission));
+        when(aiWritingSuggestionRepository.findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submissionId))
+                .thenReturn(Optional.of(suggestion));
+        when(teacherWritingFeedbackRepository.findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submissionId))
+                .thenReturn(Optional.of(feedback));
+
+        var response = learningService.getWritingSubmission(writingBlockId);
+
+        assertNotNull(response.aiSuggestion());
+        assertFalse(response.aiSuggestion().official());
+        assertNotNull(response.teacherFeedback());
+        assertTrue(response.teacherFeedback().official());
+        assertEquals("Good revision.", response.teacherFeedback().comment());
+        assertEquals(0, response.teacherFeedback().score().compareTo(new java.math.BigDecimal("8.50")));
+    }
+
+    @Test
+    @DisplayName("getWritingSubmission scopes lookup to current student's enrollment")
+    void testGetWritingSubmission_UsesCurrentEnrollmentOnly() {
+        UUID writingBlockId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId)
+                .type(LessonBlockType.WRITING)
+                .title("Writing")
+                .module(courseModule)
+                .build();
+
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        mockActiveEnrollment();
+        when(writingSubmissionRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, writingBlockId))
+                .thenReturn(Optional.empty());
+
+        assertNull(learningService.getWritingSubmission(writingBlockId));
+        verify(writingSubmissionRepository)
+                .findByEnrollmentIdAndLessonBlockId(enrollmentId, writingBlockId);
+    }
 
     @Test
     @DisplayName("requestAiWritingAssistance - Forbidden - Another student's submission")
