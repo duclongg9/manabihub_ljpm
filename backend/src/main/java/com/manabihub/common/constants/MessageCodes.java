@@ -151,6 +151,13 @@ public final class MessageCodes {
     public static final String LEARNING_INVALID_BLOCK_TYPE = "LEARNING_INVALID_BLOCK_TYPE";
     public static final String LEARNING_INVALID_VIDEO_POSITION = "LEARNING_INVALID_VIDEO_POSITION";
     public static final String LEARNING_INVALID_FLASHCARD_INDEX = "LEARNING_INVALID_FLASHCARD_INDEX";
+    public static final String LEARNING_INVALID_QUIZ_ANSWERS = "LEARNING_INVALID_QUIZ_ANSWERS";
+    public static final String LEARNING_QUIZ_SUBMITTED = "LEARNING_QUIZ_SUBMITTED";
+    public static final String LEARNING_FINAL_TEST_NOT_ELIGIBLE = "LEARNING_FINAL_TEST_NOT_ELIGIBLE";
+    public static final String LEARNING_FINAL_TEST_ATTEMPT_NOT_FOUND = "LEARNING_FINAL_TEST_ATTEMPT_NOT_FOUND";
+    public static final String LEARNING_FINAL_TEST_ATTEMPT_EXPIRED = "LEARNING_FINAL_TEST_ATTEMPT_EXPIRED";
+    public static final String LEARNING_FINAL_TEST_STARTED = "LEARNING_FINAL_TEST_STARTED";
+    public static final String LEARNING_FINAL_TEST_SUBMITTED = "LEARNING_FINAL_TEST_SUBMITTED";
 
     // ──────────────────────────────────────────────
     // AI — AI-related operations
