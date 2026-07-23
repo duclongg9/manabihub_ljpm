@@ -38,7 +38,6 @@ public class TeacherProfileMapper {
     ) {
         user.setFullName(request.getFullName());
         user.setPhoneNumber(request.getPhoneNumber());
-        user.setAvatarUrl(request.getAvatarUrl());
     }
 
     public void updateProfile(

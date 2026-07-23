@@ -8,7 +8,7 @@ import {PageHeader} from "../../shared/components/PageHeader/PageHeader";
 import {LoadingState} from "../../shared/components/LoadingState/LoadingState";
 import AvatarUpload from "../../shared/components/AvatarUpload/AvatarUpload";
 
-import {getMyTeacherProfile, updateMyTeacherProfile,} from "./profileApi";
+import {getMyTeacherProfile, updateMyTeacherProfile, uploadAvatar} from "./profileApi";
 
 export default function TeacherProfilePage() {
 
@@ -151,8 +151,6 @@ export default function TeacherProfilePage() {
 
                 phoneNumber: form.phoneNumber,
 
-                avatarUrl: form.avatarUrl,
-
                 displayName: form.displayName,
 
                 jlptGoal: form.jlptGoal,
@@ -251,18 +249,22 @@ export default function TeacherProfilePage() {
 
     }
 
-    function handleAvatar(file: File) {
-
+    async function handleAvatar(file: File) {
         const preview = URL.createObjectURL(file);
+        setForm(prev => ({ ...prev, avatarUrl: preview }));
 
-        setForm({
-
-            ...form,
-
-            avatarUrl: preview,
-
-        });
-
+        try {
+            setSaving(true);
+            const serverUrl = await uploadAvatar(file);
+            setForm(prev => ({ ...prev, avatarUrl: serverUrl }));
+            setSnackbar({ open: true, message: "Avatar uploaded successfully", severity: "success" });
+        } catch (error) {
+            console.error("Avatar upload failed:", error);
+            setSnackbar({ open: true, message: "Failed to upload avatar", severity: "error" });
+        } finally {
+            setSaving(false);
+            URL.revokeObjectURL(preview);
+        }
     }
 
     if (loading) {
