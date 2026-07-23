@@ -23,11 +23,11 @@ import com.manabihub.learning.dto.response.LearningLessonBlockResponse;
 import com.manabihub.learning.dto.response.LearningModuleResponse;
 import com.manabihub.learning.dto.response.LessonProgressResponse;
 import com.manabihub.learning.entity.Enrollment;
-import com.manabihub.learning.entity.LessonProgress;
+import com.manabihub.learning.entity.LessonBlockProgress;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.enums.LessonProgressStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
-import com.manabihub.learning.repository.LessonProgressRepository;
+import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.LearningService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +63,7 @@ public class LearningServiceImpl implements LearningService {
     private final LessonBlockRepository lessonBlockRepository;
     private final StudentProfileRepository studentProfileRepository;
     private final EnrollmentRepository enrollmentRepository;
-    private final LessonProgressRepository lessonProgressRepository;
+    private final LessonBlockProgressRepository lessonBlockProgressRepository;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
 
@@ -89,9 +89,9 @@ public class LearningServiceImpl implements LearningService {
             );
         }
 
-        Map<UUID, LessonProgress> progressByBlockId = lessonProgressRepository.findByEnrollment_Id(enrollment.getId())
+        Map<UUID, LessonBlockProgress> progressByBlockId = lessonBlockProgressRepository.findByEnrollmentId(enrollment.getId())
                 .stream()
-                .collect(Collectors.toMap(progress -> progress.getLessonBlock().getId(), Function.identity()));
+                .collect(Collectors.toMap(progress -> progress.getLessonBlockId(), Function.identity()));
 
         int completedLessons = (int) allBlocks.stream()
                 .filter(block -> isCompleted(progressByBlockId.get(block.getId())))
@@ -154,13 +154,13 @@ public class LearningServiceImpl implements LearningService {
             );
         }
 
-        LessonProgress progress = resolveOrCreateProgress(enrollment, block);
+        LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
         progress.setLastVideoPositionSeconds(request.positionSeconds());
         if (progress.getStatus() == LessonProgressStatus.NOT_STARTED) {
             progress.setStatus(LessonProgressStatus.IN_PROGRESS);
         }
 
-        lessonProgressRepository.save(progress);
+        lessonBlockProgressRepository.save(progress);
         return toProgressResponse(progress);
     }
 
@@ -168,16 +168,24 @@ public class LearningServiceImpl implements LearningService {
     @Transactional
     public LessonProgressResponse markLessonComplete(UUID lessonBlockId) {
         LessonBlock block = resolveLessonBlock(lessonBlockId);
+        if (block.getType() != LessonBlockType.VIDEO && block.getType() != LessonBlockType.TEXT) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Cannot mark " + block.getType() + " block as complete through this endpoint.",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
         Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
 
-        LessonProgress progress = resolveOrCreateProgress(enrollment, block);
+        LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
         if (progress.getStatus() != LessonProgressStatus.COMPLETED) {
             progress.setStatus(LessonProgressStatus.COMPLETED);
             progress.setCompletedAt(Instant.now());
         }
 
-        lessonProgressRepository.save(progress);
-        completeEnrollmentIfCourseFinished(enrollment, progress);
+        lessonBlockProgressRepository.save(progress);
+        // MHB-25: Do not set EnrollmentStatus.COMPLETED. This belongs to MHB-26/27.
         return toProgressResponse(progress);
     }
 
@@ -191,9 +199,9 @@ public class LearningServiceImpl implements LearningService {
             return new CourseProgressSummaryResponse(course.getId(), course.getTitle(), 0, 0, 0.0, null, null, false);
         }
 
-        Map<UUID, LessonProgress> progressByBlockId = lessonProgressRepository.findByEnrollment_Id(enrollment.getId())
+        Map<UUID, LessonBlockProgress> progressByBlockId = lessonBlockProgressRepository.findByEnrollmentId(enrollment.getId())
                 .stream()
-                .collect(Collectors.toMap(progress -> progress.getLessonBlock().getId(), Function.identity()));
+                .collect(Collectors.toMap(progress -> progress.getLessonBlockId(), Function.identity()));
 
         int completedLessons = (int) allBlocks.stream()
                 .filter(block -> isCompleted(progressByBlockId.get(block.getId())))
@@ -248,7 +256,7 @@ public class LearningServiceImpl implements LearningService {
                 ));
     }
 
-    private void completeEnrollmentIfCourseFinished(Enrollment enrollment, LessonProgress justCompleted) {
+    private void completeEnrollmentIfCourseFinished(Enrollment enrollment, LessonBlockProgress justCompleted) {
         if (enrollment.getStatus() != EnrollmentStatus.ACTIVE) {
             return;
         }
@@ -258,10 +266,11 @@ public class LearningServiceImpl implements LearningService {
             return;
         }
 
-        Map<UUID, LessonProgress> progressByBlockId = new HashMap<>(lessonProgressRepository.findByEnrollment_Id(enrollment.getId())
+        Map<UUID, LessonBlockProgress> progressByBlockId = new HashMap<>(lessonBlockProgressRepository.findByEnrollmentId(enrollment.getId())
                 .stream()
-                .collect(Collectors.toMap(progress -> progress.getLessonBlock().getId(), Function.identity())));
-        progressByBlockId.put(justCompleted.getLessonBlock().getId(), justCompleted);
+                .collect(Collectors.toMap(progress -> progress.getLessonBlockId(), Function.identity())));
+        progressByBlockId.put(justCompleted.getLessonBlockId(), justCompleted);
+        boolean justCompletedLastBlock = justCompleted != null && justCompleted.getLessonBlockId().equals(allBlocks.getLast().getId());
 
         boolean allCompleted = allBlocks.stream()
                 .allMatch(block -> isCompleted(progressByBlockId.get(block.getId())));
@@ -282,22 +291,22 @@ public class LearningServiceImpl implements LearningService {
                 ));
     }
 
-    private LessonProgress resolveOrCreateProgress(Enrollment enrollment, LessonBlock block) {
-        return lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollment.getId(), block.getId())
-                .orElseGet(() -> LessonProgress.builder()
-                        .enrollment(enrollment)
-                        .lessonBlock(block)
+    private LessonBlockProgress resolveOrCreateProgress(Enrollment enrollment, LessonBlock block) {
+        return lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollment.getId(), block.getId())
+                .orElseGet(() -> LessonBlockProgress.builder()
+                        .enrollmentId(enrollment.getId())
+                        .lessonBlockId(block.getId())
                         .status(LessonProgressStatus.NOT_STARTED)
                         .build());
     }
 
-    private boolean isCompleted(LessonProgress progress) {
+    private boolean isCompleted(LessonBlockProgress progress) {
         return progress != null && progress.getStatus() == LessonProgressStatus.COMPLETED;
     }
 
     private LearningModuleResponse toModuleResponse(
             CourseModule module,
-            Map<UUID, LessonProgress> progressByBlockId,
+            Map<UUID, LessonBlockProgress> progressByBlockId,
             UUID currentLessonBlockId,
             List<String> warnings
     ) {
@@ -311,7 +320,7 @@ public class LearningServiceImpl implements LearningService {
     private LearningLessonBlockResponse toBlockResponse(
             CourseModule module,
             LessonBlock block,
-            LessonProgress progress,
+            LessonBlockProgress progress,
             UUID currentLessonBlockId,
             List<String> warnings
     ) {
@@ -356,10 +365,10 @@ public class LearningServiceImpl implements LearningService {
         };
     }
 
-    private LessonProgressResponse toProgressResponse(LessonProgress progress) {
+    private LessonProgressResponse toProgressResponse(LessonBlockProgress progress) {
         return new LessonProgressResponse(
-                progress.getLessonBlock().getId(),
-                progress.getEnrollment().getId(),
+                progress.getLessonBlockId(),
+                progress.getEnrollmentId(),
                 progress.getStatus(),
                 progress.getLastVideoPositionSeconds(),
                 progress.getCompletedAt(),
@@ -395,11 +404,13 @@ public class LearningServiceImpl implements LearningService {
     private List<QuizQuestionResponse> readQuizItems(LessonBlock block, List<String> fallbackOptions) {
         List<QuizQuestionResponse> quizItems = readJsonList(block.getQuizItemsJson(), QUIZ_ITEMS_TYPE);
         if (!quizItems.isEmpty()) {
-            return quizItems;
+            return quizItems.stream()
+                    .map(q -> new QuizQuestionResponse(q.question(), q.options(), null))
+                    .toList();
         }
 
         if (StringUtils.hasText(block.getQuizQuestion())) {
-            return List.of(new QuizQuestionResponse(block.getQuizQuestion(), fallbackOptions, block.getQuizAnswer()));
+            return List.of(new QuizQuestionResponse(block.getQuizQuestion(), fallbackOptions, null));
         }
 
         return List.of();

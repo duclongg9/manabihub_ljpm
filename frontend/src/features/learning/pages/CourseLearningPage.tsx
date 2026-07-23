@@ -263,7 +263,11 @@ export function CourseLearningPage() {
                     variant="contained"
                     color="success"
                     startIcon={<CheckCircleIcon />}
-                    disabled={completing || selectedBlock.progressStatus === 'COMPLETED'}
+                    disabled={
+                      completing ||
+                      selectedBlock.progressStatus === 'COMPLETED' ||
+                      ['QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
+                    }
                     onClick={handleMarkComplete}
                   >
                     {selectedBlock.progressStatus === 'COMPLETED' ? 'Đã hoàn thành' : 'Hoàn thành bài học'}
@@ -405,7 +409,6 @@ function VideoBlock({
 
 function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [revealed, setRevealed] = useState(false);
 
   if (questions.length === 0) {
     return <Alert severity="info">Bài trắc nghiệm chưa có câu hỏi.</Alert>;
@@ -421,22 +424,20 @@ function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
           <Stack>
             {question.options.map((option) => {
               const isSelected = answers[index] === option;
-              const isCorrect = revealed && question.answer === option;
-              const isWrong = revealed && isSelected && question.answer !== option;
               return (
                 <Stack
                   key={option}
                   direction="row"
-                  onClick={() => !revealed && setAnswers((prev) => ({ ...prev, [index]: option }))}
+                  onClick={() => setAnswers((prev) => ({ ...prev, [index]: option }))}
                   sx={{
                     alignItems: 'center',
-                    cursor: revealed ? 'default' : 'pointer',
+                    cursor: 'pointer',
                     borderRadius: 1,
                     px: 1,
-                    bgcolor: isCorrect ? 'success.light' : isWrong ? 'error.light' : 'transparent',
+                    bgcolor: 'transparent',
                   }}
                 >
-                  <Radio checked={isSelected} size="small" disabled={revealed} />
+                  <Radio checked={isSelected} size="small" />
                   <Typography variant="body2">{option}</Typography>
                 </Stack>
               );
@@ -444,9 +445,9 @@ function QuizBlock({ questions }: { questions: QuizQuestion[] }) {
           </Stack>
         </Paper>
       ))}
-      <Button variant="outlined" onClick={() => setRevealed(true)} disabled={revealed} sx={{ alignSelf: 'flex-start' }}>
-        Kiểm tra đáp án
-      </Button>
+      <Alert severity="info" sx={{ alignSelf: 'flex-start' }}>
+        Lưu bài làm và chấm điểm sẽ được hỗ trợ trong phiên bản tới (MHB-27).
+      </Alert>
     </Stack>
   );
 }

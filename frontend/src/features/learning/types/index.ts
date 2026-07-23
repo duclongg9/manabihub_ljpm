@@ -5,7 +5,6 @@ export type LessonBlockType = 'VIDEO' | 'TEXT' | 'QUIZ' | 'FLASHCARD' | 'WRITING
 export interface QuizQuestion {
   question: string;
   options: string[];
-  answer?: string;
 }
 
 export interface FlashcardItem {

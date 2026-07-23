@@ -18,11 +18,11 @@ import com.manabihub.learning.dto.response.CourseProgressSummaryResponse;
 import com.manabihub.learning.dto.response.LearningLessonBlockResponse;
 import com.manabihub.learning.dto.response.LessonProgressResponse;
 import com.manabihub.learning.entity.Enrollment;
-import com.manabihub.learning.entity.LessonProgress;
+import com.manabihub.learning.entity.LessonBlockProgress;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.enums.LessonProgressStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
-import com.manabihub.learning.repository.LessonProgressRepository;
+import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
@@ -53,7 +53,7 @@ class LearningServiceImplTest {
     @Mock private LessonBlockRepository lessonBlockRepository;
     @Mock private StudentProfileRepository studentProfileRepository;
     @Mock private EnrollmentRepository enrollmentRepository;
-    @Mock private LessonProgressRepository lessonProgressRepository;
+    @Mock private LessonBlockProgressRepository lessonBlockProgressRepository;
     @Mock private CurrentUserService currentUserService;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -111,8 +111,8 @@ class LearningServiceImplTest {
         when(enrollmentRepository.findByStudent_IdAndCourse_Id(studentId, courseId)).thenReturn(Optional.of(enrollment));
     }
 
-    private LessonProgress completedProgress(LessonBlock block) {
-        return LessonProgress.builder().id(UUID.randomUUID()).enrollment(enrollment).lessonBlock(block)
+    private LessonBlockProgress completedProgress(LessonBlock block) {
+        return LessonBlockProgress.builder().id(UUID.randomUUID()).enrollmentId(enrollment.getId()).lessonBlockId(block.getId())
                 .status(LessonProgressStatus.COMPLETED).build();
     }
 
@@ -187,7 +187,7 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         courseModule.addBlock(quizBlock);
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId)).thenReturn(List.of());
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId)).thenReturn(List.of());
 
         CourseLearningResponse response = learningService.openOrResumeCourse(courseId);
         assertEquals(blockVideoId, response.currentLessonBlockId());
@@ -204,7 +204,7 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         courseModule.addBlock(quizBlock);
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId)).thenReturn(List.of(completedProgress(videoBlock)));
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId)).thenReturn(List.of(completedProgress(videoBlock)));
 
         CourseLearningResponse response = learningService.openOrResumeCourse(courseId);
         assertEquals(blockTextId, response.currentLessonBlockId());
@@ -219,7 +219,7 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         courseModule.addBlock(quizBlock);
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId))
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId))
                 .thenReturn(List.of(completedProgress(videoBlock), completedProgress(textBlock), completedProgress(quizBlock)));
 
         CourseLearningResponse response = learningService.openOrResumeCourse(courseId);
@@ -235,7 +235,7 @@ class LearningServiceImplTest {
         videoBlock.setVideoUrl(null);
         courseModule.addBlock(videoBlock);
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId)).thenReturn(List.of());
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId)).thenReturn(List.of());
 
         CourseLearningResponse response = learningService.openOrResumeCourse(courseId);
         assertFalse(response.warnings().isEmpty());
@@ -250,7 +250,7 @@ class LearningServiceImplTest {
         enrollment.setStatus(EnrollmentStatus.COMPLETED);
         courseModule.addBlock(videoBlock);
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId)).thenReturn(List.of(completedProgress(videoBlock)));
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId)).thenReturn(List.of(completedProgress(videoBlock)));
 
         CourseLearningResponse response = learningService.openOrResumeCourse(courseId);
         assertTrue(response.courseCompleted());
@@ -340,8 +340,8 @@ class LearningServiceImplTest {
     void testSaveVideoProgress_UTC06_CreateNew() {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
-        when(lessonProgressRepository.save(any(LessonProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LessonProgressResponse response = learningService.saveVideoProgress(blockVideoId, new SaveVideoProgressRequest(120));
         assertEquals(LessonProgressStatus.IN_PROGRESS, response.status());
@@ -354,10 +354,10 @@ class LearningServiceImplTest {
     void testSaveVideoProgress_UTC07_UpdateInProgress() {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
-        LessonProgress existing = LessonProgress.builder().id(UUID.randomUUID()).enrollment(enrollment).lessonBlock(videoBlock)
+        LessonBlockProgress existing = LessonBlockProgress.builder().id(UUID.randomUUID()).enrollmentId(enrollment.getId()).lessonBlockId(videoBlock.getId())
                 .status(LessonProgressStatus.IN_PROGRESS).lastVideoPositionSeconds(60).build();
-        when(lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollmentId, blockVideoId)).thenReturn(Optional.of(existing));
-        when(lessonProgressRepository.save(any(LessonProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.of(existing));
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LessonProgressResponse response = learningService.saveVideoProgress(blockVideoId, new SaveVideoProgressRequest(200));
         assertEquals(LessonProgressStatus.IN_PROGRESS, response.status());
@@ -371,10 +371,10 @@ class LearningServiceImplTest {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
         Instant completedAt = Instant.now().minusSeconds(3600);
-        LessonProgress existing = LessonProgress.builder().id(UUID.randomUUID()).enrollment(enrollment).lessonBlock(videoBlock)
+        LessonBlockProgress existing = LessonBlockProgress.builder().id(UUID.randomUUID()).enrollmentId(enrollment.getId()).lessonBlockId(videoBlock.getId())
                 .status(LessonProgressStatus.COMPLETED).completedAt(completedAt).lastVideoPositionSeconds(300).build();
-        when(lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollmentId, blockVideoId)).thenReturn(Optional.of(existing));
-        when(lessonProgressRepository.save(any(LessonProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.of(existing));
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LessonProgressResponse response = learningService.saveVideoProgress(blockVideoId, new SaveVideoProgressRequest(100));
         assertEquals(LessonProgressStatus.COMPLETED, response.status());
@@ -415,8 +415,8 @@ class LearningServiceImplTest {
     void testMarkLessonComplete_UTC03_CreateNew() {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
-        when(lessonProgressRepository.save(any(LessonProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LessonProgressResponse response = learningService.markLessonComplete(blockVideoId);
         assertEquals(LessonProgressStatus.COMPLETED, response.status());
@@ -429,10 +429,10 @@ class LearningServiceImplTest {
     void testMarkLessonComplete_UTC04_FromInProgress() {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
-        LessonProgress existing = LessonProgress.builder().id(UUID.randomUUID()).enrollment(enrollment).lessonBlock(videoBlock)
+        LessonBlockProgress existing = LessonBlockProgress.builder().id(UUID.randomUUID()).enrollmentId(enrollment.getId()).lessonBlockId(videoBlock.getId())
                 .status(LessonProgressStatus.IN_PROGRESS).build();
-        when(lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollmentId, blockVideoId)).thenReturn(Optional.of(existing));
-        when(lessonProgressRepository.save(any(LessonProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.of(existing));
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LessonProgressResponse response = learningService.markLessonComplete(blockVideoId);
         assertEquals(LessonProgressStatus.COMPLETED, response.status());
@@ -446,10 +446,10 @@ class LearningServiceImplTest {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
         Instant firstCompletedAt = Instant.now().minusSeconds(600);
-        LessonProgress existing = LessonProgress.builder().id(UUID.randomUUID()).enrollment(enrollment).lessonBlock(videoBlock)
+        LessonBlockProgress existing = LessonBlockProgress.builder().id(UUID.randomUUID()).enrollmentId(enrollment.getId()).lessonBlockId(videoBlock.getId())
                 .status(LessonProgressStatus.COMPLETED).completedAt(firstCompletedAt).build();
-        when(lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollmentId, blockVideoId)).thenReturn(Optional.of(existing));
-        when(lessonProgressRepository.save(any(LessonProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.of(existing));
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LessonProgressResponse response = learningService.markLessonComplete(blockVideoId);
         assertEquals(firstCompletedAt, response.completedAt());
@@ -457,15 +457,14 @@ class LearningServiceImplTest {
 
     @Test
     @Order(306)
-    @DisplayName("UTC06: QUIZ block completes without grading (out of scope)")
+    @DisplayName("UTC06: QUIZ block completes fails via this endpoint")
     void testMarkLessonComplete_UTC06_QuizNoGrading() {
         when(lessonBlockRepository.findById(blockQuizId)).thenReturn(Optional.of(quizBlock));
-        mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollmentId, blockQuizId)).thenReturn(Optional.empty());
-        when(lessonProgressRepository.save(any(LessonProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        LessonProgressResponse response = learningService.markLessonComplete(blockQuizId);
-        assertEquals(LessonProgressStatus.COMPLETED, response.status());
+        
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            learningService.markLessonComplete(blockQuizId);
+        });
+        assertEquals(MessageCodes.COMMON_BAD_REQUEST, ex.getMessageCode());
     }
 
     @Test
@@ -476,16 +475,16 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         when(lessonBlockRepository.findById(blockTextId)).thenReturn(Optional.of(textBlock));
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollmentId, blockTextId)).thenReturn(Optional.empty());
-        when(lessonProgressRepository.save(any(LessonProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId)).thenReturn(List.of(completedProgress(videoBlock)));
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockTextId)).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // removed unnecessary stubbing
 
         LessonProgressResponse response = learningService.markLessonComplete(blockTextId);
 
         assertEquals(LessonProgressStatus.COMPLETED, response.status());
-        assertEquals(EnrollmentStatus.COMPLETED, enrollment.getStatus());
-        assertNotNull(enrollment.getCompletedAt());
-        verify(enrollmentRepository).save(enrollment);
+        assertEquals(EnrollmentStatus.ACTIVE, enrollment.getStatus());
+        assertNull(enrollment.getCompletedAt());
+        
     }
 
     @Test
@@ -496,9 +495,9 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_IdAndLessonBlock_Id(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
-        when(lessonProgressRepository.save(any(LessonProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId)).thenReturn(List.of());
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // removed unnecessary stubbing
 
         LessonProgressResponse response = learningService.markLessonComplete(blockVideoId);
 
@@ -556,7 +555,7 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         courseModule.addBlock(quizBlock);
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId)).thenReturn(List.of());
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId)).thenReturn(List.of());
 
         CourseProgressSummaryResponse response = learningService.getCourseProgress(courseId);
         assertEquals(3, response.totalLessons());
@@ -572,7 +571,7 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         courseModule.addBlock(quizBlock);
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId))
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId))
                 .thenReturn(List.of(completedProgress(videoBlock), completedProgress(quizBlock)));
 
         CourseProgressSummaryResponse response = learningService.getCourseProgress(courseId);
@@ -590,7 +589,7 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         courseModule.addBlock(quizBlock);
         mockActiveEnrollment();
-        when(lessonProgressRepository.findByEnrollment_Id(enrollmentId))
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId))
                 .thenReturn(List.of(completedProgress(videoBlock), completedProgress(textBlock), completedProgress(quizBlock)));
 
         CourseProgressSummaryResponse response = learningService.getCourseProgress(courseId);
