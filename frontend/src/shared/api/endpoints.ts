@@ -36,6 +36,8 @@ export const ENDPOINTS = {
   student: {
     dashboardStats: '/v1/student/dashboard/stats',
     courses: '/v1/student/courses',
+    wishlist: '/v1/student/wishlist',
+    wishlistCourse: (courseId: string) => `/v1/student/wishlist/${courseId}`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>

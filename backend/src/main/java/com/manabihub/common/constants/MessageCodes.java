@@ -161,6 +161,11 @@ public final class MessageCodes {
     public static final String LEARNING_CERTIFICATE_NOT_FOUND = "LEARNING_CERTIFICATE_NOT_FOUND";
     public static final String LEARNING_CERTIFICATE_NOT_ELIGIBLE = "LEARNING_CERTIFICATE_NOT_ELIGIBLE";
     public static final String LEARNING_CERTIFICATE_ISSUED = "LEARNING_CERTIFICATE_ISSUED";
+    public static final String LEARNING_WISHLIST_ADDED = "LEARNING_WISHLIST_ADDED";
+    public static final String LEARNING_WISHLIST_REMOVED = "LEARNING_WISHLIST_REMOVED";
+    public static final String LEARNING_WISHLIST_DUPLICATE = "LEARNING_WISHLIST_DUPLICATE";
+    public static final String LEARNING_WISHLIST_ITEM_NOT_FOUND = "LEARNING_WISHLIST_ITEM_NOT_FOUND";
+    public static final String LEARNING_STUDENT_PROFILE_NOT_FOUND = "LEARNING_STUDENT_PROFILE_NOT_FOUND";
 
     // ──────────────────────────────────────────────
     // AI — AI-related operations
