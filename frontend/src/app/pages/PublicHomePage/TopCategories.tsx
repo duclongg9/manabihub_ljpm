@@ -16,18 +16,17 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
 
 const CATEGORIES = [
-  { id: 'n5', name: 'JLPT N5', count: '12+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'n4', name: 'JLPT N4', count: '15+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'n3', name: 'JLPT N3', count: '20+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'n2', name: 'JLPT N2', count: '18+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'n1', name: 'JLPT N1', count: '8+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'vocab', name: 'Từ vựng (Goi)', count: '25+', icon: <TextSnippetIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
-  { id: 'grammar', name: 'Ngữ pháp (Bunpou)', count: '22+', icon: <MenuBookIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
-  { id: 'listening', name: 'Nghe hiểu (Choukai)', count: '30+', icon: <HeadphonesIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
-  { id: 'reading', name: 'Đọc hiểu (Dokkai)', count: '15+', icon: <ChromeReaderModeIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
-  { id: 'writing', name: 'Viết & Kanji', count: '10+', icon: <EditIcon sx={{ fontSize: 32, color: '#8b5cf6' }} /> },
-  { id: 'n5-2', name: 'JLPT N5', count: '12+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
-  { id: 'n4-2', name: 'JLPT N4', count: '15+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N5', name: 'JLPT N5', count: '12+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N4', name: 'JLPT N4', count: '15+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N3', name: 'JLPT N3', count: '20+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N2', name: 'JLPT N2', count: '18+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'jlptLevel=N1', name: 'JLPT N1', count: '8+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
+  { id: 'category=vocabulary', name: 'Từ vựng (Goi)', count: '25+', icon: <TextSnippetIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
+  { id: 'category=grammar', name: 'Ngữ pháp (Bunpou)', count: '22+', icon: <MenuBookIcon sx={{ fontSize: 32, color: '#10b981' }} /> },
+  { id: 'category=jlpt-prep', name: 'Luyện thi JLPT', count: '30+', icon: <HeadphonesIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
+  { id: 'category=conversation', name: 'Giao tiếp', count: '15+', icon: <ChromeReaderModeIcon sx={{ fontSize: 32, color: '#f59e0b' }} /> },
+  { id: 'category=kanji', name: 'Hán tự (Kanji)', count: '10+', icon: <EditIcon sx={{ fontSize: 32, color: '#8b5cf6' }} /> },
+  { id: 'category=business-japanese', name: 'Tiếng Nhật Thương mại', count: '12+', icon: <AssignmentIcon sx={{ fontSize: 32, color: '#3b82f6' }} /> },
 ];
 
 export const TopCategories: React.FC = () => {
@@ -208,7 +207,7 @@ export const TopCategories: React.FC = () => {
                           boxShadow: 'none'
                         }
                       }}
-                      onClick={() => navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?category=${cat.id.split('-')[0]}`)}
+                      onClick={() => navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?${cat.id}`)}
                     >
                       XEM THÊM
                     </Button>
