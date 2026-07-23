@@ -37,11 +37,7 @@ public class UserAvatarServiceImpl implements UserAvatarService {
     private final Path storageRoot;
     private final String publicPathPrefix;
 
-    private static final List<String> ALLOWED_MIME_TYPES = List.of(
-            "image/jpeg",
-            "image/png",
-            "image/webp"
-    );
+
 
     private static final long MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
@@ -114,7 +110,7 @@ public class UserAvatarServiceImpl implements UserAvatarService {
         }
 
         UUID userId = currentUserService.getCurrentUserId();
-        AppUser user = appUserRepository.findById(userId)
+        AppUser user = appUserRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "User not found", HttpStatus.NOT_FOUND));
 
         String newFilename = UUID.randomUUID().toString() + "." + extension;
@@ -136,8 +132,6 @@ public class UserAvatarServiceImpl implements UserAvatarService {
 
         String stableUrl = publicPathPrefix + "/" + newFilename;
         String oldAvatarUrl = user.getAvatarUrl();
-        user.setAvatarUrl(stableUrl);
-        appUserRepository.save(user);
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -165,6 +159,9 @@ public class UserAvatarServiceImpl implements UserAvatarService {
                 }
             }
         });
+
+        user.setAvatarUrl(stableUrl);
+        appUserRepository.save(user);
 
         // Audit log
         Map<String, Object> after = Map.of(

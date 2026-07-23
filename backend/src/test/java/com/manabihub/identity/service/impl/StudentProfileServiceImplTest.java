@@ -55,6 +55,7 @@ class StudentProfileServiceImplTest {
                 .id(userId)
                 .email("student@manabihub.local")
                 .fullName("Google Name")
+                .avatarUrl("https://example.com/avatar.png")
                 .build();
         UpdateStudentProfileRequest request = request("Nguyen Van A", "0912345678", "N3");
 
@@ -76,6 +77,7 @@ class StudentProfileServiceImplTest {
         assertEquals("0912345678", response.getPhoneNumber());
         assertEquals("Nguyen Van A", response.getDisplayName());
         assertEquals("N3", response.getJlptGoal());
+        assertEquals("https://example.com/avatar.png", response.getAvatarUrl());
     }
 
     @Test
@@ -85,6 +87,7 @@ class StudentProfileServiceImplTest {
                 .id(userId)
                 .email("student@manabihub.local")
                 .fullName("Old Name")
+                .avatarUrl("/uploads/user-avatars/old.png")
                 .build();
         StudentProfile existingProfile = StudentProfile.builder()
                 .id(UUID.randomUUID())
@@ -107,6 +110,7 @@ class StudentProfileServiceImplTest {
         assertEquals("Tran Thi B", response.getFullName());
         assertEquals("Tran Thi B", response.getDisplayName());
         assertEquals("N2", response.getJlptGoal());
+        assertEquals("/uploads/user-avatars/old.png", response.getAvatarUrl());
     }
 
     private UpdateStudentProfileRequest request(String name, String phoneNumber, String jlptGoal) {

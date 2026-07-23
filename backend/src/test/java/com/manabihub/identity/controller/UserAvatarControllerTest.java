@@ -205,4 +205,31 @@ class UserAvatarControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.messageCode").value(MessageCodes.COMMON_BAD_REQUEST));
     }
+
+    @Test
+    @DisplayName("Upload avatar - Lifecycle: Public access works after successful upload")
+    @WithMockUser(roles = {"STUDENT"})
+    void uploadAvatar_Lifecycle_PublicAccess() throws Exception {
+        when(currentUserService.getCurrentUserId()).thenReturn(studentUser.getId());
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.png",
+                "image/png",
+                VALID_PNG
+        );
+
+        String jsonResponse = mockMvc.perform(multipart("/api/v1/users/avatar")
+                        .file(file)
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String avatarUrl = com.jayway.jsonpath.JsonPath.read(jsonResponse, "$.data");
+
+        // Use standard WebMvc request without auth to test permitAll and resource handler
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(avatarUrl))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType(MediaType.IMAGE_PNG_VALUE));
+    }
 }
