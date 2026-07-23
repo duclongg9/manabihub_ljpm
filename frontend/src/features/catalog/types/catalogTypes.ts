@@ -12,7 +12,6 @@ export interface PublicCourseSummary {
   teacherName?: string;
   teacherAvatarUrl?: string;
   totalLessons: number;
-  publishedAt?: string;
 }
 
 // ─── Catalog Filter Params ───────────────────────────────────────

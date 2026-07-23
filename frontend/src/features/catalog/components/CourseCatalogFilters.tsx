@@ -1,48 +1,49 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Button,
+  Divider,
   Drawer,
+  FormControl,
   IconButton,
-  Stack,
-  Typography,
   InputAdornment,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
   useMediaQuery,
   useTheme,
-  Divider,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import CloseIcon from '@mui/icons-material/Close';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import SearchIcon from '@mui/icons-material/Search';
+import type { SelectChangeEvent } from '@mui/material';
 import type { CourseCatalogFilters, CourseCategory } from '../types/catalogTypes';
 
-interface CourseCatalogFiltersProps {
+const JLPT_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
+
+interface CourseCatalogFiltersBarProps {
   filters: CourseCatalogFilters;
   onFiltersChange: (filters: CourseCatalogFilters) => void;
   categories: CourseCategory[];
   categoriesLoading?: boolean;
-}
-
-const JLPT_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
-
-const SORT_OPTIONS = [
-  { value: 'publishedAt,desc', label: 'Mới nhất' },
-  { value: 'price,asc', label: 'Giá tăng dần' },
-  { value: 'price,desc', label: 'Giá giảm dần' },
-  { value: 'title,asc', label: 'Tên A-Z' },
-];
-
-interface CourseCatalogFiltersWithSortProps extends CourseCatalogFiltersProps {
   sort: string;
   onSortChange: (sort: string) => void;
 }
 
-export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersWithSortProps> = ({
+function toPriceInput(value?: number): string {
+  return value === undefined ? '' : String(value);
+}
+
+function parsePrice(value: string): number | undefined {
+  if (value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = ({
   filters,
   onFiltersChange,
   categories,
@@ -53,190 +54,253 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersWithSortProps
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [keyword, setKeyword] = useState(filters.keyword ?? '');
+  const [minPrice, setMinPrice] = useState(toPriceInput(filters.minPrice));
+  const [maxPrice, setMaxPrice] = useState(toPriceInput(filters.maxPrice));
+  const [priceError, setPriceError] = useState('');
 
-  const handleChange = (field: keyof CourseCatalogFilters, value: string | number | undefined) => {
-    onFiltersChange({ ...filters, [field]: value || undefined });
+  useEffect(() => {
+    setKeyword(filters.keyword ?? '');
+  }, [filters.keyword]);
+
+  useEffect(() => {
+    setMinPrice(toPriceInput(filters.minPrice));
+    setMaxPrice(toPriceInput(filters.maxPrice));
+  }, [filters.minPrice, filters.maxPrice]);
+
+  const updateFilter = (field: keyof CourseCatalogFilters, value?: string) => {
+    onFiltersChange({
+      ...filters,
+      [field]: value || undefined,
+    });
   };
 
-  const handleClearAll = () => {
-    onFiltersChange({});
-    onSortChange('publishedAt,desc');
+  const submitKeyword = (event: React.FormEvent) => {
+    event.preventDefault();
+    onFiltersChange({
+      ...filters,
+      keyword: keyword.trim() || undefined,
+    });
+  };
+
+  const applyPrice = () => {
+    const parsedMin = parsePrice(minPrice);
+    const parsedMax = parsePrice(maxPrice);
+    const hasInvalidValue =
+      (minPrice.trim() !== '' && parsedMin === undefined) ||
+      (maxPrice.trim() !== '' && parsedMax === undefined);
+
+    if (hasInvalidValue) {
+      setPriceError('Giá phải là số không âm.');
+      return;
+    }
+
+    if (parsedMin !== undefined && parsedMax !== undefined && parsedMin > parsedMax) {
+      setPriceError('Giá tối thiểu không được lớn hơn giá tối đa.');
+      return;
+    }
+
+    setPriceError('');
+    onFiltersChange({
+      ...filters,
+      minPrice: parsedMin,
+      maxPrice: parsedMax,
+    });
     setDrawerOpen(false);
   };
 
-  const hasActiveFilters = !!(
-    filters.keyword ||
-    filters.category ||
-    filters.jlptLevel ||
-    filters.minPrice ||
-    filters.maxPrice
-  );
+  const clearFilters = () => {
+    setKeyword('');
+    setMinPrice('');
+    setMaxPrice('');
+    setPriceError('');
+    onFiltersChange({});
+    setDrawerOpen(false);
+  };
 
-  const filterContent = (
-    <Stack spacing={2} sx={{ p: isMobile ? 2 : 0 }}>
-      {isMobile && (
-        <>
-          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Bộ lọc
-            </Typography>
-            <IconButton onClick={() => setDrawerOpen(false)} size="small">
-              <CloseIcon />
-            </IconButton>
-          </Stack>
-          <Divider />
-        </>
-      )}
+  const handleSortChange = (event: SelectChangeEvent) => {
+    onSortChange(event.target.value);
+  };
 
-      {/* Category */}
-      <FormControl size="small" fullWidth={isMobile} sx={{ minWidth: isMobile ? undefined : 160 }}>
-        <InputLabel>Danh mục</InputLabel>
+  const filterFields = (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))',
+        gap: 1.5,
+        alignItems: 'start',
+      }}
+    >
+      <FormControl fullWidth size="small">
+        <InputLabel id="catalog-category-label">Danh mục</InputLabel>
         <Select
-          value={filters.category || ''}
+          labelId="catalog-category-label"
+          value={filters.category ?? ''}
           label="Danh mục"
-          onChange={(e) => handleChange('category', e.target.value)}
+          disabled={categoriesLoading}
+          onChange={(event) => updateFilter('category', event.target.value)}
         >
-          <MenuItem value="">Tất cả</MenuItem>
-          {!categoriesLoading &&
-            categories.map((cat) => (
-              <MenuItem key={cat.id} value={cat.code}>
-                {cat.name}
-              </MenuItem>
-            ))}
+          <MenuItem value="">Tất cả danh mục</MenuItem>
+          {categories.map((category) => (
+            <MenuItem key={category.id} value={category.code}>
+              {category.name}
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
 
-      {/* JLPT Level */}
-      <FormControl size="small" fullWidth={isMobile} sx={{ minWidth: isMobile ? undefined : 120 }}>
-        <InputLabel>Trình độ</InputLabel>
+      <FormControl fullWidth size="small">
+        <InputLabel id="catalog-jlpt-label">Trình độ</InputLabel>
         <Select
-          value={filters.jlptLevel || ''}
+          labelId="catalog-jlpt-label"
+          value={filters.jlptLevel ?? ''}
           label="Trình độ"
-          onChange={(e) => handleChange('jlptLevel', e.target.value)}
+          onChange={(event) => updateFilter('jlptLevel', event.target.value)}
         >
-          <MenuItem value="">Tất cả</MenuItem>
+          <MenuItem value="">Mọi cấp độ</MenuItem>
           {JLPT_LEVELS.map((level) => (
             <MenuItem key={level} value={level}>
-              {level}
+              JLPT {level}
             </MenuItem>
           ))}
         </Select>
       </FormControl>
 
-      {/* Price Range */}
-      <Stack direction={isMobile ? 'column' : 'row'} spacing={1}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.5}
+        sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}
+      >
         <TextField
-          size="small"
           label="Giá từ"
           type="number"
-          value={filters.minPrice || ''}
-          onChange={(e) =>
-            handleChange('minPrice', e.target.value ? Number(e.target.value) : undefined)
-          }
-          slotProps={{ htmlInput: { min: 0 } }}
-          sx={{ minWidth: 120 }}
+          value={minPrice}
+          onChange={(event) => setMinPrice(event.target.value)}
+          size="small"
+          fullWidth
+          slotProps={{ htmlInput: { min: 0, step: 10000 } }}
         />
         <TextField
-          size="small"
           label="Giá đến"
           type="number"
-          value={filters.maxPrice || ''}
-          onChange={(e) =>
-            handleChange('maxPrice', e.target.value ? Number(e.target.value) : undefined)
-          }
-          slotProps={{ htmlInput: { min: 0 } }}
-          sx={{ minWidth: 120 }}
+          value={maxPrice}
+          onChange={(event) => setMaxPrice(event.target.value)}
+          size="small"
+          fullWidth
+          slotProps={{ htmlInput: { min: 0, step: 10000 } }}
         />
       </Stack>
+      {priceError && (
+        <Typography variant="caption" color="error">
+          {priceError}
+        </Typography>
+      )}
 
-      {/* Sort */}
-      <FormControl size="small" fullWidth={isMobile} sx={{ minWidth: isMobile ? undefined : 160 }}>
-        <InputLabel>Sắp xếp</InputLabel>
-        <Select value={sort} label="Sắp xếp" onChange={(e) => onSortChange(e.target.value)}>
-          {SORT_OPTIONS.map((opt) => (
-            <MenuItem key={opt.value} value={opt.value}>
-              {opt.label}
-            </MenuItem>
-          ))}
+      <Button variant="outlined" onClick={applyPrice}>
+        Áp dụng khoảng giá
+      </Button>
+
+      <FormControl fullWidth size="small">
+        <InputLabel id="catalog-sort-label">Sắp xếp</InputLabel>
+        <Select
+          labelId="catalog-sort-label"
+          value={sort}
+          label="Sắp xếp"
+          onChange={handleSortChange}
+        >
+          <MenuItem value="publishedAt,desc">Mới xuất bản</MenuItem>
+          <MenuItem value="price,asc">Giá thấp đến cao</MenuItem>
+          <MenuItem value="price,desc">Giá cao đến thấp</MenuItem>
+          <MenuItem value="title,asc">Tên A-Z</MenuItem>
         </Select>
       </FormControl>
 
-      {/* Clear Filters */}
-      {(hasActiveFilters || sort !== 'publishedAt,desc') && (
-        <Button size="small" onClick={handleClearAll} color="inherit">
-          Xóa bộ lọc
-        </Button>
-      )}
-
-      {isMobile && (
-        <Button
-          variant="contained"
-          fullWidth
-          onClick={() => setDrawerOpen(false)}
-          sx={{ mt: 1 }}
-        >
-          Áp dụng
-        </Button>
-      )}
-    </Stack>
+      <Button color="inherit" onClick={clearFilters}>
+        Xóa bộ lọc
+      </Button>
+    </Box>
   );
 
   return (
-    <Box sx={{ mb: 3 }}>
-      {/* Search Bar — always visible */}
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 2 }}>
+    <Box>
+      <Stack
+        component="form"
+        onSubmit={submitKeyword}
+        direction="row"
+        spacing={1}
+        sx={{ mb: 2 }}
+      >
         <TextField
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder="Tìm theo tên khóa học..."
           size="small"
-          placeholder="Tìm kiếm khóa học..."
-          value={filters.keyword || ''}
-          onChange={(e) => handleChange('keyword', e.target.value)}
+          fullWidth
           slotProps={{
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon color="action" />
+                  <SearchIcon fontSize="small" />
                 </InputAdornment>
               ),
             },
           }}
-          sx={{ flexGrow: 1 }}
         />
+        <Button
+          type="submit"
+          variant="contained"
+          sx={{ minWidth: 112, whiteSpace: 'nowrap' }}
+        >
+          Tìm kiếm
+        </Button>
         {isMobile && (
           <IconButton
+            aria-label="Mở bộ lọc"
+            title="Bộ lọc"
             onClick={() => setDrawerOpen(true)}
-            color={hasActiveFilters ? 'primary' : 'default'}
-            sx={{
-              border: 1,
-              borderColor: hasActiveFilters ? 'primary.main' : 'divider',
-              borderRadius: 1,
-            }}
+            sx={{ border: '1px solid', borderColor: 'divider' }}
           >
             <FilterListIcon />
           </IconButton>
         )}
       </Stack>
 
-      {/* Desktop: inline filters */}
       {!isMobile && (
-        <Stack direction="row" spacing={1.5} useFlexGap sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
-          {filterContent}
-        </Stack>
+        <Box
+          sx={{
+            p: 2,
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+          }}
+        >
+          {filterFields}
+        </Box>
       )}
 
-      {/* Mobile: drawer filters */}
       <Drawer
         anchor="bottom"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        sx={{
-          '& .MuiDrawer-paper': {
-            borderTopLeftRadius: 16,
-            borderTopRightRadius: 16,
-            maxHeight: '80vh',
-          },
-        }}
+        slotProps={{ paper: { sx: { maxHeight: '88vh', borderRadius: '8px 8px 0 0' } } }}
       >
-        {filterContent}
+        <Box sx={{ p: 2.5 }}>
+          <Stack
+            direction="row"
+            sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <Typography variant="h6">Bộ lọc khóa học</Typography>
+            <IconButton
+              aria-label="Đóng bộ lọc"
+              title="Đóng"
+              onClick={() => setDrawerOpen(false)}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+          <Divider sx={{ my: 2 }} />
+          {filterFields}
+        </Box>
       </Drawer>
     </Box>
   );

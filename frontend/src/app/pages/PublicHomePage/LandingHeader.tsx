@@ -9,6 +9,21 @@ import { ROUTES } from '../../../shared/constants/routes';
 
 export const LandingHeader: React.FC = () => {
   const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = React.useState('');
+
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?keyword=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      navigate(ROUTES.PUBLIC.COURSE_BROWSE);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   return (
     <AppBar position="sticky" sx={{ bgcolor: '#ffffff', color: '#0f172a', borderBottom: '1px solid #e2e8f0', boxShadow: 'none' }}>
@@ -44,8 +59,11 @@ export const LandingHeader: React.FC = () => {
             <InputBase
               placeholder="Tìm kiếm khóa học, giảng viên..."
               sx={{ ml: 1, flex: 1, fontSize: '0.9rem' }}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
             />
-            <IconButton type="button" sx={{ p: '10px' }} aria-label="search">
+            <IconButton type="button" sx={{ p: '10px' }} aria-label="search" onClick={handleSearch}>
               <SearchIcon fontSize="small" />
             </IconButton>
           </Box>
