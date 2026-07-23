@@ -113,6 +113,16 @@ class LearningServiceImplTest {
                 .content("Noi dung bai doc").orderIndex(2).module(courseModule).build();
         quizBlock = LessonBlock.builder().id(blockQuizId).type(LessonBlockType.QUIZ).title("Quiz 1")
                 .quizQuestion("Cau hoi?").quizOptionsJson("[\"A\",\"B\"]").quizAnswer("A").orderIndex(3).module(courseModule).build();
+
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(inv -> {
+            org.springframework.transaction.support.TransactionCallback<Object> callback = inv.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+        lenient().doAnswer(inv -> {
+            java.util.function.Consumer<org.springframework.transaction.TransactionStatus> callback = inv.getArgument(0);
+            callback.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
     }
 
     private void mockActiveEnrollment() {
@@ -757,16 +767,6 @@ class LearningServiceImplTest {
         when(aiUsageLogRepository.countByUserIdAndFeatureCodeAndRequestStatusAndCreatedAtAfter(
                 any(), any(), any(), any()
         )).thenReturn(0L);
-
-        when(transactionTemplate.execute(any())).thenAnswer(inv -> {
-            org.springframework.transaction.support.TransactionCallback<Boolean> callback = inv.getArgument(0);
-            return callback.doInTransaction(null);
-        });
-        doAnswer(inv -> {
-            java.util.function.Consumer<org.springframework.transaction.TransactionStatus> callback = inv.getArgument(0);
-            callback.accept(null);
-            return null;
-        }).when(transactionTemplate).executeWithoutResult(any());
 
         com.fasterxml.jackson.databind.JsonNode mockNode = objectMapper.createArrayNode();
         com.manabihub.ai.provider.AiWritingAssistanceProvider.Result mockResult = new com.manabihub.ai.provider.AiWritingAssistanceProvider.Result(
