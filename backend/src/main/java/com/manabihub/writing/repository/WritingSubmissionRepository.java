@@ -125,8 +125,9 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
     Optional<WritingSubmission> findByIdAndEnrollmentIdAndLessonBlockId(UUID id, UUID enrollmentId, UUID lessonBlockId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM WritingSubmission w WHERE w.id = :id AND w.enrollment.id = :enrollmentId AND w.lessonBlockId = :lessonBlockId")
     @EntityGraph(attributePaths = {
             "enrollment", "enrollment.course", "student", "student.user"
     })
-    Optional<WritingSubmission> findByIdAndEnrollmentIdAndLessonBlockIdForUpdate(UUID id, UUID enrollmentId, UUID lessonBlockId);
+    Optional<WritingSubmission> findByIdAndEnrollmentIdAndLessonBlockIdForUpdate(@Param("id") UUID id, @Param("enrollmentId") UUID enrollmentId, @Param("lessonBlockId") UUID lessonBlockId);
 }
