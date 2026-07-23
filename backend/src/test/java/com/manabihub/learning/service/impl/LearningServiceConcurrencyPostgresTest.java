@@ -4,6 +4,7 @@ import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseModule;
 import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.LessonBlockType;
+import com.manabihub.course.repository.CourseModuleRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.repository.LessonBlockRepository;
 import com.manabihub.identity.entity.AppUser;
@@ -22,7 +23,6 @@ import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.learning.repository.FlashcardProgressRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.LearningService;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +51,11 @@ import static org.mockito.Mockito.when;
 @Testcontainers(disabledWithoutDocker = true)
 public class LearningServiceConcurrencyPostgresTest {
 
+    private static final UUID DEMO_USER_ID = UUID.fromString("d0000000-0000-0000-0000-000000000001");
+    private static final UUID DEMO_STUDENT_ID = UUID.fromString("e0000000-0000-0000-0000-000000000001");
+    private static final UUID DEMO_COURSE_ID = UUID.fromString("f0000000-0000-0000-0000-000000000001");
+    private static final UUID DEMO_ENROLLMENT_ID = UUID.fromString("f4000000-0000-0000-0000-000000000001");
+
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
             .withDatabaseName("manabihub_test")
@@ -71,6 +76,7 @@ public class LearningServiceConcurrencyPostgresTest {
     @Autowired private AppUserRepository userRepository;
     @Autowired private StudentProfileRepository studentProfileRepository;
     @Autowired private CourseRepository courseRepository;
+    @Autowired private CourseModuleRepository courseModuleRepository;
     @Autowired private LessonBlockRepository lessonBlockRepository;
     @Autowired private EnrollmentRepository enrollmentRepository;
     @Autowired private LessonBlockProgressRepository lessonBlockProgressRepository;
@@ -79,7 +85,6 @@ public class LearningServiceConcurrencyPostgresTest {
     @MockBean private CurrentUserService currentUserService;
 
     private AppUser user;
-    private StudentProfile studentProfile;
     private Course course;
     private CourseModule module;
     private LessonBlock flashcardBlock;
@@ -87,29 +92,34 @@ public class LearningServiceConcurrencyPostgresTest {
 
     @BeforeEach
     void setUp() {
-        user = AppUser.builder().id(UUID.randomUUID()).email("m28-" + UUID.randomUUID() + "@example.com").fullName("Test").build();
-        userRepository.save(user);
+        user = userRepository.findById(DEMO_USER_ID)
+                .orElseThrow(() -> new IllegalStateException("Demo user not found in Flyway seed"));
+        course = courseRepository.findById(DEMO_COURSE_ID)
+                .orElseThrow(() -> new IllegalStateException("Demo course not found in Flyway seed"));
+        enrollment = enrollmentRepository.findById(DEMO_ENROLLMENT_ID)
+                .orElseThrow(() -> new IllegalStateException("Demo enrollment not found in Flyway seed"));
 
-        studentProfile = StudentProfile.builder().id(UUID.randomUUID()).user(user).displayName("Test Student").build();
-        studentProfileRepository.save(studentProfile);
+        module = courseModuleRepository.saveAndFlush(
+                CourseModule.builder()
+                        .course(course)
+                        .title("MHB-28 " + UUID.randomUUID())
+                        .orderIndex(1000)
+                        .blocks(new ArrayList<>())
+                        .build()
+        );
 
-        course = Course.builder().id(UUID.randomUUID()).title("Test Course").modules(new ArrayList<>()).build();
-        module = CourseModule.builder().id(UUID.randomUUID()).title("Mod 1").course(course).blocks(new ArrayList<>()).orderIndex(1).build();
-        course.addModule(module);
-        courseRepository.save(course);
+        flashcardBlock = lessonBlockRepository.saveAndFlush(
+                LessonBlock.builder()
+                        .type(LessonBlockType.FLASHCARD)
+                        .title("Flashcards")
+                        .module(module)
+                        .orderIndex(1)
+                        .flashcardsJson("[{\"front\":\"A\",\"back\":\"B\"}, {\"front\":\"C\",\"back\":\"D\"}]")
+                        .build()
+        );
 
-        flashcardBlock = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
-                .title("Flashcards").module(module).orderIndex(1)
-                .flashcardsJson("[{\"front\":\"A\",\"back\":\"B\"}, {\"front\":\"C\",\"back\":\"D\"}]").build();
-        lessonBlockRepository.save(flashcardBlock);
-
-        enrollment = Enrollment.builder().id(UUID.randomUUID()).student(studentProfile).course(course).status(EnrollmentStatus.ACTIVE).build();
-        enrollmentRepository.save(enrollment);
-
-        when(currentUserService.getCurrentUserId()).thenReturn(user.getId());
+        when(currentUserService.getCurrentUserId()).thenReturn(DEMO_USER_ID);
     }
-
-
 
     @Test
     @DisplayName("Concurrent same-card reviews produce exactly 1 row and zero exceptions")
@@ -236,12 +246,25 @@ public class LearningServiceConcurrencyPostgresTest {
     @Test
     @DisplayName("Another student's reviews are isolated")
     void testAnotherStudentIsolation() {
-        AppUser user2 = AppUser.builder().id(UUID.randomUUID()).email("user2@example.com").fullName("Test 2").build();
-        userRepository.save(user2);
-        StudentProfile student2 = StudentProfile.builder().id(UUID.randomUUID()).user(user2).displayName("Student 2").build();
-        studentProfileRepository.save(student2);
-        Enrollment enrollment2 = Enrollment.builder().id(UUID.randomUUID()).student(student2).course(course).status(EnrollmentStatus.ACTIVE).build();
-        enrollmentRepository.save(enrollment2);
+        AppUser user2 = userRepository.saveAndFlush(
+                AppUser.builder()
+                        .email("m28-" + UUID.randomUUID() + "@example.com")
+                        .fullName("Test 2")
+                        .build()
+        );
+        StudentProfile student2 = studentProfileRepository.saveAndFlush(
+                StudentProfile.builder()
+                        .user(user2)
+                        .displayName("Student 2")
+                        .build()
+        );
+        Enrollment enrollment2 = enrollmentRepository.saveAndFlush(
+                Enrollment.builder()
+                        .student(student2)
+                        .course(course)
+                        .status(EnrollmentStatus.ACTIVE)
+                        .build()
+        );
 
         when(currentUserService.getCurrentUserId()).thenReturn(user2.getId());
         learningService.reviewFlashcard(flashcardBlock.getId(), new ReviewFlashcardRequest(0, FlashcardStatus.REMEMBERED));
