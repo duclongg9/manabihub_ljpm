@@ -158,6 +158,9 @@ public final class MessageCodes {
     public static final String LEARNING_FINAL_TEST_ATTEMPT_EXPIRED = "LEARNING_FINAL_TEST_ATTEMPT_EXPIRED";
     public static final String LEARNING_FINAL_TEST_STARTED = "LEARNING_FINAL_TEST_STARTED";
     public static final String LEARNING_FINAL_TEST_SUBMITTED = "LEARNING_FINAL_TEST_SUBMITTED";
+    public static final String LEARNING_CERTIFICATE_NOT_FOUND = "LEARNING_CERTIFICATE_NOT_FOUND";
+    public static final String LEARNING_CERTIFICATE_NOT_ELIGIBLE = "LEARNING_CERTIFICATE_NOT_ELIGIBLE";
+    public static final String LEARNING_CERTIFICATE_ISSUED = "LEARNING_CERTIFICATE_ISSUED";
 
     // ──────────────────────────────────────────────
     // AI — AI-related operations

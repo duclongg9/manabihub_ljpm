@@ -1,0 +1,217 @@
+package com.manabihub.learning.service.impl;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.common.exception.BusinessException;
+import com.manabihub.course.entity.Course;
+import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.identity.entity.AppUser;
+import com.manabihub.identity.entity.StudentProfile;
+import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.identity.service.CurrentUserService;
+import com.manabihub.learning.dto.response.CertificateEligibilityResponse;
+import com.manabihub.learning.dto.response.LearningCertificateResponse;
+import com.manabihub.learning.entity.Enrollment;
+import com.manabihub.learning.entity.LearningCertificate;
+import com.manabihub.learning.enums.EnrollmentStatus;
+import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.repository.LearningCertificateRepository;
+import com.manabihub.learning.repository.LessonBlockProgressRepository;
+import com.manabihub.learning.service.CertificateEligibilityService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class StudentCertificateServiceImplTest {
+
+    @Mock
+    private CourseRepository courseRepository;
+    @Mock
+    private StudentProfileRepository studentProfileRepository;
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
+    @Mock
+    private LessonBlockProgressRepository lessonBlockProgressRepository;
+    @Mock
+    private LearningCertificateRepository certificateRepository;
+    @Mock
+    private CertificateEligibilityService eligibilityService;
+    @Mock
+    private CurrentUserService currentUserService;
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
+
+    @InjectMocks
+    private StudentCertificateServiceImpl service;
+
+    private UUID userId;
+    private Course course;
+    private StudentProfile student;
+    private Enrollment enrollment;
+
+    @BeforeEach
+    void setUp() {
+        userId = UUID.randomUUID();
+        course = Course.builder()
+                .id(UUID.randomUUID())
+                .title("Japanese Foundations")
+                .modules(new ArrayList<>())
+                .build();
+        AppUser user = AppUser.builder()
+                .id(userId)
+                .email("student@example.com")
+                .fullName("Nguyen An")
+                .build();
+        student = StudentProfile.builder()
+                .id(UUID.randomUUID())
+                .user(user)
+                .displayName("An Nguyen")
+                .build();
+        enrollment = Enrollment.builder()
+                .id(UUID.randomUUID())
+                .student(student)
+                .course(course)
+                .status(EnrollmentStatus.COMPLETED)
+                .build();
+    }
+
+    @Test
+    void generateCertificate_createsImmutableSnapshotWhenEligible() {
+        mockOwnedEnrollment();
+        when(enrollmentRepository.findByIdForUpdate(enrollment.getId())).thenReturn(Optional.of(enrollment));
+        when(certificateRepository.findByEnrollmentId(enrollment.getId())).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollment.getId())).thenReturn(List.of());
+        when(eligibilityService.evaluate(any(), any(), any())).thenReturn(eligible());
+        when(certificateRepository.save(any())).thenAnswer(invocation -> {
+            LearningCertificate value = invocation.getArgument(0);
+            return LearningCertificate.builder()
+                    .id(UUID.randomUUID())
+                    .enrollment(value.getEnrollment())
+                    .certificateNumber(value.getCertificateNumber())
+                    .studentName(value.getStudentName())
+                    .courseTitle(value.getCourseTitle())
+                    .eligibilitySnapshot(value.getEligibilitySnapshot())
+                    .issuedAt(Instant.parse("2026-07-24T00:00:00Z"))
+                    .build();
+        });
+
+        LearningCertificateResponse result = service.generateCertificate(course.getId());
+
+        assertEquals("An Nguyen", result.studentName());
+        assertEquals(course.getTitle(), result.courseTitle());
+        assertTrue(result.certificateNumber().startsWith("MHB-"));
+        verify(certificateRepository).save(any(LearningCertificate.class));
+    }
+
+    @Test
+    void generateCertificate_returnsExistingRecordIdempotently() {
+        mockOwnedEnrollment();
+        when(enrollmentRepository.findByIdForUpdate(enrollment.getId())).thenReturn(Optional.of(enrollment));
+        LearningCertificate existing = certificate("MHB-EXISTING");
+        when(certificateRepository.findByEnrollmentId(enrollment.getId())).thenReturn(Optional.of(existing));
+
+        LearningCertificateResponse first = service.generateCertificate(course.getId());
+        LearningCertificateResponse second = service.generateCertificate(course.getId());
+
+        assertEquals(first.id(), second.id());
+        assertEquals("MHB-EXISTING", first.certificateNumber());
+        verify(eligibilityService, never()).evaluate(any(), any(), any());
+        verify(certificateRepository, never()).save(any());
+    }
+
+    @Test
+    void generateCertificate_rejectsWhenAnyRuleFails() {
+        mockOwnedEnrollment();
+        when(enrollmentRepository.findByIdForUpdate(enrollment.getId())).thenReturn(Optional.of(enrollment));
+        when(certificateRepository.findByEnrollmentId(enrollment.getId())).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollment.getId())).thenReturn(List.of());
+        when(eligibilityService.evaluate(any(), any(), any())).thenReturn(
+                new CertificateEligibilityResponse(
+                        false, false, false, false, null, 85, false,
+                        List.of("PROGRESS_INCOMPLETE", "FINAL_TEST_NOT_PASSED")
+                )
+        );
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.generateCertificate(course.getId())
+        );
+
+        assertEquals(MessageCodes.LEARNING_CERTIFICATE_NOT_ELIGIBLE, exception.getMessageCode());
+        verify(certificateRepository, never()).save(any());
+    }
+
+    @Test
+    void getCertificate_returnsNotFoundWithoutLeakingOtherEnrollment() {
+        mockOwnedEnrollment();
+        when(certificateRepository.findByEnrollmentId(enrollment.getId())).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.getCertificate(course.getId())
+        );
+
+        assertEquals(MessageCodes.LEARNING_CERTIFICATE_NOT_FOUND, exception.getMessageCode());
+    }
+
+    @Test
+    void getCertificate_rejectsStudentWithoutOwnedEnrollment() {
+        when(courseRepository.findById(course.getId())).thenReturn(Optional.of(course));
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId()))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.getCertificate(course.getId())
+        );
+
+        assertEquals(MessageCodes.LEARNING_NOT_ENROLLED, exception.getMessageCode());
+    }
+
+    private void mockOwnedEnrollment() {
+        when(courseRepository.findById(course.getId())).thenReturn(Optional.of(course));
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId()))
+                .thenReturn(Optional.of(enrollment));
+    }
+
+    private CertificateEligibilityResponse eligible() {
+        return new CertificateEligibilityResponse(
+                true, true, true, true, null, 85, true, List.of()
+        );
+    }
+
+    private LearningCertificate certificate(String number) {
+        return LearningCertificate.builder()
+                .id(UUID.randomUUID())
+                .enrollment(enrollment)
+                .certificateNumber(number)
+                .studentName("An Nguyen")
+                .courseTitle(course.getTitle())
+                .eligibilitySnapshot(objectMapper.valueToTree(eligible()))
+                .issuedAt(Instant.parse("2026-07-24T00:00:00Z"))
+                .build();
+    }
+}

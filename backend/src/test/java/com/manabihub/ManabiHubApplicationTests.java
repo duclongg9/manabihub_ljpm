@@ -29,6 +29,7 @@ import com.manabihub.course.repository.CourseApprovalDecisionRepository;
 import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.learning.repository.FinalTestAttemptRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
+import com.manabihub.learning.repository.LearningCertificateRepository;
 import com.manabihub.learning.repository.QuizAttemptRepository;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
@@ -144,6 +145,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private FinalTestAttemptRepository finalTestAttemptRepository;
+
+    @MockBean
+    private LearningCertificateRepository learningCertificateRepository;
 
     @MockBean
     private WritingSubmissionRepository writingSubmissionRepository;
