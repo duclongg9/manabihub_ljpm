@@ -87,7 +87,7 @@ public class LearningServiceConcurrencyPostgresTest {
 
     @BeforeEach
     void setUp() {
-        user = AppUser.builder().id(UUID.randomUUID()).email("test@example.com").fullName("Test").build();
+        user = AppUser.builder().id(UUID.randomUUID()).email("m28-" + UUID.randomUUID() + "@example.com").fullName("Test").build();
         userRepository.save(user);
 
         studentProfile = StudentProfile.builder().id(UUID.randomUUID()).user(user).displayName("Test Student").build();
@@ -109,16 +109,7 @@ public class LearningServiceConcurrencyPostgresTest {
         when(currentUserService.getCurrentUserId()).thenReturn(user.getId());
     }
 
-    @AfterEach
-    void tearDown() {
-        flashcardProgressRepository.deleteAll();
-        lessonBlockProgressRepository.deleteAll();
-        enrollmentRepository.deleteAll();
-        lessonBlockRepository.deleteAll();
-        courseRepository.deleteAll();
-        studentProfileRepository.deleteAll();
-        userRepository.deleteAll();
-    }
+
 
     @Test
     @DisplayName("Concurrent same-card reviews produce exactly 1 row and zero exceptions")
@@ -141,26 +132,30 @@ public class LearningServiceConcurrencyPostgresTest {
 
             assertTrue(readyLatch.await(5, TimeUnit.SECONDS), "Workers did not become ready in time");
             startLatch.countDown();
+
+            List<Throwable> errors = new ArrayList<>();
+            for (Future<LessonProgressResponse> f : futures) {
+                try {
+                    f.get(30, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    errors.add(e.getCause() != null ? e.getCause() : e);
+                }
+            }
+            assertEquals(0, errors.size(), "All requests must succeed, but got: " + errors);
+
+            int count = flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollment.getId(), flashcardBlock.getId());
+            assertEquals(1, count, "Exactly 1 flashcard_progress row for card_index=0");
+
+            var persisted = flashcardProgressRepository.findByEnrollmentIdAndLessonBlockIdAndCardIndex(
+                    enrollment.getId(), flashcardBlock.getId(), 0).orElseThrow();
+            assertEquals(FlashcardStatus.REMEMBERED, persisted.getStatus());
+
+            executor.shutdown();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS), "Executor must terminate");
         } finally {
+            startLatch.countDown();
             executor.shutdownNow();
         }
-
-        List<Throwable> errors = new ArrayList<>();
-        for (Future<LessonProgressResponse> f : futures) {
-            try {
-                f.get();
-            } catch (Exception e) {
-                errors.add(e.getCause() != null ? e.getCause() : e);
-            }
-        }
-        assertEquals(0, errors.size(), "All requests must succeed, but got: " + errors);
-
-        int count = flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollment.getId(), flashcardBlock.getId());
-        assertEquals(1, count, "Exactly 1 flashcard_progress row for card_index=0");
-
-        var persisted = flashcardProgressRepository.findByEnrollmentIdAndLessonBlockIdAndCardIndex(
-                enrollment.getId(), flashcardBlock.getId(), 0).orElseThrow();
-        assertEquals(FlashcardStatus.REMEMBERED, persisted.getStatus());
     }
 
     @Test
@@ -186,28 +181,32 @@ public class LearningServiceConcurrencyPostgresTest {
 
             assertTrue(readyLatch.await(5, TimeUnit.SECONDS), "Workers did not become ready in time");
             startLatch.countDown();
+
+            List<Throwable> errors = new ArrayList<>();
+            for (Future<LessonProgressResponse> f : futures) {
+                try {
+                    f.get(30, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    errors.add(e.getCause() != null ? e.getCause() : e);
+                }
+            }
+            assertEquals(0, errors.size(), "All requests must succeed, but got: " + errors);
+
+            int count = flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollment.getId(), flashcardBlock.getId());
+            assertEquals(2, count, "Exactly 2 flashcard_progress rows (one per card)");
+
+            LessonBlockProgress finalProgress = lessonBlockProgressRepository
+                    .findByEnrollmentIdAndLessonBlockId(enrollment.getId(), flashcardBlock.getId())
+                    .orElseThrow(() -> new AssertionError("LessonBlockProgress must exist"));
+            assertEquals(LessonProgressStatus.COMPLETED, finalProgress.getStatus(),
+                    "All cards reviewed => block COMPLETED");
+
+            executor.shutdown();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS), "Executor must terminate");
         } finally {
+            startLatch.countDown();
             executor.shutdownNow();
         }
-
-        List<Throwable> errors = new ArrayList<>();
-        for (Future<LessonProgressResponse> f : futures) {
-            try {
-                f.get();
-            } catch (Exception e) {
-                errors.add(e.getCause() != null ? e.getCause() : e);
-            }
-        }
-        assertEquals(0, errors.size(), "All requests must succeed, but got: " + errors);
-
-        int count = flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollment.getId(), flashcardBlock.getId());
-        assertEquals(2, count, "Exactly 2 flashcard_progress rows (one per card)");
-
-        LessonBlockProgress finalProgress = lessonBlockProgressRepository
-                .findByEnrollmentIdAndLessonBlockId(enrollment.getId(), flashcardBlock.getId())
-                .orElseThrow(() -> new AssertionError("LessonBlockProgress must exist"));
-        assertEquals(LessonProgressStatus.COMPLETED, finalProgress.getStatus(),
-                "All cards reviewed => block COMPLETED");
     }
 
     @Test
