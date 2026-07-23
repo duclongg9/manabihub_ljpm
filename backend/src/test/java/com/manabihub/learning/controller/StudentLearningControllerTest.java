@@ -335,7 +335,16 @@ class StudentLearningControllerTest {
                 10,
                 5,
                 50.0,
-                null, null, false
+                null,
+                null,
+                false,
+                new com.manabihub.learning.dto.response.FinalTestEligibilityResponse(
+                        true, false, "LESSONS_INCOMPLETE", UUID.randomUUID(), 10, 5, 0, 2, false
+                ),
+                new com.manabihub.learning.dto.response.CertificateEligibilityResponse(
+                        false, false, false, true, null, 85, false,
+                        java.util.List.of("PROGRESS_INCOMPLETE", "FINAL_TEST_NOT_PASSED")
+                )
         );
 
         when(learningService.getCourseProgress(courseId)).thenReturn(response);
@@ -345,7 +354,10 @@ class StudentLearningControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
                 .andExpect(jsonPath("$.data.totalLessons", is(10)))
-                .andExpect(jsonPath("$.data.completedLessons", is(5)));
+                .andExpect(jsonPath("$.data.completedLessons", is(5)))
+                .andExpect(jsonPath("$.data.finalTestEligibility.eligible", is(false)))
+                .andExpect(jsonPath("$.data.certificateEligibility.eligible", is(false)))
+                .andExpect(jsonPath("$.data.certificateEligibility.exerciseScoreThreshold", is(85)));
     }
 
     @Test

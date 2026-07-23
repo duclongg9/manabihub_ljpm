@@ -2,6 +2,7 @@ import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 import type {
   CourseLearning,
+  CourseProgressSummary,
   FinalTestAttempt,
   FinalTestEligibility,
   FinalTestSubmissionResult,
@@ -13,6 +14,11 @@ import type {
 export const learningService = {
   openCourse: async (courseId: string): Promise<CourseLearning> => {
     const response = await axiosClient.get(ENDPOINTS.LEARNING.COURSE_LEARN(courseId));
+    return response.data.data;
+  },
+
+  getCourseProgress: async (courseId: string): Promise<CourseProgressSummary> => {
+    const response = await axiosClient.get(ENDPOINTS.LEARNING.COURSE_PROGRESS(courseId));
     return response.data.data;
   },
 

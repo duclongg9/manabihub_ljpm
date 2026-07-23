@@ -112,6 +112,30 @@ export interface CourseLearning {
   warnings: string[];
 }
 
+export interface CertificateEligibility {
+  eligible: boolean;
+  progressComplete: boolean;
+  requiredAssignmentsComplete: boolean;
+  exerciseScoreSatisfied: boolean;
+  exerciseAverageScore: number | null;
+  exerciseScoreThreshold: number;
+  finalTestPassed: boolean;
+  reasons: string[];
+}
+
+export interface CourseProgressSummary {
+  courseId: string;
+  courseTitle: string;
+  totalLessons: number;
+  completedLessons: number;
+  progressPercent: number;
+  nextLessonBlockId: string | null;
+  nextLessonTitle: string | null;
+  courseCompleted: boolean;
+  finalTestEligibility: FinalTestEligibility;
+  certificateEligibility: CertificateEligibility;
+}
+
 export interface LessonProgress {
   lessonBlockId: string;
   enrollmentId: string;

@@ -37,6 +37,7 @@ import DOMPurify from 'dompurify';
 import { learningService } from '../services/learningService';
 import type {
   CourseLearning,
+  CourseProgressSummary,
   FinalTestAttempt,
   FinalTestEligibility,
   FinalTestSubmissionResult,
@@ -679,6 +680,7 @@ function FinalTestPanel({
   completedLessons: number;
 }) {
   const [eligibility, setEligibility] = useState<FinalTestEligibility | null>(null);
+  const [progressSummary, setProgressSummary] = useState<CourseProgressSummary | null>(null);
   const [attempt, setAttempt] = useState<FinalTestAttempt | null>(null);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [result, setResult] = useState<FinalTestSubmissionResult | null>(null);
@@ -689,8 +691,12 @@ function FinalTestPanel({
 
   const loadEligibility = useCallback(async () => {
     try {
-      const value = await learningService.getFinalTestEligibility(courseId);
-      setEligibility(value);
+      const [finalTestValue, progressValue] = await Promise.all([
+        learningService.getFinalTestEligibility(courseId),
+        learningService.getCourseProgress(courseId),
+      ]);
+      setEligibility(finalTestValue);
+      setProgressSummary(progressValue);
     } catch {
       setErrorMsg('Không thể kiểm tra điều kiện làm Final Test.');
     } finally {
@@ -788,6 +794,12 @@ function FinalTestPanel({
     LESSONS_INCOMPLETE: 'Hoàn thành tất cả bài học để mở Final Test.',
     ATTEMPTS_EXHAUSTED: 'Bạn đã sử dụng hết số lần thi.',
   };
+  const certificateReasonText: Record<string, string> = {
+    PROGRESS_INCOMPLETE: 'Hoàn thành toàn bộ nội dung khoá học.',
+    ASSIGNMENTS_INCOMPLETE: 'Nộp đầy đủ các bài Writing bắt buộc.',
+    EXERCISE_AVERAGE_BELOW_85: 'Điểm Quiz trung bình cần đạt tối thiểu 85%.',
+    FINAL_TEST_NOT_PASSED: 'Vượt qua Final Test.',
+  };
 
   if (loading) {
     return <LinearProgress sx={{ mb: 2 }} />;
@@ -812,9 +824,28 @@ function FinalTestPanel({
               variant="outlined"
             />
           )}
+          {progressSummary && (
+            <Chip
+              size="small"
+              color={progressSummary.certificateEligibility.eligible ? 'success' : 'default'}
+              label={progressSummary.certificateEligibility.eligible
+                ? 'Đủ điều kiện chứng chỉ'
+                : 'Chứng chỉ đang khoá'}
+              variant={progressSummary.certificateEligibility.eligible ? 'filled' : 'outlined'}
+            />
+          )}
         </Stack>
 
         {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
+
+        {progressSummary && !progressSummary.certificateEligibility.eligible && (
+          <Alert severity="info">
+            Điều kiện chứng chỉ còn thiếu:{' '}
+            {progressSummary.certificateEligibility.reasons
+              .map((reason) => certificateReasonText[reason] || reason)
+              .join(' ')}
+          </Alert>
+        )}
 
         {!attempt && eligibility && (
           <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
