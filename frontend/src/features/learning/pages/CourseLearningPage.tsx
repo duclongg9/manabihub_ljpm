@@ -184,7 +184,8 @@ export function CourseLearningPage() {
         ...prev,
         modules: newModules,
         completedLessons: newCompleted,
-        progressPercent: newTotal > 0 ? (newCompleted / newTotal) * 100 : 0,
+        progressPercent: newTotal > 0 ? Math.round((newCompleted * 10000) / newTotal) / 100 : 0,
+        courseCompleted: newTotal > 0 && newCompleted === newTotal,
       };
     });
   }, []);

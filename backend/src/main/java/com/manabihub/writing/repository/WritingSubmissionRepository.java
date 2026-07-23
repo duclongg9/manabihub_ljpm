@@ -118,4 +118,15 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
             "enrollment", "enrollment.course", "student", "student.user"
     })
     Optional<WritingSubmission> findByEnrollmentIdAndLessonBlockId(UUID enrollmentId, UUID lessonBlockId);
+
+    @EntityGraph(attributePaths = {
+            "enrollment", "enrollment.course", "student", "student.user"
+    })
+    Optional<WritingSubmission> findByIdAndEnrollmentIdAndLessonBlockId(UUID id, UUID enrollmentId, UUID lessonBlockId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "enrollment", "enrollment.course", "student", "student.user"
+    })
+    Optional<WritingSubmission> findByIdAndEnrollmentIdAndLessonBlockIdForUpdate(UUID id, UUID enrollmentId, UUID lessonBlockId);
 }

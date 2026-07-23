@@ -583,14 +583,14 @@ public class LearningServiceImpl implements LearningService {
         long requestsLastMinute = aiUsageLogRepository.countByUserIdAndFeatureCodeAndRequestStatusAndCreatedAtAfter(currentUserId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.SUCCESS, oneMinuteAgo);
         if (requestsLastMinute >= settings.rateLimitPerMinute()) {
             aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.BLOCKED, null, 0, 0, "Rate limit exceeded (minute)");
-            throw new BusinessException(MessageCodes.SYSTEM_RATE_LIMITED, "Too many AI requests. Please wait a moment.", HttpStatus.TOO_MANY_REQUESTS);
+            throw new BusinessException(MessageCodes.MSG_AI_001, "Too many AI requests. Please wait a moment.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
         Instant oneDayAgo = Instant.now().minusSeconds(86400);
         long requestsLastDay = aiUsageLogRepository.countByUserIdAndFeatureCodeAndRequestStatusAndCreatedAtAfter(currentUserId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.SUCCESS, oneDayAgo);
         if (requestsLastDay >= settings.dailyLimit()) {
             aiUsageLogService.record(currentUserId, course.getId(), lessonBlockId, submissionId, "AI_WRITING_ASSISTANCE", AiUsageRequestStatus.BLOCKED, null, 0, 0, "Rate limit exceeded (daily)");
-            throw new BusinessException(MessageCodes.SYSTEM_RATE_LIMITED, "You have reached your daily AI usage limit.", HttpStatus.TOO_MANY_REQUESTS);
+            throw new BusinessException(MessageCodes.MSG_AI_001, "You have reached your daily AI usage limit.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
         // 3. Status Check & Pre-saving (In a new transaction to persist SUGGESTION_PROCESSING state before provider call)

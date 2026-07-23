@@ -730,7 +730,7 @@ class LearningServiceImplTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 learningService.requestAiWritingAssistance(blockVideoId, subId));
-        assertEquals(MessageCodes.SYSTEM_RATE_LIMITED, ex.getMessageCode());
+        assertEquals(MessageCodes.MSG_AI_001, ex.getMessageCode());
     }
 
     @Test
