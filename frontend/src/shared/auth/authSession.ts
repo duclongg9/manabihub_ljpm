@@ -126,9 +126,18 @@ export function consumePostLoginRoute(kind: AuthSessionKind, session: AuthSessio
   }
 
   const key = RETURN_TO_KEYS[kind];
-  const path = window.sessionStorage.getItem(key);
+  const destination = peekPostLoginRoute(kind, session);
   window.sessionStorage.removeItem(key);
 
+  return destination;
+}
+
+export function peekPostLoginRoute(kind: AuthSessionKind, session: AuthSession) {
+  if (typeof window === 'undefined') {
+    return getDefaultRoute(session);
+  }
+
+  const path = window.sessionStorage.getItem(RETURN_TO_KEYS[kind]);
   return path && canAccessPath(session, path) ? path : getDefaultRoute(session);
 }
 

@@ -95,13 +95,45 @@ class TeacherKycServiceTest {
     }
 
     @Test
-    void getStatus_ThrowsNotFound_WhenTeacherProfileDoesNotExist() {
+    void getStatus_CreatesCandidateProfile_WhenTeacherProfileDoesNotExist() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        UUID teacherId = UUID.randomUUID();
+
+        AppUser user = new AppUser();
+        user.setId(userId);
+
+        TeacherProfile candidate = new TeacherProfile();
+        candidate.setId(teacherId);
+        candidate.setUser(user);
+        candidate.setKycStatus(TeacherKycStatus.NOT_SUBMITTED);
+        candidate.setCanPublishCourse(false);
+
+        when(teacherProfileRepository.findByUserId(userId))
+                .thenReturn(Optional.empty(), Optional.of(candidate));
+        when(teacherProfileRepository.createCandidateIfAbsent(any(UUID.class), eq(userId))).thenReturn(1);
+        when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherId))
+                .thenReturn(Optional.empty());
+
+        // Act
+        KycStatusResponse response = teacherKycService.getStatus(userId);
+
+        // Assert
+        assertEquals(teacherId, response.teacherId());
+        assertEquals("NOT_SUBMITTED", response.teacherKycStatus());
+        assertFalse(response.canPublishCourse());
+        verify(teacherProfileRepository).createCandidateIfAbsent(any(UUID.class), eq(userId));
+    }
+
+    @Test
+    void getStatus_ThrowsNotFound_WhenCandidateCannotBeInitialized() {
         // Arrange
         UUID userId = UUID.randomUUID();
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.empty());
+        when(teacherProfileRepository.createCandidateIfAbsent(any(UUID.class), eq(userId))).thenReturn(0);
 
         // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class, () -> teacherKycService.getStatus(userId));
-        assertEquals("Teacher profile was not found for the current user", exception.getMessage());
+        assertEquals("Teacher profile could not be initialized for the current user", exception.getMessage());
     }
 }
