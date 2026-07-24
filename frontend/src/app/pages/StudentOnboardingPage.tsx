@@ -2,18 +2,13 @@ import { useState, useEffect } from 'react';
 import {
   Alert, Box, Typography, Button, CircularProgress, Stack, Card,
   TextField, Stepper, Step, StepLabel,
-  Container, InputAdornment, Avatar,
-  FormControl, InputLabel, Select, FormHelperText, MenuItem
+  Container, InputAdornment, FormHelperText
 } from '@mui/material';
 import { isAxiosError } from 'axios';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import FaceIcon from '@mui/icons-material/Face';
-import Face2Icon from '@mui/icons-material/Face2';
-import Face3Icon from '@mui/icons-material/Face3';
-import Face4Icon from '@mui/icons-material/Face4';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   clearAuthSession,
@@ -115,11 +110,22 @@ export function StudentOnboardingPage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#F8FAFC', backgroundImage: 'radial-gradient(at 100% 0%, rgba(254, 226, 226, 0.4) 0px, transparent 50%), radial-gradient(at 0% 100%, rgba(255, 237, 213, 0.4) 0px, transparent 50%)', display: 'flex', flexDirection: 'column' }}>
       {/* Minimal Header */}
-      <Box sx={{ p: 2, bgcolor: 'white', borderBottom: '1px solid', borderColor: 'grey.200', display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ p: 2, px: 4, bgcolor: 'white', borderBottom: '1px solid', borderColor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Typography variant="h6" sx={{ fontWeight: 900, color: '#C41E3A', letterSpacing: '-0.5px' }}>
           <MenuBookIcon sx={{ verticalAlign: 'middle', mr: 1, mb: 0.5 }} />
           ManabiHub
         </Typography>
+        <Button
+          variant="text"
+          color="inherit"
+          onClick={() => {
+            clearAuthSession('public');
+            navigate('/login');
+          }}
+          sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', '&:hover': { color: 'grey.900' } }}
+        >
+          Đăng xuất
+        </Button>
       </Box>
 
       <Box sx={{ flexGrow: 1, py: { xs: 4, md: 6 }, display: 'flex', alignItems: 'center' }}>
@@ -153,7 +159,7 @@ export function StudentOnboardingPage() {
         </Stepper>
 
         {/* Content Box */}
-        <Card sx={{ borderRadius: 4, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)', border: '1px solid #f1f5f9', bgcolor: 'white' }}>
+        <Card sx={{ borderRadius: 4, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', border: '1px solid #f1f5f9', bgcolor: 'white' }}>
           <Box sx={{ p: { xs: 3, md: 4 } }}>
 
             {/* STEP 0: STUDENT PROFILE SETUP */}
@@ -168,25 +174,35 @@ export function StudentOnboardingPage() {
                     <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1.5 }}>
                       Chọn một nhân vật yêu thích
                     </Typography>
-                    <Stack direction="row" spacing={2}>
-                      {[<FaceIcon fontSize="large" />, <Face2Icon fontSize="large" />, <Face3Icon fontSize="large" />, <Face4Icon fontSize="large" />].map((icon, idx) => (
-                        <Box
-                          key={idx}
-                          onClick={() => setAvatarIndex(idx)}
-                          sx={{
-                            width: 64, height: 64, borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'pointer', transition: 'all 0.2s',
-                            border: '3px solid',
-                            borderColor: avatarIndex === idx ? '#C41E3A' : 'transparent',
-                            bgcolor: avatarIndex === idx ? '#fff1f2' : 'grey.100',
-                            color: avatarIndex === idx ? '#C41E3A' : 'grey.500',
-                            '&:hover': {
-                              bgcolor: avatarIndex === idx ? '#fff1f2' : 'grey.200'
-                            }
-                          }}
-                        >
-                          {icon}
+                    <Stack direction="row" spacing={{ xs: 1.5, sm: 3 }} sx={{ maxWidth: 400, justifyContent: 'space-between' }}>
+                      {[
+                        { emoji: '🐕', name: 'Shiba-kun', bg: '#fef08a' },
+                        { emoji: '🥷', name: 'Ninja', bg: '#e2e8f0' },
+                        { emoji: '👨‍🏫', name: 'Sensei', bg: '#bfdbfe' },
+                        { emoji: '🐱', name: 'Maneki', bg: '#fecdd3' }
+                      ].map((item, idx) => (
+                        <Box key={idx} sx={{ textAlign: 'center' }}>
+                          <Box
+                            onClick={() => setAvatarIndex(idx)}
+                            sx={{
+                              width: { xs: 64, sm: 72 }, height: { xs: 64, sm: 72 }, borderRadius: '50%',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer', transition: 'all 0.2s',
+                              border: '3px solid',
+                              borderColor: avatarIndex === idx ? '#C41E3A' : 'transparent',
+                              bgcolor: item.bg,
+                              fontSize: { xs: '2rem', sm: '2.5rem' },
+                              mb: 1,
+                              '&:hover': {
+                                transform: 'scale(1.05)'
+                              }
+                            }}
+                          >
+                            {item.emoji}
+                          </Box>
+                          <Typography variant="caption" sx={{ fontWeight: avatarIndex === idx ? 700 : 500, color: avatarIndex === idx ? '#C41E3A' : 'text.secondary' }}>
+                            {item.name}
+                          </Typography>
                         </Box>
                       ))}
                     </Stack>
@@ -216,7 +232,7 @@ export function StudentOnboardingPage() {
                       fullWidth
                       variant="outlined"
                       error={!!errors.phone}
-                      helperText={errors.phone || 'Không bắt buộc. Ví dụ: 0912345678'}
+                      helperText={errors.phone || 'Dùng để nhận thông báo khóa học (Không bắt buộc)'}
                       slotProps={{ input: { startAdornment: <InputAdornment position="start" sx={{ mr: 0.5 }}><PhoneIcon sx={{ color: 'grey.400' }} /></InputAdornment> } }}
                     />
                   </Box>
@@ -261,7 +277,7 @@ export function StudentOnboardingPage() {
                         </Box>
                       ))}
                     </Stack>
-                    <FormHelperText sx={{ mt: 1, mx: 0 }}>Giúp chúng tôi đề xuất lộ trình và khóa học phù hợp nhất với bạn.</FormHelperText>
+                    <FormHelperText sx={{ mt: 3, mx: 0, fontSize: '0.85rem' }}>Giúp chúng tôi đề xuất lộ trình và khóa học phù hợp nhất với bạn.</FormHelperText>
                   </Box>
 
 
@@ -291,20 +307,7 @@ export function StudentOnboardingPage() {
 
           {/* Footer Actions */}
           <Box sx={{ p: { xs: 3, md: 4 }, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'grey.200', display: 'flex', justifyContent: activeStep === 0 ? 'flex-end' : 'space-between', alignItems: 'center', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
-            {activeStep === 0 ? (
-              <Button
-                variant="text"
-                color="inherit"
-                disabled={saving}
-                onClick={() => {
-                  clearAuthSession('public');
-                  navigate('/login');
-                }}
-                sx={{ textTransform: 'none', fontWeight: 500, color: 'text.secondary', position: 'absolute', left: 32 }}
-              >
-                Đăng xuất
-              </Button>
-            ) : (
+            {activeStep === 0 ? null : (
               <Button
                 variant="outlined"
                 color="inherit"
