@@ -41,57 +41,59 @@ export function StudentWishlistPage() {
           ]}
         />
 
-        {isLoading && <LoadingState message="Loading your wishlist..." />}
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          {isLoading && <LoadingState message="Loading your wishlist..." />}
 
-        {isError && (
-          <ErrorState
-            title="Wishlist unavailable"
-            message="Please check your connection and try again."
-            onRetry={() => refetch()}
-          />
-        )}
-
-        {!isLoading && !isError && data.length === 0 && (
-          <Box
-            sx={{
-              py: 6,
-              bgcolor: 'background.paper',
-              border: '1px solid',
-              borderColor: 'divider',
-            }}
-          >
-            <EmptyState
-              title="Chưa có khóa học yêu thích"
-              description="Khám phá các khóa học và lưu lại những khóa học bạn quan tâm."
-              icon={<FavoriteBorderIcon sx={{ fontSize: 56, color: 'text.secondary' }} />}
-              actionLabel="Khám phá khóa học ngay ➔"
-              onAction={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
+          {isError && (
+            <ErrorState
+              title="Wishlist unavailable"
+              message="Please check your connection and try again."
+              onRetry={() => refetch()}
             />
-          </Box>
-        )}
+          )}
 
-        {!isLoading && !isError && data.length > 0 && (
-          <Grid container spacing={2.5}>
-            {data.map((item) => (
-              <Grid key={item.id} size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>
-                <CourseCatalogCard
-                  course={{
-                    id: item.courseId,
-                    title: item.title,
-                    slug: item.slug,
-                    thumbnailUrl: item.thumbnailUrl,
-                    jlptLevel: item.jlptLevel,
-                    category: item.category,
-                    price: item.price,
-                    currency: item.currency,
-                    teacherName: item.teacherName,
-                    totalLessons: item.totalLessons,
-                  }}
-                />
-              </Grid>
-            ))}
-          </Grid>
-        )}
+          {!isLoading && !isError && data.length === 0 && (
+            <Box
+              sx={{
+                py: 6,
+                bgcolor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <EmptyState
+                title="Chưa có khóa học yêu thích"
+                description="Khám phá các khóa học và lưu lại những khóa học bạn quan tâm."
+                icon={<FavoriteBorderIcon sx={{ fontSize: 56, color: 'text.secondary' }} />}
+                actionLabel="Khám phá khóa học ngay ➔"
+                onAction={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
+              />
+            </Box>
+          )}
+
+          {!isLoading && !isError && data.length > 0 && (
+            <Grid container spacing={2.5}>
+              {data.map((item) => (
+                <Grid key={item.id} size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>
+                  <CourseCatalogCard
+                    course={{
+                      id: item.courseId,
+                      title: item.title,
+                      slug: item.slug,
+                      thumbnailUrl: item.thumbnailUrl,
+                      jlptLevel: item.jlptLevel,
+                      category: item.category,
+                      price: item.price,
+                      currency: item.currency,
+                      teacherName: item.teacherName,
+                      totalLessons: item.totalLessons,
+                    }}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Box>
       </Box>
     </Box>
   );

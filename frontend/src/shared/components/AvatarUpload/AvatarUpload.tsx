@@ -5,13 +5,15 @@ interface AvatarUploadProps {
     avatarUrl: string;
     onSelect?: (file: File) => void;
     disabled?: boolean;
+    size?: number;
 }
 
 export default function AvatarUpload({
-                                         avatarUrl,
-                                         onSelect,
-                                         disabled = false,
-                                     }: AvatarUploadProps) {
+    avatarUrl,
+    onSelect,
+    disabled = false,
+    size = 96,
+}: AvatarUploadProps) {
 
     function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
@@ -20,18 +22,18 @@ export default function AvatarUpload({
     }
 
     return (
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mb: 4 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             <Box sx={{ position: 'relative' }}>
                 <Avatar
                     src={avatarUrl}
                     sx={{
-                        width: 96,
-                        height: 96,
+                        width: size,
+                        height: size,
                         boxShadow: '0 0 0 4px rgba(196, 30, 58, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                         bgcolor: '#fef2f2',
                         color: '#C41E3A',
                         fontWeight: 700,
-                        fontSize: '2.5rem'
+                        fontSize: size > 80 ? '2.5rem' : '2rem'
                     }}
                 />
                 <Tooltip title="Đổi ảnh đại diện">
@@ -46,12 +48,12 @@ export default function AvatarUpload({
                             border: '1px solid #E5E7EB',
                             boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                             '&:hover': { bgcolor: 'grey.50' },
-                            width: 36,
-                            height: 36,
+                            width: size > 80 ? 36 : 30,
+                            height: size > 80 ? 36 : 30,
                             color: 'text.secondary',
                         }}
                     >
-                        <CameraAltOutlinedIcon sx={{ fontSize: 20 }} />
+                        <CameraAltOutlinedIcon sx={{ fontSize: size > 80 ? 20 : 16 }} />
                         <input hidden type="file" accept="image/*" disabled={disabled} onChange={handleChange} />
                     </IconButton>
                 </Tooltip>

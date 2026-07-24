@@ -161,93 +161,96 @@ export default function StudentProfilePage() {
                     Cập nhật thông tin tài khoản và thiết lập học tập của bạn.
                 </Typography>
 
-                <Grid container spacing={4}>
-                    {/* Left Card - Avatar & Status */}
-                    <Grid size={{ xs: 12, md: 4 }}>
-                        <Card elevation={0} sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRadius: 4, border: "1px solid", borderColor: 'divider', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', bgcolor: '#FFFFFF', textAlign: 'center', p: 4 }}>
+                <Card elevation={0} sx={{ position: 'relative', zIndex: 1, borderRadius: 4, border: "1px solid", borderColor: 'divider', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', bgcolor: '#FFFFFF' }}>
+                    
+                    {/* Hero Profile Header */}
+                    <Box sx={{ p: { xs: 3, md: 5 }, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'center', sm: 'flex-start' }, justifyContent: 'space-between', gap: 3 }}>
+                        
+                        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', gap: { xs: 2, sm: 4 }, textAlign: { xs: 'center', sm: 'left' } }}>
                             <AvatarUpload
                                 avatarUrl={resolvePublicAssetUrl(form.avatarUrl) || ""}
                                 onSelect={handleAvatar}
                                 disabled={saving}
+                                size={80}
                             />
-                            <Typography variant="h6" sx={{ fontWeight: 700, mt: 2 }}>
-                                {form.displayName || form.fullName || "Học viên ManabiHub"}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                                {form.email}
-                            </Typography>
-                            
-                            <Divider sx={{ my: 3 }} />
-                            
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
-                                Mục tiêu hiện tại
-                            </Typography>
-                            <Box sx={{ display: 'inline-block', px: 2, py: 0.5, bgcolor: '#fee2e2', color: '#C41E3A', borderRadius: 2, fontWeight: 800, fontSize: '1.25rem' }}>
-                                {initialForm.jlptGoal || "Chưa thiết lập"}
-                            </Box>
-                            
-                            <Divider sx={{ my: 3 }} />
-                            
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
-                                <Typography variant="caption" color="text.secondary">
+                            <Box>
+                                <Typography variant="h5" sx={{ fontWeight: 800, color: 'grey.900', mb: 0.5 }}>
+                                    {form.displayName || form.fullName || "Học viên ManabiHub"}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    {form.email}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'grey.500', fontWeight: 500, bgcolor: 'grey.50', px: 1.5, py: 0.5, borderRadius: 1 }}>
                                     Ngày tham gia: 24/07/2026
                                 </Typography>
                             </Box>
-                        </Card>
-                    </Grid>
+                        </Box>
 
-                    {/* Right Card - Profile Form */}
-                    <Grid size={{ xs: 12, md: 8 }}>
-                        <Card elevation={0} sx={{ borderRadius: 4, border: "1px solid", borderColor: 'divider', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', bgcolor: '#FFFFFF' }}>
-                            <CardContent sx={{ p: { xs: 3, md: 5 } }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                        Thông tin cá nhân
-                                    </Typography>
-                                    {isDirty && (
-                                        <Typography variant="caption" sx={{ color: '#C41E3A', fontWeight: 700 }}>
-                                            * BẠN CÓ THAY ĐỔI CHƯA LƯU
-                                        </Typography>
-                                    )}
-                                </Box>
-                                
-                                <Grid container spacing={3}>
-                                    <Grid size={{ xs: 12, sm: 6 }}>
-                                        <TextField
-                                            fullWidth
-                                            label="Họ và tên (*)"
-                                            value={form.fullName}
-                                            onChange={handleChange("fullName")}
-                                            error={!!errors.fullName}
-                                            helperText={errors.fullName}
-                                            sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
-                                        />
-                                    </Grid>
-                                    <Grid size={{ xs: 12, sm: 6 }}>
-                                        <TextField
-                                            fullWidth
-                                            label="Tên hiển thị"
-                                            value={form.displayName}
-                                            onChange={handleChange("displayName")}
-                                            placeholder="Tên gọi ngắn gọn..."
-                                            sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
-                                        />
-                                    </Grid>
-                                    <Grid size={{ xs: 12, sm: 6 }}>
-                                        <TextField
-                                            fullWidth
-                                            label="Email"
-                                            value={form.email}
-                                            disabled
-                                            sx={{ bgcolor: 'grey.50' }}
-                                            helperText="🔒 Email đăng nhập - Không thể thay đổi"
-                                        />
-                                    </Grid>
-                                    <Grid size={{ xs: 12, sm: 6 }}>
-                                        <TextField
-                                            fullWidth
-                                            label="Số điện thoại"
-                                            value={form.phoneNumber}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'center', sm: 'flex-end' }, gap: 1 }}>
+                            <Typography variant="caption" sx={{ textTransform: 'uppercase', fontWeight: 700, color: 'grey.500', letterSpacing: 0.5 }}>
+                                MỤC TIÊU HIỆN TẠI
+                            </Typography>
+                            <Box sx={{ px: 2.5, py: 0.75, bgcolor: '#fee2e2', color: '#C41E3A', borderRadius: '9999px', fontWeight: 800, fontSize: '1rem', boxShadow: '0 2px 4px rgba(196, 30, 58, 0.1)' }}>
+                                {initialForm.jlptGoal || "Chưa thiết lập"}
+                            </Box>
+                        </Box>
+
+                    </Box>
+
+                    <Divider sx={{ mx: { xs: 3, md: 5 }, borderColor: 'grey.100' }} />
+
+                    <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                Thông tin cá nhân
+                            </Typography>
+                            {isDirty && (
+                                <Typography variant="caption" sx={{ color: '#C41E3A', fontWeight: 700 }}>
+                                    * BẠN CÓ THAY ĐỔI CHƯA LƯU
+                                </Typography>
+                            )}
+                        </Box>
+                        
+                        <Grid container spacing={3}>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    fullWidth
+                                    label="Họ và tên (*)"
+                                    value={form.fullName}
+                                    onChange={handleChange("fullName")}
+                                    error={!!errors.fullName}
+                                    helperText={errors.fullName}
+                                    sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+                                />
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    fullWidth
+                                    label="Tên hiển thị"
+                                    value={form.displayName}
+                                    onChange={handleChange("displayName")}
+                                    placeholder="Tên gọi ngắn gọn..."
+                                    sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+                                />
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    fullWidth
+                                    label="Email"
+                                    value={form.email}
+                                    disabled
+                                    sx={{ bgcolor: 'grey.50' }}
+                                    slotProps={{
+                                        input: { startAdornment: <Typography sx={{ mr: 1, opacity: 0.5 }}>🔒</Typography> }
+                                    }}
+                                    helperText="Email đăng nhập - Không thể thay đổi"
+                                />
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                                <TextField
+                                    fullWidth
+                                    label="Số điện thoại"
+                                    value={form.phoneNumber}
                                             onChange={handleChange("phoneNumber")}
                                             error={!!errors.phoneNumber}
                                             helperText={errors.phoneNumber}
@@ -338,8 +341,6 @@ export default function StudentProfilePage() {
 
                             </CardContent>
                         </Card>
-                    </Grid>
-                </Grid>
                 </Box>
             </Box>
 
