@@ -32,13 +32,14 @@ interface CourseCatalogFiltersBarProps {
   onSortChange: (sort: string) => void;
 }
 
-function toPriceInput(value?: number): string {
-  return value === undefined ? '' : String(value);
+function formatPriceInput(value?: number): string {
+  return value === undefined ? '' : value.toLocaleString('en-US');
 }
 
 function parsePrice(value: string): number | undefined {
-  if (value.trim() === '') return undefined;
-  const parsed = Number(value);
+  const numericStr = value.replace(/\D/g, '');
+  if (!numericStr) return undefined;
+  const parsed = Number(numericStr);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
@@ -53,14 +54,19 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [minPrice, setMinPrice] = useState(toPriceInput(filters.minPrice));
-  const [maxPrice, setMaxPrice] = useState(toPriceInput(filters.maxPrice));
+  const [minPrice, setMinPrice] = useState(formatPriceInput(filters.minPrice));
+  const [maxPrice, setMaxPrice] = useState(formatPriceInput(filters.maxPrice));
   const [priceError, setPriceError] = useState('');
 
   useEffect(() => {
-    setMinPrice(toPriceInput(filters.minPrice));
-    setMaxPrice(toPriceInput(filters.maxPrice));
+    setMinPrice(formatPriceInput(filters.minPrice));
+    setMaxPrice(formatPriceInput(filters.maxPrice));
   }, [filters.minPrice, filters.maxPrice]);
+
+  const handlePriceChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const numericStr = e.target.value.replace(/\D/g, '');
+    setter(numericStr ? Number(numericStr).toLocaleString('en-US') : '');
+  };
 
   const updateFilter = (field: keyof CourseCatalogFilters, value?: string) => {
     onFiltersChange({
@@ -149,47 +155,48 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
         </Select>
       </FormControl>
 
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={1.5}
-        sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}
-      >
-        <TextField
-          placeholder="Giá từ"
-          type="number"
-          value={minPrice}
-          onChange={(event) => setMinPrice(event.target.value)}
-          onBlur={applyPrice}
-          onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
-          size="small"
-          fullWidth
-          slotProps={{
-            input: { endAdornment: <InputAdornment position="end">đ</InputAdornment> },
-            htmlInput: { min: 0, step: 10000 }
-          }}
-          sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
-        />
-        <TextField
-          placeholder="Giá đến"
-          type="number"
-          value={maxPrice}
-          onChange={(event) => setMaxPrice(event.target.value)}
-          onBlur={applyPrice}
-          onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
-          size="small"
-          fullWidth
-          slotProps={{
-            input: { endAdornment: <InputAdornment position="end">đ</InputAdornment> },
-            htmlInput: { min: 0, step: 10000 }
-          }}
-          sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
-        />
+      <Stack direction="column" sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+        >
+          <TextField
+            placeholder="Giá từ"
+            type="text"
+            value={minPrice}
+            onChange={handlePriceChange(setMinPrice)}
+            onBlur={applyPrice}
+            onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
+            size="small"
+            fullWidth
+            slotProps={{
+              input: { endAdornment: <InputAdornment position="end">đ</InputAdornment> },
+              htmlInput: { inputMode: 'numeric' }
+            }}
+            sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+          />
+          <TextField
+            placeholder="Giá đến"
+            type="text"
+            value={maxPrice}
+            onChange={handlePriceChange(setMaxPrice)}
+            onBlur={applyPrice}
+            onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
+            size="small"
+            fullWidth
+            slotProps={{
+              input: { endAdornment: <InputAdornment position="end">đ</InputAdornment> },
+              htmlInput: { inputMode: 'numeric' }
+            }}
+            sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+          />
+        </Stack>
+        {priceError && (
+          <Typography variant="caption" color="error" sx={{ mt: 0.5, px: 0.5 }}>
+            {priceError}
+          </Typography>
+        )}
       </Stack>
-      {priceError && (
-        <Typography variant="caption" color="error" sx={{ gridColumn: 'span 2' }}>
-          {priceError}
-        </Typography>
-      )}
 
       <FormControl fullWidth size="small">
         <Select
