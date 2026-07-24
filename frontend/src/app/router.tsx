@@ -33,6 +33,7 @@ import { TeacherWritingReviewsPage } from '../features/writing-review/pages/Teac
 import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages/TeacherWritingReviewDetailPage';
 import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistPage';
+import { TeacherWalletPage } from '../features/my-wallet/pages/TeacherWalletPage';
 
 export const router = createBrowserRouter([
   {
@@ -170,7 +171,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'wallet',
-        element: <Navigate to="/teacher/dashboard" replace />,
+        element: <TeacherWalletPage />,
       },
     ],
   },
