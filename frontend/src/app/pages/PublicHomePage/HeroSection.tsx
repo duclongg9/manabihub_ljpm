@@ -1,6 +1,8 @@
 import React from 'react';
 import { Box, Container, Typography, Button } from '@mui/material';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
@@ -173,8 +175,8 @@ export const HeroSection: React.FC = () => {
                   sx={{
                     py: 1.8, px: 5,
                     borderRadius: '12px',
-                    borderColor: 'rgba(255,255,255,0.3)',
-                    borderWidth: '1.5px',
+                    borderColor: '#ffffff',
+                    borderWidth: '2px',
                     color: '#ffffff',
                     fontWeight: 700,
                     textTransform: 'none',
@@ -253,15 +255,15 @@ export const HeroSection: React.FC = () => {
                 position: 'absolute',
                 bottom: { xs: 10, md: 30 },
                 left: { xs: 0, md: -10 },
-                bgcolor: 'rgba(196, 30, 58, 0.92)',
-                backdropFilter: 'blur(8px)',
-                color: '#fff',
-                px: 2.5, py: 1,
-                borderRadius: '10px',
+                bgcolor: '#FFF8E1',
+                color: '#1A1A2E',
+                display: 'flex', alignItems: 'center', gap: 1,
+                px: 2.5, py: 1.2,
+                borderRadius: '12px',
                 fontWeight: 700,
-                fontSize: '0.8rem',
-                letterSpacing: '0.05em',
-                boxShadow: '0 4px 16px rgba(196, 30, 58, 0.3)',
+                fontSize: '0.85rem',
+                letterSpacing: '0.02em',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                 zIndex: 10,
                 animation: 'floatBadge 4s ease-in-out infinite',
                 '@keyframes floatBadge': {
@@ -270,7 +272,8 @@ export const HeroSection: React.FC = () => {
                 }
               }}
             >
-              🎌 JLPT N5 → N1
+              <MenuBookIcon sx={{ color: '#D4A017', fontSize: 18 }} />
+              JLPT N5 → N1
             </Box>
 
             {/* Floating sakura badge */}
@@ -279,14 +282,14 @@ export const HeroSection: React.FC = () => {
                 position: 'absolute',
                 top: { xs: 20, md: 40 },
                 right: { xs: 10, md: 0 },
-                bgcolor: 'rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                color: '#fff',
-                px: 2, py: 0.8,
-                borderRadius: '10px',
-                fontWeight: 600,
-                fontSize: '0.75rem',
+                bgcolor: 'rgba(255, 255, 255, 0.95)',
+                color: '#1A1A2E',
+                display: 'flex', alignItems: 'center', gap: 1,
+                px: 2.5, py: 1.2,
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
                 zIndex: 10,
                 animation: 'floatBadge2 5s ease-in-out 1s infinite',
                 '@keyframes floatBadge2': {
@@ -295,7 +298,8 @@ export const HeroSection: React.FC = () => {
                 }
               }}
             >
-              🌸 AI Trợ lý học tập
+              <AutoAwesomeIcon sx={{ color: '#C41E3A', fontSize: 18 }} />
+              AI Trợ lý học tập
             </Box>
           </Box>
         </Box>

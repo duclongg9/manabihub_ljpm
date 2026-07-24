@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Badge, Avatar } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Badge, Avatar, Menu, MenuItem } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SearchIcon from '@mui/icons-material/Search';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
@@ -12,6 +12,7 @@ export const LandingHeader: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [scrolled, setScrolled] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const session = getAuthSession('public');
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
 
@@ -74,22 +75,39 @@ export const LandingHeader: React.FC = () => {
             </Typography>
           </Box>
 
-          <Button
-            component={Link}
-            to={ROUTES.PUBLIC.COURSE_BROWSE}
-            color="inherit"
-            endIcon={<KeyboardArrowDownIcon />}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              display: { xs: 'none', md: 'flex' },
-              textDecoration: 'none',
-              color: '#475569',
-              '&:hover': { color: '#C41E3A' }
-            }}
-          >
-            Danh mục
-          </Button>
+          <Box>
+            <Button
+              color="inherit"
+              endIcon={<KeyboardArrowDownIcon />}
+              onClick={(e) => setAnchorEl(e.currentTarget)}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                display: { xs: 'none', md: 'flex' },
+                color: '#475569',
+                '&:hover': { color: '#C41E3A' }
+              }}
+            >
+              Danh mục
+            </Button>
+            <Menu
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={() => setAnchorEl(null)}
+              disableScrollLock
+              sx={{ '& .MuiPaper-root': { zIndex: 9999, mt: 1, borderRadius: '12px', minWidth: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', border: '1px solid #e8e0d8' } }}
+            >
+              <MenuItem onClick={() => { setAnchorEl(null); navigate(ROUTES.PUBLIC.COURSE_BROWSE); }} sx={{ py: 1.5, fontWeight: 600, color: '#1A1A2E' }}>
+                Tất cả khóa học
+              </MenuItem>
+              <MenuItem onClick={() => { setAnchorEl(null); navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?jlptLevel=N5`); }} sx={{ py: 1.5, color: '#475569' }}>
+                Luyện thi JLPT
+              </MenuItem>
+              <MenuItem onClick={() => { setAnchorEl(null); navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?category=vocabulary`); }} sx={{ py: 1.5, color: '#475569' }}>
+                Kỹ năng ứng dụng
+              </MenuItem>
+            </Menu>
+          </Box>
         </Box>
 
         {/* Center Section: Search Bar */}

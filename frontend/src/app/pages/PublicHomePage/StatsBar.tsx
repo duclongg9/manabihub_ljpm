@@ -29,14 +29,15 @@ export const StatsBar: React.FC = () => {
     <Box
       ref={ref}
       sx={{
-        background: 'linear-gradient(135deg, #1B2A4A 0%, #243B5C 100%)',
+        bgcolor: '#ffffff',
         py: { xs: 4, md: 5 },
         position: 'relative',
         overflow: 'hidden',
+        borderBottom: '1px solid #e8e0d8',
       }}
     >
       {/* Subtle top border accent */}
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #C41E3A, #D4A017, #5B8C5A, #1B2A4A)' }} />
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #C41E3A, #D4A017, #5B8C5A, #1B2A4A)' }} />
 
       <Container maxWidth="lg">
         <Box
@@ -72,11 +73,11 @@ export const StatsBar: React.FC = () => {
               >
                 {stat.icon}
               </Box>
-              <Box>
-                <Typography sx={{ color: '#ffffff', fontWeight: 800, fontSize: '1.5rem', lineHeight: 1.2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <Typography sx={{ color: '#1A1A2E', fontWeight: 800, fontSize: '1.5rem', lineHeight: 1.2 }}>
                   {stat.value}
                 </Typography>
-                <Typography sx={{ color: '#8899b3', fontSize: '0.8rem', fontWeight: 500 }}>
+                <Typography sx={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>
                   {stat.label}
                 </Typography>
               </Box>
