@@ -1,15 +1,18 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Badge } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Badge, Avatar } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SearchIcon from '@mui/icons-material/Search';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
+import { getAuthSession, getDefaultRoute } from '../../../shared/auth/authSession';
 
 export const LandingHeader: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = React.useState('');
+  const session = getAuthSession('public');
+  const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -85,13 +88,24 @@ export const LandingHeader: React.FC = () => {
             </Badge>
           </IconButton>
 
-          <Button
-            variant="contained"
-            onClick={() => navigate(ROUTES.PUBLIC.LOGIN)}
-            sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#0f172a', color: 'white', borderRadius: 2, px: 3, '&:hover': { bgcolor: '#334155' } }}
-          >
-            Đăng nhập / Đăng ký
-          </Button>
+          {session ? (
+            <Button
+              variant="contained"
+              startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: '#10b981', fontSize: '0.8rem' }}>{avatarLabel}</Avatar>}
+              onClick={() => navigate(getDefaultRoute(session))}
+              sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#0f172a', color: 'white', borderRadius: 2, px: 2.5, '&:hover': { bgcolor: '#334155' } }}
+            >
+              Trang của tôi
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              onClick={() => navigate(ROUTES.PUBLIC.LOGIN)}
+              sx={{ textTransform: 'none', fontWeight: 600, bgcolor: '#0f172a', color: 'white', borderRadius: 2, px: 3, '&:hover': { bgcolor: '#334155' } }}
+            >
+              Đăng nhập / Đăng ký
+            </Button>
+          )}
         </Box>
       </Toolbar>
     </AppBar>

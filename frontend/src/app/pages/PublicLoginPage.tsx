@@ -1,9 +1,13 @@
 import { Alert, Box, Typography, Button, Stack, Avatar, AvatarGroup, keyframes } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getAsset } from '../../shared/utils/assets';
-import { rememberPostLoginRoute } from '../../shared/auth/authSession';
+import {
+  getAuthSession,
+  getDefaultRoute,
+  rememberPostLoginRoute,
+} from '../../shared/auth/authSession';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(20px); }
@@ -29,6 +33,11 @@ export function PublicLoginPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const sessionExpired = searchParams.get('reason') === 'session-expired';
+  const session = getAuthSession('public');
+
+  if (session) {
+    return <Navigate to={getDefaultRoute(session)} replace />;
+  }
 
   const handleGoogleLogin = () => {
     const returnTo = (location.state as { from?: unknown } | null)?.from;
