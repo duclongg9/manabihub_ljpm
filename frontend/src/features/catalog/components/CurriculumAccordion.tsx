@@ -60,14 +60,17 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <div className="text-sm font-semibold text-slate-500">
-          {modules.length} phần • {modules.reduce((acc, m) => acc + m.blocks.length, 0)} bài học
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 mb-1">Nội dung khóa học</h2>
+          <div className="text-sm font-medium text-slate-500">
+            {modules.length} phần • {modules.reduce((acc, m) => acc + m.blocks.length, 0)} bài học
+          </div>
         </div>
         {isAllExpanded ? (
           <button
             onClick={handleCollapseAll}
-            className="flex items-center text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors px-3 py-1.5 rounded-lg"
+            className="flex items-center px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-colors"
           >
             <KeyboardDoubleArrowUpIcon fontSize="small" className="mr-1" />
             Thu gọn tất cả
@@ -75,7 +78,7 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
         ) : (
           <button
             onClick={handleExpandAll}
-            className="flex items-center text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors px-3 py-1.5 rounded-lg"
+            className="flex items-center px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-colors"
           >
             <KeyboardDoubleArrowDownIcon fontSize="small" className="mr-1" />
             Mở rộng tất cả

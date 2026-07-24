@@ -111,10 +111,6 @@ export const CourseDetailPage = () => {
 
             {/* Curriculum */}
             <div className="mb-12">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6">Nội dung khóa học</h2>
-              <div className="flex justify-between items-center mb-4 text-sm text-slate-600">
-                <span>{course.modules.length} phần • {course.totalLessons || course.modules.reduce((acc, m) => acc + m.blocks.length, 0)} bài học</span>
-              </div>
               <CurriculumAccordion
                 modules={course.modules}
                 courseId={course.id}

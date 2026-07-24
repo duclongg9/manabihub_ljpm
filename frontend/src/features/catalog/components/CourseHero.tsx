@@ -23,7 +23,16 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 flex flex-col items-start">
-          {/* Breadcrumbs / Badges */}
+          {/* Breadcrumb */}
+          <div className="flex items-center text-xs font-medium text-white/50 mb-3 tracking-wide">
+            <span className="hover:text-white/80 cursor-pointer transition-colors">Khám phá khóa học</span>
+            <span className="mx-2">/</span>
+            <span className="hover:text-white/80 cursor-pointer transition-colors">{course.jlptLevel || 'JLPT N3'}</span>
+            <span className="mx-2">/</span>
+            <span className="text-white/80 truncate max-w-[200px] sm:max-w-xs">{course.title}</span>
+          </div>
+
+          {/* Badges */}
           <div className="flex flex-wrap items-center gap-3 mb-4">
             {course.category && (
               <span className="px-3 py-1 bg-white/10 border border-white/20 rounded-full text-red-100 text-xs font-semibold tracking-wide uppercase">

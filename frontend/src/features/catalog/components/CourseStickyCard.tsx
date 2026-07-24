@@ -7,7 +7,6 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import { Dialog, DialogContent, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import FilterHdrIcon from '@mui/icons-material/FilterHdr';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 
 interface CourseStickyCardProps {
@@ -44,9 +43,9 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
           {course.thumbnailUrl ? (
             <img src={course.thumbnailUrl} alt={course.title} className="w-full h-full object-cover rounded-xl transition-opacity group-hover:opacity-80" />
           ) : (
-            <div className="flex flex-col items-center justify-center text-slate-300 w-full h-full bg-slate-100 rounded-xl">
-              <FilterHdrIcon sx={{ fontSize: 64, mb: 1, opacity: 0.5 }} />
-              <span className="text-xs font-semibold uppercase tracking-wider opacity-70">ManabiHub</span>
+            <div className="flex flex-col items-center justify-center text-rose-200/40 w-full h-full bg-gradient-to-br from-rose-900 to-slate-900 rounded-xl relative overflow-hidden">
+              <span className="text-8xl font-black absolute opacity-20 transform -rotate-12 translate-x-4 translate-y-4">作文</span>
+              <span className="text-sm font-semibold uppercase tracking-wider opacity-90 z-10 text-rose-100">ManabiHub</span>
             </div>
           )}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
@@ -56,14 +55,14 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
             <span className="text-white font-bold mt-3 drop-shadow-md bg-slate-900/60 px-3 py-1 rounded-full text-sm backdrop-blur-sm">Xem trước khóa học</span>
           </div>
           {/* Wishlist Button Overlay */}
-          <div onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()} className="absolute top-3 right-3 p-1 bg-white/80 backdrop-blur-sm rounded-full shadow z-20 flex items-center justify-center">
             <WishlistToggleButton courseId={course.id} variant="icon" />
           </div>
         </div>
 
       <div className="p-7">
         <div className="mb-6 flex items-baseline gap-2">
-          <span className="text-4xl font-extrabold tracking-tight text-slate-900">
+          <span className="text-2xl font-bold text-slate-900">
             {course.price === 0 ? (
               <span className="text-emerald-500">Miễn phí</span>
             ) : (
@@ -78,14 +77,14 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
           </button>
         ) : (
           <>
+            <button className="bg-red-600 hover:bg-red-700 text-white w-full py-3 rounded-xl font-semibold mb-3 transition-colors">
+              {course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
+            </button>
             {course.price > 0 && (
-              <button className="w-full bg-white hover:bg-red-50 text-red-600 font-bold py-3.5 px-4 rounded-xl transition-all mb-3 border border-red-600">
+              <button className="border border-red-600 text-red-600 hover:bg-red-50 w-full py-3 rounded-xl font-semibold mb-2 transition-colors">
                 Thêm vào giỏ hàng
               </button>
             )}
-            <button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-red-600/30 hover:shadow-red-600/50 hover:-translate-y-0.5 mb-4">
-              {course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
-            </button>
             <p className="text-center text-xs text-slate-500 font-medium mb-6">
               Đảm bảo hoàn tiền trong 30 ngày
             </p>
