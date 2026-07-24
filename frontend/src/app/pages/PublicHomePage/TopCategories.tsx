@@ -15,21 +15,21 @@ import { getAsset } from '../../../shared/utils/assets';
 
 /* ─── JLPT Levels with vivid progression colors ─── */
 const JLPT_LEVELS = [
-  { id: 'jlptLevel=N5', name: 'N5', kanji: '初', subtitle: '初級', color: '#4CAF50', gradient: 'linear-gradient(135deg, #4CAF50, #66BB6A)', label: 'Sơ cấp', emoji: '🌱' },
-  { id: 'jlptLevel=N4', name: 'N4', kanji: '基', subtitle: '初中級', color: '#26A69A', gradient: 'linear-gradient(135deg, #26A69A, #4DB6AC)', label: 'Sơ-Trung cấp', emoji: '🌿' },
-  { id: 'jlptLevel=N3', name: 'N3', kanji: '中', subtitle: '中級', color: '#1E88E5', gradient: 'linear-gradient(135deg, #1E88E5, #42A5F5)', label: 'Trung cấp', emoji: '⚡' },
-  { id: 'jlptLevel=N2', name: 'N2', kanji: '上', subtitle: '上級', color: '#E8432A', gradient: 'linear-gradient(135deg, #E8432A, #EF5350)', label: 'Cao cấp', emoji: '🔥' },
-  { id: 'jlptLevel=N1', name: 'N1', kanji: '極', subtitle: '最上級', color: '#C41E3A', gradient: 'linear-gradient(135deg, #C41E3A, #D4A017)', label: 'Thành thạo', emoji: '👑' },
+  { id: 'jlptLevel=N5', name: 'N5', kanji: '初', subtitle: '初級', color: '#EF9A9A', gradient: 'linear-gradient(135deg, #EF9A9A, #E57373)', label: 'Sơ cấp', emoji: '🌱' },
+  { id: 'jlptLevel=N4', name: 'N4', kanji: '基', subtitle: '初中級', color: '#EF5350', gradient: 'linear-gradient(135deg, #EF5350, #E53935)', label: 'Sơ-Trung cấp', emoji: '🌿' },
+  { id: 'jlptLevel=N3', name: 'N3', kanji: '中', subtitle: '中級', color: '#E53935', gradient: 'linear-gradient(135deg, #E53935, #D32F2F)', label: 'Trung cấp', emoji: '⚡' },
+  { id: 'jlptLevel=N2', name: 'N2', kanji: '上', subtitle: '上級', color: '#C62828', gradient: 'linear-gradient(135deg, #D32F2F, #C62828)', label: 'Cao cấp', emoji: '🔥' },
+  { id: 'jlptLevel=N1', name: 'N1', kanji: '極', subtitle: '最上級', color: '#B71C1C', gradient: 'linear-gradient(135deg, #C62828, #B71C1C)', label: 'Thành thạo', emoji: '👑' },
 ];
 
 /* ─── Skill Categories with unique color accents ─── */
 const SKILL_CATEGORIES = [
-  { id: 'category=vocabulary', name: 'Từ vựng', kanji: '語彙', color: '#5B8C5A', bgTint: '#E8F5E9', borderAccent: '#4CAF50' },
-  { id: 'category=grammar', name: 'Ngữ pháp', kanji: '文法', color: '#1B2A4A', bgTint: '#E8EAF6', borderAccent: '#3F51B5' },
-  { id: 'category=kanji', name: 'Hán tự', kanji: '漢字', color: '#C41E3A', bgTint: '#FFEBEE', borderAccent: '#E53935' },
-  { id: 'category=conversation', name: 'Giao tiếp', kanji: '会話', color: '#D4A017', bgTint: '#FFF8E1', borderAccent: '#FFB300' },
-  { id: 'category=jlpt-prep', name: 'Luyện thi', kanji: '試験', color: '#E8432A', bgTint: '#FBE9E7', borderAccent: '#FF5722' },
-  { id: 'category=business-japanese', name: 'Thương mại', kanji: '商業', color: '#00695C', bgTint: '#E0F2F1', borderAccent: '#00897B' },
+  { id: 'category=vocabulary', name: 'Từ vựng', kanji: '語彙' },
+  { id: 'category=grammar', name: 'Ngữ pháp', kanji: '文法' },
+  { id: 'category=kanji', name: 'Hán tự', kanji: '漢字' },
+  { id: 'category=conversation', name: 'Giao tiếp', kanji: '会話' },
+  { id: 'category=jlpt-prep', name: 'Luyện thi', kanji: '試験' },
+  { id: 'category=business-japanese', name: 'Thương mại', kanji: '商業' },
 ];
 
 export const TopCategories: React.FC = () => {
@@ -115,7 +115,7 @@ export const TopCategories: React.FC = () => {
                 position: 'absolute',
                 top: '50%', left: '8%', right: '8%',
                 height: '3px',
-                background: 'linear-gradient(to right, #4CAF50, #26A69A, #1E88E5, #E8432A, #C41E3A)',
+                background: 'linear-gradient(to right, #EF9A9A, #EF5350, #E53935, #C62828, #B71C1C)',
                 borderRadius: 4,
                 opacity: isVisible ? 0.35 : 0,
                 transition: 'opacity 1.5s ease 0.5s',
@@ -162,7 +162,7 @@ export const TopCategories: React.FC = () => {
                   elevation={0}
                   onClick={() => navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?${level.id}`)}
                   sx={{
-                    p: { xs: 2.5, md: 3 },
+                    p: { xs: 3, md: 4 },
                     width: '100%',
                     textAlign: 'center',
                     borderRadius: '20px',
@@ -265,10 +265,9 @@ export const TopCategories: React.FC = () => {
                   sx={{
                     p: 3,
                     textAlign: 'center',
-                    borderRadius: '18px',
-                    border: '2px solid transparent',
-                    borderBottom: `4px solid ${category.borderAccent}`,
-                    bgcolor: category.bgTint,
+                    borderRadius: '16px',
+                    border: '1px solid #e8e0d8',
+                    bgcolor: '#FFFFFF',
                     cursor: 'pointer',
                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                     position: 'relative',
@@ -277,25 +276,27 @@ export const TopCategories: React.FC = () => {
                     transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
                     transitionDelay: `${0.6 + index * 0.1}s`,
                     '&:hover': {
-                      transform: 'translateY(-6px) scale(1.03)',
-                      borderColor: category.borderAccent,
-                      boxShadow: `0 12px 28px ${category.color}18`,
+                      transform: 'translateY(-6px)',
+                      borderColor: '#C41E3A',
+                      boxShadow: '0 12px 28px rgba(196, 30, 58, 0.08)',
+                    },
+                    '&:hover .category-kanji': {
+                      color: '#C41E3A',
+                      transform: 'scale(1.1)',
                     }
                   }}
                 >
                   {/* Large Kanji as icon */}
                   <Typography
+                    className="category-kanji"
                     sx={{
                       fontSize: '2.8rem',
                       fontWeight: 800,
                       fontFamily: '"Noto Sans JP", serif',
-                      color: category.color,
+                      color: '#1A1A2E',
                       mb: 1,
                       lineHeight: 1.1,
-                      transition: 'transform 0.3s ease',
-                      '.MuiPaper-root:hover &': {
-                        transform: 'scale(1.1)',
-                      }
+                      transition: 'all 0.3s ease',
                     }}
                   >
                     {category.kanji}
@@ -336,7 +337,7 @@ export const TopCategories: React.FC = () => {
                 width: '100%', height: '100%',
                 objectFit: 'cover',
                 display: 'block',
-                borderRadius: 4,
+                borderRadius: '12px',
               }}
             />
           </Box>
@@ -346,7 +347,7 @@ export const TopCategories: React.FC = () => {
             sx={{
               width: { xs: '100%', md: '578.5px' },
               height: { xs: 'auto', md: '583.67px' },
-              pl: { xs: 0, md: 5 },
+              pl: { xs: 0, md: 6 },
               pt: { xs: 5, md: 0 },
               display: 'flex', flexDirection: 'column', justifyContent: 'center',
               opacity: isVisible ? 1 : 0,
@@ -354,26 +355,26 @@ export const TopCategories: React.FC = () => {
               transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <Box sx={{ width: 4, height: 20, bgcolor: '#C41E3A', borderRadius: 2, mr: 1.5 }} />
               <Typography variant="overline" sx={{ color: '#C41E3A', fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.85rem' }}>
                 GIỚI THIỆU
               </Typography>
             </Box>
 
-            <Typography variant="h2" sx={{ fontWeight: 800, color: '#1A1A2E', mb: 2.5, letterSpacing: '-0.02em', lineHeight: 1.2, fontSize: { xs: '2rem', md: '2.5rem', lg: '2.8rem' } }}>
+            <Typography variant="h2" sx={{ fontWeight: 800, color: '#1A1A2E', mb: 3, letterSpacing: '-0.02em', lineHeight: 1.3, fontSize: { xs: '2rem', md: '2.5rem', lg: '2.8rem' } }}>
               Chào Mừng Đến Với ManabiHub
             </Typography>
 
-            <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.7, mb: 2 }}>
-              Bạn muốn nâng cao kiến thức và kỹ năng của mình? Bạn muốn học những khóa học chất lượng<br />
+            <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.9, mb: 2.5 }}>
+              Bạn muốn nâng cao kiến thức và kỹ năng của mình? Bạn muốn học những khóa học chất lượng
               từ các giảng viên tiếng Nhật? Hãy khám phá các khóa học đang có trên ManabiHub.
             </Typography>
 
-            <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.7, mb: 4 }}>
-              Chúng tôi là một nền tảng học tiếng Nhật trực tuyến cung cấp một loạt các khóa học<br />
-              đa dạng và chất lượng, từ JLPT N1-N5. Với đội ngũ giảng viên giàu kinh nghiệm và kiến thức<br />
-              chuyên môn sâu rộng, chúng tôi cam kết mang đến cho bạn những khóa học chất lượng cao<br />
+            <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.9, mb: 4.5 }}>
+              Chúng tôi là một nền tảng học tiếng Nhật trực tuyến cung cấp một loạt các khóa học
+              đa dạng và chất lượng, từ JLPT N1-N5. Với đội ngũ giảng viên giàu kinh nghiệm và kiến thức
+              chuyên môn sâu rộng, chúng tôi cam kết mang đến cho bạn những khóa học chất lượng cao
               và mang tính thực tiễn.
             </Typography>
 

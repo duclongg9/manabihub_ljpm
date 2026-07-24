@@ -95,7 +95,7 @@ export const LandingHeader: React.FC = () => {
               open={Boolean(anchorEl)}
               onClose={() => setAnchorEl(null)}
               disableScrollLock
-              sx={{ '& .MuiPaper-root': { zIndex: 9999, mt: 1, borderRadius: '12px', minWidth: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', border: '1px solid #e8e0d8' } }}
+              sx={{ zIndex: 9999, '& .MuiPaper-root': { mt: 1, borderRadius: '12px', minWidth: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', border: '1px solid #e8e0d8' } }}
             >
               <MenuItem onClick={() => { setAnchorEl(null); navigate(ROUTES.PUBLIC.COURSE_BROWSE); }} sx={{ py: 1.5, fontWeight: 600, color: '#1A1A2E' }}>
                 Tất cả khóa học

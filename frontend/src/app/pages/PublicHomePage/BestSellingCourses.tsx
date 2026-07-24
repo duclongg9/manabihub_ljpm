@@ -73,13 +73,7 @@ export const BestSellingCourses: React.FC = () => {
           </Typography>
         )}
 
-        {isError && (
-          <Typography color="error" sx={{ py: 5 }}>
-            Chưa thể tải danh sách khóa học.
-          </Typography>
-        )}
-
-        {!isLoading && !isError && courses.length === 0 && (
+        {(isError || (!isLoading && courses.length === 0)) && (
           <Box sx={{ py: 8, textAlign: 'center' }}>
             <Typography sx={{ fontSize: '4rem', mb: 2, opacity: 0.3 }}>📚</Typography>
             <Typography sx={{ color: '#64748b', fontWeight: 600, fontSize: '1.1rem', mb: 1 }}>
