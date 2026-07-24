@@ -21,9 +21,9 @@ export function StudentWishlistPage() {
       <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', position: 'relative' }}>
         <PageHeader
           title={
-            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center' }}>
-              Danh sách yêu thích
-              <Box component="span" sx={{ ml: 2, px: 1.5, py: 0.25, bgcolor: '#fee2e2', color: '#dc2626', borderRadius: 4, fontSize: '0.875rem', fontWeight: 700, lineHeight: 1 }}>
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
+              <span>Danh sách yêu thích</span>
+              <Box component="span" sx={{ px: 1.5, py: 0.25, bgcolor: '#fee2e2', color: '#dc2626', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.5, minWidth: 24, textAlign: 'center' }}>
                 {data.length}
               </Box>
             </Box>

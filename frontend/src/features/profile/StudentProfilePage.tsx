@@ -157,10 +157,10 @@ export default function StudentProfilePage() {
                     Cập nhật thông tin tài khoản và thiết lập học tập của bạn.
                 </Typography>
 
-                <Grid container spacing={4} sx={{ maxWidth: '1280px', width: '100%', mx: "auto" }}>
+                <Grid container spacing={4}>
                     {/* Left Card - Avatar & Status */}
                     <Grid size={{ xs: 12, md: 4 }}>
-                        <Card elevation={0} sx={{ height: '100%', borderRadius: 4, border: "1px solid", borderColor: 'divider', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', bgcolor: '#FFFFFF', textAlign: 'center', p: 4 }}>
+                        <Card elevation={0} sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRadius: 4, border: "1px solid", borderColor: 'divider', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', bgcolor: '#FFFFFF', textAlign: 'center', p: 4 }}>
                             <AvatarUpload
                                 avatarUrl={resolvePublicAssetUrl(form.avatarUrl) || ""}
                                 onSelect={handleAvatar}

@@ -184,7 +184,7 @@ export const CourseCatalogPage: React.FC = () => {
           breadcrumbs={[{ label: 'Học viên' }, { label: 'Khám phá khóa học' }]}
         />
 
-        <Box sx={{ position: 'sticky', top: { xs: 56, sm: 64 }, zIndex: 20, bgcolor: 'rgba(251, 249, 245, 0.9)', backdropFilter: 'blur(12px)', py: 2, mx: -2, px: 2, borderRadius: 2, transition: 'all 0.3s' }}>
+        <Box sx={{ position: 'sticky', top: { xs: 56, sm: 64 }, zIndex: 20, bgcolor: 'rgba(250, 249, 246, 0.92)', backdropFilter: 'blur(12px)', py: 2, mx: -2, px: 2, borderRadius: 2, transition: 'all 0.3s' }}>
           <CourseCatalogFiltersBar
             filters={query.filters}
             onFiltersChange={handleFiltersChange}

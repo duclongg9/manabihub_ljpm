@@ -58,7 +58,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, waterma
           )}
           
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb" sx={{ mt: subtitle ? 1 : 0, '& ol': { listStyle: 'none', pl: 0, m: 0 } }}>
+            <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb" sx={{ mt: subtitle ? 1 : 0, '& ol': { listStyle: 'none', listStyleType: 'none', pl: 0, m: 0, display: 'flex', alignItems: 'center' }, '& li': { listStyle: 'none', listStyleType: 'none', pl: 0, m: 0, '&::before': { content: 'none' }, '&::marker': { content: 'none' } } }}>
               {breadcrumbs.map((bc, index) => {
                 const isLast = index === breadcrumbs.length - 1;
                 if (isLast || !bc.href) {
