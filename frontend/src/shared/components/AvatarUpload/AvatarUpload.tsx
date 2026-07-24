@@ -10,6 +10,7 @@ interface AvatarUploadProps {
     ) => void;
 
     disabled?: boolean;
+    label?: string;
 }
 
 export default function AvatarUpload({
@@ -17,6 +18,7 @@ export default function AvatarUpload({
                                          avatarUrl,
                                          onSelect,
                                          disabled = false,
+                                         label = "Change Avatar",
                                      }: AvatarUploadProps) {
 
     function handleChange(
@@ -62,7 +64,7 @@ export default function AvatarUpload({
                 }}
             >
 
-                Change Avatar
+                {label}
 
                 <input
                     hidden
