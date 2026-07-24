@@ -1,4 +1,4 @@
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+
 import {
   Box,
   Grid,
@@ -28,9 +28,11 @@ export function StudentWishlistPage() {
           title={
             <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
               <span>Danh sách yêu thích</span>
-              <Box component="span" sx={{ px: 1.5, py: 0.25, bgcolor: '#fee2e2', color: '#dc2626', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.5, minWidth: 24, textAlign: 'center' }}>
-                {data.length}
-              </Box>
+              {!isLoading && !isError && (
+                <Box component="span" sx={{ px: 1.5, py: 0.25, bgcolor: '#fee2e2', color: '#C41E3A', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.5, minWidth: 24, textAlign: 'center' }}>
+                  {data.length}
+                </Box>
+              )}
             </Box>
           }
           subtitle="お気に入り"
@@ -42,12 +44,12 @@ export function StudentWishlistPage() {
         />
 
         <Box sx={{ position: 'relative', zIndex: 1 }}>
-          {isLoading && <LoadingState message="Loading your wishlist..." />}
+          {isLoading && <LoadingState message="Đang tải danh sách yêu thích..." />}
 
           {isError && (
             <ErrorState
-              title="Wishlist unavailable"
-              message="Please check your connection and try again."
+              title="Không thể tải danh sách"
+              message="Vui lòng kiểm tra kết nối và thử lại."
               onRetry={() => refetch()}
             />
           )}
@@ -55,18 +57,22 @@ export function StudentWishlistPage() {
           {!isLoading && !isError && data.length === 0 && (
             <Box
               sx={{
-                py: 6,
+                py: 8,
                 bgcolor: 'background.paper',
                 border: '1px solid',
                 borderColor: 'divider',
+                borderRadius: 4,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               <EmptyState
-                title="Chưa có khóa học yêu thích"
-                description="Khám phá các khóa học và lưu lại những khóa học bạn quan tâm."
-                icon={<FavoriteBorderIcon sx={{ fontSize: 56, color: 'text.secondary' }} />}
+                title="Danh sách yêu thích của bạn đang trống!"
+                description="Hãy khám phá thêm nhiều khóa học thú vị nhé."
+                icon={<Box sx={{ fontSize: '5rem', mb: 2, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.05))', transform: 'rotate(-5deg)' }}>🐕</Box>}
                 actionLabel="Khám phá khóa học ngay ➔"
-                onAction={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
+                onAction={() => navigate(ROUTES.STUDENT.BROWSE_COURSES || '/student/browse')}
               />
             </Box>
           )}

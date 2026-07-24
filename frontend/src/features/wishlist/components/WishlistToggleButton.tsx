@@ -67,13 +67,15 @@ export function WishlistToggleButton({
             sx={{
               position: 'absolute',
               zIndex: 2,
-              top: 8,
-              right: 8,
+              top: 12,
+              right: 12,
               width: 40,
               height: 40,
-              bgcolor: 'background.paper',
-              boxShadow: 1,
-              '&:hover': { bgcolor: 'background.paper' },
+              bgcolor: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(4px)',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              transition: 'transform 0.2s',
+              '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' },
             }}
           >
             {isSaved ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
