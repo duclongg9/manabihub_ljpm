@@ -55,7 +55,7 @@ export function PublicLoginPage() {
           overflow: 'hidden',
           '&::before': {
             content: '""', position: 'absolute', inset: 0,
-            background: 'rgba(0, 0, 0, 0.4)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 30%, rgba(0,0,0,0.7) 100%)',
             zIndex: 1
           }
         }}
@@ -67,7 +67,7 @@ export function PublicLoginPage() {
         <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', p: 8, height: '100%' }}>
           {/* Logo at top */}
           <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none', flexShrink: 0 }}>
-            <Box sx={{ width: 40, height: 40, bgcolor: '#3b82f6', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.39)' }}>
+            <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px 0 rgba(196, 30, 58, 0.39)' }}>
               <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
             </Box>
             <Typography variant="h5" sx={{ fontWeight: 800, color: 'white', letterSpacing: '-0.5px' }}>
@@ -78,22 +78,25 @@ export function PublicLoginPage() {
           {/* Centered Content */}
           <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Box sx={{ maxWidth: 500, animation: `${fadeIn} 1s ease-out` }}>
+              <Typography sx={{ fontFamily: '"Noto Sans JP", sans-serif', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.15em', mb: 2 }}>
+                日本学問 — Nhật Bản Học
+              </Typography>
               <Typography variant="h2" sx={{ fontWeight: 800, color: 'white', mb: 3, lineHeight: 1.1, fontSize: '3.5rem' }}>
-                Hành trình chinh phục tiếng Nhật bắt đầu từ đây
+                Hành trình chinh phục <Box component="span" sx={{ color: '#FF6B6B' }}>tiếng Nhật</Box> bắt đầu từ đây
               </Typography>
               <Typography variant="h6" sx={{ color: '#cbd5e1', mb: 4, fontWeight: 400, lineHeight: 1.6 }}>
                 Học tập cùng các chuyên gia JLPT hàng đầu.
               </Typography>
 
               <Stack direction="row" sx={{ alignItems: 'center' }} spacing={2}>
-                <AvatarGroup total={50000} sx={{ '& .MuiAvatar-root': { width: 48, height: 48, border: '2px solid', borderColor: 'grey.900' } }}>
+                <AvatarGroup total={500} sx={{ '& .MuiAvatar-root': { width: 48, height: 48, border: '2px solid', borderColor: 'grey.900' } }}>
                   <Avatar alt="Student 1" src={getAsset('anh1.png')} />
                   <Avatar alt="Student 2" src={getAsset('anh2.png')} />
                   <Avatar alt="Student 3" src={getAsset('anh3.png')} />
                   <Avatar alt="Student 4" src={getAsset('anh4.png')} />
                 </AvatarGroup>
                 <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', lineHeight: 1.4 }}>
-                  <Typography component="span" sx={{ color: 'white', fontWeight: 700 }}>50,000+ học viên</Typography> <br />
+                  <Typography component="span" sx={{ color: '#FF6B6B', fontWeight: 800 }}>500+ học viên</Typography> <br />
                   đã đồng hành
                 </Typography>
               </Stack>
@@ -115,13 +118,16 @@ export function PublicLoginPage() {
         <Box sx={{ width: '100%', maxWidth: 400, animation: `${fadeIn} 0.6s ease-out` }}>
           {/* Mobile Header Logo */}
           <Box component={Link} to="/" sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 6, textDecoration: 'none' }}>
-            <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
             </Box>
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>ManabiHub</Typography>
           </Box>
 
           <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography sx={{ fontFamily: '"Noto Sans JP", sans-serif', color: '#C41E3A', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mb: 1 }}>
+              ようこそ!
+            </Typography>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#0f172a', mb: 1.5, letterSpacing: '-0.5px' }}>
               Chào mừng bạn! 👋
             </Typography>
@@ -138,14 +144,10 @@ export function PublicLoginPage() {
 
           {/* Primary Action */}
           <Button
-            variant="contained"
+            variant="outlined"
             fullWidth
             onClick={handleGoogleLogin}
-            startIcon={
-              <Box sx={{ bgcolor: 'white', p: 0.5, borderRadius: 1, display: 'flex', mr: 0.5 }}>
-                <GoogleIcon />
-              </Box>
-            }
+            startIcon={<GoogleIcon />}
             sx={{
               py: 1.5,
               mb: 3,
@@ -153,14 +155,18 @@ export function PublicLoginPage() {
               textTransform: 'none',
               fontWeight: 700,
               fontSize: '1.05rem',
-              bgcolor: '#2563eb',
-              color: 'white',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              bgcolor: '#ffffff',
+              color: '#334155',
+              borderColor: '#e2e8f0',
+              borderWidth: '1.5px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
               transition: 'all 0.3s ease',
               '&:hover': {
-                bgcolor: '#1d4ed8',
+                bgcolor: '#fcfcfc',
+                borderColor: '#C41E3A',
+                color: '#C41E3A',
                 transform: 'translateY(-2px)',
-                boxShadow: '0 8px 20px rgba(37, 99, 235, 0.35)',
+                boxShadow: '0 8px 16px rgba(196, 30, 58, 0.12)',
               },
               '&:active': {
                 transform: 'translateY(0)',
