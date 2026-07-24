@@ -1,22 +1,18 @@
-import React from 'react';
-import { Box, Card, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Button } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Card, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Button, Tabs, Tab } from '@mui/material';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { useNavigate } from 'react-router-dom';
 
 // Dummy data for transactions (can be fetched from API later)
-const DUMMY_TRANSACTIONS = [
-  // Uncomment to test populated state
-  // {
-  //   id: '#MB-89234',
-  //   courseName: 'JLPT N3 作文マスター',
-  //   date: '24/07/2026',
-  //   amount: '250.000 ₫',
-  //   status: 'Thành công',
-  // }
-];
+const DUMMY_TRANSACTIONS: any[] = [];
 
 export const StudentPaymentsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [tabValue, setTabValue] = useState(0);
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
 
   return (
     <Box component="main" sx={{ minHeight: '100vh', bgcolor: '#F8FAFC' }}>
@@ -32,6 +28,26 @@ export const StudentPaymentsPage: React.FC = () => {
         />
 
         <Card elevation={0} sx={{ borderRadius: 4, border: "1px solid", borderColor: 'divider', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', bgcolor: '#FFFFFF', overflow: 'hidden' }}>
+          
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
+            <Tabs 
+              value={tabValue} 
+              onChange={handleTabChange} 
+              aria-label="payment history tabs"
+              sx={{ 
+                px: 2,
+                '& .MuiTabs-indicator': { backgroundColor: '#C41E3A' },
+                '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '0.9rem', color: 'text.secondary', minWidth: 'auto', mr: 4 },
+                '& .Mui-selected': { color: '#C41E3A !important' }
+              }}
+            >
+              <Tab label="Tất cả" />
+              <Tab label="Thành công" />
+              <Tab label="Đang xử lý" />
+              <Tab label="Đã hủy" />
+            </Tabs>
+          </Box>
+
           {DUMMY_TRANSACTIONS.length > 0 ? (
             <TableContainer>
               <Table sx={{ minWidth: 650 }}>

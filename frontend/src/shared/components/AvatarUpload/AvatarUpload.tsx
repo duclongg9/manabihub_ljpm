@@ -27,7 +27,11 @@ export default function AvatarUpload({
                     sx={{
                         width: 96,
                         height: 96,
-                        boxShadow: '0 0 0 4px rgba(220, 38, 38, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        boxShadow: '0 0 0 4px rgba(196, 30, 58, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        bgcolor: '#fef2f2',
+                        color: '#C41E3A',
+                        fontWeight: 700,
+                        fontSize: '2.5rem'
                     }}
                 />
                 <Tooltip title="Đổi ảnh đại diện">

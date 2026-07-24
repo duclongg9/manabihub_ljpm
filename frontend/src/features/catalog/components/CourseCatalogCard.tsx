@@ -55,8 +55,6 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
           transform: 'translateY(-4px)',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
           '& .card-title': { color: '#C41E3A' },
-          '& .card-cta': { opacity: 1, transform: 'translateX(0)', maxHeight: 20, mt: 0.5 },
-          '& .card-price': { opacity: 0, maxHeight: 0, overflow: 'hidden' }
         },
       }}
     >
@@ -158,31 +156,33 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
           <Stack
             direction="row"
             spacing={1}
-            sx={{ mt: 'auto', pt: 2, justifyContent: 'space-between', alignItems: 'flex-end' }}
+            sx={{ mt: 'auto', pt: 2, justifyContent: 'space-between', alignItems: 'center' }}
           >
-            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-              <Typography
-                className="card-price"
-                variant="subtitle1"
-                sx={{ fontWeight: 800, color: course.price === 0 ? 'success.main' : 'text.primary', transition: 'all 0.3s', maxHeight: 30 }}
-              >
-                {formatPrice(course.price, course.currency)}
-              </Typography>
-              <Typography 
-                className="card-cta" 
-                variant="caption" 
-                sx={{ color: '#C41E3A', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.5, opacity: 0, transform: 'translateX(-10px)', transition: 'all 0.3s', maxHeight: 0 }}
-              >
-                 Khám phá ngay ➔
-              </Typography>
-            </Box>
-            <Stack
-              direction="row"
-              spacing={0.5}
-              sx={{ alignItems: 'center', color: '#64748b', bgcolor: '#f1f5f9', px: 1.5, py: 0.5, borderRadius: '8px' }}
+            <Typography
+              className="card-price"
+              variant="subtitle1"
+              sx={{ fontWeight: 800, color: course.price === 0 ? 'success.main' : '#C41E3A' }}
             >
-              <Typography variant="caption" sx={{ fontWeight: 600 }}>{course.totalLessons || (idNum % 20) + 12} bài học</Typography>
-            </Stack>
+              {formatPrice(course.price, course.currency)}
+            </Typography>
+            <Box
+              sx={{
+                bgcolor: '#C41E3A',
+                color: 'white',
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 2,
+                fontSize: '0.875rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                transition: 'all 0.2s',
+                '&:hover': { bgcolor: '#a01830' }
+              }}
+            >
+              Thêm vào giỏ 🛒
+            </Box>
           </Stack>
         </CardContent>
       </CardActionArea>

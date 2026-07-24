@@ -17,15 +17,17 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, waterma
         <Typography
           sx={{
             position: 'absolute',
-            top: -30,
-            right: 0,
-            fontSize: '8rem',
+            top: '50%',
+            right: '5%',
+            transform: 'translateY(-50%)',
+            fontSize: { xs: '6rem', md: '10rem' },
             fontWeight: 900,
-            color: 'rgba(0,0,0,0.02)',
+            color: 'rgba(0,0,0,0.03)',
             zIndex: 0,
             pointerEvents: 'none',
             userSelect: 'none',
             lineHeight: 1,
+            whiteSpace: 'nowrap'
           }}
         >
           {watermark}
@@ -44,18 +46,18 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, waterma
           )}
           
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb" sx={{ mt: subtitle ? 1 : 0 }}>
+            <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb" sx={{ mt: subtitle ? 1 : 0, '& ol': { listStyle: 'none', pl: 0, m: 0 } }}>
               {breadcrumbs.map((bc, index) => {
                 const isLast = index === breadcrumbs.length - 1;
                 if (isLast || !bc.href) {
                   return (
-                    <Typography key={index} color="text.primary" variant="body2">
+                    <Typography key={index} color="text.primary" variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
                       {bc.label}
                     </Typography>
                   );
                 }
                 return (
-                  <Link key={index} underline="hover" color="inherit" href={bc.href} variant="body2">
+                  <Link key={index} underline="hover" color="inherit" href={bc.href} variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
                     {bc.label}
                   </Link>
                 );
