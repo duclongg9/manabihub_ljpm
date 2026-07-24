@@ -46,7 +46,7 @@ export const BecomeTeacherBanner: React.FC = () => {
 
       <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
         {/* Japanese accent text */}
-        <Typography sx={{ color: 'rgba(196, 30, 58, 0.6)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.15em', mb: 2 }}>
+        <Typography sx={{ fontFamily: '"Noto Sans JP", sans-serif', color: 'rgba(196, 30, 58, 0.6)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.15em', mb: 2 }}>
           先生になろう — Trở Thành Sensei
         </Typography>
 

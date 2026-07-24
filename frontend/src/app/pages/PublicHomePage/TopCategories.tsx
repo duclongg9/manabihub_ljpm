@@ -8,29 +8,28 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import ArticleIcon from '@mui/icons-material/Article';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
 
-/* ─── JLPT Levels (Timeline style) ─── */
+/* ─── JLPT Levels with vivid progression colors ─── */
 const JLPT_LEVELS = [
-  { id: 'jlptLevel=N5', name: 'N5', subtitle: '初級', color: '#5B8C5A', label: 'Sơ cấp' },
-  { id: 'jlptLevel=N4', name: 'N4', subtitle: '初中級', color: '#3B9979', label: 'Sơ-Trung cấp' },
-  { id: 'jlptLevel=N3', name: 'N3', subtitle: '中級', color: '#D4A017', label: 'Trung cấp' },
-  { id: 'jlptLevel=N2', name: 'N2', subtitle: '上級', color: '#E8432A', label: 'Cao cấp' },
-  { id: 'jlptLevel=N1', name: 'N1', subtitle: '最上級', color: '#C41E3A', label: 'Thành thạo' },
+  { id: 'jlptLevel=N5', name: 'N5', kanji: '初', subtitle: '初級', color: '#4CAF50', gradient: 'linear-gradient(135deg, #4CAF50, #66BB6A)', label: 'Sơ cấp', emoji: '🌱' },
+  { id: 'jlptLevel=N4', name: 'N4', kanji: '基', subtitle: '初中級', color: '#26A69A', gradient: 'linear-gradient(135deg, #26A69A, #4DB6AC)', label: 'Sơ-Trung cấp', emoji: '🌿' },
+  { id: 'jlptLevel=N3', name: 'N3', kanji: '中', subtitle: '中級', color: '#1E88E5', gradient: 'linear-gradient(135deg, #1E88E5, #42A5F5)', label: 'Trung cấp', emoji: '⚡' },
+  { id: 'jlptLevel=N2', name: 'N2', kanji: '上', subtitle: '上級', color: '#E8432A', gradient: 'linear-gradient(135deg, #E8432A, #EF5350)', label: 'Cao cấp', emoji: '🔥' },
+  { id: 'jlptLevel=N1', name: 'N1', kanji: '極', subtitle: '最上級', color: '#C41E3A', gradient: 'linear-gradient(135deg, #C41E3A, #D4A017)', label: 'Thành thạo', emoji: '👑' },
 ];
 
-/* ─── Skill Categories ─── */
+/* ─── Skill Categories with unique color accents ─── */
 const SKILL_CATEGORIES = [
-  { id: 'category=vocabulary', name: 'Từ vựng', kanji: '語彙', color: '#5B8C5A' },
-  { id: 'category=grammar', name: 'Ngữ pháp', kanji: '文法', color: '#1B2A4A' },
-  { id: 'category=kanji', name: 'Hán tự', kanji: '漢字', color: '#C41E3A' },
-  { id: 'category=conversation', name: 'Giao tiếp', kanji: '会話', color: '#D4A017' },
-  { id: 'category=jlpt-prep', name: 'Luyện thi', kanji: '試験', color: '#E8432A' },
-  { id: 'category=business-japanese', name: 'Thương mại', kanji: '商業', color: '#3B9979' },
+  { id: 'category=vocabulary', name: 'Từ vựng', kanji: '語彙', color: '#5B8C5A', bgTint: '#E8F5E9', borderAccent: '#4CAF50' },
+  { id: 'category=grammar', name: 'Ngữ pháp', kanji: '文法', color: '#1B2A4A', bgTint: '#E8EAF6', borderAccent: '#3F51B5' },
+  { id: 'category=kanji', name: 'Hán tự', kanji: '漢字', color: '#C41E3A', bgTint: '#FFEBEE', borderAccent: '#E53935' },
+  { id: 'category=conversation', name: 'Giao tiếp', kanji: '会話', color: '#D4A017', bgTint: '#FFF8E1', borderAccent: '#FFB300' },
+  { id: 'category=jlpt-prep', name: 'Luyện thi', kanji: '試験', color: '#E8432A', bgTint: '#FBE9E7', borderAccent: '#FF5722' },
+  { id: 'category=business-japanese', name: 'Thương mại', kanji: '商業', color: '#00695C', bgTint: '#E0F2F1', borderAccent: '#00897B' },
 ];
 
 export const TopCategories: React.FC = () => {
@@ -40,12 +39,8 @@ export const TopCategories: React.FC = () => {
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
-      },
-      { threshold: 0.1, rootMargin: '0px' }
+      ([entry]) => { if (entry.isIntersecting) setIsVisible(true); },
+      { threshold: 0.08, rootMargin: '0px' }
     );
     if (sectionRef.current) observer.observe(sectionRef.current);
     return () => observer.disconnect();
@@ -55,7 +50,7 @@ export const TopCategories: React.FC = () => {
     <Box ref={sectionRef} sx={{ py: { xs: 8, md: 12 }, bgcolor: '#FBF9F5', overflowX: 'hidden' }}>
       <Container disableGutters sx={{ maxWidth: { md: '1157px' }, px: { xs: 3, md: 0 }, margin: '0 auto' }}>
 
-        {/* ══════════ SECTION 1: JLPT TIMELINE ══════════ */}
+        {/* ══════════ SECTION 1: JLPT PROGRESSION PATH ══════════ */}
         <Box sx={{ mb: { xs: 8, md: 12 } }}>
           <Box
             sx={{
@@ -63,8 +58,7 @@ export const TopCategories: React.FC = () => {
               flexDirection: { xs: 'column', md: 'row' },
               alignItems: { xs: 'flex-start', md: 'flex-end' },
               justifyContent: 'space-between',
-              gap: 3,
-              mb: 5,
+              gap: 3, mb: 5,
             }}
           >
             <Box>
@@ -77,6 +71,9 @@ export const TopCategories: React.FC = () => {
               <Typography variant="h3" sx={{ fontWeight: 800, color: '#1A1A2E', letterSpacing: '-0.02em', lineHeight: 1.3, fontSize: { xs: '2rem', md: '2.5rem' } }}>
                 Chinh phục từng cấp độ
               </Typography>
+              <Typography sx={{ color: '#64748b', mt: 1, fontSize: '1rem' }}>
+                Lộ trình học tập từ cơ bản đến nâng cao — mỗi bước là một thành tựu mới
+              </Typography>
             </Box>
 
             <Button
@@ -85,18 +82,15 @@ export const TopCategories: React.FC = () => {
               onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
               sx={{
                 background: 'linear-gradient(135deg, #C41E3A, #E8432A)',
-                py: 1.5,
-                px: 3,
-                fontWeight: 700,
+                py: 1.5, px: 3, fontWeight: 700,
                 borderRadius: '10px',
                 boxShadow: '0 4px 16px rgba(196, 30, 58, 0.25)',
-                textTransform: 'uppercase',
-                fontSize: '0.85rem',
+                textTransform: 'uppercase', fontSize: '0.85rem',
                 transition: 'all 0.3s ease',
                 '&:hover': {
                   background: 'linear-gradient(135deg, #A8182F, #D13A24)',
-                  boxShadow: '0 8px 24px rgba(196,30,58,0.4)',
                   transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 24px rgba(196,30,58,0.4)',
                 }
               }}
             >
@@ -104,27 +98,27 @@ export const TopCategories: React.FC = () => {
             </Button>
           </Box>
 
-          {/* JLPT Timeline Row */}
+          {/* JLPT Progression Path */}
           <Box
             sx={{
               display: 'flex',
               flexDirection: { xs: 'column', md: 'row' },
-              alignItems: 'stretch',
-              gap: 0,
+              alignItems: { xs: 'stretch', md: 'stretch' },
+              gap: { xs: 2, md: 0 },
               position: 'relative',
             }}
           >
-            {/* Connecting line (desktop) */}
+            {/* Connecting gradient line (desktop) */}
             <Box
               sx={{
                 display: { xs: 'none', md: 'block' },
                 position: 'absolute',
-                top: '50%',
-                left: '5%',
-                right: '5%',
-                height: '2px',
-                background: 'linear-gradient(to right, #5B8C5A, #3B9979, #D4A017, #E8432A, #C41E3A)',
-                opacity: 0.2,
+                top: '50%', left: '8%', right: '8%',
+                height: '3px',
+                background: 'linear-gradient(to right, #4CAF50, #26A69A, #1E88E5, #E8432A, #C41E3A)',
+                borderRadius: 4,
+                opacity: isVisible ? 0.35 : 0,
+                transition: 'opacity 1.5s ease 0.5s',
                 zIndex: 0,
               }}
             />
@@ -139,93 +133,118 @@ export const TopCategories: React.FC = () => {
                   alignItems: 'center',
                   position: 'relative',
                   zIndex: 1,
-                  px: 1,
+                  px: { xs: 0, md: 1.5 },
                   opacity: isVisible ? 1 : 0,
-                  transform: isVisible ? 'translateY(0)' : 'translateY(40px)',
+                  transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(40px) scale(0.9)',
                   transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.12}s`,
                 }}
               >
+                {/* Level node dot on the line */}
+                <Box
+                  sx={{
+                    display: { xs: 'none', md: 'flex' },
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 16, height: 16,
+                    borderRadius: '50%',
+                    bgcolor: level.color,
+                    border: '3px solid #FBF9F5',
+                    boxShadow: `0 0 0 3px ${level.color}30, 0 2px 8px ${level.color}40`,
+                    zIndex: 3,
+                    opacity: isVisible ? 1 : 0,
+                    transition: `all 0.5s ease ${0.8 + index * 0.1}s`,
+                  }}
+                />
+
                 <Paper
                   elevation={0}
                   onClick={() => navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?${level.id}`)}
                   sx={{
-                    p: 3,
+                    p: { xs: 2.5, md: 3 },
                     width: '100%',
                     textAlign: 'center',
-                    borderRadius: '16px',
-                    border: '1.5px solid',
-                    borderColor: '#e8e0d8',
+                    borderRadius: '20px',
+                    border: '2px solid transparent',
                     bgcolor: '#FFFFFF',
                     cursor: 'pointer',
-                    transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                     position: 'relative',
                     overflow: 'hidden',
+                    mb: { xs: 0, md: 8 },
                     '&:hover': {
-                      transform: 'translateY(-6px)',
-                      boxShadow: `0 12px 30px ${level.color}22`,
+                      transform: 'translateY(-8px) scale(1.02)',
+                      boxShadow: `0 16px 40px ${level.color}20`,
                       borderColor: level.color,
                     },
+                    // Top colored bar
                     '&::before': {
                       content: '""',
                       position: 'absolute',
                       top: 0, left: 0, right: 0,
-                      height: '4px',
-                      bgcolor: level.color,
-                      borderRadius: '16px 16px 0 0',
+                      height: '5px',
+                      background: level.gradient,
+                      borderRadius: '20px 20px 0 0',
                     }
                   }}
                 >
-                  {/* Kanji watermark */}
+                  {/* Large Kanji watermark */}
                   <Typography
                     sx={{
                       position: 'absolute',
-                      bottom: -5, right: 5,
-                      fontSize: '4rem',
+                      bottom: -8, right: 8,
+                      fontSize: '5rem',
                       fontWeight: 900,
+                      fontFamily: '"Noto Sans JP", serif',
                       color: `${level.color}08`,
                       lineHeight: 1,
                       userSelect: 'none',
                       pointerEvents: 'none',
                     }}
                   >
-                    {level.subtitle}
+                    {level.kanji}
                   </Typography>
 
-                  <Typography sx={{ fontWeight: 900, fontSize: '1.8rem', color: level.color, mb: 0.5 }}>
+                  {/* Emoji */}
+                  <Typography sx={{ fontSize: '1.5rem', mb: 1 }}>{level.emoji}</Typography>
+
+                  {/* Level name with color */}
+                  <Typography
+                    sx={{
+                      fontWeight: 900,
+                      fontSize: '1.6rem',
+                      background: level.gradient,
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      mb: 0.5,
+                    }}
+                  >
                     {level.name}
                   </Typography>
-                  <Typography sx={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600, mb: 0.5 }}>
+
+                  <Typography
+                    sx={{
+                      fontSize: '0.85rem',
+                      fontFamily: '"Noto Sans JP", sans-serif',
+                      color: '#64748b',
+                      fontWeight: 600,
+                      mb: 0.3,
+                    }}
+                  >
                     {level.subtitle}
                   </Typography>
-                  <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 500 }}>
+                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {level.label}
                   </Typography>
                 </Paper>
-
-                {/* Arrow connector (desktop only, skip last) */}
-                {index < JLPT_LEVELS.length - 1 && (
-                  <Box
-                    sx={{
-                      display: { xs: 'none', md: 'block' },
-                      position: 'absolute',
-                      right: -12,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      zIndex: 2,
-                      color: '#C41E3A',
-                      fontSize: '1.2rem',
-                      opacity: 0.4,
-                    }}
-                  >
-                    →
-                  </Box>
-                )}
               </Box>
             ))}
           </Box>
         </Box>
 
-        {/* ══════════ SECTION 2: SKILL CATEGORIES ══════════ */}
+        {/* ══════════ SECTION 2: SKILL CATEGORIES (Colorful) ══════════ */}
         <Box sx={{ mb: { xs: 8, md: 12 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
             <Box sx={{ width: 4, height: 20, bgcolor: '#D4A017', borderRadius: 2, mr: 1.5 }} />
@@ -246,32 +265,37 @@ export const TopCategories: React.FC = () => {
                   sx={{
                     p: 3,
                     textAlign: 'center',
-                    borderRadius: '16px',
-                    border: '1.5px solid #e8e0d8',
-                    bgcolor: '#FFFFFF',
+                    borderRadius: '18px',
+                    border: '2px solid transparent',
+                    borderBottom: `4px solid ${category.borderAccent}`,
+                    bgcolor: category.bgTint,
                     cursor: 'pointer',
-                    transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                     position: 'relative',
                     overflow: 'hidden',
                     opacity: isVisible ? 1 : 0,
                     transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-                    transitionDelay: `${0.6 + index * 0.08}s`,
+                    transitionDelay: `${0.6 + index * 0.1}s`,
                     '&:hover': {
-                      transform: 'translateY(-4px)',
-                      borderColor: category.color,
-                      boxShadow: `0 8px 20px ${category.color}18`,
+                      transform: 'translateY(-6px) scale(1.03)',
+                      borderColor: category.borderAccent,
+                      boxShadow: `0 12px 28px ${category.color}18`,
                     }
                   }}
                 >
                   {/* Large Kanji as icon */}
                   <Typography
                     sx={{
-                      fontSize: '2.5rem',
+                      fontSize: '2.8rem',
                       fontWeight: 800,
+                      fontFamily: '"Noto Sans JP", serif',
                       color: category.color,
                       mb: 1,
-                      lineHeight: 1.2,
-                      fontFamily: '"Noto Sans JP", "Noto Serif JP", serif',
+                      lineHeight: 1.1,
+                      transition: 'transform 0.3s ease',
+                      '.MuiPaper-root:hover &': {
+                        transform: 'scale(1.1)',
+                      }
                     }}
                   >
                     {category.kanji}
@@ -309,8 +333,7 @@ export const TopCategories: React.FC = () => {
               src={getAsset('hero.png')}
               alt="ManabiHub"
               sx={{
-                width: '100%',
-                height: '100%',
+                width: '100%', height: '100%',
                 objectFit: 'cover',
                 display: 'block',
                 borderRadius: 4,
@@ -325,9 +348,7 @@ export const TopCategories: React.FC = () => {
               height: { xs: 'auto', md: '583.67px' },
               pl: { xs: 0, md: 5 },
               pt: { xs: 5, md: 0 },
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
+              display: 'flex', flexDirection: 'column', justifyContent: 'center',
               opacity: isVisible ? 1 : 0,
               transform: isVisible ? 'translateX(0)' : 'translateX(40px)',
               transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s',
@@ -356,17 +377,12 @@ export const TopCategories: React.FC = () => {
               và mang tính thực tiễn.
             </Typography>
 
-            {/* Checklist & Small Image Group */}
+            {/* Checklist */}
             <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
               <Box
                 component="img"
                 src={getAsset('course2.png')}
-                sx={{
-                  width: '160px',
-                  height: '110px',
-                  objectFit: 'cover',
-                  borderRadius: 3,
-                }}
+                sx={{ width: '160px', height: '110px', objectFit: 'cover', borderRadius: 3 }}
               />
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 {[
@@ -383,7 +399,6 @@ export const TopCategories: React.FC = () => {
                 ))}
               </Box>
             </Box>
-
           </Box>
         </Box>
       </Container>
