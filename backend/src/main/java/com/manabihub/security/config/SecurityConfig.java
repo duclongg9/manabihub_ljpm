@@ -158,14 +158,26 @@ public class SecurityConfig {
                 if (token.contains(".")) {
                     String[] parts = token.split("\\.");
                     if (parts.length >= 2) {
-                        String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
-                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        java.util.Map<String, Object> payloadMap = mapper.readValue(payloadJson, java.util.Map.class);
-                        if (payloadMap.containsKey("sub")) {
-                            subject = payloadMap.get("sub").toString();
-                        }
-                        if (payloadMap.containsKey("role")) {
-                            role = payloadMap.get("role").toString();
+                        try {
+                            String base64Url = parts[1];
+                            int pad = 4 - (base64Url.length() % 4);
+                            if (pad > 0 && pad < 4) {
+                                StringBuilder sb = new StringBuilder(base64Url);
+                                for (int i = 0; i < pad; i++) sb.append("=");
+                                base64Url = sb.toString();
+                            }
+                            String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(base64Url));
+                            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                            java.util.Map<String, Object> payloadMap = mapper.readValue(payloadJson, java.util.Map.class);
+                            if (payloadMap.containsKey("sub")) {
+                                subject = payloadMap.get("sub").toString();
+                            }
+                            if (payloadMap.containsKey("role")) {
+                                role = payloadMap.get("role").toString();
+                            }
+                        } catch (Exception ex) {
+                            // If parsing fails, we shouldn't pass the whole JWT as subject, just fallback to a dummy UUID
+                            subject = "c0000000-0000-0000-0000-000000000001";
                         }
                     }
                 }

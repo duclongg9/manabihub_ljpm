@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Alert, Box, Typography, Button, CircularProgress, Stack, Card,
   TextField, Stepper, Step, StepLabel,
-  Container, InputAdornment,
+  Container, InputAdornment, Avatar,
   FormControl, InputLabel, Select, FormHelperText, MenuItem
 } from '@mui/material';
 import { isAxiosError } from 'axios';
@@ -10,6 +10,10 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import FaceIcon from '@mui/icons-material/Face';
+import Face2Icon from '@mui/icons-material/Face2';
+import Face3Icon from '@mui/icons-material/Face3';
+import Face4Icon from '@mui/icons-material/Face4';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   clearAuthSession,
@@ -34,6 +38,7 @@ export function StudentOnboardingPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [goal, setGoal] = useState('n3');
+  const [avatarIndex, setAvatarIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -92,6 +97,7 @@ export function StudentOnboardingPage() {
         fullName: name.trim(),
         jlptGoal: goal.toUpperCase(),
         phoneNumber: phone.trim() || null,
+        // (In a real app, we would send the avatar index or URL)
       });
       setActiveStep(1);
     } catch (requestError) {
@@ -107,7 +113,7 @@ export function StudentOnboardingPage() {
   const handleBack = () => setActiveStep((prev) => prev - 1);
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#F8FAFC', backgroundImage: 'radial-gradient(at 100% 0%, rgba(254, 226, 226, 0.4) 0px, transparent 50%), radial-gradient(at 0% 100%, rgba(255, 237, 213, 0.4) 0px, transparent 50%)', display: 'flex', flexDirection: 'column' }}>
       {/* Minimal Header */}
       <Box sx={{ p: 2, bgcolor: 'white', borderBottom: '1px solid', borderColor: 'grey.200', display: 'flex', alignItems: 'center' }}>
         <Typography variant="h6" sx={{ fontWeight: 900, color: '#C41E3A', letterSpacing: '-0.5px' }}>
@@ -147,7 +153,7 @@ export function StudentOnboardingPage() {
         </Stepper>
 
         {/* Content Box */}
-        <Card sx={{ borderRadius: 4, boxShadow: '0 10px 40px rgba(0,0,0,0.08)', border: '1px solid #f3f4f6', bgcolor: 'white' }}>
+        <Card sx={{ borderRadius: 4, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)', border: '1px solid #f1f5f9', bgcolor: 'white' }}>
           <Box sx={{ p: { xs: 3, md: 4 } }}>
 
             {/* STEP 0: STUDENT PROFILE SETUP */}
@@ -158,6 +164,34 @@ export function StudentOnboardingPage() {
                 </Typography>
 
                 <Stack spacing={3}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1.5 }}>
+                      Chọn một nhân vật yêu thích
+                    </Typography>
+                    <Stack direction="row" spacing={2}>
+                      {[<FaceIcon fontSize="large" />, <Face2Icon fontSize="large" />, <Face3Icon fontSize="large" />, <Face4Icon fontSize="large" />].map((icon, idx) => (
+                        <Box
+                          key={idx}
+                          onClick={() => setAvatarIndex(idx)}
+                          sx={{
+                            width: 64, height: 64, borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer', transition: 'all 0.2s',
+                            border: '3px solid',
+                            borderColor: avatarIndex === idx ? '#C41E3A' : 'transparent',
+                            bgcolor: avatarIndex === idx ? '#fff1f2' : 'grey.100',
+                            color: avatarIndex === idx ? '#C41E3A' : 'grey.500',
+                            '&:hover': {
+                              bgcolor: avatarIndex === idx ? '#fff1f2' : 'grey.200'
+                            }
+                          }}
+                        >
+                          {icon}
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Box>
+
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
                     <TextField
                       label="Họ và tên *"
@@ -187,23 +221,48 @@ export function StudentOnboardingPage() {
                     />
                   </Box>
 
-                  <FormControl fullWidth variant="outlined">
-                    <InputLabel id="jlpt-goal-label">Mục tiêu JLPT của bạn</InputLabel>
-                    <Select
-                      value={goal}
-                      onChange={(e) => setGoal(e.target.value as string)}
-                      labelId="jlpt-goal-label"
-                      id="jlpt-goal"
-                      label="Mục tiêu JLPT của bạn"
-                    >
-                      <MenuItem value="n5">N5 - Sơ cấp</MenuItem>
-                      <MenuItem value="n4">N4 - Sơ trung cấp</MenuItem>
-                      <MenuItem value="n3">N3 - Trung cấp</MenuItem>
-                      <MenuItem value="n2">N2 - Thượng cấp</MenuItem>
-                      <MenuItem value="n1">N1 - Cao cấp</MenuItem>
-                    </Select>
-                    <FormHelperText>Giúp chúng tôi đề xuất lộ trình và khóa học phù hợp nhất với bạn.</FormHelperText>
-                  </FormControl>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1.5 }}>
+                      Mục tiêu JLPT của bạn
+                    </Typography>
+                    <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { height: 6 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'grey.300', borderRadius: 3 } }}>
+                      {[
+                        { id: 'n5', label: 'N5', sub: 'Sơ cấp' },
+                        { id: 'n4', label: 'N4', sub: 'Sơ trung cấp' },
+                        { id: 'n3', label: 'N3', sub: 'Trung cấp' },
+                        { id: 'n2', label: 'N2', sub: 'Thượng cấp' },
+                        { id: 'n1', label: 'N1', sub: 'Cao cấp' }
+                      ].map(item => (
+                        <Box
+                          key={item.id}
+                          onClick={() => setGoal(item.id)}
+                          sx={{
+                            flex: 1, minWidth: 80,
+                            p: 1.5,
+                            borderRadius: 2,
+                            border: '1px solid',
+                            borderColor: goal === item.id ? '#C41E3A' : 'grey.300',
+                            bgcolor: goal === item.id ? '#fff1f2' : 'white',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              borderColor: goal === item.id ? '#C41E3A' : 'grey.400',
+                              bgcolor: goal === item.id ? '#fff1f2' : 'grey.50'
+                            }
+                          }}
+                        >
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: goal === item.id ? '#C41E3A' : 'text.primary' }}>
+                            {item.label}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: goal === item.id ? '#C41E3A' : 'text.secondary', display: 'block' }}>
+                            {item.sub}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                    <FormHelperText sx={{ mt: 1, mx: 0 }}>Giúp chúng tôi đề xuất lộ trình và khóa học phù hợp nhất với bạn.</FormHelperText>
+                  </Box>
 
 
 
@@ -231,23 +290,31 @@ export function StudentOnboardingPage() {
           </Box>
 
           {/* Footer Actions */}
-          <Box sx={{ p: { xs: 3, md: 4 }, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'grey.200', display: 'flex', justifyContent: 'space-between', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
-            <Button
-              variant="outlined"
-              color="inherit"
-              disabled={saving}
-              onClick={() => {
-                if (activeStep === 0) {
+          <Box sx={{ p: { xs: 3, md: 4 }, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'grey.200', display: 'flex', justifyContent: activeStep === 0 ? 'flex-end' : 'space-between', alignItems: 'center', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
+            {activeStep === 0 ? (
+              <Button
+                variant="text"
+                color="inherit"
+                disabled={saving}
+                onClick={() => {
                   clearAuthSession('public');
                   navigate('/login');
-                } else {
-                  handleBack();
-                }
-              }}
-              sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', borderColor: 'grey.300', '&:hover': { bgcolor: 'grey.100', borderColor: 'grey.400' } }}
-            >
-              Quay lại
-            </Button>
+                }}
+                sx={{ textTransform: 'none', fontWeight: 500, color: 'text.secondary', position: 'absolute', left: 32 }}
+              >
+                Đăng xuất
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                color="inherit"
+                disabled={saving}
+                onClick={handleBack}
+                sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', borderColor: 'grey.300', '&:hover': { bgcolor: 'grey.100', borderColor: 'grey.400' } }}
+              >
+                Quay lại
+              </Button>
+            )}
             <Button
               variant="contained"
               onClick={handleNext}
