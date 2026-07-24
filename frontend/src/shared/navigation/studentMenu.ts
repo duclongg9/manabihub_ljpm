@@ -7,27 +7,27 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 
 export const STUDENT_MENU = [
   {
-    title: 'My Learning',
+    title: 'Khóa học của tôi',
     path: ROUTES.STUDENT.DASHBOARD,
     icon: SpaceDashboardIcon,
   },
   {
-    title: 'Browse Courses',
+    title: 'Khám phá khóa học',
     path: ROUTES.PUBLIC.COURSE_BROWSE,
     icon: LibraryBooksIcon,
   },
   {
-    title: 'My Wishlist',
+    title: 'Danh sách yêu thích',
     path: ROUTES.STUDENT.WISHLIST,
     icon: FavoriteBorderIcon,
   },
   {
-    title: 'Purchase History',
+    title: 'Lịch sử thanh toán',
     path: ROUTES.STUDENT.PAYMENTS,
     icon: ReceiptLongIcon,
   },
   {
-    title: "Manage Profile",
+    title: "Hồ sơ cá nhân",
     path: ROUTES.STUDENT.PROFILE,
     icon: AccountCircleIcon,
   },
