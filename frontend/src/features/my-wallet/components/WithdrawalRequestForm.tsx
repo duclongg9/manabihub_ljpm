@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import type { WithdrawalFormValues } from '../schemas/withdrawalSchema';
 import { formatCurrency } from '../../../shared/utils/formatCurrency';
-import type { TeacherWallet, TeacherBankAccount } from '../types/wallet.types';
+import type { TeacherWallet } from '../types/wallet.types';
 import { walletService } from '../services/walletService';
 import { useQuery, useMutation } from '@tanstack/react-query';
 
@@ -28,7 +28,7 @@ interface WithdrawalRequestFormProps {
 }
 
 export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: WithdrawalRequestFormProps) {
-  const { data: savedAccountsResponse, isLoading: isLoadingAccounts } = useQuery({
+  const { data: savedAccountsResponse } = useQuery({
     queryKey: ['savedBankAccounts'],
     queryFn: () => walletService.getSavedBankAccounts(),
   });

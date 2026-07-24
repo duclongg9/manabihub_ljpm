@@ -186,6 +186,9 @@ class ManabiHubApplicationTests {
     @MockBean
     private com.manabihub.payout.repository.BankAccountRepository bankAccountRepository;
 
+    @MockBean
+    private com.manabihub.payout.repository.TeacherBankAccountRepository teacherBankAccountRepository;
+
     @Test
     void contextLoads() {
         // Basic integration test to verify the Spring Application Context loads correctly.
