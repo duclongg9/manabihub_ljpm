@@ -1,6 +1,5 @@
 import { Alert, Box, Typography, Button, Stack, Avatar, AvatarGroup, keyframes } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getAsset } from '../../shared/utils/assets';
 import {
@@ -12,12 +11,6 @@ import {
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
-`;
-
-const pulseGlow = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
-  70% { box-shadow: 0 0 0 15px rgba(37, 99, 235, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
 `;
 
 const GoogleIcon = () => (
@@ -71,8 +64,9 @@ export function PublicLoginPage() {
           <img src={getAsset('hero.png')} alt="Japan Study" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </Box>
 
-        <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', p: 8, width: '100%' }}>
-          <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none' }}>
+        <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', p: 8, height: '100%' }}>
+          {/* Logo at top */}
+          <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none', flexShrink: 0 }}>
             <Box sx={{ width: 40, height: 40, bgcolor: '#3b82f6', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.39)' }}>
               <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
             </Box>
@@ -81,26 +75,29 @@ export function PublicLoginPage() {
             </Typography>
           </Box>
 
-          <Box sx={{ maxWidth: 500, mb: 4, animation: `${fadeIn} 1s ease-out` }}>
-            <Typography variant="h2" sx={{ fontWeight: 800, color: 'white', mb: 3, lineHeight: 1.1, fontSize: '3.5rem' }}>
-              Hành trình chinh phục tiếng Nhật bắt đầu từ đây
-            </Typography>
-            <Typography variant="h6" sx={{ color: '#cbd5e1', mb: 4, fontWeight: 400, lineHeight: 1.6 }}>
-              Học tập cùng các chuyên gia JLPT hàng đầu. Hơn 50,000+ học viên đã đạt được mục tiêu của mình cùng ManabiHub.
-            </Typography>
-
-            <Stack direction="row" sx={{ alignItems: 'center' }} spacing={2}>
-              <AvatarGroup total={50000} sx={{ '& .MuiAvatar-root': { width: 48, height: 48, border: '2px solid', borderColor: 'grey.900' } }}>
-                <Avatar alt="Student 1" src={getAsset('anh1.png')} />
-                <Avatar alt="Student 2" src={getAsset('anh2.png')} />
-                <Avatar alt="Student 3" src={getAsset('anh3.png')} />
-                <Avatar alt="Student 4" src={getAsset('anh4.png')} />
-              </AvatarGroup>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', lineHeight: 1.4 }}>
-                Tham gia cộng đồng <br />
-                <Typography component="span" sx={{ color: 'white', fontWeight: 700 }}>hơn 50k+ học viên</Typography>
+          {/* Centered Content */}
+          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <Box sx={{ maxWidth: 500, animation: `${fadeIn} 1s ease-out` }}>
+              <Typography variant="h2" sx={{ fontWeight: 800, color: 'white', mb: 3, lineHeight: 1.1, fontSize: '3.5rem' }}>
+                Hành trình chinh phục tiếng Nhật bắt đầu từ đây
               </Typography>
-            </Stack>
+              <Typography variant="h6" sx={{ color: '#cbd5e1', mb: 4, fontWeight: 400, lineHeight: 1.6 }}>
+                Học tập cùng các chuyên gia JLPT hàng đầu.
+              </Typography>
+
+              <Stack direction="row" sx={{ alignItems: 'center' }} spacing={2}>
+                <AvatarGroup total={50000} sx={{ '& .MuiAvatar-root': { width: 48, height: 48, border: '2px solid', borderColor: 'grey.900' } }}>
+                  <Avatar alt="Student 1" src={getAsset('anh1.png')} />
+                  <Avatar alt="Student 2" src={getAsset('anh2.png')} />
+                  <Avatar alt="Student 3" src={getAsset('anh3.png')} />
+                  <Avatar alt="Student 4" src={getAsset('anh4.png')} />
+                </AvatarGroup>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', lineHeight: 1.4 }}>
+                  <Typography component="span" sx={{ color: 'white', fontWeight: 700 }}>50,000+ học viên</Typography> <br />
+                  đã đồng hành
+                </Typography>
+              </Stack>
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -124,15 +121,12 @@ export function PublicLoginPage() {
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>ManabiHub</Typography>
           </Box>
 
-          <Box sx={{ textAlign: 'center', mb: 5 }}>
-            <Box sx={{ width: 64, height: 64, margin: '0 auto 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: `${pulseGlow} 2s infinite` }}>
-              <MenuBookIcon sx={{ fontSize: 32, color: '#2563eb' }} />
-            </Box>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#0f172a', mb: 1.5, letterSpacing: '-0.5px' }}>
-              Chào mừng đến hệ thống 👋
+              Chào mừng bạn! 👋
             </Typography>
             <Typography variant="body1" sx={{ color: '#64748b', lineHeight: 1.6 }}>
-              Để đảm bảo tính minh bạch cộng đồng và chất lượng người dùng, ManabiHub <Box component="span" sx={{ fontWeight: 600, color: '#334155' }}>chỉ hỗ trợ đăng ký và đăng nhập qua tài khoản Google</Box>.
+              Đăng nhập nhanh chóng và bảo mật chỉ với một chạm.
             </Typography>
           </Box>
 
@@ -144,55 +138,40 @@ export function PublicLoginPage() {
 
           {/* Primary Action */}
           <Button
-            variant="outlined"
+            variant="contained"
             fullWidth
             onClick={handleGoogleLogin}
-            startIcon={<GoogleIcon />}
+            startIcon={
+              <Box sx={{ bgcolor: 'white', p: 0.5, borderRadius: 1, display: 'flex', mr: 0.5 }}>
+                <GoogleIcon />
+              </Box>
+            }
             sx={{
-              py: 1.8,
-              mb: 4,
+              py: 1.5,
+              mb: 3,
               borderRadius: 3,
               textTransform: 'none',
               fontWeight: 700,
-              fontSize: '1rem',
-              borderColor: '#cbd5e1',
-              color: '#334155',
+              fontSize: '1.05rem',
+              bgcolor: '#2563eb',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
               transition: 'all 0.3s ease',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
               '&:hover': {
-                bgcolor: '#f8fafc',
-                borderColor: '#94a3b8',
+                bgcolor: '#1d4ed8',
                 transform: 'translateY(-2px)',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+                boxShadow: '0 8px 20px rgba(37, 99, 235, 0.35)',
               },
               '&:active': {
                 transform: 'translateY(0)',
               }
             }}
           >
-            Tiếp tục với tài khoản Google
+            Đăng nhập với Google
           </Button>
 
-          {/* Info Notice */}
-          <Box sx={{ p: 2, mb: 4, bgcolor: '#eff6ff', borderRadius: 3, border: '1px solid', borderColor: '#bfdbfe' }}>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
-              <Box sx={{ mt: 0.25 }}>
-                <InfoOutlinedIcon sx={{ color: '#2563eb', fontSize: 20 }} />
-              </Box>
-              <Box>
-                <Typography variant="body2" sx={{ color: '#0f172a', fontWeight: 700, mb: 0.5 }}>
-                  Thông tin vai trò (Role)
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.6, display: 'block' }}>
-                  Mọi tài khoản đăng ký mới sẽ mặc định là <Box component="span" sx={{ fontWeight: 600, color: '#0f172a' }}>Học viên</Box>. Nếu muốn trở thành Giảng viên, bạn có thể thực hiện nâng cấp tài khoản (Nộp KYC & Bằng cấp) tại Trang chủ sau khi đăng nhập.
-                </Typography>
-              </Box>
-            </Stack>
-          </Box>
-
-          {/* Admin Notice */}
           <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', textAlign: 'center', lineHeight: 1.6 }}>
-            *Đối với Quản trị viên (Admin), vui lòng đăng nhập thông qua Cổng nội bộ (<Box component={Link} to="/admin/login" sx={{ color: '#64748b', textDecoration: 'underline', '&:hover': { color: '#2563eb' } }}>Admin Portal</Box>).
+            *Bằng việc đăng nhập, bạn đồng ý với <Box component="span" sx={{ textDecoration: 'underline', cursor: 'pointer', '&:hover': { color: '#64748b' }}}>Điều khoản dịch vụ</Box> của chúng tôi.
           </Typography>
 
         </Box>
