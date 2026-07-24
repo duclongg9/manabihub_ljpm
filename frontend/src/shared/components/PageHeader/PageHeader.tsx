@@ -12,21 +12,32 @@ interface PageHeaderProps {
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, watermark, breadcrumbs, action }) => {
   return (
-    <Box sx={{ mb: 4, position: 'relative', overflow: 'hidden' }}>
+    <Box
+      sx={{
+        mb: 4,
+        position: 'relative',
+        bgcolor: 'background.paper',
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 4,
+        p: { xs: 3, md: 5 },
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+      }}
+    >
       {watermark && (
         <Typography
           sx={{
             position: 'absolute',
-            top: '50%',
-            right: '5%',
-            transform: 'translateY(-50%)',
-            fontSize: { xs: '6rem', md: '10rem' },
+            top: -20,
+            right: -20,
+            fontSize: '15rem',
             fontWeight: 900,
-            color: 'rgba(0,0,0,0.03)',
+            color: 'rgba(0,0,0,0.025)',
             zIndex: 0,
             pointerEvents: 'none',
             userSelect: 'none',
             lineHeight: 1,
+            writingMode: 'vertical-rl',
             whiteSpace: 'nowrap'
           }}
         >

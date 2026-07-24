@@ -175,8 +175,8 @@ export const CourseCatalogPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#FBF9F5', pb: 8 }}>
-      <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 }, flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
+    <Box component="main" sx={{ minHeight: '100vh', flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#F8FAFC', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', position: 'relative', flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
         <PageHeader
           title="Khám phá khóa học"
           subtitle="コースを探す"

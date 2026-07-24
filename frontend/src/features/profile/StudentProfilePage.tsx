@@ -141,7 +141,8 @@ export default function StudentProfilePage() {
 
     return (
         <>
-            <Box sx={{ backgroundColor: "#F8FAFC", minHeight: "100vh", p: { xs: 2, md: 4 } }}>
+            <Box component="main" sx={{ bgcolor: "#F8FAFC", minHeight: "100vh", py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
+                <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', position: 'relative' }}>
                 <PageHeader
                     title="Hồ sơ cá nhân"
                     subtitle="プロフィール設定"
@@ -335,6 +336,7 @@ export default function StudentProfilePage() {
                         </Card>
                     </Grid>
                 </Grid>
+                </Box>
             </Box>
 
             <Snackbar
