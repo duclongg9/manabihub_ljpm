@@ -64,7 +64,7 @@ export const TopInstructorsSection: React.FC = () => {
           {/* Left Side: Text and Buttons */}
           <Box
             sx={{
-              width: { xs: '100%', md: '40%' },
+              width: { xs: '100%', md: '35%' },
               pr: { xs: 0, md: 4 },
               display: 'flex', flexDirection: 'column', justifyContent: 'center',
               opacity: isVisible ? 1 : 0,
@@ -110,29 +110,16 @@ export const TopInstructorsSection: React.FC = () => {
               >
                 KHÁM PHÁ KHÓA HỌC
               </Button>
-              <Button
-                variant="outlined"
-                endIcon={<ArrowForwardIcon />}
-                onClick={() => navigate(ROUTES.PUBLIC.ABOUT)}
-                sx={{
-                  py: 1.5, px: 4, fontWeight: 700, borderRadius: '10px',
-                  borderColor: '#1B2A4A', borderWidth: '1.5px', color: '#1B2A4A',
-                  transition: 'all 0.3s ease',
-                  '&:hover': { borderColor: '#C41E3A', color: '#C41E3A', bgcolor: 'rgba(196, 30, 58, 0.04)', transform: 'translateY(-2px)' }
-                }}
-              >
-                TÌM HIỂU THÊM
-              </Button>
             </Box>
           </Box>
 
           {/* Right Side: Instructor Cards */}
           <Box
             sx={{
-              width: { xs: '100%', md: '60%' },
+              width: { xs: '100%', md: '65%' },
               display: 'flex',
               flexWrap: 'wrap',
-              gap: 2.5,
+              gap: 3,
               justifyContent: 'center',
               alignContent: 'center',
             }}
@@ -141,125 +128,127 @@ export const TopInstructorsSection: React.FC = () => {
               <Box
                 key={instructor.id}
                 sx={{
-                  width: { xs: '100%', sm: 'calc(50% - 10px)' },
+                  width: { xs: '100%', sm: 'calc(50% - 12px)' },
                   opacity: isVisible ? 1 : 0,
                   transform: isVisible ? 'translateY(0)' : 'translateY(50px)',
                   transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.2}s`,
                 }}
               >
-                <Box
+                <Paper
+                  elevation={0}
                   sx={{
-                    position: 'relative',
                     borderRadius: '20px',
-                    overflow: 'hidden',
-                    bgcolor: '#f1f5f9',
-                    width: '100%',
-                    height: '320px',
-                    cursor: 'pointer',
-                    '&:hover .instructor-info': { transform: 'translateY(0)', opacity: 1 },
-                    '&:hover .instructor-img': { transform: 'scale(1.05)' },
-                    '&:hover .instructor-name-bar': { opacity: 0 },
+                    bgcolor: '#ffffff',
+                    border: '1px solid #f1f5f9',
+                    p: 3,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      transform: 'translateY(-6px)',
+                      boxShadow: '0 16px 32px rgba(0,0,0,0.06)',
+                      borderColor: '#e2e8f0',
+                    }
                   }}
                 >
-                  {/* Instructor Image */}
-                  <Box
-                    className="instructor-img"
-                    sx={{
-                      width: '100%', height: '100%',
-                      backgroundImage: `url(${instructor.image})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      transition: 'transform 0.5s ease',
-                    }}
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 3 }}>
+                    <Box sx={{ position: 'relative' }}>
+                      <Box
+                        sx={{
+                          width: 64, height: 64,
+                          borderRadius: '50%',
+                          backgroundImage: `url(${instructor.image})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          border: '2px solid #fff',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }}
+                      />
+                      {/* KYC Verified Badge */}
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          bottom: 0, right: -4,
+                          width: 20, height: 20,
+                          bgcolor: '#10b981',
+                          borderRadius: '50%',
+                          border: '2px solid #fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: '0 2px 4px rgba(16, 185, 129, 0.4)',
+                        }}
+                      >
+                        <Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 'bold' }}>✓</Typography>
+                      </Box>
+                    </Box>
 
-                  {/* Static name bar (visible by default, hidden on hover) */}
+                    <Box>
+                      <Typography sx={{ fontWeight: 800, color: '#1A1A2E', fontSize: '1.15rem' }}>
+                        {instructor.name}
+                      </Typography>
+                      <Typography sx={{ color: '#C41E3A', fontWeight: 600, fontSize: '0.85rem' }}>
+                        {instructor.title}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Japanese Quote Bubble */}
                   <Box
-                    className="instructor-name-bar"
                     sx={{
-                      position: 'absolute',
-                      bottom: 0, left: 0, right: 0,
-                      background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
-                      p: 2, pt: 4,
-                      transition: 'opacity 0.3s ease',
+                      bgcolor: '#F8FAFC',
+                      borderRadius: '12px',
+                      p: 2,
+                      mb: 3,
+                      position: 'relative',
+                      border: '1px solid #e2e8f0',
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        top: -6, left: 24,
+                        width: 12, height: 12,
+                        bgcolor: '#F8FAFC',
+                        borderTop: '1px solid #e2e8f0',
+                        borderLeft: '1px solid #e2e8f0',
+                        transform: 'rotate(45deg)',
+                      }
                     }}
                   >
-                    <Typography sx={{ color: '#fff', fontWeight: 800, fontSize: '1.05rem' }}>
-                      {instructor.name}
+                    <Typography
+                      sx={{
+                        fontFamily: '"Noto Sans JP", sans-serif',
+                        fontSize: '0.9rem',
+                        fontWeight: 700,
+                        color: '#1A1A2E',
+                        lineHeight: 1.5,
+                        mb: 0.5,
+                      }}
+                    >
+                      「{instructor.quote}」
                     </Typography>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', fontWeight: 600 }}>
-                      {instructor.title}
+                    <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
+                      {instructor.quoteMeaning}
                     </Typography>
                   </Box>
 
-                  {/* Detailed hover panel with quote */}
-                  <Paper
-                    className="instructor-info"
-                    elevation={0}
-                    sx={{
-                      position: 'absolute',
-                      bottom: 0, left: 0, right: 0,
-                      bgcolor: '#ffffff',
-                      p: 2.5,
-                      transform: 'translateY(100%)',
-                      opacity: 0,
-                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                      borderTopRightRadius: 20, borderTopLeftRadius: 20,
-                      boxShadow: '0 -10px 40px rgba(0,0,0,0.08)'
-                    }}
-                  >
-                    <Typography sx={{ fontWeight: 800, color: '#1A1A2E', mb: 0.3, fontSize: '1.1rem' }}>
-                      {instructor.name}
-                    </Typography>
-                    <Typography sx={{ color: '#C41E3A', fontWeight: 600, mb: 1.5, fontSize: '0.8rem' }}>
-                      {instructor.title}
-                    </Typography>
-
-                    <Divider sx={{ mb: 1.5 }} />
-
-                    {/* Stats */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', color: '#64748b', gap: 2, mb: 1.5 }}>
+                  <Box sx={{ mt: 'auto' }}>
+                    <Divider sx={{ mb: 2, borderColor: '#f1f5f9' }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <MenuBookIcon sx={{ fontSize: 14, mr: 0.5, color: '#C41E3A' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 600 }}>{instructor.courses} Khóa học</Typography>
+                        <MenuBookIcon sx={{ fontSize: 16, mr: 0.5, color: '#94a3b8' }} />
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b' }}>
+                          {instructor.courses} Khóa học
+                        </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <PeopleAltIcon sx={{ fontSize: 14, mr: 0.5, color: '#D4A017' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 600 }}>{instructor.students} Học viên</Typography>
+                        <PeopleAltIcon sx={{ fontSize: 16, mr: 0.5, color: '#94a3b8' }} />
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b' }}>
+                          {instructor.students} Học viên
+                        </Typography>
                       </Box>
                     </Box>
-
-                    {/* Quote in hover panel */}
-                    <Box
-                      sx={{
-                        bgcolor: '#FBF9F5',
-                        borderRadius: '10px',
-                        p: 1.5,
-                        borderLeft: '3px solid #C41E3A',
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
-                        <FormatQuoteIcon sx={{ fontSize: 16, color: '#C41E3A', transform: 'rotate(180deg)', mt: 0.2 }} />
-                        <Box>
-                          <Typography
-                            sx={{
-                              fontFamily: '"Noto Sans JP", sans-serif',
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              color: '#1A1A2E',
-                              lineHeight: 1.4,
-                            }}
-                          >
-                            {instructor.quote}
-                          </Typography>
-                          <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic', mt: 0.3 }}>
-                            {instructor.quoteMeaning}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Box>
-                  </Paper>
-                </Box>
+                  </Box>
+                </Paper>
               </Box>
             ))}
           </Box>
