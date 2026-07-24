@@ -96,7 +96,7 @@ public class TeacherKycService {
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public KycStatusResponse getStatus(UUID userId) {
         TeacherProfile teacherProfile = resolveTeacher(userId);
         KycRequest latestRequest = kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
@@ -335,11 +335,19 @@ public class TeacherKycService {
 
     private TeacherProfile resolveTeacher(UUID userId) {
         return teacherProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.KYC_TEACHER_NOT_FOUND,
-                        "Teacher profile was not found for the current user",
-                        HttpStatus.NOT_FOUND
-                ));
+                .orElseGet(() -> {
+                    teacherProfileRepository.createCandidateIfAbsent(UUID.randomUUID(), userId);
+                    return teacherProfileRepository.findByUserId(userId)
+                            .orElseThrow(() -> teacherProfileNotFound());
+                });
+    }
+
+    private BusinessException teacherProfileNotFound() {
+        return new BusinessException(
+                MessageCodes.KYC_TEACHER_NOT_FOUND,
+                "Teacher profile could not be initialized for the current user",
+                HttpStatus.NOT_FOUND
+        );
     }
 
     private void validateIdentityAllowed(AppUser user, TeacherProfile teacherProfile, KycRequest latestRequest) {

@@ -17,9 +17,11 @@ import {
   consumePostLoginRoute,
   getAuthSession,
   hasAnyRole,
+  peekPostLoginRoute,
   storeAuthToken,
 } from '../../shared/auth/authSession';
 import { ROLES } from '../../shared/constants/roles';
+import { ROUTES } from '../../shared/constants/routes';
 import { updateMyStudentProfile } from '../../features/profile/profileApi';
 
 // [CODE NOTE]: Giao diện Onboarding cho Học viên mới lần đầu login bằng Google (UC-01/02).
@@ -38,6 +40,9 @@ export function StudentOnboardingPage() {
 
   // Validation errors
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
+  const session = getAuthSession('public');
+  const completionDestination = session ? peekPostLoginRoute('public', session) : '/login';
+  const continuesToTeacherKyc = completionDestination.startsWith(ROUTES.TEACHER.KYC);
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -234,7 +239,9 @@ export function StudentOnboardingPage() {
                   Hoàn tất thiết lập!
                 </Typography>
                 <Typography variant="body1" sx={{ color: 'grey.600', maxWidth: 400, mx: 'auto', lineHeight: 1.6 }}>
-                  Tài khoản Học viên của bạn đã sẵn sàng. Cùng bắt đầu hành trình chinh phục tiếng Nhật cùng ManabiHub ngay thôi!
+                  {continuesToTeacherKyc
+                    ? 'Tài khoản Học viên của bạn đã sẵn sàng. Tiếp theo, hãy xác minh danh tính và chứng chỉ để đăng ký trở thành Giảng viên.'
+                    : 'Tài khoản Học viên của bạn đã sẵn sàng. Cùng bắt đầu hành trình chinh phục tiếng Nhật cùng ManabiHub ngay thôi!'}
                 </Typography>
               </Box>
             )}
@@ -265,7 +272,13 @@ export function StudentOnboardingPage() {
               startIcon={saving ? <CircularProgress color="inherit" size={18} /> : undefined}
               sx={{ px: 4, py: 1.5, borderRadius: 2, textTransform: 'none', fontWeight: 700, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}
             >
-              {saving ? 'Đang lưu...' : activeStep === steps.length - 1 ? 'Khám phá Trang chủ' : 'Tiếp tục'}
+              {saving
+                ? 'Đang lưu...'
+                : activeStep === steps.length - 1
+                  ? continuesToTeacherKyc
+                    ? 'Tiếp tục xác minh Giảng viên'
+                    : 'Đến trang của tôi'
+                  : 'Tiếp tục'}
             </Button>
           </Box>
         </Card>
