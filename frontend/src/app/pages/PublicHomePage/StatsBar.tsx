@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Box, Container, Typography } from '@mui/material';
+import { Box, Container, Typography, Paper } from '@mui/material';
 import SchoolIcon from '@mui/icons-material/School';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -29,61 +29,74 @@ export const StatsBar: React.FC = () => {
     <Box
       ref={ref}
       sx={{
-        bgcolor: '#ffffff',
-        py: { xs: 4, md: 5 },
         position: 'relative',
-        overflow: 'hidden',
-        borderBottom: '1px solid #e8e0d8',
+        zIndex: 10,
+        mt: { xs: -6, md: -8 }, // Negative margin to overlap Hero
+        px: { xs: 2, md: 0 },
       }}
     >
-      {/* Subtle top border accent */}
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #C41E3A, #D4A017, #5B8C5A, #1B2A4A)' }} />
-
       <Container maxWidth="lg">
-        <Box
+        <Paper
+          elevation={0}
           sx={{
-            display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            justifyContent: 'space-around',
-            alignItems: 'center',
-            gap: { xs: 3, sm: 2 },
+            bgcolor: '#ffffff',
+            py: { xs: 4, md: 5 },
+            px: { xs: 2, md: 4 },
+            borderRadius: '24px',
+            boxShadow: '0 16px 40px rgba(0,0,0,0.08)',
+            border: '1px solid rgba(0,0,0,0.04)',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          {STATS.map((stat, index) => (
-            <Box
-              key={index}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                opacity: isVisible ? 1 : 0,
-                transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-                transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.15}s`,
-              }}
-            >
+          {/* Subtle top border accent inside the card */}
+          <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #C41E3A, #D4A017, #5B8C5A, #1B2A4A)' }} />
+
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-around',
+              alignItems: 'center',
+              gap: { xs: 4, sm: 2 },
+            }}
+          >
+            {STATS.map((stat, index) => (
               <Box
+                key={index}
                 sx={{
-                  width: 52, height: 52,
-                  borderRadius: '14px',
-                  bgcolor: `${stat.color}18`,
-                  color: stat.color,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: `1.5px solid ${stat.color}30`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  opacity: isVisible ? 1 : 0,
+                  transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+                  transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.15}s`,
                 }}
               >
-                {stat.icon}
+                <Box
+                  sx={{
+                    width: 52, height: 52,
+                    borderRadius: '14px',
+                    bgcolor: `${stat.color}18`,
+                    color: stat.color,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: `1.5px solid ${stat.color}30`,
+                  }}
+                >
+                  {stat.icon}
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography sx={{ color: '#1A1A2E', fontWeight: 800, fontSize: '1.5rem', lineHeight: 1.2 }}>
+                    {stat.value}
+                  </Typography>
+                  <Typography sx={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>
+                    {stat.label}
+                  </Typography>
+                </Box>
               </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography sx={{ color: '#1A1A2E', fontWeight: 800, fontSize: '1.5rem', lineHeight: 1.2 }}>
-                  {stat.value}
-                </Typography>
-                <Typography sx={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>
-                  {stat.label}
-                </Typography>
-              </Box>
-            </Box>
-          ))}
-        </Box>
+            ))}
+          </Box>
+        </Paper>
       </Container>
     </Box>
   );
