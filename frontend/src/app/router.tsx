@@ -34,6 +34,8 @@ import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages
 import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistPage';
 
+import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -104,7 +106,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'payments',
-        element: <div>Student Payments Placeholder</div>,
+        element: <StudentPaymentsPage />,
       },
       {
         path: 'courses',

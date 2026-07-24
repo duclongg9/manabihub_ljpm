@@ -57,17 +57,21 @@ export const StudentDashboardPage: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto', bgcolor: '#FAF9F6', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
-      {/* Background Watermark */}
-      <Typography variant="h1" sx={{ position: 'absolute', top: -20, right: -20, fontSize: '15rem', fontWeight: 900, color: 'rgba(0,0,0,0.025)', userSelect: 'none', pointerEvents: 'none', zIndex: 0, writingMode: 'vertical-rl' }}>
-        目標
-      </Typography>
+    <Box component="main" sx={{ minHeight: '100vh', bgcolor: '#FAF9F6', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', position: 'relative' }}>
+        {/* Background Watermark */}
+        <Typography variant="h1" sx={{ position: 'absolute', top: -40, right: -20, fontSize: '15rem', fontWeight: 900, color: 'rgba(0,0,0,0.025)', userSelect: 'none', pointerEvents: 'none', zIndex: 0, writingMode: 'vertical-rl' }}>
+          目標
+        </Typography>
 
       <Box sx={{ position: 'relative', zIndex: 1 }}>
         {/* Personalized Greeting */}
         <Box sx={{ mb: 5 }}>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: 'grey.900', mb: 1 }}>
+          <Typography variant="h4" sx={{ fontWeight: 800, color: 'grey.900', mb: 0.5 }}>
             Chào buổi sáng, {profile?.displayName || 'bạn'}-san! 👋
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled', letterSpacing: 1.5, fontWeight: 700, mb: 1 }}>
+            おはようございます
           </Typography>
           <Typography variant="body1" sx={{ color: 'text.secondary', fontSize: '1.1rem' }}>
             Hôm nay bạn muốn chinh phục kiến thức nào?
@@ -156,6 +160,18 @@ export const StudentDashboardPage: React.FC = () => {
               ) : (
                 <Box sx={{ textAlign: 'center', py: 4 }}>
                   <Box sx={{ fontSize: '7rem', mb: 1, filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.1))', transform: 'rotate(-5deg)' }}>🐕</Box>
+                  
+                  {/* Dummy Progress Bar */}
+                  <Box sx={{ width: '100%', maxWidth: 300, mx: 'auto', mb: 4, mt: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>JLPT {profile?.jlptGoal || 'N3'}</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>0%</Typography>
+                    </Box>
+                    <Box sx={{ width: '100%', height: 8, bgcolor: 'grey.200', borderRadius: 4, overflow: 'hidden' }}>
+                      <Box sx={{ width: '0%', height: '100%', bgcolor: '#C41E3A', borderRadius: 4 }}></Box>
+                    </Box>
+                  </Box>
+                  
                   <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1, color: 'grey.900', fontSize: '1.25rem' }}>Hành trình JLPT {profile?.jlptGoal || 'N3'} đang chờ bạn!</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 4, maxWidth: 320, mx: 'auto', lineHeight: 1.6 }}>Đăng ký khóa học đầu tiên để kích hoạt tiến trình học tập và kết bạn cùng Shiba-kun nhé.</Typography>
                   <Button variant="contained" onClick={() => navigate('/student/browse')} sx={{ borderRadius: 8, px: 4, py: 1.5, textTransform: 'none', fontWeight: 700, fontSize: '1rem', bgcolor: '#C41E3A', '&:hover': { bgcolor: '#a01830' }, boxShadow: '0 4px 14px 0 rgba(196,30,58,0.39)' }}>
@@ -190,21 +206,24 @@ export const StudentDashboardPage: React.FC = () => {
                     onClick={() => navigate('/student/browse')}
                     sx={{
                       p: 2, borderRadius: 3, border: '1px solid', borderColor: 'grey.200',
+                      bgcolor: '#F8FAFC',
+                      boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)',
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       cursor: 'pointer', transition: 'all 0.2s',
                       '&:hover': { 
                         borderColor: '#fecdd3', 
                         bgcolor: '#fff1f2', 
-                        transform: 'translateX(4px)',
+                        boxShadow: '0 4px 6px -1px rgba(196,30,58,0.1)',
+                        transform: 'translateY(-2px)',
                         '& .title-text': { color: '#C41E3A' },
-                        '& .arrow-icon': { color: '#C41E3A' }
+                        '& .arrow-icon': { color: '#C41E3A', transform: 'translateX(4px)' }
                       }
                     }}
                   >
                     <Typography className="title-text" variant="body2" sx={{ fontWeight: 700, color: 'grey.800', transition: 'color 0.2s' }}>
                       Luyện {skill} {profile?.jlptGoal || 'N3'}
                     </Typography>
-                    <ArrowForwardIcon className="arrow-icon" sx={{ fontSize: 16, color: 'grey.400', transition: 'color 0.2s' }} />
+                    <ArrowForwardIcon className="arrow-icon" sx={{ fontSize: 16, color: 'grey.400', transition: 'all 0.2s' }} />
                   </Box>
                 ))}
               </Stack>
@@ -212,6 +231,7 @@ export const StudentDashboardPage: React.FC = () => {
           </Grid>
         </Grid>
       </Box>
+    </Box>
     </Box>
   );
 };
