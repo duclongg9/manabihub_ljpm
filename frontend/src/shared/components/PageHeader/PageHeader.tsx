@@ -10,7 +10,7 @@ interface PageHeaderProps {
   action?: React.ReactNode;
 }
 
-export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, watermark, breadcrumbs, action }) => {
+export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, breadcrumbs, action }) => {
   return (
     <Box
       sx={{
@@ -25,26 +25,6 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, waterma
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
       }}
     >
-      {watermark && (
-        <Typography
-          sx={{
-            position: 'absolute',
-            top: -20,
-            right: -20,
-            fontSize: '15rem',
-            fontWeight: 900,
-            color: 'rgba(0,0,0,0.025)',
-            zIndex: 0,
-            pointerEvents: 'none',
-            userSelect: 'none',
-            lineHeight: 1,
-            writingMode: 'vertical-rl',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          {watermark}
-        </Typography>
-      )}
       <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
         <Box>
           <Typography variant="h4" component="h1" gutterBottom={!subtitle} sx={{ fontWeight: 700 }}>

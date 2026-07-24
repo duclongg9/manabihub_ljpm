@@ -143,6 +143,10 @@ export default function StudentProfilePage() {
         <>
             <Box component="main" sx={{ bgcolor: "#FAF9F6", minHeight: "100vh", py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
                 <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', position: 'relative' }}>
+                {/* Background Watermark */}
+                <Typography variant="h1" sx={{ position: 'absolute', top: -40, right: -20, fontSize: '15rem', fontWeight: 900, color: 'rgba(0,0,0,0.025)', userSelect: 'none', pointerEvents: 'none', zIndex: 0, writingMode: 'vertical-rl' }}>
+                  精進
+                </Typography>
                 <PageHeader
                     title="Hồ sơ cá nhân"
                     subtitle="プロフィール設定"
