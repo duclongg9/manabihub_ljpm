@@ -152,10 +152,28 @@ public class SecurityConfig {
     public JwtDecoder mockJwtDecoder() {
         return token -> {
             try {
+                String subject = token;
+                String role = "STUDENT";
+                
+                if (token.contains(".")) {
+                    String[] parts = token.split("\\.");
+                    if (parts.length >= 2) {
+                        String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        java.util.Map<String, Object> payloadMap = mapper.readValue(payloadJson, java.util.Map.class);
+                        if (payloadMap.containsKey("sub")) {
+                            subject = payloadMap.get("sub").toString();
+                        }
+                        if (payloadMap.containsKey("role")) {
+                            role = payloadMap.get("role").toString();
+                        }
+                    }
+                }
+                
                 return org.springframework.security.oauth2.jwt.Jwt.withTokenValue(token)
                         .header("alg", "none")
-                        .claim("sub", token)
-                        .claim("role", "STUDENT")
+                        .claim("sub", subject)
+                        .claim("role", role)
                         .build();
             } catch (Exception e) {
                 throw new JwtException("Invalid mock token: " + token);
