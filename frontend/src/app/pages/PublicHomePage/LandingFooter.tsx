@@ -7,28 +7,31 @@ import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 
-const FooterLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => (
+const FooterLink: React.FC<{ to: string; children: React.ReactNode; disabled?: boolean }> = ({ to, children, disabled }) => (
   <Typography
     variant="body2"
-    component={Link}
-    to={to}
+    component={disabled ? 'span' : Link}
+    to={disabled ? undefined : to}
     sx={{
-      color: '#94a3b8',
+      color: disabled ? '#4a5568' : '#94a3b8',
       textDecoration: 'none',
-      display: 'inline-block',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 0.5,
       transition: 'all 0.3s ease',
       position: 'relative',
-      '&::after': {
+      cursor: disabled ? 'default' : 'pointer',
+      '&::after': disabled ? {} : {
         content: '""',
         position: 'absolute',
         width: '0',
         height: '1px',
         bottom: '-2px',
         left: 0,
-        backgroundColor: '#3b82f6',
+        backgroundColor: '#C41E3A',
         transition: 'width 0.3s ease',
       },
-      '&:hover': {
+      '&:hover': disabled ? {} : {
         color: '#ffffff',
         transform: 'translateX(4px)',
         '&::after': {
@@ -38,15 +41,31 @@ const FooterLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, c
     }}
   >
     {children}
+    {disabled && (
+      <Box
+        component="span"
+        sx={{
+          fontSize: '0.65rem',
+          bgcolor: 'rgba(196, 30, 58, 0.15)',
+          color: '#C41E3A',
+          px: 0.8, py: 0.2,
+          borderRadius: '4px',
+          fontWeight: 600,
+          ml: 0.5,
+        }}
+      >
+        Sắp ra mắt
+      </Box>
+    )}
   </Typography>
 );
 
 export const LandingFooter: React.FC = () => {
   return (
-    <Box sx={{ bgcolor: '#0b1120', pt: { xs: 10, md: 14 }, pb: 6, borderTop: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
+    <Box sx={{ bgcolor: '#0A1628', pt: { xs: 10, md: 14 }, pb: 6, borderTop: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
       {/* Background Glow Effects */}
-      <Box sx={{ position: 'absolute', top: '-20%', left: '-10%', width: '40%', height: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
-      <Box sx={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '30%', height: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.05) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
+      <Box sx={{ position: 'absolute', top: '-20%', left: '-10%', width: '40%', height: '50%', background: 'radial-gradient(circle, rgba(196,30,58,0.06) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
+      <Box sx={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '30%', height: '50%', background: 'radial-gradient(circle, rgba(91,140,90,0.04) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
 
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
         <Grid container spacing={8} sx={{ mb: 10 }}>
@@ -56,10 +75,10 @@ export const LandingFooter: React.FC = () => {
               <Box
                 sx={{
                   width: 40, height: 40,
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)',
                   borderRadius: 2,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)'
+                  boxShadow: '0 4px 15px rgba(196, 30, 58, 0.3)'
                 }}
               >
                 <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
@@ -81,10 +100,10 @@ export const LandingFooter: React.FC = () => {
                     border: '1px solid rgba(255,255,255,0.1)',
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
-                      bgcolor: '#3b82f6',
+                      bgcolor: '#C41E3A',
                       color: '#ffffff',
                       transform: 'translateY(-4px)',
-                      boxShadow: '0 10px 20px rgba(59, 130, 246, 0.3)'
+                      boxShadow: '0 10px 20px rgba(196, 30, 58, 0.3)'
                     }
                   }}
                 >
@@ -112,9 +131,9 @@ export const LandingFooter: React.FC = () => {
               Hỗ Trợ
             </Typography>
             <Stack spacing={2}>
-              <FooterLink to="#">Điều khoản sử dụng</FooterLink>
-              <FooterLink to="#">Chính sách bảo mật</FooterLink>
-              <FooterLink to="#">Câu hỏi thường gặp</FooterLink>
+              <FooterLink to="#" disabled>Điều khoản sử dụng</FooterLink>
+              <FooterLink to="#" disabled>Chính sách bảo mật</FooterLink>
+              <FooterLink to="#" disabled>Câu hỏi thường gặp</FooterLink>
             </Stack>
           </Grid>
 
@@ -125,28 +144,33 @@ export const LandingFooter: React.FC = () => {
             </Typography>
             <Stack spacing={2}>
               <FooterLink to={ROUTES.TEACHER.KYC}>Trở thành giảng viên</FooterLink>
-              <FooterLink to="#">Quy định giảng viên</FooterLink>
-              <FooterLink to="#">Chia sẻ doanh thu (lên đến 97%)</FooterLink>
+              <FooterLink to="#" disabled>Quy định giảng viên</FooterLink>
+              <FooterLink to={ROUTES.TEACHER.KYC}>Chia sẻ doanh thu (lên đến 97%)</FooterLink>
             </Stack>
           </Grid>
         </Grid>
 
-        <Divider sx={{ mb: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
+        <Divider sx={{ mb: 4, borderColor: 'rgba(255,255,255,0.08)' }} />
 
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 300 }}>
+          <Typography variant="body2" sx={{ color: '#4a5568', fontWeight: 300 }}>
             © {new Date().getFullYear()} ManabiHub. All rights reserved.
           </Typography>
           <Box sx={{ display: 'flex', gap: 3 }}>
-            <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.3s', '&:hover': { color: '#ffffff' } }}>
-              Privacy
-            </Typography>
-            <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.3s', '&:hover': { color: '#ffffff' } }}>
-              Terms
-            </Typography>
-            <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.3s', '&:hover': { color: '#ffffff' } }}>
-              Sitemap
-            </Typography>
+            {['Privacy', 'Terms', 'Sitemap'].map((text) => (
+              <Typography
+                key={text}
+                variant="body2"
+                component="span"
+                sx={{
+                  color: '#4a5568',
+                  cursor: 'default',
+                  fontSize: '0.85rem',
+                }}
+              >
+                {text}
+              </Typography>
+            ))}
           </Box>
         </Box>
       </Container>

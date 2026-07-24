@@ -29,19 +29,24 @@ export const FloatingMascot: React.FC = () => {
     <Box
       sx={{
         position: 'fixed',
-        bottom: { xs: 20, md: 40 },
-        left: { xs: 20, md: 40 },
+        bottom: { xs: 16, md: 32 },
+        left: { xs: 16, md: 32 },
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
         cursor: 'pointer',
+        opacity: 0.92,
+        transition: 'opacity 0.3s ease',
+        '&:hover': {
+          opacity: 1,
+        },
         '&:hover .mascot-img': {
-          transform: 'scale(1.15) rotate(-10deg)' // Cute interaction on hover
+          transform: 'scale(1.12) rotate(-8deg)'
         },
         '&:hover .mascot-bubble': {
-          transform: 'translateY(-5px)',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
+          transform: 'translateY(-4px)',
+          boxShadow: '0 8px 20px rgba(196, 30, 58, 0.12)'
         }
       }}
       onClick={() => {
@@ -59,29 +64,29 @@ export const FloatingMascot: React.FC = () => {
           className="mascot-bubble"
           sx={{
             bgcolor: '#ffffff',
-            px: 2.5,
-            py: 1.5,
-            borderRadius: 3,
-            borderBottomLeftRadius: 4, // Tail points to mascot
-            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-            mb: 2,
-            ml: 2,
+            px: 2,
+            py: 1.2,
+            borderRadius: '12px',
+            borderBottomLeftRadius: '4px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+            mb: 1.5,
+            ml: 1.5,
             transition: 'all 0.3s ease',
-            border: '2px solid #eff6ff',
-            maxWidth: 200,
+            border: '1.5px solid #FFF5F5',
+            maxWidth: 180,
             position: 'relative',
             '&::after': {
               content: '""',
               position: 'absolute',
-              bottom: -10,
-              left: 20,
-              borderWidth: '10px 10px 0 0',
+              bottom: -8,
+              left: 16,
+              borderWidth: '8px 8px 0 0',
               borderStyle: 'solid',
               borderColor: '#ffffff transparent transparent transparent',
             }
           }}
         >
-          <Typography variant="body2" sx={{ fontWeight: 700, color: '#3b82f6', fontSize: '0.9rem', lineHeight: 1.4 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700, color: '#C41E3A', fontSize: '0.8rem', lineHeight: 1.4 }}>
             {MESSAGES[messageIndex]}
           </Typography>
         </Box>
@@ -90,20 +95,20 @@ export const FloatingMascot: React.FC = () => {
       {/* Mascot Image inside a circle */}
       <Box
         sx={{
-          width: 80,
-          height: 80,
+          width: 64,
+          height: 64,
           borderRadius: '50%',
           bgcolor: '#ffffff',
-          boxShadow: '0 8px 25px rgba(37,99,235,0.2)',
+          boxShadow: '0 6px 20px rgba(196, 30, 58, 0.15)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
-          border: '4px solid #fff',
-          animation: 'float 3s ease-in-out infinite',
+          border: '3px solid #FFF5F5',
+          animation: 'float 4s ease-in-out infinite',
           '@keyframes float': {
             '0%': { transform: 'translateY(0px)' },
-            '50%': { transform: 'translateY(-10px)' },
+            '50%': { transform: 'translateY(-6px)' },
             '100%': { transform: 'translateY(0px)' }
           }
         }}
@@ -114,8 +119,8 @@ export const FloatingMascot: React.FC = () => {
           src={getAsset('shiba_mascot.png')}
           alt="Shiba Mascot"
           sx={{
-            width: '120%', // Zoom in slightly to hide background edges
-            height: '120%',
+            width: '115%',
+            height: '115%',
             objectFit: 'cover',
             transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
             transformOrigin: 'bottom center',

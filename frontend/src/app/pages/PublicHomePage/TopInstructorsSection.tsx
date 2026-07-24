@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Container, Typography, Button, Paper, Divider } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import ArticleIcon from '@mui/icons-material/Article';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import AddIcon from '@mui/icons-material/Add';
@@ -12,40 +11,31 @@ import { getAsset } from '../../../shared/utils/assets';
 const INSTRUCTORS = [
   {
     id: 1,
-    name: 'Đức long',
-    title: 'Giảng viên',
+    name: 'Đức Long',
+    title: 'Giảng viên JLPT',
     image: getAsset('teacher1.png'),
     courses: 2,
     students: '60+',
-    quote: '"Học tiếng Nhật là hành trình khám phá văn hóa."'
+    quote: '「学びは毎日の積み重ね」'
   },
   {
     id: 2,
     name: 'Tuấn Hưng',
-    title: 'Giảng viên',
+    title: 'Giảng viên Ngữ pháp',
     image: getAsset('teacher2.png'),
     courses: 4,
     students: '30+',
-    quote: '"Nỗ lực hôm nay, thành công ngày mai."'
+    quote: '「努力は裏切らない」'
   },
   {
     id: 3,
     name: 'Thành Yến',
-    title: 'Giảng viên',
+    title: 'Giảng viên Giao tiếp',
     image: getAsset('teacher3.png'),
     courses: 3,
     students: '50+',
-    quote: '"Ngôn ngữ là cầu nối giữa các tâm hồn."'
+    quote: '「言葉は心の架け橋」'
   },
-  {
-    id: 4,
-    name: 'Thu Hương',
-    title: 'Giảng viên',
-    image: getAsset('teacher4.png'),
-    courses: 5,
-    students: '120+',
-    quote: '"Thành thạo giao tiếp chỉ sau 3 tháng."'
-  }
 ];
 
 export const TopInstructorsSection: React.FC = () => {
@@ -67,17 +57,16 @@ export const TopInstructorsSection: React.FC = () => {
   }, []);
 
   return (
-    <Box ref={sectionRef} sx={{ py: { xs: 8, md: 12 }, bgcolor: '#ffffff' }}>
+    <Box ref={sectionRef} sx={{ py: { xs: 8, md: 12 }, bgcolor: '#FBF9F5' }}>
       <Container disableGutters sx={{ maxWidth: { md: '1157px' }, px: { xs: 3, md: 0 }, margin: '0 auto' }}>
 
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: { xs: 4, md: 0 } }}>
 
-          {/* Left Side: Text and Buttons (578.5 x 575.56) */}
+          {/* Left Side: Text and Buttons */}
           <Box
             sx={{
-              width: { xs: '100%', md: '578.5px' },
-              height: { xs: 'auto', md: '575.56px' },
-              pr: { xs: 0, md: 4 }, // Padding right to avoid text hitting the images directly
+              width: { xs: '100%', md: '45%' },
+              pr: { xs: 0, md: 4 },
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
@@ -87,22 +76,22 @@ export const TopInstructorsSection: React.FC = () => {
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <ArticleIcon sx={{ fontSize: 18, color: '#3b82f6', mr: 1 }} />
-              <Typography variant="overline" sx={{ color: '#3b82f6', fontWeight: 600, letterSpacing: '0.05em', fontSize: '0.85rem' }}>
+              <Box sx={{ width: 4, height: 20, bgcolor: '#C41E3A', borderRadius: 2, mr: 1.5 }} />
+              <Typography variant="overline" sx={{ color: '#C41E3A', fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.85rem' }}>
                 GIẢNG VIÊN CỦA CHÚNG TÔI
               </Typography>
             </Box>
 
-            <Typography variant="h2" sx={{ fontWeight: 800, color: '#0f172a', mb: 3, letterSpacing: '-0.02em', lineHeight: 1.2, fontSize: { xs: '2.2rem', md: '3rem' } }}>
-              Gặp Gỡ Giảng Viên Chuyên Nghiệp Của Chúng Tôi
+            <Typography variant="h2" sx={{ fontWeight: 800, color: '#1A1A2E', mb: 3, letterSpacing: '-0.02em', lineHeight: 1.2, fontSize: { xs: '2.2rem', md: '2.8rem' } }}>
+              Gặp Gỡ Giảng Viên Chuyên Nghiệp
             </Typography>
 
             <Typography variant="body1" sx={{ color: '#475569', fontSize: '1.05rem', lineHeight: 1.7, mb: 3 }}>
-              Giảng viên của chúng tôi là những chuyên gia tận tâm và giàu kinh nghiệm trong lĩnh vực của mình. Chúng tôi tự hào có đội ngũ giảng viên chuyên nghiệp, được tuyển chọn kỹ lưỡng và có trình độ học vấn cao.
+              Giảng viên của chúng tôi là những chuyên gia tận tâm và giàu kinh nghiệm trong lĩnh vực giảng dạy tiếng Nhật. Được tuyển chọn kỹ lưỡng qua quy trình KYC nghiêm ngặt.
             </Typography>
 
             <Typography variant="body1" sx={{ color: '#475569', fontSize: '1.05rem', lineHeight: 1.7, mb: 5 }}>
-              Họ không chỉ có kiến thức sắc bén, mà còn có khả năng truyền đạt và tạo động lực cho học viên.
+              Họ không chỉ có kiến thức sắc bén, mà còn có khả năng truyền đạt và tạo động lực cho học viên trên hành trình chinh phục tiếng Nhật.
             </Typography>
 
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -111,52 +100,64 @@ export const TopInstructorsSection: React.FC = () => {
                 endIcon={<ArrowForwardIcon />}
                 onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
                 sx={{
-                  bgcolor: '#2563eb',
+                  background: 'linear-gradient(135deg, #C41E3A, #E8432A)',
                   py: 1.5,
                   px: 4,
                   fontWeight: 700,
-                  borderRadius: 1,
-                  boxShadow: 'none',
-                  '&:hover': { bgcolor: '#1d4ed8', boxShadow: '0 4px 14px rgba(37,99,235,0.4)' }
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 16px rgba(196, 30, 58, 0.25)',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #A8182F, #D13A24)',
+                    boxShadow: '0 8px 24px rgba(196,30,58,0.4)',
+                    transform: 'translateY(-2px)',
+                  }
                 }}
               >
                 KHÁM PHÁ KHÓA HỌC
               </Button>
               <Button
-                variant="contained"
+                variant="outlined"
                 endIcon={<ArrowForwardIcon />}
+                onClick={() => navigate(ROUTES.PUBLIC.ABOUT)}
                 sx={{
-                  bgcolor: '#ef4444',
                   py: 1.5,
                   px: 4,
                   fontWeight: 700,
-                  borderRadius: 1,
-                  boxShadow: 'none',
-                  '&:hover': { bgcolor: '#dc2626', boxShadow: '0 4px 14px rgba(239,68,68,0.4)' }
+                  borderRadius: '10px',
+                  borderColor: '#1B2A4A',
+                  borderWidth: '1.5px',
+                  color: '#1B2A4A',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    borderColor: '#C41E3A',
+                    color: '#C41E3A',
+                    bgcolor: 'rgba(196, 30, 58, 0.04)',
+                    transform: 'translateY(-2px)',
+                  }
                 }}
               >
-                LIÊN HỆ
+                TÌM HIỂU THÊM
               </Button>
             </Box>
           </Box>
 
-          {/* Right Side: Instructor Grid (578.5 x 575.56 total) */}
+          {/* Right Side: Instructor Grid (3 cards) */}
           <Box
             sx={{
-              width: { xs: '100%', md: '578.5px' },
-              height: { xs: 'auto', md: '575.56px' },
+              width: { xs: '100%', md: '55%' },
               display: 'flex',
               flexWrap: 'wrap',
-              gap: 0 // Exact pixel matching implies they sit flush with each other, though we can add gaps inside their boxes
+              gap: 2.5,
+              justifyContent: 'center',
+              alignContent: 'center',
             }}
           >
             {INSTRUCTORS.map((instructor, index) => (
               <Box
                 key={instructor.id}
                 sx={{
-                  width: { xs: '100%', sm: '50%', md: '289.25px' }, // Exact width
-                  height: { xs: 'auto', sm: 'auto', md: '287.78px' }, // Exact height (575.56 / 2)
-                  p: 1.5, // Padding acts as gap between cards so they don't stick completely
+                  width: { xs: '100%', sm: 'calc(50% - 10px)', md: index === 2 ? 'calc(50% - 10px)' : 'calc(50% - 10px)' },
                   opacity: isVisible ? 1 : 0,
                   transform: isVisible ? 'translateY(0)' : 'translateY(50px)',
                   transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.2}s`,
@@ -165,12 +166,11 @@ export const TopInstructorsSection: React.FC = () => {
                 <Box
                   sx={{
                     position: 'relative',
-                    borderRadius: 4,
+                    borderRadius: '20px',
                     overflow: 'hidden',
                     bgcolor: '#f1f5f9',
                     width: '100%',
-                    height: '100%',
-                    minHeight: { xs: '250px', md: '100%' }, // For mobile
+                    height: '320px',
                     cursor: 'pointer',
                     '&:hover .instructor-info': {
                       transform: 'translateY(0)',
@@ -191,11 +191,30 @@ export const TopInstructorsSection: React.FC = () => {
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       transition: 'transform 0.5s ease',
-                      ...(!instructor.image && { background: 'linear-gradient(45deg, #3b82f6, #0ea5e9)' })
+                      ...(!instructor.image && { background: 'linear-gradient(45deg, #1B2A4A, #2A3F6A)' })
                     }}
                   />
 
-                  {/* Blue Plus Button */}
+                  {/* Quote overlay */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 12, left: 12,
+                      bgcolor: 'rgba(27, 42, 74, 0.85)',
+                      backdropFilter: 'blur(8px)',
+                      color: '#fff',
+                      px: 2, py: 0.8,
+                      borderRadius: '10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      maxWidth: '80%',
+                      zIndex: 5,
+                    }}
+                  >
+                    {instructor.quote}
+                  </Box>
+
+                  {/* Plus Button */}
                   <Box
                     sx={{
                       position: 'absolute',
@@ -203,14 +222,16 @@ export const TopInstructorsSection: React.FC = () => {
                       right: 12,
                       width: 40,
                       height: 40,
-                      bgcolor: '#2563eb',
+                      background: 'linear-gradient(135deg, #C41E3A, #E8432A)',
                       color: '#fff',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(37,99,235,0.4)',
+                      boxShadow: '0 4px 12px rgba(196,30,58,0.4)',
                       zIndex: 10,
+                      transition: 'transform 0.3s ease',
+                      '&:hover': { transform: 'scale(1.15) rotate(90deg)' }
                     }}
                   >
                     <AddIcon />
@@ -226,7 +247,7 @@ export const TopInstructorsSection: React.FC = () => {
                       left: 0,
                       right: 0,
                       bgcolor: '#ffffff',
-                      p: 2,
+                      p: 2.5,
                       transform: 'translateY(100%)',
                       opacity: 0,
                       transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -235,23 +256,23 @@ export const TopInstructorsSection: React.FC = () => {
                       boxShadow: '0 -10px 40px rgba(0,0,0,0.08)'
                     }}
                   >
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5, fontSize: '1.1rem' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1A1A2E', mb: 0.3, fontSize: '1.1rem' }}>
                       {instructor.name}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#3b82f6', fontWeight: 600, mb: 1, fontSize: '0.8rem' }}>
+                    <Typography variant="body2" sx={{ color: '#C41E3A', fontWeight: 600, mb: 1.5, fontSize: '0.8rem' }}>
                       {instructor.title}
                     </Typography>
 
                     <Divider sx={{ mb: 1.5 }} />
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', color: '#64748b', flexWrap: 'wrap', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', color: '#64748b', flexWrap: 'wrap', gap: 1.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <MenuBookIcon sx={{ fontSize: 14, mr: 0.5, color: '#94a3b8' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 500 }}>{instructor.courses} Khóa học</Typography>
+                        <MenuBookIcon sx={{ fontSize: 14, mr: 0.5, color: '#C41E3A' }} />
+                        <Typography variant="caption" sx={{ fontWeight: 600 }}>{instructor.courses} Khóa học</Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <PeopleAltIcon sx={{ fontSize: 14, mr: 0.5, color: '#94a3b8' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 500 }}>{instructor.students} Học viên</Typography>
+                        <PeopleAltIcon sx={{ fontSize: 14, mr: 0.5, color: '#D4A017' }} />
+                        <Typography variant="caption" sx={{ fontWeight: 600 }}>{instructor.students} Học viên</Typography>
                       </Box>
                     </Box>
                   </Paper>

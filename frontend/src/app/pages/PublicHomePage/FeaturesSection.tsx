@@ -7,28 +7,32 @@ import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 
 const FEATURES = [
   {
-    icon: <SearchIcon sx={{ fontSize: 40, color: '#3b82f6' }} />,
+    icon: <SearchIcon sx={{ fontSize: 36, color: '#C41E3A' }} />,
     title: 'Tìm kiếm khóa học',
     description: 'Dễ dàng tìm kiếm và lựa chọn khóa học phù hợp với mục tiêu JLPT hoặc kỹ năng của bạn.',
-    iconBg: '#eff6ff'
+    accentColor: '#C41E3A',
+    iconBg: '#FFF5F5'
   },
   {
-    icon: <LaptopMacIcon sx={{ fontSize: 40, color: '#10b981' }} />,
+    icon: <LaptopMacIcon sx={{ fontSize: 36, color: '#1B2A4A' }} />,
     title: 'Đăng ký và học tập',
     description: 'Đăng ký khóa học và xem video bài giảng chất lượng cao, linh hoạt học mọi lúc mọi nơi.',
-    iconBg: '#ecfdf5'
+    accentColor: '#1B2A4A',
+    iconBg: '#F0F4FA'
   },
   {
-    icon: <TaskAltIcon sx={{ fontSize: 40, color: '#f59e0b' }} />,
+    icon: <TaskAltIcon sx={{ fontSize: 36, color: '#D4A017' }} />,
     title: 'Thực hành bài học',
     description: 'Làm bài tập trắc nghiệm và thực hành đa dạng để củng cố kiến thức ngay sau mỗi bài học.',
-    iconBg: '#fffbeb'
+    accentColor: '#D4A017',
+    iconBg: '#FFFBEB'
   },
   {
-    icon: <SmartToyOutlinedIcon sx={{ fontSize: 40, color: '#8b5cf6' }} />,
+    icon: <SmartToyOutlinedIcon sx={{ fontSize: 36, color: '#5B8C5A' }} />,
     title: 'Trợ lý AI hỗ trợ học tập',
     description: 'Nhận gợi ý và giải đáp từ AI. (Lưu ý: AI đóng vai trò hỗ trợ tham khảo, không chấm điểm chính thức).',
-    iconBg: '#f5f3ff'
+    accentColor: '#5B8C5A',
+    iconBg: '#F0FAF0'
   }
 ];
 
@@ -50,9 +54,22 @@ export const FeaturesSection: React.FC = () => {
   }, []);
 
   return (
-    <Box ref={sectionRef} sx={{ py: 12, bgcolor: '#ffffff', perspective: '1000px' }}>
+    <Box
+      ref={sectionRef}
+      sx={{
+        py: 12,
+        background: 'linear-gradient(180deg, #FBF9F5 0%, #FFFFFF 100%)',
+        perspective: '1000px'
+      }}
+    >
       <Container maxWidth="lg">
-        <Typography variant="h3" sx={{ fontWeight: 800, color: '#0f172a', textAlign: 'center', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5 }}>
+          <Box sx={{ width: 4, height: 20, bgcolor: '#C41E3A', borderRadius: 2, mr: 1.5 }} />
+          <Typography variant="overline" sx={{ color: '#C41E3A', fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.85rem' }}>
+            TẠI SAO CHỌN MANABIHUB
+          </Typography>
+        </Box>
+        <Typography variant="h3" sx={{ fontWeight: 800, color: '#1A1A2E', textAlign: 'center', mb: 2 }}>
           {'Lý do chọn chúng tôi'}
         </Typography>
         <Typography variant="h6" sx={{ color: '#64748b', textAlign: 'center', mb: 8, fontWeight: 400 }}>
@@ -82,25 +99,45 @@ export const FeaturesSection: React.FC = () => {
                   flexDirection: 'column',
                   alignItems: 'center',
                   textAlign: 'center',
-                  borderRadius: 4,
+                  borderRadius: '20px',
                   bgcolor: '#ffffff',
-                  border: '1px solid transparent',
-                  transition: 'all 0.3s ease',
-                  '&:hover': { transform: 'translateY(-8px)', borderColor: '#e2e8f0', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.05)' }
+                  border: '1.5px solid #e8e0d8',
+                  borderLeft: `4px solid ${feature.accentColor}`,
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  '&:hover': {
+                    transform: 'translateY(-8px)',
+                    borderColor: feature.accentColor,
+                    boxShadow: `0 16px 40px ${feature.accentColor}12`,
+                  },
+                  // Gradient shine sweep on hover
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0, left: '-100%',
+                    width: '100%', height: '100%',
+                    background: `linear-gradient(90deg, transparent, ${feature.accentColor}08, transparent)`,
+                    transition: 'left 0.6s ease',
+                  },
+                  '&:hover::after': {
+                    left: '100%',
+                  }
                 }}
               >
                 <Box
                   sx={{
-                    width: 80, height: 80, borderRadius: '50%', bgcolor: feature.iconBg,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3
+                    width: 72, height: 72, borderRadius: '18px', bgcolor: feature.iconBg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3,
+                    transition: 'transform 0.3s ease',
                   }}
                 >
                   {feature.icon}
                 </Box>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', mb: 2, fontSize: '1.1rem' }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#1A1A2E', mb: 2, fontSize: '1.05rem' }}>
                   {feature.title}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.6 }}>
+                <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.7 }}>
                   {feature.description}
                 </Typography>
               </Paper>
