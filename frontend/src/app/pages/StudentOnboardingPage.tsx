@@ -105,8 +105,6 @@ export function StudentOnboardingPage() {
     }
   };
 
-  const handleBack = () => setActiveStep((prev) => prev - 1);
-
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#F8FAFC', backgroundImage: 'radial-gradient(at 100% 0%, rgba(254, 226, 226, 0.4) 0px, transparent 50%), radial-gradient(at 0% 100%, rgba(255, 237, 213, 0.4) 0px, transparent 50%)', display: 'flex', flexDirection: 'column' }}>
       {/* Minimal Header */}
@@ -306,18 +304,7 @@ export function StudentOnboardingPage() {
           </Box>
 
           {/* Footer Actions */}
-          <Box sx={{ p: { xs: 3, md: 4 }, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'grey.200', display: 'flex', justifyContent: activeStep === 0 ? 'flex-end' : 'space-between', alignItems: 'center', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
-            {activeStep === 0 ? null : (
-              <Button
-                variant="outlined"
-                color="inherit"
-                disabled={saving}
-                onClick={handleBack}
-                sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', borderColor: 'grey.300', '&:hover': { bgcolor: 'grey.100', borderColor: 'grey.400' } }}
-              >
-                Quay lại
-              </Button>
-            )}
+          <Box sx={{ p: { xs: 3, md: 4 }, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'grey.200', display: 'flex', justifyContent: activeStep === 0 ? 'flex-end' : 'flex-end', alignItems: 'center', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
             <Button
               variant="contained"
               onClick={handleNext}
