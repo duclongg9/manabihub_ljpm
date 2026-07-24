@@ -63,11 +63,11 @@ export const StudentPaymentsPage: React.FC = () => {
             <Table sx={{ minWidth: 650 }}>
               <TableHead sx={{ bgcolor: 'grey.50' }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Mã đơn hàng</TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Khóa học</TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Ngày thanh toán</TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Số tiền</TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Trạng thái</TableCell>
+                  <TableCell sx={{ width: '20%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Mã đơn hàng</TableCell>
+                  <TableCell sx={{ width: '35%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Khóa học</TableCell>
+                  <TableCell sx={{ width: '20%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Ngày thanh toán</TableCell>
+                  <TableCell align="right" sx={{ width: '15%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Số tiền</TableCell>
+                  <TableCell align="center" sx={{ width: '10%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Trạng thái</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -77,8 +77,8 @@ export const StudentPaymentsPage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700 }}>{row.id}</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: 'grey.900' }}>{row.courseName}</TableCell>
                       <TableCell>{row.date}</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{row.amount}</TableCell>
-                      <TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>{row.amount}</TableCell>
+                      <TableCell align="center">
                         <Chip size="small" label={row.status} sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 700 }} />
                       </TableCell>
                     </TableRow>
