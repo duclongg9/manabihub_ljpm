@@ -1,4 +1,4 @@
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+
 import {
   Box,
   Container,
@@ -18,18 +18,25 @@ export function StudentWishlistPage() {
   const { data = [], isLoading, isError, refetch } = useWishlist();
 
   return (
-    <Box component="main" sx={{ minHeight: '100%', bgcolor: 'grey.50' }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}>
-        <Typography component="h1" variant="h4" sx={{ fontWeight: 800, mb: 3 }}>
-          My Wishlist
-        </Typography>
+    <Box component="main" sx={{ minHeight: '100%', bgcolor: 'grey.50', pb: 8 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 }, minHeight: '50vh', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Typography component="h1" variant="h4" sx={{ fontWeight: 800 }}>
+            Danh sách yêu thích
+          </Typography>
+          {!isLoading && !isError && (
+            <Box component="span" sx={{ ml: 2, px: 1.5, py: 0.25, borderRadius: '9999px', bgcolor: '#fee2e2', color: '#C41E3A', fontSize: '0.875rem', fontWeight: 700 }}>
+              {data.length}
+            </Box>
+          )}
+        </Box>
 
-        {isLoading && <LoadingState message="Loading your wishlist..." />}
+        {isLoading && <LoadingState message="Đang tải danh sách yêu thích..." />}
 
         {isError && (
           <ErrorState
-            title="Wishlist unavailable"
-            message="Please check your connection and try again."
+            title="Không thể tải danh sách"
+            message="Vui lòng kiểm tra kết nối và thử lại."
             onRetry={() => refetch()}
           />
         )}
@@ -37,18 +44,23 @@ export function StudentWishlistPage() {
         {!isLoading && !isError && data.length === 0 && (
           <Box
             sx={{
-              py: 6,
+              py: 8,
               bgcolor: 'background.paper',
               border: '1px solid',
               borderColor: 'divider',
+              borderRadius: 4,
+              flexGrow: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <EmptyState
-              title="Your wishlist is empty"
-              description="Browse published courses and save the ones you want to revisit."
-              icon={<FavoriteBorderIcon sx={{ fontSize: 56, color: 'text.secondary' }} />}
-              actionLabel="Browse courses"
-              onAction={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
+              title="Danh sách yêu thích của bạn đang trống!"
+              description="Hãy khám phá thêm nhiều khóa học thú vị nhé."
+              icon={<Box sx={{ fontSize: '5rem', mb: 2, filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.05))' }}>🐕</Box>}
+              actionLabel="Khám phá khóa học ngay ➔"
+              onAction={() => navigate(ROUTES.STUDENT.BROWSE_COURSES)}
             />
           </Box>
         )}
