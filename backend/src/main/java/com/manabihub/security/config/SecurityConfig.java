@@ -152,10 +152,40 @@ public class SecurityConfig {
     public JwtDecoder mockJwtDecoder() {
         return token -> {
             try {
-                UUID.fromString(token);
+                String subject = token;
+                String role = "STUDENT";
+                
+                if (token.contains(".")) {
+                    String[] parts = token.split("\\.");
+                    if (parts.length >= 2) {
+                        try {
+                            String base64Url = parts[1];
+                            int pad = 4 - (base64Url.length() % 4);
+                            if (pad > 0 && pad < 4) {
+                                StringBuilder sb = new StringBuilder(base64Url);
+                                for (int i = 0; i < pad; i++) sb.append("=");
+                                base64Url = sb.toString();
+                            }
+                            String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(base64Url));
+                            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                            java.util.Map<String, Object> payloadMap = mapper.readValue(payloadJson, java.util.Map.class);
+                            if (payloadMap.containsKey("sub")) {
+                                subject = payloadMap.get("sub").toString();
+                            }
+                            if (payloadMap.containsKey("role")) {
+                                role = payloadMap.get("role").toString();
+                            }
+                        } catch (Exception ex) {
+                            // If parsing fails, we shouldn't pass the whole JWT as subject, just fallback to a dummy UUID
+                            subject = "c0000000-0000-0000-0000-000000000001";
+                        }
+                    }
+                }
+                
                 return org.springframework.security.oauth2.jwt.Jwt.withTokenValue(token)
                         .header("alg", "none")
-                        .claim("sub", token)
+                        .claim("sub", subject)
+                        .claim("role", role)
                         .build();
             } catch (Exception e) {
                 throw new JwtException("Invalid mock token: " + token);

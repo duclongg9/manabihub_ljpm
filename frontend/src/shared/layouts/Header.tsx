@@ -83,35 +83,43 @@ export const Header: React.FC<HeaderProps> = ({
           </Tooltip>
         )}
         
-        <Typography variant="h6" component={Link} to="/" sx={{ flexGrow: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 700 }}>
+        <Typography variant="h6" component={Link} to="/" sx={{ flexGrow: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
           ManabiHub
         </Typography>
 
-        {session && notificationPath ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Tooltip title="Thông báo">
-              <IconButton color="inherit" aria-label="Mở thông báo" onClick={() => navigate(notificationPath)}>
-                <NotificationsIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Tài khoản">
-              <IconButton
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 2 } }}>
+          <Button component={Link} to="/" color="inherit" sx={{ display: { xs: 'none', md: 'flex' }, textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+            Trang chủ
+          </Button>
+
+          {session && notificationPath ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Tooltip title="Thông báo">
+                <IconButton color="inherit" aria-label="Mở thông báo" onClick={() => navigate(notificationPath)} sx={{ color: 'text.secondary' }}>
+                  <NotificationsIcon />
+                </IconButton>
+              </Tooltip>
+              <Button
+                color="inherit"
                 aria-label="Mở menu tài khoản"
                 aria-controls={accountAnchor ? 'account-menu' : undefined}
-                aria-expanded={accountAnchor ? 'true' : undefined}
                 aria-haspopup="true"
                 onClick={(event) => setAccountAnchor(event.currentTarget)}
-                size="small"
+                sx={{ textTransform: 'none', color: 'text.primary', borderRadius: 8, pl: 0.5, pr: 1.5, py: 0.5, '&:hover': { bgcolor: 'grey.100' } }}
               >
-                <Avatar sx={{ bgcolor: 'secondary.main', width: 32, height: 32 }}>{avatarLabel}</Avatar>
-              </IconButton>
-            </Tooltip>
-          </Box>
-        ) : (
-          <Button startIcon={<LoginIcon />} onClick={() => navigate(ROUTES.PUBLIC.LOGIN)}>
-            Đăng nhập
-          </Button>
-        )}
+                <Avatar sx={{ bgcolor: '#C41E3A', width: 32, height: 32, mr: 1, fontSize: '0.875rem', fontWeight: 700 }}>{avatarLabel}</Avatar>
+                <Typography variant="body2" sx={{ fontWeight: 600, display: { xs: 'none', sm: 'block' } }}>
+                  {session.email?.split('@')[0] || 'Tài khoản'}
+                </Typography>
+                <Box component="span" sx={{ display: 'inline-flex', ml: 0.5, fontSize: '0.7rem', color: 'grey.500' }}>▼</Box>
+              </Button>
+            </Box>
+          ) : (
+            <Button startIcon={<LoginIcon />} onClick={() => navigate(ROUTES.PUBLIC.LOGIN)} sx={{ fontWeight: 600 }}>
+              Đăng nhập
+            </Button>
+          )}
+        </Box>
       </Toolbar>
       {session && (
         <Menu

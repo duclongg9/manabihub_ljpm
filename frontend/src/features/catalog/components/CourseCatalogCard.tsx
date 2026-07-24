@@ -37,6 +37,8 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
     [course.thumbnailUrl],
   );
 
+  const idNum = parseInt(String(course.id).replace(/\D/g, '') || '0', 10);
+
   return (
     <Card
       elevation={0}
@@ -124,20 +126,26 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
             {course.title}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, display: 'flex', alignItems: 'center', gap: 1 }}>
-            {course.teacherName || 'Giảng viên Demo'}
+            {course.teacherName || 'Sensai Manabi'}
           </Typography>
 
           {/* Mock Trust Factors */}
           <Stack direction="row" sx={{ alignItems: 'center', mt: 1.5, gap: 1.5 }}>
             <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5 }}>
               <StarIcon sx={{ fontSize: 16, color: '#F59E0B' }} />
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#475569' }}>4.8</Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8' }}>(120)</Typography>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#475569' }}>
+                {(4 + (idNum % 10) / 10).toFixed(1)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                ({(idNum % 200) + 15})
+              </Typography>
             </Stack>
             <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#cbd5e1' }} />
             <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5 }}>
               <PersonIcon sx={{ fontSize: 16, color: '#94a3b8' }} />
-              <Typography variant="caption" sx={{ color: '#64748b' }}>450 học viên</Typography>
+              <Typography variant="caption" sx={{ color: '#64748b' }}>
+                {(idNum % 500) + 50} học viên
+              </Typography>
             </Stack>
           </Stack>
 
@@ -157,7 +165,7 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
               spacing={0.5}
               sx={{ alignItems: 'center', color: '#64748b', bgcolor: '#f1f5f9', px: 1.5, py: 0.5, borderRadius: '8px' }}
             >
-              <Typography variant="caption" sx={{ fontWeight: 600 }}>{course.totalLessons} bài học</Typography>
+              <Typography variant="caption" sx={{ fontWeight: 600 }}>{course.totalLessons || (idNum % 20) + 12} bài học</Typography>
             </Stack>
           </Stack>
         </CardContent>

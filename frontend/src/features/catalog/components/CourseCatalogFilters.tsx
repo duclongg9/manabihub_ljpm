@@ -6,8 +6,6 @@ import {
   Drawer,
   FormControl,
   IconButton,
-  InputAdornment,
-  InputLabel,
   MenuItem,
   Select,
   Stack,
@@ -16,9 +14,9 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
+import InputAdornment from '@mui/material/InputAdornment';
 import CloseIcon from '@mui/icons-material/Close';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import SearchIcon from '@mui/icons-material/Search';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import type { SelectChangeEvent } from '@mui/material';
 import type { CourseCatalogFilters, CourseCategory } from '../types/catalogTypes';
@@ -34,13 +32,14 @@ interface CourseCatalogFiltersBarProps {
   onSortChange: (sort: string) => void;
 }
 
-function toPriceInput(value?: number): string {
-  return value === undefined ? '' : String(value);
+function formatPriceInput(value?: number): string {
+  return value === undefined ? '' : value.toLocaleString('en-US');
 }
 
 function parsePrice(value: string): number | undefined {
-  if (value.trim() === '') return undefined;
-  const parsed = Number(value);
+  const numericStr = value.replace(/\D/g, '');
+  if (!numericStr) return undefined;
+  const parsed = Number(numericStr);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
@@ -55,32 +54,24 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [keyword, setKeyword] = useState(filters.keyword ?? '');
-  const [minPrice, setMinPrice] = useState(toPriceInput(filters.minPrice));
-  const [maxPrice, setMaxPrice] = useState(toPriceInput(filters.maxPrice));
+  const [minPrice, setMinPrice] = useState(formatPriceInput(filters.minPrice));
+  const [maxPrice, setMaxPrice] = useState(formatPriceInput(filters.maxPrice));
   const [priceError, setPriceError] = useState('');
 
   useEffect(() => {
-    setKeyword(filters.keyword ?? '');
-  }, [filters.keyword]);
-
-  useEffect(() => {
-    setMinPrice(toPriceInput(filters.minPrice));
-    setMaxPrice(toPriceInput(filters.maxPrice));
+    setMinPrice(formatPriceInput(filters.minPrice));
+    setMaxPrice(formatPriceInput(filters.maxPrice));
   }, [filters.minPrice, filters.maxPrice]);
+
+  const handlePriceChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const numericStr = e.target.value.replace(/\D/g, '');
+    setter(numericStr ? Number(numericStr).toLocaleString('en-US') : '');
+  };
 
   const updateFilter = (field: keyof CourseCatalogFilters, value?: string) => {
     onFiltersChange({
       ...filters,
       [field]: value || undefined,
-    });
-  };
-
-  const submitKeyword = (event: React.FormEvent) => {
-    event.preventDefault();
-    onFiltersChange({
-      ...filters,
-      keyword: keyword.trim() || undefined,
     });
   };
 
@@ -111,7 +102,6 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
   };
 
   const clearFilters = () => {
-    setKeyword('');
     setMinPrice('');
     setMaxPrice('');
     setPriceError('');
@@ -133,15 +123,14 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
       }}
     >
       <FormControl fullWidth size="small">
-        <InputLabel id="catalog-category-label">Danh mục</InputLabel>
         <Select
-          labelId="catalog-category-label"
+          displayEmpty
           value={filters.category ?? ''}
-          label="Danh mục"
           disabled={categoriesLoading}
           onChange={(event) => updateFilter('category', event.target.value)}
+          sx={{ '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
         >
-          <MenuItem value="">Tất cả danh mục</MenuItem>
+          <MenuItem value=""><Typography color="text.secondary">Danh mục</Typography></MenuItem>
           {categories.map((category) => (
             <MenuItem key={category.id} value={category.code}>
               {category.name}
@@ -151,14 +140,13 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
       </FormControl>
 
       <FormControl fullWidth size="small">
-        <InputLabel id="catalog-jlpt-label">Trình độ</InputLabel>
         <Select
-          labelId="catalog-jlpt-label"
+          displayEmpty
           value={filters.jlptLevel ?? ''}
-          label="Trình độ"
           onChange={(event) => updateFilter('jlptLevel', event.target.value)}
+          sx={{ '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
         >
-          <MenuItem value="">Mọi cấp độ</MenuItem>
+          <MenuItem value=""><Typography color="text.secondary">Trình độ</Typography></MenuItem>
           {JLPT_LEVELS.map((level) => (
             <MenuItem key={level} value={level}>
               JLPT {level}
@@ -167,45 +155,55 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
         </Select>
       </FormControl>
 
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={1.5}
-        sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}
-      >
-        <TextField
-          label="Giá từ"
-          type="number"
-          value={minPrice}
-          onChange={(event) => setMinPrice(event.target.value)}
-          size="small"
-          fullWidth
-          slotProps={{ htmlInput: { min: 0, step: 10000 } }}
-        />
-        <TextField
-          label="Giá đến"
-          type="number"
-          value={maxPrice}
-          onChange={(event) => setMaxPrice(event.target.value)}
-          onBlur={applyPrice}
-          onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
-          size="small"
-          fullWidth
-          slotProps={{ htmlInput: { min: 0, step: 10000 } }}
-        />
+      <Stack direction="column" sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+        >
+          <TextField
+            placeholder="Giá từ"
+            type="text"
+            value={minPrice}
+            onChange={handlePriceChange(setMinPrice)}
+            onBlur={applyPrice}
+            onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
+            size="small"
+            fullWidth
+            slotProps={{
+              input: { endAdornment: <InputAdornment position="end">đ</InputAdornment> },
+              htmlInput: { inputMode: 'numeric' }
+            }}
+            sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+          />
+          <TextField
+            placeholder="Giá đến"
+            type="text"
+            value={maxPrice}
+            onChange={handlePriceChange(setMaxPrice)}
+            onBlur={applyPrice}
+            onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
+            size="small"
+            fullWidth
+            slotProps={{
+              input: { endAdornment: <InputAdornment position="end">đ</InputAdornment> },
+              htmlInput: { inputMode: 'numeric' }
+            }}
+            sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+          />
+        </Stack>
+        {priceError && (
+          <Typography variant="caption" color="error" sx={{ mt: 0.5, px: 0.5 }}>
+            {priceError}
+          </Typography>
+        )}
       </Stack>
-      {priceError && (
-        <Typography variant="caption" color="error" sx={{ gridColumn: 'span 2' }}>
-          {priceError}
-        </Typography>
-      )}
 
       <FormControl fullWidth size="small">
-        <InputLabel id="catalog-sort-label">Sắp xếp</InputLabel>
         <Select
-          labelId="catalog-sort-label"
+          displayEmpty
           value={sort}
-          label="Sắp xếp"
           onChange={handleSortChange}
+          sx={{ '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
         >
           <MenuItem value="publishedAt,desc">Mới xuất bản</MenuItem>
           <MenuItem value="price,asc">Giá thấp đến cao</MenuItem>
@@ -231,66 +229,30 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
 
   return (
     <Box>
-      <Stack
-        component="form"
-        onSubmit={submitKeyword}
-        direction="row"
-        spacing={1}
-        sx={{ mb: 2 }}
-      >
-        <TextField
-          value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-          placeholder="Tìm theo tên khóa học..."
-          size="small"
-          fullWidth
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-        <Button
-          type="submit"
-          variant="contained"
-          sx={{
-            minWidth: 120,
-            whiteSpace: 'nowrap',
-            bgcolor: '#C41E3A',
-            color: 'white',
-            fontWeight: 700,
-            boxShadow: '0 4px 12px rgba(196, 30, 58, 0.2)',
-            '&:hover': {
-              bgcolor: '#9d182e',
-              boxShadow: '0 6px 16px rgba(196, 30, 58, 0.3)',
-            }
-          }}
-        >
-          Tìm kiếm
-        </Button>
-        {isMobile && (
-          <IconButton
-            aria-label="Mở bộ lọc"
-            title="Bộ lọc"
+      {isMobile ? (
+        <Stack direction="row" sx={{ mb: 2, justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Bộ lọc</Typography>
+          <Button
+            variant="outlined"
+            startIcon={<FilterListIcon />}
             onClick={() => setDrawerOpen(true)}
-            sx={{ border: '1px solid', borderColor: 'divider' }}
+            sx={{
+              borderColor: '#e2e8f0', color: '#475569',
+              '&:hover': { borderColor: '#C41E3A', color: '#C41E3A' }
+            }}
           >
-            <FilterListIcon />
-          </IconButton>
-        )}
-      </Stack>
-
-      {!isMobile && (
+            Mở bộ lọc
+          </Button>
+        </Stack>
+      ) : (
         <Box
           sx={{
             p: 2,
             border: '1px solid',
             borderColor: 'divider',
             bgcolor: 'background.paper',
+            borderRadius: 3,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
           }}
         >
           {filterFields}

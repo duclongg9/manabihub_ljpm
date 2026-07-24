@@ -175,8 +175,8 @@ export const CourseCatalogPage: React.FC = () => {
   };
 
   return (
-    <Box component="main" sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}>
+    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#FBF9F5', pb: 8 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 }, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ mb: 3 }}>
           <Typography component="h1" variant="h4" sx={{ fontWeight: 800 }}>
             Khóa học tiếng Nhật
@@ -220,7 +220,7 @@ export const CourseCatalogPage: React.FC = () => {
         )}
 
         {!isLoading && !isError && data?.content.length === 0 && (
-          <Box sx={{ py: 6, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ py: 6, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
             <EmptyState
               title="Không tìm thấy khóa học phù hợp"
               description="Hãy thử từ khóa hoặc khoảng giá khác."
@@ -234,17 +234,19 @@ export const CourseCatalogPage: React.FC = () => {
         )}
 
         {!isLoading && !isError && data && data.content.length > 0 && (
-          <Grid
-            container
-            spacing={2.5}
-            sx={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 160ms ease' }}
-          >
-            {data.content.map((course) => (
-              <Grid key={course.id} size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>
-                <CourseCatalogCard course={course} />
-              </Grid>
-            ))}
-          </Grid>
+          <Box sx={{ flexGrow: 1 }}>
+            <Grid
+              container
+              spacing={2.5}
+              sx={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 160ms ease', alignContent: 'flex-start', minHeight: 400 }}
+            >
+              {data.content.map((course) => (
+                <Grid key={course.id} size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>
+                  <CourseCatalogCard course={course} />
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
         )}
 
         {!isLoading && !isError && data && data.totalPages > 1 && (
