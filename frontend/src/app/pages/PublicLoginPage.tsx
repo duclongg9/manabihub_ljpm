@@ -75,8 +75,8 @@ export function PublicLoginPage() {
             </Typography>
           </Box>
 
-          {/* Centered Content */}
-          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {/* Content shifted slightly up for vertical balance */}
+          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', pb: '15vh' }}>
             <Box sx={{ maxWidth: 500, animation: `${fadeIn} 1s ease-out` }}>
               <Typography sx={{ fontFamily: '"Noto Sans JP", sans-serif', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.15em', mb: 2 }}>
                 日本学問 — Nhật Bản Học
@@ -88,18 +88,20 @@ export function PublicLoginPage() {
                 Học tập cùng các chuyên gia JLPT hàng đầu.
               </Typography>
 
-              <Stack direction="row" sx={{ alignItems: 'center' }} spacing={2}>
-                <AvatarGroup total={500} sx={{ '& .MuiAvatar-root': { width: 48, height: 48, border: '2px solid', borderColor: 'grey.900' } }}>
-                  <Avatar alt="Student 1" src={getAsset('anh1.png')} />
-                  <Avatar alt="Student 2" src={getAsset('anh2.png')} />
-                  <Avatar alt="Student 3" src={getAsset('anh3.png')} />
-                  <Avatar alt="Student 4" src={getAsset('anh4.png')} />
-                </AvatarGroup>
-                <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', lineHeight: 1.4 }}>
-                  <Typography component="span" sx={{ color: '#FF6B6B', fontWeight: 800 }}>500+ học viên</Typography> <br />
-                  đã đồng hành
-                </Typography>
-              </Stack>
+              <Box sx={{ display: 'inline-block' }}>
+                <Stack direction="row" sx={{ alignItems: 'center', background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50px', px: 3, py: 1.5 }} spacing={2}>
+                  <AvatarGroup total={500} sx={{ '& .MuiAvatar-root': { width: 44, height: 44, border: '2px solid', borderColor: 'grey.900' } }}>
+                    <Avatar alt="Student 1" src={getAsset('anh1.png')} />
+                    <Avatar alt="Student 2" src={getAsset('anh2.png')} />
+                    <Avatar alt="Student 3" src={getAsset('anh3.png')} />
+                    <Avatar alt="Student 4" src={getAsset('anh4.png')} />
+                  </AvatarGroup>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', lineHeight: 1.4 }}>
+                    <Typography component="span" sx={{ color: '#FF6B6B', fontWeight: 800 }}>500+ học viên</Typography> <br />
+                    đã đồng hành
+                  </Typography>
+                </Stack>
+              </Box>
             </Box>
           </Box>
         </Box>
@@ -112,10 +114,17 @@ export function PublicLoginPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           p: { xs: 3, sm: 6, md: 8 },
           position: 'relative',
-          bgcolor: '#ffffff',
+          bgcolor: '#FAF9F6',
         }}
       >
-        <Box sx={{ width: '100%', maxWidth: 400, animation: `${fadeIn} 0.6s ease-out` }}>
+        <Box sx={{
+          width: '100%', maxWidth: 420, animation: `${fadeIn} 0.6s ease-out`,
+          bgcolor: '#ffffff',
+          p: { xs: 4, sm: 5 },
+          borderRadius: '24px',
+          boxShadow: '0 20px 40px -10px rgba(0,0,0,0.05)',
+          border: '1px solid #f1f5f9'
+        }}>
           {/* Mobile Header Logo */}
           <Box component={Link} to="/" sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 6, textDecoration: 'none' }}>
             <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -151,7 +160,7 @@ export function PublicLoginPage() {
             sx={{
               py: 1.5,
               mb: 3,
-              borderRadius: 3,
+              borderRadius: '12px',
               textTransform: 'none',
               fontWeight: 700,
               fontSize: '1.05rem',
@@ -177,7 +186,7 @@ export function PublicLoginPage() {
           </Button>
 
           <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', textAlign: 'center', lineHeight: 1.6 }}>
-            *Bằng việc đăng nhập, bạn đồng ý với <Box component="span" sx={{ textDecoration: 'underline', cursor: 'pointer', '&:hover': { color: '#64748b' }}}>Điều khoản dịch vụ</Box> của chúng tôi.
+            Bằng việc đăng nhập, bạn đồng ý với <Box component="span" sx={{ color: '#C41E3A', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600, '&:hover': { color: '#E8432A' }}}>Điều khoản dịch vụ</Box> của chúng tôi.
           </Typography>
 
         </Box>
