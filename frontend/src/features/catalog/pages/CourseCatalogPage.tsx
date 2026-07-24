@@ -6,6 +6,7 @@ import {
   Pagination,
   Stack,
   Typography,
+  Chip,
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { useSearchParams } from 'react-router-dom';
@@ -15,7 +16,6 @@ import { useCourseCatalog } from '../hooks/useCourseCatalog';
 import { useCourseCategories } from '../hooks/useCourseCategories';
 import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
 import { ErrorState } from '../../../shared/components/ErrorState/ErrorState';
-import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
 import type { CourseCatalogFilters } from '../types/catalogTypes';
 
 const PAGE_SIZE = 12;
@@ -176,7 +176,7 @@ export const CourseCatalogPage: React.FC = () => {
 
   return (
     <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#FBF9F5', pb: 8 }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 }, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 }, flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
         <Box sx={{ mb: 3 }}>
           <Typography component="h1" variant="h4" sx={{ fontWeight: 800 }}>
             Khóa học tiếng Nhật
@@ -186,22 +186,41 @@ export const CourseCatalogPage: React.FC = () => {
           </Typography>
         </Box>
 
-        <CourseCatalogFiltersBar
-          filters={query.filters}
-          onFiltersChange={handleFiltersChange}
-          categories={categories}
-          categoriesLoading={categoriesLoading}
-          sort={query.sort}
-          onSortChange={handleSortChange}
-        />
+        <Box sx={{ position: 'sticky', top: { xs: 56, sm: 64 }, zIndex: 20, bgcolor: 'rgba(251, 249, 245, 0.9)', backdropFilter: 'blur(12px)', py: 2, mx: -2, px: 2, borderRadius: 2, transition: 'all 0.3s' }}>
+          <CourseCatalogFiltersBar
+            filters={query.filters}
+            onFiltersChange={handleFiltersChange}
+            categories={categories}
+            categoriesLoading={categoriesLoading}
+            sort={query.sort}
+            onSortChange={handleSortChange}
+          />
+        </Box>
 
         <Stack
-          direction="row"
-          sx={{ my: 3, minHeight: 28, justifyContent: 'space-between', alignItems: 'center' }}
+          direction={{ xs: 'column', sm: 'row' }}
+          sx={{ my: 3, minHeight: 28, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}
         >
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            {data ? `${data.totalElements} khóa học` : 'Danh sách khóa học'}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              {data ? `${data.totalElements} khóa học` : 'Danh sách khóa học'}
+            </Typography>
+            {/* Active Filter Badges */}
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+              {query.filters.category && (
+                <Chip size="small" label={`Danh mục: ${categories.find(c => c.code === query.filters.category)?.name || query.filters.category}`} onDelete={() => handleFiltersChange({ ...query.filters, category: undefined })} sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }} />
+              )}
+              {query.filters.jlptLevel && (
+                <Chip size="small" label={`Trình độ: ${query.filters.jlptLevel}`} onDelete={() => handleFiltersChange({ ...query.filters, jlptLevel: undefined })} sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }} />
+              )}
+              {query.filters.minPrice !== undefined && (
+                <Chip size="small" label={`Giá từ: ${query.filters.minPrice.toLocaleString()}đ`} onDelete={() => handleFiltersChange({ ...query.filters, minPrice: undefined })} sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }} />
+              )}
+              {query.filters.maxPrice !== undefined && (
+                <Chip size="small" label={`Giá đến: ${query.filters.maxPrice.toLocaleString()}đ`} onDelete={() => handleFiltersChange({ ...query.filters, maxPrice: undefined })} sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }} />
+              )}
+            </Stack>
+          </Box>
           {isFetching && !isLoading && (
             <Typography variant="caption" color="text.secondary">
               Đang cập nhật...
@@ -209,7 +228,26 @@ export const CourseCatalogPage: React.FC = () => {
           )}
         </Stack>
 
-        {isLoading && <LoadingState message="Đang tải danh sách khóa học..." />}
+        {isLoading && (
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            {Array.from(new Array(12)).map((_, index) => (
+              <Grid key={index} size={{ xs: 12, md: 6, lg: 4 }}>
+                <Box sx={{ bgcolor: 'white', borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'grey.100', height: 340 }}>
+                  <Box sx={{ width: '100%', aspectRatio: '16/9', bgcolor: 'grey.200', animation: 'pulse 1.5s infinite ease-in-out' }} />
+                  <Box sx={{ p: 2 }}>
+                    <Box sx={{ width: '30%', height: 16, bgcolor: 'grey.200', borderRadius: 1, mb: 1.5, animation: 'pulse 1.5s infinite ease-in-out' }} />
+                    <Box sx={{ width: '90%', height: 24, bgcolor: 'grey.200', borderRadius: 1, mb: 1, animation: 'pulse 1.5s infinite ease-in-out' }} />
+                    <Box sx={{ width: '60%', height: 24, bgcolor: 'grey.200', borderRadius: 1, mb: 3, animation: 'pulse 1.5s infinite ease-in-out' }} />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 'auto' }}>
+                      <Box sx={{ width: '40%', height: 24, bgcolor: 'grey.200', borderRadius: 1, animation: 'pulse 1.5s infinite ease-in-out' }} />
+                      <Box sx={{ width: '20%', height: 24, bgcolor: 'grey.200', borderRadius: 1, animation: 'pulse 1.5s infinite ease-in-out' }} />
+                    </Box>
+                  </Box>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        )}
 
         {isError && (
           <ErrorState
@@ -237,11 +275,11 @@ export const CourseCatalogPage: React.FC = () => {
           <Box sx={{ flexGrow: 1 }}>
             <Grid
               container
-              spacing={2.5}
-              sx={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 160ms ease', alignContent: 'flex-start', minHeight: 400 }}
+              spacing={3}
+              sx={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 160ms ease', alignContent: 'flex-start' }}
             >
               {data.content.map((course) => (
-                <Grid key={course.id} size={{ xs: 12, sm: 6, lg: 4, xl: 3 }}>
+                <Grid key={course.id} size={{ xs: 12, md: 6, lg: 4 }}>
                   <CourseCatalogCard course={course} />
                 </Grid>
               ))}

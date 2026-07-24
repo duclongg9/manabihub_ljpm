@@ -57,11 +57,25 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
   const [minPrice, setMinPrice] = useState(formatPriceInput(filters.minPrice));
   const [maxPrice, setMaxPrice] = useState(formatPriceInput(filters.maxPrice));
   const [priceError, setPriceError] = useState('');
+  const [keyword, setKeyword] = useState(filters.keyword || '');
 
   useEffect(() => {
     setMinPrice(formatPriceInput(filters.minPrice));
     setMaxPrice(formatPriceInput(filters.maxPrice));
   }, [filters.minPrice, filters.maxPrice]);
+
+  useEffect(() => {
+    setKeyword(filters.keyword || '');
+  }, [filters.keyword]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (keyword !== (filters.keyword || '')) {
+        updateFilter('keyword', keyword);
+      }
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [keyword]);
 
   const handlePriceChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const numericStr = e.target.value.replace(/\D/g, '');
@@ -104,6 +118,7 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
   const clearFilters = () => {
     setMinPrice('');
     setMaxPrice('');
+    setKeyword('');
     setPriceError('');
     onFiltersChange({});
     setDrawerOpen(false);
@@ -117,11 +132,21 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(7, minmax(0, 1fr))',
         gap: 2,
         alignItems: 'center',
       }}
     >
+      <FormControl fullWidth size="small" sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
+        <TextField
+          placeholder="Tìm khóa học..."
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          size="small"
+          sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+        />
+      </FormControl>
+
       <FormControl fullWidth size="small">
         <Select
           displayEmpty
@@ -170,7 +195,7 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
             size="small"
             fullWidth
             slotProps={{
-              input: { endAdornment: <InputAdornment position="end">đ</InputAdornment> },
+              input: { endAdornment: <InputAdornment position="end" sx={{ mr: 1 }}>đ</InputAdornment> },
               htmlInput: { inputMode: 'numeric' }
             }}
             sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
@@ -185,7 +210,7 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
             size="small"
             fullWidth
             slotProps={{
-              input: { endAdornment: <InputAdornment position="end">đ</InputAdornment> },
+              input: { endAdornment: <InputAdornment position="end" sx={{ mr: 1 }}>đ</InputAdornment> },
               htmlInput: { inputMode: 'numeric' }
             }}
             sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
@@ -219,7 +244,11 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
         sx={{
           color: '#475569',
           fontWeight: 600,
-          '&:hover': { color: '#C41E3A', bgcolor: 'transparent' }
+          bgcolor: '#f1f5f9',
+          borderRadius: 2,
+          px: 2, py: 1,
+          transition: 'all 0.2s',
+          '&:hover': { color: '#C41E3A', bgcolor: '#fef2f2' }
         }}
       >
         Xóa bộ lọc
