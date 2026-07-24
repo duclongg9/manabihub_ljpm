@@ -30,5 +30,6 @@ public class CreateWithdrawalRequest {
     @NotBlank(message = "OTP code is required")
     private String otpCode;
 
+    @Builder.Default
     private boolean saveAccount = false;
 }
