@@ -36,10 +36,18 @@ axiosClient.interceptors.response.use(
     const status = error.response?.status;
     const requestUrl = error.config?.url as string | undefined;
 
-    if (status === 401 && !isLoginRequest(requestUrl)) {
+    if (
+      status === 401
+      && !isLoginRequest(requestUrl)
+      && !isPublicApiRequest(requestUrl)
+    ) {
       const kind = resolveSessionKind(requestUrl);
-      clearAuthSession(kind);
-      redirectToLogin(kind);
+      const session = getAuthSession(kind);
+
+      if (session || isProtectedScreen(kind)) {
+        clearAuthSession(kind);
+        redirectToLogin(kind);
+      }
     }
 
     return Promise.reject(error);
@@ -56,6 +64,23 @@ function resolveSessionKind(requestUrl?: string): AuthSessionKind {
 
 function isLoginRequest(requestUrl?: string) {
   return requestUrl?.includes('/admin/auth/login') ?? false;
+}
+
+function isPublicApiRequest(requestUrl?: string) {
+  const path = requestUrl ?? '';
+  return path.includes('/v1/public/')
+    || path.includes('/v1/course-categories');
+}
+
+function isProtectedScreen(kind: AuthSessionKind) {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const path = window.location.pathname;
+  return kind === 'admin'
+    ? path.startsWith('/admin') && path !== '/admin/login'
+    : path.startsWith('/student') || path.startsWith('/teacher');
 }
 
 function redirectToLogin(kind: AuthSessionKind) {
