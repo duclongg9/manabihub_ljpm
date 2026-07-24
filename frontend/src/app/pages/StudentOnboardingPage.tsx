@@ -3,7 +3,7 @@ import {
   Alert, Box, Typography, Button, CircularProgress, Stack, Card,
   TextField, Stepper, Step, StepLabel,
   Container, InputAdornment,
-  FormControl, InputLabel, Select, FormHelperText
+  FormControl, InputLabel, Select, FormHelperText, MenuItem
 } from '@mui/material';
 import { isAxiosError } from 'axios';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
@@ -179,25 +179,17 @@ export function StudentOnboardingPage() {
                   <FormControl fullWidth variant="outlined">
                     <InputLabel id="jlpt-goal-label">Mục tiêu JLPT của bạn</InputLabel>
                     <Select
-                      native
                       value={goal}
-                      onChange={(e) => setGoal(e.target.value)}
-                      title="Mục tiêu JLPT của bạn"
-                      aria-label="Mục tiêu JLPT của bạn"
+                      onChange={(e) => setGoal(e.target.value as string)}
                       labelId="jlpt-goal-label"
                       id="jlpt-goal"
                       label="Mục tiêu JLPT của bạn"
-                      inputProps={{
-                        title: 'Mục tiêu JLPT của bạn',
-                        'aria-label': 'Mục tiêu JLPT của bạn',
-                        id: 'jlpt-goal-select'
-                      }}
                     >
-                      <option value="n5">N5 - Sơ cấp</option>
-                      <option value="n4">N4 - Sơ trung cấp</option>
-                      <option value="n3">N3 - Trung cấp</option>
-                      <option value="n2">N2 - Thượng cấp</option>
-                      <option value="n1">N1 - Cao cấp</option>
+                      <MenuItem value="n5">N5 - Sơ cấp</MenuItem>
+                      <MenuItem value="n4">N4 - Sơ trung cấp</MenuItem>
+                      <MenuItem value="n3">N3 - Trung cấp</MenuItem>
+                      <MenuItem value="n2">N2 - Thượng cấp</MenuItem>
+                      <MenuItem value="n1">N1 - Cao cấp</MenuItem>
                     </Select>
                     <FormHelperText>Giúp chúng tôi đề xuất lộ trình và khóa học phù hợp nhất với bạn.</FormHelperText>
                   </FormControl>

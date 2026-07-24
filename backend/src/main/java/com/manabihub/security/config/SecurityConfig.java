@@ -152,10 +152,10 @@ public class SecurityConfig {
     public JwtDecoder mockJwtDecoder() {
         return token -> {
             try {
-                UUID.fromString(token);
                 return org.springframework.security.oauth2.jwt.Jwt.withTokenValue(token)
                         .header("alg", "none")
                         .claim("sub", token)
+                        .claim("role", "STUDENT")
                         .build();
             } catch (Exception e) {
                 throw new JwtException("Invalid mock token: " + token);
