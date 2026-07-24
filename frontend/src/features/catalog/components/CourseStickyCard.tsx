@@ -7,6 +7,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import { Dialog, DialogContent, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import FilterHdrIcon from '@mui/icons-material/FilterHdr';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 
 interface CourseStickyCardProps {
@@ -43,13 +44,20 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
           {course.thumbnailUrl ? (
             <img src={course.thumbnailUrl} alt={course.title} className="w-full h-full object-cover rounded-xl transition-opacity group-hover:opacity-80" />
           ) : (
-            <div className="text-slate-400 text-sm">Chưa có ảnh bìa</div>
+            <div className="flex flex-col items-center justify-center text-slate-300 w-full h-full bg-slate-100 rounded-xl">
+              <FilterHdrIcon sx={{ fontSize: 64, mb: 1, opacity: 0.5 }} />
+              <span className="text-xs font-semibold uppercase tracking-wider opacity-70">ManabiHub</span>
+            </div>
           )}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
             <div className="bg-slate-900/60 p-3 rounded-full backdrop-blur-sm">
               <PlayCircleIcon className="text-white shadow-lg" sx={{ fontSize: 48 }} />
             </div>
             <span className="text-white font-bold mt-3 drop-shadow-md bg-slate-900/60 px-3 py-1 rounded-full text-sm backdrop-blur-sm">Xem trước khóa học</span>
+          </div>
+          {/* Wishlist Button Overlay */}
+          <div onClick={(e) => e.stopPropagation()}>
+            <WishlistToggleButton courseId={course.id} variant="icon" />
           </div>
         </div>
 
@@ -71,11 +79,11 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
         ) : (
           <>
             {course.price > 0 && (
-              <button className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-3.5 px-4 rounded-xl transition-all mb-3 border border-indigo-200">
+              <button className="w-full bg-white hover:bg-red-50 text-red-600 font-bold py-3.5 px-4 rounded-xl transition-all mb-3 border border-red-600">
                 Thêm vào giỏ hàng
               </button>
             )}
-            <button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:-translate-y-0.5 mb-4">
+            <button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-red-600/30 hover:shadow-red-600/50 hover:-translate-y-0.5 mb-4">
               {course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
             </button>
             <p className="text-center text-xs text-slate-500 font-medium mb-6">
@@ -83,8 +91,6 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
             </p>
           </>
         )}
-
-        <WishlistToggleButton courseId={course.id} variant="button" />
 
         <div className="text-sm border-t border-slate-100 pt-6 mt-2">
           <h4 className="font-bold mb-4 text-slate-900 text-base">Khóa học này bao gồm:</h4>

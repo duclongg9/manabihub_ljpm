@@ -54,7 +54,7 @@ export function WishlistToggleButton({
     }
   };
 
-  const label = isSaved ? 'Remove from wishlist' : 'Add to wishlist';
+  const label = isSaved ? 'Bỏ lưu' : 'Lưu khóa học';
 
   return (
     <>
@@ -78,7 +78,7 @@ export function WishlistToggleButton({
               '&:hover': { bgcolor: 'white', transform: 'scale(1.1)' },
             }}
           >
-            {isSaved ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
+            {isSaved ? <FavoriteIcon sx={{ color: '#DC2626' }} /> : <FavoriteBorderIcon sx={{ color: 'text.secondary' }} />}
           </IconButton>
         </Tooltip>
       ) : (
@@ -100,7 +100,7 @@ export function WishlistToggleButton({
         onClose={() => setErrorOpen(false)}
       >
         <Alert severity="error" onClose={() => setErrorOpen(false)}>
-          Wishlist could not be updated. Please try again.
+          Không thể cập nhật danh sách yêu thích. Vui lòng thử lại.
         </Alert>
       </Snackbar>
     </>
