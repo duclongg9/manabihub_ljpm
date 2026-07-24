@@ -7,7 +7,13 @@ import AvatarUpload from "../../shared/components/AvatarUpload/AvatarUpload";
 import {getMyStudentProfile, updateMyStudentProfile, uploadAvatar} from "./profileApi";
 import {resolvePublicAssetUrl} from "../../shared/utils/assetUtils";
 
-const JLPT_LEVELS = ["N5", "N4", "N3", "N2", "N1"];
+const JLPT_LEVELS = [
+    { level: "N5", label: "N5 • 初級" },
+    { level: "N4", label: "N4 • 初中級" },
+    { level: "N3", label: "N3 • 中級" },
+    { level: "N2", label: "N2 • 準上級" },
+    { level: "N1", label: "N1 • 上級" }
+];
 
 export default function StudentProfilePage() {
     const [loading, setLoading] = useState(true);
@@ -138,6 +144,8 @@ export default function StudentProfilePage() {
             <Box sx={{ backgroundColor: "#F8FAFC", minHeight: "100vh", p: { xs: 2, md: 4 } }}>
                 <PageHeader
                     title="Hồ sơ cá nhân"
+                    subtitle="プロフィール設定"
+                    watermark="精進"
                     breadcrumbs={[
                         {label: "Học viên"},
                         {label: "Hồ sơ"},
@@ -151,7 +159,7 @@ export default function StudentProfilePage() {
                 <Grid container spacing={4} sx={{ maxWidth: '1280px', width: '100%', mx: "auto" }}>
                     {/* Left Card - Avatar & Status */}
                     <Grid size={{ xs: 12, md: 4 }}>
-                        <Card elevation={0} sx={{ borderRadius: 4, border: "1px solid #E5E7EB", textAlign: 'center', p: 4, position: 'sticky', top: 24 }}>
+                        <Card elevation={0} sx={{ borderRadius: 4, border: "1px solid", borderColor: 'divider', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', bgcolor: '#FFFFFF', textAlign: 'center', p: 4, position: 'sticky', top: 24 }}>
                             <AvatarUpload
                                 avatarUrl={resolvePublicAssetUrl(form.avatarUrl) || ""}
                                 onSelect={handleAvatar}
@@ -185,7 +193,7 @@ export default function StudentProfilePage() {
 
                     {/* Right Card - Profile Form */}
                     <Grid size={{ xs: 12, md: 8 }}>
-                        <Card elevation={0} sx={{ borderRadius: 4, border: "1px solid #E5E7EB" }}>
+                        <Card elevation={0} sx={{ borderRadius: 4, border: "1px solid", borderColor: 'divider', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', bgcolor: '#FFFFFF' }}>
                             <CardContent sx={{ p: { xs: 3, md: 5 } }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -253,7 +261,7 @@ export default function StudentProfilePage() {
                                 </Typography>
                                 
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 5 }}>
-                                    {JLPT_LEVELS.map((level) => {
+                                    {JLPT_LEVELS.map(({ level, label }) => {
                                         const isSelected = form.jlptGoal === level;
                                         return (
                                             <Box
@@ -276,7 +284,7 @@ export default function StudentProfilePage() {
                                                     }
                                                 }}
                                             >
-                                                {level}
+                                                {label}
                                             </Box>
                                         );
                                     })}
