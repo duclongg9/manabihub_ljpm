@@ -19,6 +19,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import type { SelectChangeEvent } from '@mui/material';
 import type { CourseCatalogFilters, CourseCategory } from '../types/catalogTypes';
 
@@ -126,9 +127,9 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))',
-        gap: 1.5,
-        alignItems: 'start',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))',
+        gap: 2,
+        alignItems: 'center',
       }}
     >
       <FormControl fullWidth size="small">
@@ -185,20 +186,18 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
           type="number"
           value={maxPrice}
           onChange={(event) => setMaxPrice(event.target.value)}
+          onBlur={applyPrice}
+          onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
           size="small"
           fullWidth
           slotProps={{ htmlInput: { min: 0, step: 10000 } }}
         />
       </Stack>
       {priceError && (
-        <Typography variant="caption" color="error">
+        <Typography variant="caption" color="error" sx={{ gridColumn: 'span 2' }}>
           {priceError}
         </Typography>
       )}
-
-      <Button variant="outlined" onClick={applyPrice}>
-        Áp dụng khoảng giá
-      </Button>
 
       <FormControl fullWidth size="small">
         <InputLabel id="catalog-sort-label">Sắp xếp</InputLabel>
@@ -215,7 +214,16 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
         </Select>
       </FormControl>
 
-      <Button color="inherit" onClick={clearFilters}>
+      <Button
+        variant="text"
+        onClick={clearFilters}
+        startIcon={<RestartAltIcon />}
+        sx={{
+          color: '#475569',
+          fontWeight: 600,
+          '&:hover': { color: '#C41E3A', bgcolor: 'transparent' }
+        }}
+      >
         Xóa bộ lọc
       </Button>
     </Box>
@@ -249,7 +257,18 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
         <Button
           type="submit"
           variant="contained"
-          sx={{ minWidth: 112, whiteSpace: 'nowrap' }}
+          sx={{
+            minWidth: 120,
+            whiteSpace: 'nowrap',
+            bgcolor: '#C41E3A',
+            color: 'white',
+            fontWeight: 700,
+            boxShadow: '0 4px 12px rgba(196, 30, 58, 0.2)',
+            '&:hover': {
+              bgcolor: '#9d182e',
+              boxShadow: '0 6px 16px rgba(196, 30, 58, 0.3)',
+            }
+          }}
         >
           Tìm kiếm
         </Button>
