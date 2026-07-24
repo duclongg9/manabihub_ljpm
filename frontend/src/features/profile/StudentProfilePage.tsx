@@ -15,6 +15,7 @@ export default function StudentProfilePage() {
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
     const [errors, setErrors] = useState({ fullName: "", phoneNumber: "" });
     const [form, setForm] = useState({ avatarUrl: "", fullName: "", email: "", phoneNumber: "", displayName: "", jlptGoal: "" });
+    const [initialForm, setInitialForm] = useState({ avatarUrl: "", fullName: "", email: "", phoneNumber: "", displayName: "", jlptGoal: "" });
 
     useEffect(() => {
         loadProfile();
@@ -23,14 +24,16 @@ export default function StudentProfilePage() {
     async function loadProfile() {
         try {
             const profile = await getMyStudentProfile();
-            setForm({
+            const profileData = {
                 avatarUrl: profile.avatarUrl ?? "",
                 fullName: profile.fullName ?? "",
                 email: profile.email ?? "",
                 phoneNumber: profile.phoneNumber ?? "",
                 displayName: profile.displayName ?? "",
                 jlptGoal: profile.jlptGoal ?? "",
-            });
+            };
+            setForm(profileData);
+            setInitialForm(profileData);
         } catch (error) {
             console.error(error);
             setSnackbar({ open: true, message: "Không thể tải hồ sơ.", severity: "error" });
@@ -38,6 +41,8 @@ export default function StudentProfilePage() {
             setLoading(false);
         }
     }
+
+    const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
     function validate() {
         const newErrors = { fullName: "", phoneNumber: "" };
@@ -112,6 +117,9 @@ export default function StudentProfilePage() {
                 jlptGoal: form.jlptGoal,
                 avatarUrl: serverUrl,
             } as any); // Type cast since updateMyStudentProfile param type might not have avatarUrl yet
+            
+            setInitialForm(prev => ({ ...prev, avatarUrl: serverUrl }));
+            
             setSnackbar({ open: true, message: "Tải ảnh đại diện thành công", severity: "success" });
         } catch (error) {
             console.error("Avatar upload failed:", error);
@@ -140,7 +148,7 @@ export default function StudentProfilePage() {
                     Cập nhật thông tin tài khoản và thiết lập học tập của bạn.
                 </Typography>
 
-                <Grid container spacing={4} sx={{ maxWidth: 1200, mx: "auto" }}>
+                <Grid container spacing={4} sx={{ maxWidth: '1280px', width: '100%', mx: "auto" }}>
                     {/* Left Card - Avatar & Status */}
                     <Grid size={{ xs: 12, md: 4 }}>
                         <Card elevation={0} sx={{ borderRadius: 4, border: "1px solid #E5E7EB", textAlign: 'center', p: 4, position: 'sticky', top: 24 }}>
@@ -148,7 +156,6 @@ export default function StudentProfilePage() {
                                 avatarUrl={resolvePublicAssetUrl(form.avatarUrl) || ""}
                                 onSelect={handleAvatar}
                                 disabled={saving}
-                                label="Đổi ảnh đại diện"
                             />
                             <Typography variant="h6" sx={{ fontWeight: 700, mt: 2 }}>
                                 {form.displayName || form.fullName || "Học viên ManabiHub"}
@@ -163,7 +170,7 @@ export default function StudentProfilePage() {
                                 Mục tiêu hiện tại
                             </Typography>
                             <Box sx={{ display: 'inline-block', px: 2, py: 0.5, bgcolor: '#fee2e2', color: '#C41E3A', borderRadius: 2, fontWeight: 800, fontSize: '1.25rem' }}>
-                                {form.jlptGoal || "Chưa thiết lập"}
+                                {initialForm.jlptGoal || "Chưa thiết lập"}
                             </Box>
                             
                             <Divider sx={{ my: 3 }} />
@@ -172,12 +179,6 @@ export default function StudentProfilePage() {
                                 <Typography variant="caption" color="text.secondary">
                                     Ngày tham gia: 24/07/2026
                                 </Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'success.main' }}>
-                                    <Box component="span" sx={{ fontSize: '0.75rem' }}>🟢</Box>
-                                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                                        Tài khoản đã xác thực
-                                    </Typography>
-                                </Box>
                             </Box>
                         </Card>
                     </Grid>
@@ -186,9 +187,16 @@ export default function StudentProfilePage() {
                     <Grid size={{ xs: 12, md: 8 }}>
                         <Card elevation={0} sx={{ borderRadius: 4, border: "1px solid #E5E7EB" }}>
                             <CardContent sx={{ p: { xs: 3, md: 5 } }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 4 }}>
-                                    Thông tin cá nhân
-                                </Typography>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                        Thông tin cá nhân
+                                    </Typography>
+                                    {isDirty && (
+                                        <Typography variant="caption" sx={{ color: '#C41E3A', fontWeight: 700 }}>
+                                            * BẠN CÓ THAY ĐỔI CHƯA LƯU
+                                        </Typography>
+                                    )}
+                                </Box>
                                 
                                 <Grid container spacing={3}>
                                     <Grid size={{ xs: 12, sm: 6 }}>
@@ -278,8 +286,11 @@ export default function StudentProfilePage() {
                                     <Button
                                         variant="outlined"
                                         size="large"
-                                        disabled={saving}
-                                        onClick={loadProfile}
+                                        disabled={saving || !isDirty}
+                                        onClick={() => {
+                                            setForm(initialForm);
+                                            setErrors({ fullName: "", phoneNumber: "" });
+                                        }}
                                         sx={{
                                             px: 4,
                                             borderRadius: 2,
@@ -295,7 +306,7 @@ export default function StudentProfilePage() {
                                     <Button
                                         variant="contained"
                                         size="large"
-                                        disabled={saving}
+                                        disabled={saving || !isDirty}
                                         startIcon={<SaveOutlinedIcon/>}
                                         sx={{
                                             px: 4,
@@ -303,7 +314,8 @@ export default function StudentProfilePage() {
                                             textTransform: "none",
                                             fontWeight: 600,
                                             bgcolor: '#C41E3A',
-                                            '&:hover': { bgcolor: '#a01830' }
+                                            '&:hover': { bgcolor: '#a01830' },
+                                            '&.Mui-disabled': { bgcolor: 'grey.300', color: 'grey.500' }
                                         }}
                                         onClick={handleSave}
                                     >

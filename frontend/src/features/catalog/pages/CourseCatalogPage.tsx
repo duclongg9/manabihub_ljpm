@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   Box,
-  Container,
   Grid,
   Pagination,
   Stack,
@@ -176,7 +175,7 @@ export const CourseCatalogPage: React.FC = () => {
 
   return (
     <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#FBF9F5', pb: 8 }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 }, flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
+      <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 }, flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
         <Box sx={{ mb: 3 }}>
           <Typography component="h1" variant="h4" sx={{ fontWeight: 800 }}>
             Khóa học tiếng Nhật
@@ -298,7 +297,7 @@ export const CourseCatalogPage: React.FC = () => {
             />
           </Box>
         )}
-      </Container>
+      </Box>
     </Box>
   );
 };

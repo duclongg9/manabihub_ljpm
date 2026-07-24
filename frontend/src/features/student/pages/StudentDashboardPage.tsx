@@ -57,7 +57,7 @@ export const StudentDashboardPage: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto', bgcolor: '#FAF9F6', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1280px', width: '100%', mx: 'auto', bgcolor: '#FAF9F6', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
       {/* Background Watermark */}
       <Typography variant="h1" sx={{ position: 'absolute', top: -20, right: -20, fontSize: '15rem', fontWeight: 900, color: 'rgba(0,0,0,0.025)', userSelect: 'none', pointerEvents: 'none', zIndex: 0, writingMode: 'vertical-rl' }}>
         目標

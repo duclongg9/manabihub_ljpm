@@ -1,84 +1,57 @@
 import CameraAltOutlinedIcon from "@mui/icons-material/CameraAltOutlined";
-import {Avatar, Box, Button,} from "@mui/material";
+import {Avatar, Box, IconButton, Tooltip} from "@mui/material";
 
 interface AvatarUploadProps {
-
     avatarUrl: string;
-
-    onSelect?: (
-        file: File
-    ) => void;
-
+    onSelect?: (file: File) => void;
     disabled?: boolean;
-    label?: string;
 }
 
 export default function AvatarUpload({
-
                                          avatarUrl,
                                          onSelect,
                                          disabled = false,
-                                         label = "Change Avatar",
                                      }: AvatarUploadProps) {
 
-    function handleChange(
-        event: React.ChangeEvent<HTMLInputElement>
-    ) {
-
+    function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
-
-        if (!file) {
-            return;
-        }
-
+        if (!file) return;
         onSelect?.(file);
-
     }
 
     return (
-
-        <Box
-            sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                mb: 4,
-            }}
-        >
-
-            <Avatar
-                src={avatarUrl}
-                sx={{
-                    width: 120,
-                    height: 120,
-                    boxShadow: '0 0 0 4px rgba(220, 38, 38, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                }}
-            />
-
-            <Button
-                component="label"
-                variant="outlined"
-                startIcon={<CameraAltOutlinedIcon/>}
-                disabled={disabled}
-                sx={{
-                    mt: 2,
-                }}
-            >
-
-                {label}
-
-                <input
-                    hidden
-                    type="file"
-                    accept="image/*"
-                    disabled={disabled}
-                    onChange={handleChange}
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mb: 4 }}>
+            <Box sx={{ position: 'relative' }}>
+                <Avatar
+                    src={avatarUrl}
+                    sx={{
+                        width: 96,
+                        height: 96,
+                        boxShadow: '0 0 0 4px rgba(220, 38, 38, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    }}
                 />
-
-            </Button>
-
+                <Tooltip title="Đổi ảnh đại diện">
+                    <IconButton
+                        component="label"
+                        disabled={disabled}
+                        sx={{
+                            position: 'absolute',
+                            bottom: -4,
+                            right: -4,
+                            bgcolor: 'white',
+                            border: '1px solid #E5E7EB',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            '&:hover': { bgcolor: 'grey.50' },
+                            width: 36,
+                            height: 36,
+                            color: 'text.secondary',
+                        }}
+                    >
+                        <CameraAltOutlinedIcon sx={{ fontSize: 20 }} />
+                        <input hidden type="file" accept="image/*" disabled={disabled} onChange={handleChange} />
+                    </IconButton>
+                </Tooltip>
+            </Box>
         </Box>
-
     );
-
 }
