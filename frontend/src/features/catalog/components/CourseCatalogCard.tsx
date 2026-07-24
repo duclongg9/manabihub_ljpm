@@ -49,10 +49,14 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
         borderColor: 'divider',
         borderRadius: '16px',
         overflow: 'hidden',
-        transition: 'transform 160ms ease, box-shadow 160ms ease',
+        transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        cursor: 'pointer',
         '&:hover': {
           transform: 'translateY(-4px)',
-          boxShadow: '0 12px 24px -10px rgba(0,0,0,0.1)',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          '& .card-title': { color: '#C41E3A' },
+          '& .card-cta': { opacity: 1, transform: 'translateX(0)', maxHeight: 20, mt: 0.5 },
+          '& .card-price': { opacity: 0, maxHeight: 0, overflow: 'hidden' }
         },
       }}
     >
@@ -112,6 +116,7 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
             </Typography>
           )}
           <Typography
+            className="card-title"
             component="h3"
             variant="subtitle1"
             sx={{
@@ -121,6 +126,7 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
+              transition: 'color 0.2s',
             }}
           >
             {course.title}
@@ -154,12 +160,22 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
             spacing={1}
             sx={{ mt: 'auto', pt: 2, justifyContent: 'space-between', alignItems: 'flex-end' }}
           >
-            <Typography
-              variant="subtitle1"
-              sx={{ fontWeight: 800, color: course.price === 0 ? 'success.main' : 'text.primary' }}
-            >
-              {formatPrice(course.price, course.currency)}
-            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              <Typography
+                className="card-price"
+                variant="subtitle1"
+                sx={{ fontWeight: 800, color: course.price === 0 ? 'success.main' : 'text.primary', transition: 'all 0.3s', maxHeight: 30 }}
+              >
+                {formatPrice(course.price, course.currency)}
+              </Typography>
+              <Typography 
+                className="card-cta" 
+                variant="caption" 
+                sx={{ color: '#C41E3A', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.5, opacity: 0, transform: 'translateX(-10px)', transition: 'all 0.3s', maxHeight: 0 }}
+              >
+                 Khám phá ngay ➔
+              </Typography>
+            </Box>
             <Stack
               direction="row"
               spacing={0.5}

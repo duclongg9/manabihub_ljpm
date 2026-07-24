@@ -91,6 +91,10 @@ export const router = createBrowserRouter([
         element: <StudentDashboardPage />,
       },
       {
+        path: 'browse',
+        element: <CourseCatalogPage />,
+      },
+      {
         path: 'profile',
         element: <StudentProfilePage />,
       },

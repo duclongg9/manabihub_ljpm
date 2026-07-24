@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-export const DRAWER_WIDTH = 260;
+export const DRAWER_WIDTH = 280;
 export const COLLAPSED_DRAWER_WIDTH = 72;
 
 export interface MenuItem {
@@ -99,7 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <item.icon />
                   </ListItemIcon>
                   <ListItemText
-                    primary={<Typography sx={{ fontWeight: isSelected ? 600 : 500 }}>{item.title}</Typography>}
+                    primary={<Typography sx={{ fontWeight: isSelected ? 600 : 500, fontSize: '0.9rem' }}>{item.title}</Typography>}
                     sx={{
                       opacity: collapsed ? 0 : 1,
                       overflow: 'hidden',

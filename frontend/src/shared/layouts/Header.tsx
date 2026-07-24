@@ -88,9 +88,11 @@ export const Header: React.FC<HeaderProps> = ({
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 2 } }}>
-          <Button component={Link} to="/" color="inherit" sx={{ display: { xs: 'none', md: 'flex' }, textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
-            Trang chủ
-          </Button>
+          {!session && (
+            <Button component={Link} to="/" color="inherit" sx={{ display: { xs: 'none', md: 'flex' }, textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+              Trang chủ
+            </Button>
+          )}
 
           {session && notificationPath ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
