@@ -13,7 +13,7 @@ export const STUDENT_MENU = [
   },
   {
     title: 'Khám phá khóa học',
-    path: ROUTES.PUBLIC.COURSE_BROWSE,
+    path: ROUTES.STUDENT.BROWSE_COURSES,
     icon: LibraryBooksIcon,
   },
   {

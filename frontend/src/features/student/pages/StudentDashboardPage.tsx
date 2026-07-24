@@ -149,7 +149,7 @@ export const StudentDashboardPage: React.FC = () => {
                 </Box>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Chưa có khóa học nào</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Bạn chưa bắt đầu khóa học nào. Hãy khám phá và đăng ký ngay!</Typography>
-                <Button variant="contained" onClick={() => navigate('/courses')} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}>
+                <Button variant="contained" onClick={() => navigate('/student/browse')} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}>
                   Khám phá khóa học
                 </Button>
               </Box>
