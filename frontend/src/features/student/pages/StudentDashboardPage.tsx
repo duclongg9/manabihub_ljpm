@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Grid, Paper, CircularProgress, Alert, Button, Card, Chip } from '@mui/material';
+import { Box, Typography, Grid, Paper, CircularProgress, Alert, Button, Card, Chip, Stack } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useStudentStats } from '../hooks/useStudentStats';
@@ -37,146 +37,166 @@ export const StudentDashboardPage: React.FC = () => {
 
   const statCards = [
     {
-      title: 'Tổng khóa học',
-      value: stats?.totalEnrolledCourses || 0,
-      icon: <MenuBookIcon sx={{ fontSize: 32, color: '#C41E3A' }} />,
-      bgColor: '#fff1f2',
-      borderColor: '#fecdd3',
+      title: 'Chuỗi học tập',
+      value: '3 ngày',
+      subtext: 'Tiếp tục phát huy nhé! 🔥',
+      icon: <LocalFireDepartmentIcon sx={{ fontSize: 32, color: '#C41E3A' }} />,
     },
     {
-      title: 'Đang học',
-      value: stats?.activeCourses || 0,
-      icon: <LocalFireDepartmentIcon sx={{ fontSize: 32, color: '#d97706' }} />,
-      bgColor: '#fef3c7',
-      borderColor: '#fde68a',
+      title: 'Thời gian đã học tuần này',
+      value: '45 phút',
+      subtext: 'Mục tiêu: 2 giờ',
+      icon: <MenuBookIcon sx={{ fontSize: 32, color: '#d97706' }} />,
     },
     {
-      title: 'Đã hoàn thành',
-      value: stats?.completedCourses || 0,
-      icon: <EmojiEventsIcon sx={{ fontSize: 32, color: '#eab308' }} />,
-      bgColor: '#fef9c3',
-      borderColor: '#fef08a',
+      title: 'Từ vựng N3 đã thuộc',
+      value: '25 từ',
+      subtext: 'Bắt đầu ôn tập ngay ➔',
+      icon: <EmojiEventsIcon sx={{ fontSize: 32, color: '#16a34a' }} />,
     },
   ];
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto' }}>
-      
-      {/* Personalized Greeting */}
-      <Box sx={{ mb: 5 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800, color: 'grey.900', mb: 1 }}>
-          Chào buổi sáng, {profile?.displayName || 'bạn'}-san! 👋
-        </Typography>
-        <Typography variant="body1" sx={{ color: 'text.secondary', fontSize: '1.1rem' }}>
-          Hôm nay bạn muốn chinh phục kiến thức nào?
-        </Typography>
-      </Box>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto', bgcolor: '#FAF9F6', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
+      {/* Background Watermark */}
+      <Typography variant="h1" sx={{ position: 'absolute', top: -20, right: -20, fontSize: '15rem', fontWeight: 900, color: 'rgba(0,0,0,0.02)', userSelect: 'none', zIndex: 0, writingMode: 'vertical-rl' }}>
+        目標
+      </Typography>
 
-      {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 6 }}>
-        {statCards.map((card, index) => (
-          <Grid size={{ xs: 12, sm: 4 }} key={index}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 3,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                border: '1px solid',
-                borderColor: card.borderColor,
-                borderRadius: 4,
-                bgcolor: card.bgColor,
-                background: `linear-gradient(135deg, ${card.bgColor} 0%, rgba(255,255,255,0.7) 100%)`,
-                backdropFilter: 'blur(10px)',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                },
-              }}
-            >
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, mb: 0.5 }}>
-                  {card.title}
-                </Typography>
-                <Typography variant="h3" sx={{ fontWeight: 900, color: 'grey.900' }}>
-                  {card.value}
-                </Typography>
-              </Box>
-              <Box
+      <Box sx={{ position: 'relative', zIndex: 1 }}>
+        {/* Personalized Greeting */}
+        <Box sx={{ mb: 5 }}>
+          <Typography variant="h4" sx={{ fontWeight: 800, color: 'grey.900', mb: 1 }}>
+            Chào buổi sáng, {profile?.displayName || 'bạn'}-san! 👋
+          </Typography>
+          <Typography variant="body1" sx={{ color: 'text.secondary', fontSize: '1.1rem' }}>
+            Hôm nay bạn muốn chinh phục kiến thức nào?
+          </Typography>
+        </Box>
+
+        {/* Stats Cards */}
+        <Grid container spacing={3} sx={{ mb: 6 }}>
+          {statCards.map((card, index) => (
+            <Grid size={{ xs: 12, sm: 4 }} key={index}>
+              <Paper
+                elevation={0}
                 sx={{
-                  p: 2,
-                  borderRadius: '50%',
-                  bgcolor: 'rgba(255,255,255,0.6)',
+                  p: 3,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: 'inset 0 2px 4px 0 rgba(0,0,0,0.06)'
+                  justifyContent: 'space-between',
+                  border: '1px solid',
+                  borderColor: 'slate.100',
+                  borderRadius: 4,
+                  bgcolor: 'white',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  },
                 }}
               >
-                {card.icon}
-              </Box>
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
-
-      {/* Main Content Area */}
-      <Grid container spacing={4}>
-        
-        {/* Continue Learning Section */}
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: 'grey.900' }}>
-              Khóa học đang học
-            </Typography>
-            <Button endIcon={<ArrowForwardIcon />} color="inherit" onClick={() => navigate('/student/courses')} sx={{ textTransform: 'none', fontWeight: 600 }}>
-              Xem tất cả
-            </Button>
-          </Box>
-
-          <Card sx={{ borderRadius: 4, p: 3, border: '1px solid', borderColor: 'grey.200', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            {stats?.activeCourses && stats.activeCourses > 0 ? (
-              <Box>
-                 <Typography variant="body1" color="text.secondary">Bạn có khóa học đang diễn ra. Chức năng học tiếp sẽ sớm được cập nhật!</Typography>
-              </Box>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 6 }}>
-                <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
-                  <MenuBookIcon sx={{ fontSize: 32, color: 'grey.400' }} />
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5, mb: 0.5 }}>
+                    {card.title}
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 800, color: 'grey.900', mb: 0.5 }}>
+                    {card.value}
+                  </Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: index === 0 ? '#C41E3A' : 'text.secondary', cursor: index === 2 ? 'pointer' : 'default' }}>
+                    {card.subtext}
+                  </Typography>
                 </Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Chưa có khóa học nào</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Bạn chưa bắt đầu khóa học nào. Hãy khám phá và đăng ký ngay!</Typography>
-                <Button variant="contained" onClick={() => navigate('/student/browse')} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}>
-                  Khám phá khóa học
-                </Button>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: '50%',
+                    bgcolor: 'grey.50',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {card.icon}
+                </Box>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* Main Content Area */}
+        <Grid container spacing={4} sx={{ alignItems: 'stretch' }}>
+          
+          {/* Continue Learning Section */}
+          <Grid size={{ xs: 12, md: 8 }} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 40 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: 'grey.900' }}>
+                Khóa học đang học
+              </Typography>
+              <Button endIcon={<ArrowForwardIcon />} color="inherit" onClick={() => navigate('/student/courses')} sx={{ textTransform: 'none', fontWeight: 600 }}>
+                Xem tất cả
+              </Button>
+            </Box>
+
+            <Card sx={{ borderRadius: 4, p: 4, border: '1px solid', borderColor: 'grey.200', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              {stats?.activeCourses && stats.activeCourses > 0 ? (
+                <Box>
+                  <Typography variant="body1" color="text.secondary">Bạn có khóa học đang diễn ra. Chức năng học tiếp sẽ sớm được cập nhật!</Typography>
+                </Box>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Box sx={{ fontSize: '4rem', mb: 2 }}>🐕</Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: 'grey.900' }}>Hành trình JLPT {profile?.jlptGoal || 'N3'} đang chờ bạn!</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 320, mx: 'auto' }}>Đăng ký khóa học đầu tiên để kích hoạt tiến trình học tập và kết bạn cùng Shiba-kun nhé.</Typography>
+                  <Button variant="contained" onClick={() => navigate('/student/browse')} sx={{ borderRadius: 8, px: 4, py: 1.25, textTransform: 'none', fontWeight: 700, bgcolor: '#C41E3A', '&:hover': { bgcolor: '#a01830' }, boxShadow: '0 4px 14px 0 rgba(196,30,58,0.39)' }}>
+                    Khám phá khóa học ngay
+                  </Button>
+                </Box>
+              )}
+            </Card>
+          </Grid>
+
+          {/* Recommended & Goals Section */}
+          <Grid size={{ xs: 12, md: 4 }} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ mb: 2, minHeight: 40, display: 'flex', alignItems: 'center' }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: 'grey.900' }}>
+                Lộ trình gợi ý
+              </Typography>
+            </Box>
+            <Card sx={{ borderRadius: 4, p: 3, border: '1px solid', borderColor: 'grey.200', boxShadow: 'none', bgcolor: 'white', flexGrow: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ flexGrow: 1, fontWeight: 700 }}>MỤC TIÊU CỦA BẠN</Typography>
+                <Chip label={profile?.jlptGoal || 'JLPT N3'} sx={{ fontWeight: 800, borderRadius: 1.5, bgcolor: '#C41E3A', color: 'white' }} />
               </Box>
-            )}
-          </Card>
-        </Grid>
+              
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'grey.700', mb: 2 }}>
+                Luyện kỹ năng theo lộ trình chuẩn:
+              </Typography>
 
-        {/* Recommended & Goals Section */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: 'grey.900', mb: 3 }}>
-            Lộ trình gợi ý
-          </Typography>
-          <Card sx={{ borderRadius: 4, p: 3, border: '1px solid', borderColor: 'grey.200', boxShadow: 'none', bgcolor: 'grey.50' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ flexGrow: 1, fontWeight: 600 }}>MỤC TIÊU CỦA BẠN</Typography>
-              <Chip label={profile?.jlptGoal || 'Chưa thiết lập'} color="error" size="small" sx={{ fontWeight: 700, borderRadius: 1 }} />
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, lineHeight: 1.6 }}>
-              Dựa trên mục tiêu JLPT của bạn, chúng tôi sẽ sớm ra mắt hệ thống gợi ý lộ trình học tập cá nhân hóa.
-            </Typography>
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'white', border: '1px dashed', borderColor: 'grey.300', textAlign: 'center' }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: 'grey.500' }}>Sắp ra mắt</Typography>
-            </Box>
-          </Card>
+              <Stack spacing={1.5}>
+                {['Kanji & Từ vựng', 'Ngữ pháp', 'Đọc hiểu & Nghe'].map((skill, i) => (
+                  <Box
+                    key={i}
+                    onClick={() => navigate('/student/browse')}
+                    sx={{
+                      p: 2, borderRadius: 3, border: '1px solid', borderColor: 'grey.200',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      cursor: 'pointer', transition: 'all 0.2s',
+                      '&:hover': { borderColor: '#C41E3A', bgcolor: '#fff1f2', transform: 'translateX(4px)' }
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'grey.800' }}>
+                      Luyện {skill} {profile?.jlptGoal || 'N3'}
+                    </Typography>
+                    <ArrowForwardIcon sx={{ fontSize: 16, color: 'grey.400' }} />
+                  </Box>
+                ))}
+              </Stack>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
-
+      </Box>
     </Box>
   );
 };
