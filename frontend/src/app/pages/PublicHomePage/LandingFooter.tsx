@@ -7,21 +7,21 @@ import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 
-const FooterLink: React.FC<{ to: string; children: React.ReactNode; disabled?: boolean }> = ({ to, children, disabled }) => (
+const FooterLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => (
   <Typography
     variant="body2"
-    component={disabled ? 'span' : Link}
-    to={disabled ? undefined : to}
+    component={Link}
+    to={to}
     sx={{
-      color: disabled ? '#4a5568' : '#94a3b8',
+      color: '#94a3b8',
       textDecoration: 'none',
       display: 'inline-flex',
       alignItems: 'center',
       gap: 0.5,
       transition: 'all 0.3s ease',
       position: 'relative',
-      cursor: disabled ? 'default' : 'pointer',
-      '&::after': disabled ? {} : {
+      cursor: 'pointer',
+      '&::after': {
         content: '""',
         position: 'absolute',
         width: '0',
@@ -31,7 +31,7 @@ const FooterLink: React.FC<{ to: string; children: React.ReactNode; disabled?: b
         backgroundColor: '#C41E3A',
         transition: 'width 0.3s ease',
       },
-      '&:hover': disabled ? {} : {
+      '&:hover': {
         color: '#ffffff',
         transform: 'translateX(4px)',
         '&::after': {
@@ -41,22 +41,6 @@ const FooterLink: React.FC<{ to: string; children: React.ReactNode; disabled?: b
     }}
   >
     {children}
-    {disabled && (
-      <Box
-        component="span"
-        sx={{
-          fontSize: '0.65rem',
-          bgcolor: 'rgba(196, 30, 58, 0.15)',
-          color: '#C41E3A',
-          px: 0.8, py: 0.2,
-          borderRadius: '4px',
-          fontWeight: 600,
-          ml: 0.5,
-        }}
-      >
-        Sắp ra mắt
-      </Box>
-    )}
   </Typography>
 );
 
@@ -131,9 +115,9 @@ export const LandingFooter: React.FC = () => {
               Hỗ Trợ
             </Typography>
             <Stack spacing={2}>
-              <FooterLink to="#" disabled>Điều khoản sử dụng</FooterLink>
-              <FooterLink to="#" disabled>Chính sách bảo mật</FooterLink>
-              <FooterLink to="#" disabled>Câu hỏi thường gặp</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.HOME}>Điều khoản sử dụng</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.HOME}>Chính sách bảo mật</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.HOME}>Câu hỏi thường gặp</FooterLink>
             </Stack>
           </Grid>
 
@@ -144,7 +128,7 @@ export const LandingFooter: React.FC = () => {
             </Typography>
             <Stack spacing={2}>
               <FooterLink to={ROUTES.TEACHER.KYC}>Trở thành giảng viên</FooterLink>
-              <FooterLink to="#" disabled>Quy định giảng viên</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.HOME}>Quy định giảng viên</FooterLink>
               <FooterLink to={ROUTES.TEACHER.KYC}>Chia sẻ doanh thu (lên đến 97%)</FooterLink>
             </Stack>
           </Grid>

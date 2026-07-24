@@ -43,8 +43,8 @@ export const FloatingMascot: React.FC = () => {
         onClick={() => { setIsMinimized(false); setHasInteracted(true); }}
         sx={{
           position: 'fixed',
-          bottom: { xs: 16, md: 24 },
-          right: { xs: 16, md: 24 },
+          bottom: { xs: 16, md: 32 },
+          left: { xs: 16, md: 24 },
           zIndex: 9999,
           cursor: 'pointer',
           width: 48, height: 48,
@@ -73,12 +73,11 @@ export const FloatingMascot: React.FC = () => {
     <Box
       sx={{
         position: 'fixed',
-        bottom: { xs: 16, md: 24 },
-        right: { xs: 16, md: 24 },
+        bottom: { xs: 16, md: 32 },
+        left: { xs: 16, md: 24 },
         zIndex: 9999,
         display: 'flex',
         alignItems: 'flex-end',
-        flexDirection: 'row-reverse',
         gap: 1.5,
       }}
     >
@@ -125,7 +124,7 @@ export const FloatingMascot: React.FC = () => {
           sx={{
             bgcolor: '#ffffff',
             borderRadius: '14px',
-            borderBottomRightRadius: '4px',
+            borderBottomLeftRadius: '4px',
             boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
             border: '1.5px solid #FFF0F0',
             p: 1.5,
@@ -138,7 +137,7 @@ export const FloatingMascot: React.FC = () => {
             onClick={() => setIsMinimized(true)}
             sx={{
               position: 'absolute',
-              top: 4, left: 4,
+              top: 4, right: 4,
               width: 18, height: 18,
               borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center',

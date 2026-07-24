@@ -46,7 +46,7 @@ export const BecomeTeacherBanner: React.FC = () => {
 
       <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
         {/* Japanese accent text */}
-        <Typography sx={{ fontFamily: '"Noto Sans JP", sans-serif', color: 'rgba(196, 30, 58, 0.6)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.15em', mb: 2 }}>
+        <Typography sx={{ fontFamily: '"Noto Sans JP", sans-serif', color: '#F59E0B', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.15em', mb: 2 }}>
           先生になろう — Trở Thành Sensei
         </Typography>
 
@@ -56,7 +56,7 @@ export const BecomeTeacherBanner: React.FC = () => {
 
         <Typography variant="h6" sx={{ color: '#b0bdd0', fontWeight: 400, mb: 1, lineHeight: 1.6, px: { md: 4 } }}>
           {'Chia sẻ kiến thức của bạn và tạo thu nhập thụ động. Nền tảng chia sẻ lợi nhuận hấp dẫn lên đến '}
-          <Box component="span" sx={{ color: '#E8432A', fontWeight: 700, fontSize: '1.3em' }}>97%</Box>
+          <Box component="span" sx={{ color: '#F59E0B', fontWeight: 700, fontSize: '1.3em', textShadow: '0 2px 10px rgba(245, 158, 11, 0.3)' }}>97%</Box>
           {' cho mỗi khóa học được bán ra.'}
         </Typography>
         <Typography variant="body1" sx={{ color: '#7a8ba8', fontStyle: 'italic', mb: 5 }}>

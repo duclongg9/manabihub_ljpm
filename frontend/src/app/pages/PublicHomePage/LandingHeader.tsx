@@ -119,6 +119,9 @@ export const LandingHeader: React.FC = () => {
             px: 2, py: 0.5,
             border: '1.5px solid #e8e0d8',
             transition: 'all 0.3s ease',
+            '&:hover': {
+              borderColor: '#fca5a5',
+            },
             '&:focus-within': {
               borderColor: '#C41E3A',
               bgcolor: '#ffffff',
@@ -137,6 +140,7 @@ export const LandingHeader: React.FC = () => {
               sx={{
                 p: '8px',
                 color: '#94a3b8',
+                '.MuiBox-root:focus-within &': { color: '#C41E3A' },
                 '&:hover': { color: '#C41E3A' }
               }}
               aria-label="search"

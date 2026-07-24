@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Container, Typography, Button, Paper, Divider } from '@mui/material';
+import { Box, Container, Typography, Button, Paper, Divider, Grid } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
@@ -114,21 +114,13 @@ export const TopInstructorsSection: React.FC = () => {
           </Box>
 
           {/* Right Side: Instructor Cards */}
-          <Box
-            sx={{
-              width: { xs: '100%', md: '65%' },
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 3,
-              justifyContent: 'center',
-              alignContent: 'center',
-            }}
-          >
+          <Box sx={{ width: { xs: '100%', md: '65%' } }}>
+            <Grid container spacing={3}>
             {INSTRUCTORS.map((instructor, index) => (
-              <Box
+              <Grid
+                size={{ xs: 12, sm: 6 }}
                 key={instructor.id}
                 sx={{
-                  width: { xs: '100%', sm: 'calc(50% - 12px)' },
                   opacity: isVisible ? 1 : 0,
                   transform: isVisible ? 'translateY(0)' : 'translateY(50px)',
                   transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.2}s`,
@@ -249,8 +241,9 @@ export const TopInstructorsSection: React.FC = () => {
                     </Box>
                   </Box>
                 </Paper>
-              </Box>
+              </Grid>
             ))}
+            </Grid>
           </Box>
         </Box>
       </Container>
