@@ -7,7 +7,6 @@ import {
   Stack,
   Typography,
   Chip,
-  Skeleton,
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { useSearchParams } from 'react-router-dom';
