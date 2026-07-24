@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
 
-// Japanese Seigaiha pattern as inline SVG data URI
-const SEIGAIHA_PATTERN = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%23ffffff' fill-opacity='0.04' d='M120 120c-33.137 0-60-26.863-60-60 0-33.137 26.863-60 60-60 33.137 0 60 26.863 60 60 0 33.137-26.863 60-60 60zm-60-60c-33.137 0-60-26.863-60-60 0-33.137 26.863-60 60-60 33.137 0 60 26.863 60 60 0 33.137-26.863 60-60 60zm0 120c-33.137 0-60-26.863-60-60 0-33.137 26.863-60 60-60 33.137 0 60 26.863 60 60 0 33.137-26.863 60-60 60zM0 60c-33.137 0-60-26.863-60-60 0-33.137 26.863-60 60-60 33.137 0 60 26.863 60 60 0 33.137-26.863 60-60 60z'/%3E%3C/svg%3E")`;
+// Japanese wave pattern as inline SVG data URI
+const WAVE_PATTERN = `url("data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21.184 20c.357-.13.72-.264 1.088-.402l1.768-.661C33.64 15.347 39.647 14 50 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072h6.225c-2.51-.73-5.139-1.691-8.233-2.928C65.888 13.278 60.562 12 50 12c-10.626 0-16.855 1.397-26.66 5.063l-1.767.662c-2.475.923-4.66 1.674-6.724 2.275h6.335zm0-20C13.258 2.892 8.077 4 0 4V2c5.744 0 9.951-.574 14.85-2h6.334zM77.38 0C85.239 2.966 90.502 4 100 4V2c-6.842 0-11.386-.542-16.396-2h-6.225zM0 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072H21.18c-.358-.13-.72-.264-1.088-.402l-1.768-.661C9.73 15.347 3.723 14 0 14v0z' fill='%23ffffff' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E")`;
 
 export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ export const HeroSection: React.FC = () => {
         sx={{
           position: 'absolute', top: 0, left: 0,
           width: '100%', height: '100%',
-          backgroundImage: SEIGAIHA_PATTERN,
+          backgroundImage: WAVE_PATTERN,
           backgroundRepeat: 'repeat',
           zIndex: 0,
         }}
@@ -167,35 +167,6 @@ export const HeroSection: React.FC = () => {
                 >
                   Khám phá khóa học
                 </Button>
-
-                {/* Hanko Stamp */}
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 44,
-                    height: 44,
-                    bgcolor: 'transparent',
-                    border: '3px solid #E8432A',
-                    borderRadius: '4px',
-                    transform: 'rotate(-8deg)',
-                    mt: { xs: 0, md: 0 },
-                    ml: { xs: 0, md: -1 },
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontFamily: '"Noto Serif JP", serif',
-                      fontWeight: 900,
-                      color: '#E8432A',
-                      fontSize: '1.2rem',
-                      lineHeight: 1,
-                    }}
-                  >
-                    合格
-                  </Typography>
-                </Box>
 
                 <Button
                   variant="outlined"

@@ -161,17 +161,16 @@ export const TopInstructorsSection: React.FC = () => {
                       <Box
                         sx={{
                           position: 'absolute',
-                          bottom: -6, right: -12,
-                          bgcolor: '#C41E3A',
-                          color: '#fff',
-                          px: 1, py: 0.2,
-                          borderRadius: '12px',
+                          bottom: 0, right: -4,
+                          width: 20, height: 20,
+                          bgcolor: '#10b981',
+                          borderRadius: '50%',
                           border: '2px solid #fff',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          boxShadow: '0 2px 6px rgba(196, 30, 58, 0.3)',
+                          boxShadow: '0 2px 4px rgba(16, 185, 129, 0.4)',
                         }}
                       >
-                        <Typography sx={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.05em' }}>認定</Typography>
+                        <Typography sx={{ color: '#fff', fontSize: '0.6rem', fontWeight: 'bold' }}>✓</Typography>
                       </Box>
                     </Box>
 
@@ -185,33 +184,24 @@ export const TopInstructorsSection: React.FC = () => {
                     </Box>
                   </Box>
 
-                  {/* Manga Quote Bubble */}
+                  {/* Japanese Quote Bubble */}
                   <Box
                     sx={{
-                      bgcolor: '#ffffff',
-                      borderRadius: '16px',
-                      p: 2.5,
+                      bgcolor: '#F8FAFC',
+                      borderRadius: '12px',
+                      p: 2,
                       mb: 3,
                       position: 'relative',
-                      border: '2px solid #1A1A2E',
-                      boxShadow: '4px 4px 0px rgba(26,26,46,0.1)',
+                      border: '1px solid #e2e8f0',
                       '&::before': {
                         content: '""',
                         position: 'absolute',
-                        top: -12, left: 32,
-                        width: 0, height: 0,
-                        borderLeft: '8px solid transparent',
-                        borderRight: '8px solid transparent',
-                        borderBottom: '12px solid #1A1A2E',
-                      },
-                      '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        top: -8, left: 33,
-                        width: 0, height: 0,
-                        borderLeft: '7px solid transparent',
-                        borderRight: '7px solid transparent',
-                        borderBottom: '10px solid #ffffff',
+                        top: -6, left: 24,
+                        width: 12, height: 12,
+                        bgcolor: '#F8FAFC',
+                        borderTop: '1px solid #e2e8f0',
+                        borderLeft: '1px solid #e2e8f0',
+                        transform: 'rotate(45deg)',
                       }
                     }}
                   >
