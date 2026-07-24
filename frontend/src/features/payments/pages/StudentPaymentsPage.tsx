@@ -60,14 +60,14 @@ export const StudentPaymentsPage: React.FC = () => {
           </Box>
 
           <TableContainer>
-            <Table sx={{ minWidth: 650 }}>
+            <Table sx={{ minWidth: 650, tableLayout: 'fixed' }}>
               <TableHead sx={{ bgcolor: 'grey.50' }}>
                 <TableRow>
-                  <TableCell sx={{ width: '20%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Mã đơn hàng</TableCell>
-                  <TableCell sx={{ width: '35%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Khóa học</TableCell>
+                  <TableCell sx={{ width: '15%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Mã đơn hàng</TableCell>
+                  <TableCell sx={{ width: '40%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Khóa học</TableCell>
                   <TableCell sx={{ width: '20%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Ngày thanh toán</TableCell>
-                  <TableCell align="right" sx={{ width: '15%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Số tiền</TableCell>
-                  <TableCell align="center" sx={{ width: '10%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Trạng thái</TableCell>
+                  <TableCell align="right" sx={{ width: '12%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Số tiền</TableCell>
+                  <TableCell align="center" sx={{ width: '13%', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem' }}>Trạng thái</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
