@@ -8,18 +8,16 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
-import { getAsset } from '../../../shared/utils/assets';
 
 /* ─── JLPT Levels with vivid progression colors ─── */
 const JLPT_LEVELS = [
-  { id: 'jlptLevel=N5', name: 'N5', kanji: '初', subtitle: '初級', color: '#4CAF50', gradient: 'linear-gradient(135deg, #4CAF50, #8BC34A)', label: 'Sơ cấp', emoji: '🌱' },
-  { id: 'jlptLevel=N4', name: 'N4', kanji: '基', subtitle: '初中級', color: '#8BC34A', gradient: 'linear-gradient(135deg, #8BC34A, #CDDC39)', label: 'Sơ-Trung cấp', emoji: '🌿' },
-  { id: 'jlptLevel=N3', name: 'N3', kanji: '中', subtitle: '中級', color: '#FFB300', gradient: 'linear-gradient(135deg, #FFB300, #FF9800)', label: 'Trung cấp', emoji: '⚡' },
-  { id: 'jlptLevel=N2', name: 'N2', kanji: '上', subtitle: '上級', color: '#F57C00', gradient: 'linear-gradient(135deg, #FF9800, #F57C00)', label: 'Cao cấp', emoji: '🔥' },
-  { id: 'jlptLevel=N1', name: 'N1', kanji: '極', subtitle: '最上級', color: '#E53935', gradient: 'linear-gradient(135deg, #F57C00, #E53935)', label: 'Thành thạo', emoji: '👑' },
+  { id: 'jlptLevel=N5', name: 'N5', kanji: '初級', subtitle: '初級', color: '#4CAF50', gradient: 'linear-gradient(135deg, #4CAF50, #8BC34A)', label: 'Sơ cấp' },
+  { id: 'jlptLevel=N4', name: 'N4', kanji: '初中級', subtitle: '初中級', color: '#8BC34A', gradient: 'linear-gradient(135deg, #8BC34A, #CDDC39)', label: 'Sơ-Trung cấp' },
+  { id: 'jlptLevel=N3', name: 'N3', kanji: '中級', subtitle: '中級', color: '#C41E3A', gradient: 'linear-gradient(135deg, #C41E3A, #E8432A)', label: 'Trung cấp' },
+  { id: 'jlptLevel=N2', name: 'N2', kanji: '上級', subtitle: '上級', color: '#F57C00', gradient: 'linear-gradient(135deg, #FF9800, #F57C00)', label: 'Cao cấp' },
+  { id: 'jlptLevel=N1', name: 'N1', kanji: '最上級', subtitle: '最上級', color: '#D4A017', gradient: 'linear-gradient(135deg, #D4A017, #F3E5AB)', label: 'Thành thạo' },
 ];
 
 /* ─── Skill Categories with unique color accents ─── */
@@ -192,8 +190,18 @@ export const TopCategories: React.FC = () => {
                     {level.subtitle}
                   </Typography>
 
-                  {/* Emoji */}
-                  <Typography sx={{ fontSize: '1.8rem', mb: 1.5, position: 'relative', zIndex: 2 }}>{level.emoji}</Typography>
+                  {/* Kamon Badge */}
+                  <Box sx={{
+                    width: 48, height: 48, borderRadius: '50%',
+                    bgcolor: `${level.color}15`, border: `2px solid ${level.color}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    mb: 2, position: 'relative', zIndex: 2, mx: 'auto',
+                    boxShadow: `0 0 12px ${level.color}30`
+                  }}>
+                    <Typography sx={{ color: level.color, fontWeight: 800, fontSize: '0.9rem', fontFamily: '"Noto Sans JP", sans-serif' }}>
+                      {level.kanji}
+                    </Typography>
+                  </Box>
 
                   {/* Level name with color */}
                   <Typography
@@ -240,10 +248,12 @@ export const TopCategories: React.FC = () => {
                   onClick={() => navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?${category.id}`)}
                   sx={{
                     p: 3,
+                    pt: 4,
                     textAlign: 'center',
-                    borderRadius: '16px',
+                    borderRadius: '8px',
                     border: '1px solid #e8e0d8',
-                    bgcolor: '#FFFFFF',
+                    borderTop: '4px solid #C41E3A',
+                    bgcolor: '#FFFDF9',
                     cursor: 'pointer',
                     transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                     position: 'relative',
@@ -253,8 +263,20 @@ export const TopCategories: React.FC = () => {
                     transitionDelay: `${0.6 + index * 0.1}s`,
                     '&:hover': {
                       transform: 'translateY(-6px)',
-                      borderColor: '#C41E3A',
-                      boxShadow: '0 12px 28px rgba(196, 30, 58, 0.08)',
+                      borderColor: 'rgba(196, 30, 58, 0.5)',
+                      boxShadow: '0 12px 28px rgba(196, 30, 58, 0.15)',
+                    },
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      top: '8px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      bgcolor: '#FBF9F5',
+                      border: '1px solid #e8e0d8'
                     },
                     '&:hover .category-kanji': {
                       color: '#C41E3A',
@@ -293,90 +315,57 @@ export const TopCategories: React.FC = () => {
         </Box>
 
         {/* ══════════ SECTION 3: INTRODUCTION BLOCK ══════════ */}
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 0 }}>
-
-          {/* LEFT: Image */}
-          <Box
-            sx={{
-              width: { xs: '100%', md: '578.5px' },
-              height: { xs: 'auto', md: '583.67px' },
-              opacity: isVisible ? 1 : 0,
-              transform: isVisible ? 'translateX(0)' : 'translateX(-40px)',
-              transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s',
-            }}
-          >
-            <Box
-              component="img"
-              src={getAsset('hero.png')}
-              alt="ManabiHub"
-              sx={{
-                width: '100%', height: '100%',
-                objectFit: 'cover',
-                display: 'block',
-                borderRadius: '12px',
-              }}
-            />
-          </Box>
-
-          {/* RIGHT: Content */}
-          <Box
-            sx={{
-              width: { xs: '100%', md: '578.5px' },
-              height: { xs: 'auto', md: '583.67px' },
-              pl: { xs: 0, md: 6 },
-              pt: { xs: 5, md: 0 },
-              display: 'flex', flexDirection: 'column', justifyContent: 'center',
-              opacity: isVisible ? 1 : 0,
-              transform: isVisible ? 'translateX(0)' : 'translateX(40px)',
-              transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ pb: 8 }}>
+          <Box sx={{ width: '100%', opacity: isVisible ? 1 : 0, transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s', textAlign: 'center', mb: 6 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5 }}>
               <Box sx={{ width: 4, height: 20, bgcolor: '#C41E3A', borderRadius: 2, mr: 1.5 }} />
               <Typography variant="overline" sx={{ color: '#C41E3A', fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.85rem' }}>
-                GIỚI THIỆU
+                TẠI SAO CHỌN CHÚNG TÔI
               </Typography>
             </Box>
-
-            <Typography variant="h2" sx={{ fontWeight: 800, color: '#1A1A2E', mb: 3, letterSpacing: '-0.02em', lineHeight: 1.3, fontSize: { xs: '2rem', md: '2.5rem', lg: '2.8rem' } }}>
-              Chào Mừng Đến Với ManabiHub
+            <Typography variant="h2" sx={{ fontWeight: 800, color: '#1A1A2E', mb: 2, letterSpacing: '-0.02em', lineHeight: 1.3, fontSize: { xs: '2rem', md: '2.5rem' } }}>
+              Nền Tảng Tiếng Nhật Thế Hệ Mới
             </Typography>
-
-            <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.9, mb: 2.5 }}>
-              Bạn muốn nâng cao kiến thức và kỹ năng của mình? Bạn muốn học những khóa học chất lượng
-              từ các giảng viên tiếng Nhật? Hãy khám phá các khóa học đang có trên ManabiHub.
-            </Typography>
-
-            <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.9, mb: 4.5 }}>
-              Chúng tôi là một nền tảng học tiếng Nhật trực tuyến cung cấp một loạt các khóa học
-              đa dạng và chất lượng, từ JLPT N1-N5. Với đội ngũ giảng viên giàu kinh nghiệm và kiến thức
-              chuyên môn sâu rộng, chúng tôi cam kết mang đến cho bạn những khóa học chất lượng cao
-              và mang tính thực tiễn.
-            </Typography>
-
-            {/* Checklist */}
-            <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-              <Box
-                component="img"
-                src={getAsset('course2.png')}
-                sx={{ width: '160px', height: '110px', objectFit: 'cover', borderRadius: 3 }}
-              />
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {[
-                  'Tìm khóa học phù hợp với trình độ và mục tiêu',
-                  'Học theo nội dung và lộ trình của từng khóa học',
-                  'Tìm người hướng dẫn phù hợp cho bạn'
-                ].map((item, i) => (
-                  <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                    <CheckCircleIcon sx={{ color: '#C41E3A', mr: 1.5, fontSize: 18, mt: 0.3 }} />
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#1A1A2E', fontSize: '0.9rem' }}>
-                      {item}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
           </Box>
+
+          <Grid container spacing={4} sx={{ 
+            opacity: isVisible ? 1 : 0, 
+            transform: isVisible ? 'translateY(0)' : 'translateY(40px)', 
+            transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s' 
+          }}>
+            {/* Card 1 */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Paper elevation={0} sx={{ p: 4, borderRadius: '24px', height: '100%', bgcolor: '#ffffff', border: '1px solid #f1f5f9', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-8px)', boxShadow: '0 20px 40px rgba(0,0,0,0.04)', borderColor: '#e2e8f0' } }}>
+                <Box sx={{ width: 64, height: 64, borderRadius: '20px', bgcolor: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+                  <Typography sx={{ fontSize: '2rem' }}>🎯</Typography>
+                </Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: '#1A1A2E', mb: 2 }}>Lộ trình chuẩn JLPT</Typography>
+                <Typography sx={{ color: '#64748b', lineHeight: 1.7 }}>Hệ thống bài giảng được thiết kế khoa học, đi từ cơ bản N5 đến nâng cao N1, được kiểm duyệt bởi các chuyên gia.</Typography>
+              </Paper>
+            </Grid>
+
+            {/* Card 2 */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Paper elevation={0} sx={{ p: 4, borderRadius: '24px', height: '100%', bgcolor: '#ffffff', border: '1px solid #f1f5f9', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-8px)', boxShadow: '0 20px 40px rgba(0,0,0,0.04)', borderColor: '#e2e8f0' } }}>
+                <Box sx={{ width: 64, height: 64, borderRadius: '20px', bgcolor: '#E0E7FF', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+                  <Typography sx={{ fontSize: '2rem' }}>🤖</Typography>
+                </Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: '#1A1A2E', mb: 2 }}>AI Sensei 24/7</Typography>
+                <Typography sx={{ color: '#64748b', lineHeight: 1.7 }}>Công nghệ trợ lý ảo thông minh giúp giải đáp ngữ pháp, từ vựng và chữa bài ngay lập tức, học không giới hạn.</Typography>
+              </Paper>
+            </Grid>
+
+            {/* Card 3 */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Paper elevation={0} sx={{ p: 4, borderRadius: '24px', height: '100%', bgcolor: '#ffffff', border: '1px solid #f1f5f9', transition: 'all 0.3s', '&:hover': { transform: 'translateY(-8px)', boxShadow: '0 20px 40px rgba(0,0,0,0.04)', borderColor: '#e2e8f0' } }}>
+                <Box sx={{ width: 64, height: 64, borderRadius: '20px', bgcolor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+                  <Typography sx={{ fontSize: '2rem' }}>📜</Typography>
+                </Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: '#1A1A2E', mb: 2 }}>Thực hành & Feedback</Typography>
+                <Typography sx={{ color: '#64748b', lineHeight: 1.7 }}>Hệ thống bài tập phong phú, flashcard thông minh và bài viết luận được đánh giá chi tiết bởi giáo viên thật.</Typography>
+              </Paper>
+            </Grid>
+          </Grid>
         </Box>
       </Container>
     </Box>

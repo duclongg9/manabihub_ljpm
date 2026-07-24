@@ -7,8 +7,8 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import QuizIcon from '@mui/icons-material/Quiz';
 import StyleIcon from '@mui/icons-material/Style';
 import EditNoteIcon from '@mui/icons-material/EditNote';
-import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
-import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
+import KeyboardDoubleArrowUpIcon from '@mui/icons-material/KeyboardDoubleArrowUp';
+import KeyboardDoubleArrowDownIcon from '@mui/icons-material/KeyboardDoubleArrowDown';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import type { PublicModule, PublicLessonBlock } from '../types/courseDetailTypes';
@@ -60,21 +60,24 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4">
+        <div className="text-sm font-semibold text-slate-500">
+          {modules.length} phần • {modules.reduce((acc, m) => acc + m.blocks.length, 0)} bài học
+        </div>
         {isAllExpanded ? (
           <button
             onClick={handleCollapseAll}
-            className="flex items-center text-sm font-semibold text-red-600 hover:text-red-800 transition-colors"
+            className="flex items-center text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors px-3 py-1.5 rounded-lg"
           >
-            <UnfoldLessIcon fontSize="small" className="mr-1" />
+            <KeyboardDoubleArrowUpIcon fontSize="small" className="mr-1" />
             Thu gọn tất cả
           </button>
         ) : (
           <button
             onClick={handleExpandAll}
-            className="flex items-center text-sm font-semibold text-red-600 hover:text-red-800 transition-colors"
+            className="flex items-center text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors px-3 py-1.5 rounded-lg"
           >
-            <UnfoldMoreIcon fontSize="small" className="mr-1" />
+            <KeyboardDoubleArrowDownIcon fontSize="small" className="mr-1" />
             Mở rộng tất cả
           </button>
         )}
