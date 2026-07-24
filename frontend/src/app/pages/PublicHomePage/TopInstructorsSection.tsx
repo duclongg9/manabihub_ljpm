@@ -3,7 +3,6 @@ import { Box, Container, Typography, Button, Paper, Divider, Grid } from '@mui/m
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
-import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
