@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
-import OndemandVideoIcon from '@mui/icons-material/OndemandVideo';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import { PlayCircle, Target, BookOpen, Infinity as InfinityIcon } from 'lucide-react';
 import { Dialog, DialogContent, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
@@ -34,7 +30,7 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
 
   return (
     <>
-      <div className="bg-white text-slate-800 shadow-2xl rounded-2xl overflow-hidden border border-slate-200/60 backdrop-blur-xl transform transition-all duration-300 hover:shadow-indigo-500/10">
+      <div className="bg-white text-slate-800 shadow-2xl rounded-2xl overflow-hidden border border-slate-200/60 backdrop-blur-xl transform transition-all duration-300 hover:shadow-slate-500/10">
         {/* Thumbnail Image */}
         <div
           className="relative aspect-video bg-slate-100 flex items-center justify-center p-1 cursor-pointer group"
@@ -50,7 +46,7 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
           )}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
             <div className="bg-slate-900/60 p-3 rounded-full backdrop-blur-sm">
-              <PlayCircleIcon className="text-white shadow-lg" sx={{ fontSize: 48 }} />
+              <PlayCircle className="w-12 h-12 text-white shadow-lg" />
             </div>
             <span className="text-white font-bold mt-3 drop-shadow-md bg-slate-900/60 px-3 py-1 rounded-full text-sm backdrop-blur-sm">Xem trước khóa học</span>
           </div>
@@ -96,24 +92,24 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
           <ul className="space-y-3 text-slate-600">
             {totalVideoHours > 0 && (
               <li className="flex items-center group">
-                <OndemandVideoIcon fontSize="small" className="mr-3 text-indigo-400 group-hover:text-indigo-600 transition-colors" />
+                <PlayCircle className="w-4 h-4 mr-3 text-slate-500 group-hover:text-red-600 transition-colors" />
                 <span className="group-hover:text-slate-900 transition-colors">{totalVideoHours} giờ video theo yêu cầu</span>
               </li>
             )}
             {totalReadingBlocks > 0 && (
               <li className="flex items-center group">
-                <InsertDriveFileIcon fontSize="small" className="mr-3 text-indigo-400 group-hover:text-indigo-600 transition-colors" />
+                <BookOpen className="w-4 h-4 mr-3 text-slate-500 group-hover:text-red-600 transition-colors" />
                 <span className="group-hover:text-slate-900 transition-colors">{totalReadingBlocks} bài đọc và tài liệu</span>
               </li>
             )}
             {hasQuiz && (
               <li className="flex items-center group">
-                <EmojiEventsIcon fontSize="small" className="mr-3 text-indigo-400 group-hover:text-indigo-600 transition-colors" />
+                <Target className="w-4 h-4 mr-3 text-slate-500 group-hover:text-red-600 transition-colors" />
                 <span className="group-hover:text-slate-900 transition-colors">Bài tập thực hành & Trắc nghiệm</span>
               </li>
             )}
             <li className="flex items-center group">
-              <AllInclusiveIcon fontSize="small" className="mr-3 text-indigo-400 group-hover:text-indigo-600 transition-colors" />
+              <InfinityIcon className="w-4 h-4 mr-3 text-slate-500 group-hover:text-red-600 transition-colors" />
               <span className="group-hover:text-slate-900 transition-colors">Quyền truy cập trọn đời</span>
             </li>
           </ul>

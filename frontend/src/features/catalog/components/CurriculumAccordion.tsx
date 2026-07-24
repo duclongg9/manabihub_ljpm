@@ -5,6 +5,7 @@ import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import type { PublicModule, PublicLessonBlock } from '../types/courseDetailTypes';
+import { ChevronsUp, ChevronsDown, FileText, PlayCircle, Clock } from 'lucide-react';
 
 interface CurriculumAccordionProps {
   modules: PublicModule[];
@@ -37,15 +38,15 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
   const getBlockIcon = (type: PublicLessonBlock['type']) => {
     switch (type) {
       case 'VIDEO':
-        return <span className="text-base mr-3" title="Video">🎥</span>;
+        return <PlayCircle className="w-4 h-4 text-slate-400 mr-3" />;
       case 'TEXT':
       case 'FLASHCARD':
       case 'WRITING':
-        return <span className="text-base mr-3" title="Tài liệu">📄</span>;
+        return <FileText className="w-4 h-4 text-slate-400 mr-3" />;
       case 'QUIZ':
-        return <span className="text-base mr-3" title="Trắc nghiệm">📝</span>;
+        return <FileText className="w-4 h-4 text-slate-400 mr-3" />;
       default:
-        return <span className="text-base mr-3" title="Video">🎥</span>;
+        return <PlayCircle className="w-4 h-4 text-slate-400 mr-3" />;
     }
   };
 
@@ -63,14 +64,14 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
             onClick={handleCollapseAll}
             className="px-3.5 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-all flex items-center gap-1.5"
           >
-            ⏫ Thu gọn tất cả
+            <ChevronsUp className="w-4 h-4 text-slate-600" /> Thu gọn tất cả
           </button>
         ) : (
           <button
             onClick={handleExpandAll}
             className="px-3.5 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-all flex items-center gap-1.5"
           >
-            ⏬ Mở rộng tất cả
+            <ChevronsDown className="w-4 h-4 text-slate-600" /> Mở rộng tất cả
           </button>
         )}
       </div>
@@ -109,17 +110,17 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
                       </div>
                       <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:ml-3 pl-8 sm:pl-0">
                         {isFirstLesson && (
-                          <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors">
-                            👁️ Học thử miễn phí
+                          <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors inline-flex items-center gap-1.5">
+                            <PlayCircle className="w-3.5 h-3.5 text-emerald-600" /> Học thử miễn phí
                           </span>
                         )}
                         {block.durationMinutes ? (
-                          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
-                            ⏱️ {block.durationMinutes} phút
+                          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md inline-flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" /> {block.durationMinutes} phút
                           </span>
                         ) : (
-                          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
-                            📄 1 tài liệu
+                          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md inline-flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-slate-400" /> 1 tài liệu
                           </span>
                         )}
                         {showAiChatAction && (

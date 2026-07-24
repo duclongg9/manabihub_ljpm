@@ -5,8 +5,8 @@ import { CourseStickyCard } from '../components/CourseStickyCard';
 import { CurriculumAccordion } from '../components/CurriculumAccordion';
 import { TeacherProfile } from '../components/TeacherProfile';
 import { CourseStickyHeader } from '../components/CourseStickyHeader';
-import StarIcon from '@mui/icons-material/Star';
 import { Helmet } from 'react-helmet-async';
+import { Target, CheckCircle2, Star } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 export const CourseDetailPage = () => {
@@ -103,11 +103,14 @@ export const CourseDetailPage = () => {
 
             {/* What you will learn */}
             <div className="bg-rose-50/50 border border-rose-100 p-6 rounded-2xl mb-12">
-              <h2 className="text-lg font-bold text-slate-900 mb-4">🎯 Bạn sẽ học được gì trong khóa học này?</h2>
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                <Target className="w-5 h-5 text-red-600 mr-2" />
+                Bạn sẽ học được gì trong khóa học này?
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {displayOutcomes.map((outcome, index) => (
-                  <div key={index} className="flex items-start text-sm text-slate-700 leading-relaxed font-medium">
-                    <span className="text-emerald-600 font-bold mr-2">✓</span>
+                  <div key={index} className="flex items-start text-sm text-slate-700 leading-relaxed font-medium gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 stroke-[2.5] mt-0.5" />
                     <span>{outcome.trim()}</span>
                   </div>
                 ))}
@@ -157,9 +160,9 @@ export const CourseDetailPage = () => {
                 {/* Stats */}
                 <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border border-slate-100 min-w-[200px]">
                   <span className="text-5xl font-black text-slate-900 mb-2">4.8</span>
-                  <div className="flex text-yellow-400 mb-2">
+                  <div className="flex gap-1 mb-2">
                     {[1, 2, 3, 4, 5].map((s) => (
-                      <StarIcon key={s} fontSize="small" />
+                      <Star key={s} className="w-4 h-4 text-amber-400 fill-amber-400" />
                     ))}
                   </div>
                   <span className="text-sm font-medium text-slate-500">16 đánh giá</span>
@@ -210,9 +213,9 @@ export const CourseDetailPage = () => {
                         <div className="font-bold text-slate-900 text-sm">{review.name}</div>
                         <div className="text-xs text-slate-500">{review.date}</div>
                       </div>
-                      <div className="ml-auto flex text-yellow-400">
+                      <div className="ml-auto flex gap-0.5">
                         {[1, 2, 3, 4, 5].map((s) => (
-                          <StarIcon key={s} sx={{ fontSize: 14 }} />
+                          <Star key={s} className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
                         ))}
                       </div>
                     </div>
