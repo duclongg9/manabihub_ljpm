@@ -165,6 +165,20 @@ export default function StudentProfilePage() {
                             <Box sx={{ display: 'inline-block', px: 2, py: 0.5, bgcolor: '#fee2e2', color: '#C41E3A', borderRadius: 2, fontWeight: 800, fontSize: '1.25rem' }}>
                                 {form.jlptGoal || "Chưa thiết lập"}
                             </Box>
+                            
+                            <Divider sx={{ my: 3 }} />
+                            
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+                                <Typography variant="caption" color="text.secondary">
+                                    Ngày tham gia: 24/07/2026
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'success.main' }}>
+                                    <Box component="span" sx={{ fontSize: '0.75rem' }}>🟢</Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                        Tài khoản đã xác thực
+                                    </Typography>
+                                </Box>
+                            </Box>
                         </Card>
                     </Grid>
 
@@ -205,6 +219,7 @@ export default function StudentProfilePage() {
                                             value={form.email}
                                             disabled
                                             sx={{ bgcolor: 'grey.50' }}
+                                            helperText="🔒 Email đăng nhập - Không thể thay đổi"
                                         />
                                     </Grid>
                                     <Grid size={{ xs: 12, sm: 6 }}>
