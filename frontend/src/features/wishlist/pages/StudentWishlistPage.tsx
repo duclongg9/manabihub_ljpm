@@ -17,7 +17,7 @@ export function StudentWishlistPage() {
   const { data = [], isLoading, isError, refetch } = useWishlist();
 
   return (
-    <Box component="main" sx={{ minHeight: '100vh', bgcolor: '#F8FAFC', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
+    <Box component="main" sx={{ minHeight: '100vh', bgcolor: '#FAF9F6', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
       <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', position: 'relative' }}>
         <PageHeader
           title={

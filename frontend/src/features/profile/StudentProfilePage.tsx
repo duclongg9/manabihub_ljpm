@@ -141,7 +141,7 @@ export default function StudentProfilePage() {
 
     return (
         <>
-            <Box component="main" sx={{ bgcolor: "#F8FAFC", minHeight: "100vh", py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
+            <Box component="main" sx={{ bgcolor: "#FAF9F6", minHeight: "100vh", py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
                 <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', position: 'relative' }}>
                 <PageHeader
                     title="Hồ sơ cá nhân"

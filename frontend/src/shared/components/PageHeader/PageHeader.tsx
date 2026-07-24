@@ -16,6 +16,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, waterma
       sx={{
         mb: 4,
         position: 'relative',
+        overflow: 'hidden',
         bgcolor: 'background.paper',
         border: '1px solid',
         borderColor: 'divider',
