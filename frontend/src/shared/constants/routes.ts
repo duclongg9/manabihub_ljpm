@@ -39,6 +39,7 @@ export const ROUTES = {
     COURSE_APPROVAL: '/admin/courses/approvals',
     KYC_REVIEW: '/admin/kyc',
     FINANCE: '/admin/finance',
+    PAYOUTS: '/admin/payouts',
     NOTIFICATIONS: '/admin/notifications',
   },
 };

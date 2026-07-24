@@ -33,6 +33,8 @@ import { TeacherWritingReviewsPage } from '../features/writing-review/pages/Teac
 import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages/TeacherWritingReviewDetailPage';
 import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistPage';
+import { PayoutQueuePage } from '../features/admin-payout/pages/PayoutQueuePage';
+import { PayoutSettlementPage } from '../features/admin-payout/pages/PayoutSettlementPage';
 
 export const router = createBrowserRouter([
   {
@@ -229,6 +231,14 @@ export const router = createBrowserRouter([
       {
         path: 'finance',
         element: <Navigate to="/admin/dashboard" replace />,
+      },
+      {
+        path: 'payouts',
+        element: <PayoutQueuePage />,
+      },
+      {
+        path: 'payouts/:id',
+        element: <PayoutSettlementPage />,
       },
     ],
   },
