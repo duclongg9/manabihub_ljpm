@@ -10,7 +10,6 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   clearAuthSession,
@@ -108,20 +107,28 @@ export function StudentOnboardingPage() {
   const handleBack = () => setActiveStep((prev) => prev - 1);
 
   return (
-    <Box sx={{ minHeight: 'calc(100vh - 140px)', bgcolor: 'grey.50', py: { xs: 4, md: 6 }, display: 'flex', alignItems: 'center' }}>
-      <Container maxWidth="md">
+    <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50', display: 'flex', flexDirection: 'column' }}>
+      {/* Minimal Header */}
+      <Box sx={{ p: 2, bgcolor: 'white', borderBottom: '1px solid', borderColor: 'grey.200', display: 'flex', alignItems: 'center' }}>
+        <Typography variant="h6" sx={{ fontWeight: 900, color: '#C41E3A', letterSpacing: '-0.5px' }}>
+          <MenuBookIcon sx={{ verticalAlign: 'middle', mr: 1, mb: 0.5 }} />
+          ManabiHub
+        </Typography>
+      </Box>
 
-        {/* Header */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Box
-            sx={{
-              width: 48, height: 48, bgcolor: '#2563eb', borderRadius: 2,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2,
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          >
-            <MenuBookIcon sx={{ color: 'white', fontSize: 28 }} />
-          </Box>
+      <Box sx={{ flexGrow: 1, py: { xs: 4, md: 6 }, display: 'flex', alignItems: 'center' }}>
+        <Container maxWidth="md">
+          {/* Header */}
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Box
+              sx={{
+                width: 48, height: 48, bgcolor: '#C41E3A', borderRadius: 2,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}
+            >
+              <MenuBookIcon sx={{ color: 'white', fontSize: 28 }} />
+            </Box>
           <Typography variant="h4" sx={{ fontWeight: 800, mb: 1, color: 'text.primary' }}>
             Chào mừng bạn mới!
           </Typography>
@@ -161,18 +168,22 @@ export function StudentOnboardingPage() {
                       variant="outlined"
                       error={!!errors.name}
                       helperText={errors.name}
-                      slotProps={{ input: { startAdornment: <InputAdornment position="start"><PersonIcon sx={{ color: 'grey.400' }} /></InputAdornment> } }}
+                      slotProps={{ input: { startAdornment: <InputAdornment position="start" sx={{ mr: 0.5 }}><PersonIcon sx={{ color: 'grey.400' }} /></InputAdornment> } }}
                     />
                     <TextField
                       label="Số điện thoại"
                       placeholder="Ví dụ: 0912345678"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^\d+]/g, '');
+                        setPhone(val);
+                      }}
+                      type="tel"
                       fullWidth
                       variant="outlined"
                       error={!!errors.phone}
                       helperText={errors.phone || 'Không bắt buộc. Ví dụ: 0912345678'}
-                      slotProps={{ input: { startAdornment: <InputAdornment position="start"><PhoneIcon sx={{ color: 'grey.400' }} /></InputAdornment> } }}
+                      slotProps={{ input: { startAdornment: <InputAdornment position="start" sx={{ mr: 0.5 }}><PhoneIcon sx={{ color: 'grey.400' }} /></InputAdornment> } }}
                     />
                   </Box>
 
@@ -194,28 +205,7 @@ export function StudentOnboardingPage() {
                     <FormHelperText>Giúp chúng tôi đề xuất lộ trình và khóa học phù hợp nhất với bạn.</FormHelperText>
                   </FormControl>
 
-                  <Box
-                    sx={{
-                      p: 2.5,
-                      bgcolor: '#eff6ff',
-                      borderRadius: 3,
-                      border: '1px solid',
-                      borderColor: '#bfdbfe',
-                      display: 'flex',
-                      gap: 2,
-                      alignItems: 'flex-start'
-                    }}
-                  >
-                    <InfoOutlinedIcon sx={{ color: '#2563eb', fontSize: 24, mt: 0.25 }} />
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'grey.900', mb: 0.5 }}>
-                        Bạn muốn trở thành Giảng viên?
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: 'grey.700', lineHeight: 1.5 }}>
-                        Hãy hoàn tất bước đăng ký Học viên này trước nhé. Sau đó, bạn có thể gửi hồ sơ nâng cấp (KYC & Chứng chỉ) thông qua mục "Trở thành Giảng viên" tại Trang chủ của hệ thống.
-                      </Typography>
-                    </Box>
-                  </Box>
+
 
                   {submitError && <Alert severity="error">{submitError}</Alert>}
 
@@ -243,7 +233,8 @@ export function StudentOnboardingPage() {
           {/* Footer Actions */}
           <Box sx={{ p: { xs: 3, md: 4 }, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'grey.200', display: 'flex', justifyContent: 'space-between', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
             <Button
-              color="error"
+              variant="outlined"
+              color="inherit"
               disabled={saving}
               onClick={() => {
                 if (activeStep === 0) {
@@ -253,7 +244,7 @@ export function StudentOnboardingPage() {
                   handleBack();
                 }
               }}
-              sx={{ textTransform: 'none', fontWeight: 600 }}
+              sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', borderColor: 'grey.300', '&:hover': { bgcolor: 'grey.100', borderColor: 'grey.400' } }}
             >
               Quay lại
             </Button>
@@ -275,7 +266,8 @@ export function StudentOnboardingPage() {
           </Box>
         </Card>
 
-      </Container>
+        </Container>
+      </Box>
     </Box>
   );
 }
