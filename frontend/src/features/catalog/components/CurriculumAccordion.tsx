@@ -2,13 +2,6 @@ import { useState } from 'react';
 import { Accordion, AccordionSummary, AccordionDetails, Button, Tooltip, Typography } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
-import OndemandVideoIcon from '@mui/icons-material/OndemandVideo';
-import DescriptionIcon from '@mui/icons-material/Description';
-import QuizIcon from '@mui/icons-material/Quiz';
-import StyleIcon from '@mui/icons-material/Style';
-import EditNoteIcon from '@mui/icons-material/EditNote';
-import KeyboardDoubleArrowUpIcon from '@mui/icons-material/KeyboardDoubleArrowUp';
-import KeyboardDoubleArrowDownIcon from '@mui/icons-material/KeyboardDoubleArrowDown';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import type { PublicModule, PublicLessonBlock } from '../types/courseDetailTypes';
@@ -44,17 +37,15 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
   const getBlockIcon = (type: PublicLessonBlock['type']) => {
     switch (type) {
       case 'VIDEO':
-        return <OndemandVideoIcon fontSize="small" className="text-slate-500 mr-3" />;
+        return <span className="text-base mr-3" title="Video">🎥</span>;
       case 'TEXT':
-        return <DescriptionIcon fontSize="small" className="text-slate-500 mr-3" />;
-      case 'QUIZ':
-        return <QuizIcon fontSize="small" className="text-slate-500 mr-3" />;
       case 'FLASHCARD':
-        return <StyleIcon fontSize="small" className="text-slate-500 mr-3" />;
       case 'WRITING':
-        return <EditNoteIcon fontSize="small" className="text-slate-500 mr-3" />;
+        return <span className="text-base mr-3" title="Tài liệu">📄</span>;
+      case 'QUIZ':
+        return <span className="text-base mr-3" title="Trắc nghiệm">📝</span>;
       default:
-        return <OndemandVideoIcon fontSize="small" className="text-slate-500 mr-3" />;
+        return <span className="text-base mr-3" title="Video">🎥</span>;
     }
   };
 
@@ -70,18 +61,16 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
         {isAllExpanded ? (
           <button
             onClick={handleCollapseAll}
-            className="flex items-center px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-colors"
+            className="px-3.5 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-all flex items-center gap-1.5"
           >
-            <KeyboardDoubleArrowUpIcon fontSize="small" className="mr-1" />
-            Thu gọn tất cả
+            ⏫ Thu gọn tất cả
           </button>
         ) : (
           <button
             onClick={handleExpandAll}
-            className="flex items-center px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-colors"
+            className="px-3.5 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-all flex items-center gap-1.5"
           >
-            <KeyboardDoubleArrowDownIcon fontSize="small" className="mr-1" />
-            Mở rộng tất cả
+            ⏬ Mở rộng tất cả
           </button>
         )}
       </div>

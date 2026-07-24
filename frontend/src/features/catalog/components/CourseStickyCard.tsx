@@ -43,7 +43,7 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
           {course.thumbnailUrl ? (
             <img src={course.thumbnailUrl} alt={course.title} className="w-full h-full object-cover rounded-xl transition-opacity group-hover:opacity-80" />
           ) : (
-            <div className="flex flex-col items-center justify-center text-rose-200/40 w-full h-full bg-gradient-to-br from-rose-900 to-slate-900 rounded-xl relative overflow-hidden">
+            <div className="flex flex-col items-center justify-center text-rose-200/40 w-full h-full bg-gradient-to-br from-rose-950 via-rose-900 to-slate-900 rounded-xl relative overflow-hidden">
               <span className="text-8xl font-black absolute opacity-20 transform -rotate-12 translate-x-4 translate-y-4">作文</span>
               <span className="text-sm font-semibold uppercase tracking-wider opacity-90 z-10 text-rose-100">ManabiHub</span>
             </div>
@@ -66,7 +66,7 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
             {course.price === 0 ? (
               <span className="text-emerald-500">Miễn phí</span>
             ) : (
-              `${course.price.toLocaleString('vi-VN')} ${course.currency}`
+              `${course.price.toLocaleString('vi-VN')} ₫`
             )}
           </span>
         </div>

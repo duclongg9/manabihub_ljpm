@@ -10,7 +10,7 @@ interface CourseHeroProps {
 
 export const CourseHero = ({ course }: CourseHeroProps) => {
   return (
-    <div className="relative bg-slate-900 text-white pt-12 pb-16 sm:pt-16 sm:pb-20 overflow-hidden rounded-3xl mt-4">
+    <div className="relative bg-slate-900 text-white pt-12 pb-12 sm:pt-16 sm:pb-16 overflow-hidden rounded-t-3xl rounded-b-[2.5rem] shadow-xl mt-4">
       {/* Background Gradient Meshes */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#4C0519] via-[#881337] to-[#BE123C] opacity-90" />
       <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 rounded-full bg-red-600/20 blur-3xl" />
@@ -29,7 +29,7 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
             <span className="mx-2">/</span>
             <span className="hover:text-white/80 cursor-pointer transition-colors">{course.jlptLevel || 'JLPT N3'}</span>
             <span className="mx-2">/</span>
-            <span className="text-white/80 truncate max-w-[200px] sm:max-w-xs">{course.title}</span>
+            <span className="text-white/80 truncate max-w-[200px] sm:max-w-xs">{course.title.replace('--', '|')}</span>
           </div>
 
           {/* Badges */}
@@ -48,11 +48,12 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
 
           {/* Title & Subtitle */}
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-2 leading-tight drop-shadow-md">
-            {course.title}
+            {course.title.replace('--', '|')}
           </h1>
-          <p className="text-red-200 text-lg font-medium tracking-wide mb-6">
-            JLPT N3 ライティング実践コース
-          </p>
+          <div className="flex items-center gap-3 text-sm text-rose-100/90 mt-3 mb-6">
+            <span>🔥 51 học viên đã đăng ký</span>
+            <span>⭐ 4.8 (16 đánh giá)</span>
+          </div>
 
           {/* Description */}
           <div
