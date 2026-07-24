@@ -15,11 +15,11 @@ import { getAsset } from '../../../shared/utils/assets';
 
 /* ─── JLPT Levels with vivid progression colors ─── */
 const JLPT_LEVELS = [
-  { id: 'jlptLevel=N5', name: 'N5', kanji: '初', subtitle: '初級', color: '#EF9A9A', gradient: 'linear-gradient(135deg, #EF9A9A, #E57373)', label: 'Sơ cấp', emoji: '🌱' },
-  { id: 'jlptLevel=N4', name: 'N4', kanji: '基', subtitle: '初中級', color: '#EF5350', gradient: 'linear-gradient(135deg, #EF5350, #E53935)', label: 'Sơ-Trung cấp', emoji: '🌿' },
-  { id: 'jlptLevel=N3', name: 'N3', kanji: '中', subtitle: '中級', color: '#E53935', gradient: 'linear-gradient(135deg, #E53935, #D32F2F)', label: 'Trung cấp', emoji: '⚡' },
-  { id: 'jlptLevel=N2', name: 'N2', kanji: '上', subtitle: '上級', color: '#C62828', gradient: 'linear-gradient(135deg, #D32F2F, #C62828)', label: 'Cao cấp', emoji: '🔥' },
-  { id: 'jlptLevel=N1', name: 'N1', kanji: '極', subtitle: '最上級', color: '#B71C1C', gradient: 'linear-gradient(135deg, #C62828, #B71C1C)', label: 'Thành thạo', emoji: '👑' },
+  { id: 'jlptLevel=N5', name: 'N5', kanji: '初', subtitle: '初級', color: '#4CAF50', gradient: 'linear-gradient(135deg, #4CAF50, #8BC34A)', label: 'Sơ cấp', emoji: '🌱' },
+  { id: 'jlptLevel=N4', name: 'N4', kanji: '基', subtitle: '初中級', color: '#8BC34A', gradient: 'linear-gradient(135deg, #8BC34A, #CDDC39)', label: 'Sơ-Trung cấp', emoji: '🌿' },
+  { id: 'jlptLevel=N3', name: 'N3', kanji: '中', subtitle: '中級', color: '#FFB300', gradient: 'linear-gradient(135deg, #FFB300, #FF9800)', label: 'Trung cấp', emoji: '⚡' },
+  { id: 'jlptLevel=N2', name: 'N2', kanji: '上', subtitle: '上級', color: '#F57C00', gradient: 'linear-gradient(135deg, #FF9800, #F57C00)', label: 'Cao cấp', emoji: '🔥' },
+  { id: 'jlptLevel=N1', name: 'N1', kanji: '極', subtitle: '最上級', color: '#E53935', gradient: 'linear-gradient(135deg, #F57C00, #E53935)', label: 'Thành thạo', emoji: '👑' },
 ];
 
 /* ─── Skill Categories with unique color accents ─── */
@@ -113,9 +113,9 @@ export const TopCategories: React.FC = () => {
               sx={{
                 display: { xs: 'none', md: 'block' },
                 position: 'absolute',
-                top: '50%', left: '8%', right: '8%',
-                height: '3px',
-                background: 'linear-gradient(to right, #EF9A9A, #EF5350, #E53935, #C62828, #B71C1C)',
+                bottom: '32px', left: '8%', right: '8%',
+                height: '4px',
+                background: 'linear-gradient(to right, #4CAF50, #8BC34A, #FFB300, #F57C00, #E53935)',
                 borderRadius: 4,
                 opacity: isVisible ? 0.35 : 0,
                 transition: 'opacity 1.5s ease 0.5s',
@@ -139,24 +139,7 @@ export const TopCategories: React.FC = () => {
                   transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.12}s`,
                 }}
               >
-                {/* Level node dot on the line */}
-                <Box
-                  sx={{
-                    display: { xs: 'none', md: 'flex' },
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: 16, height: 16,
-                    borderRadius: '50%',
-                    bgcolor: level.color,
-                    border: '3px solid #FBF9F5',
-                    boxShadow: `0 0 0 3px ${level.color}30, 0 2px 8px ${level.color}40`,
-                    zIndex: 3,
-                    opacity: isVisible ? 1 : 0,
-                    transition: `all 0.5s ease ${0.8 + index * 0.1}s`,
-                  }}
-                />
+                {/* No node dots here */}
 
                 <Paper
                   elevation={0}
@@ -193,47 +176,40 @@ export const TopCategories: React.FC = () => {
                   <Typography
                     sx={{
                       position: 'absolute',
-                      bottom: -8, right: 8,
-                      fontSize: '5rem',
+                      top: '50%', left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      fontSize: { xs: '5.5rem', md: '6.5rem' },
                       fontWeight: 900,
                       fontFamily: '"Noto Sans JP", serif',
-                      color: `${level.color}08`,
+                      color: `${level.color}`,
+                      opacity: 0.05,
                       lineHeight: 1,
                       userSelect: 'none',
                       pointerEvents: 'none',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {level.kanji}
+                    {level.subtitle}
                   </Typography>
 
                   {/* Emoji */}
-                  <Typography sx={{ fontSize: '1.5rem', mb: 1 }}>{level.emoji}</Typography>
+                  <Typography sx={{ fontSize: '1.8rem', mb: 1.5, position: 'relative', zIndex: 2 }}>{level.emoji}</Typography>
 
                   {/* Level name with color */}
                   <Typography
                     sx={{
                       fontWeight: 900,
-                      fontSize: '1.6rem',
+                      fontSize: '1.8rem',
                       background: level.gradient,
                       backgroundClip: 'text',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
                       mb: 0.5,
+                      position: 'relative',
+                      zIndex: 2,
                     }}
                   >
                     {level.name}
-                  </Typography>
-
-                  <Typography
-                    sx={{
-                      fontSize: '0.85rem',
-                      fontFamily: '"Noto Sans JP", sans-serif',
-                      color: '#64748b',
-                      fontWeight: 600,
-                      mb: 0.3,
-                    }}
-                  >
-                    {level.subtitle}
                   </Typography>
                   <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {level.label}
