@@ -48,7 +48,15 @@ if (Test-Path -LiteralPath $bundlePath) {
     Remove-Item -LiteralPath $bundlePath -Force
 }
 
-Compress-Archive -Path (Join-Path $stagingDir "*") -DestinationPath $bundlePath -CompressionLevel Optimal
+Push-Location $stagingDir
+try {
+    tar -a -c -f $bundlePath *
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create zip bundle using tar command. Exit code $LASTEXITCODE."
+    }
+} finally {
+    Pop-Location
+}
 
 Write-Host "Elastic Beanstalk bundle created:" -ForegroundColor Green
 Write-Host "  $bundlePath"
