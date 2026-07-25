@@ -88,7 +88,7 @@ export const CheckoutReturnPage = () => {
           <Spinner />
           <h1 className="text-xl font-bold text-slate-900 mt-6">Đang xác nhận thanh toán…</h1>
           <p className="text-sm text-slate-500 mt-2">
-            Hệ thống đang chờ xác nhận từ cổng thanh toán (webhook). Vui lòng không đóng trang này.
+            Thanh toán đang được xử lý. Vui lòng chờ xác nhận. Đừng đóng trang này.
           </p>
         </>
       )}
@@ -98,7 +98,7 @@ export const CheckoutReturnPage = () => {
           <StatusIcon variant="success" />
           <h1 className="text-2xl font-extrabold text-slate-900 mt-6">Thanh toán thành công!</h1>
           <p className="text-sm text-slate-500 mt-2">
-            Bạn đã được ghi danh vào khóa học. Chúc bạn học tốt!
+            Thanh toán thành công. Sản phẩm đã được mở. Chúc bạn học tốt!
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             {firstCourseId && (
@@ -124,7 +124,7 @@ export const CheckoutReturnPage = () => {
           <StatusIcon variant="error" />
           <h1 className="text-2xl font-extrabold text-slate-900 mt-6">Thanh toán không thành công</h1>
           <p className="text-sm text-slate-500 mt-2">
-            Giao dịch chưa hoàn tất. Bạn có thể thử mua lại từ trang khóa học.
+            Thanh toán không thành công. Vui lòng thử lại.
           </p>
           <button
             onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}

@@ -53,7 +53,8 @@ public class OrderController {
                     order.getCurrency(),
                     order.getStatus().name(),
                     null);
-            return ApiResponse.success(MessageCodes.ORDER_CREATED, "Enrolled in free course.", freeCheckout);
+            // MSG-PAY-002: product unlocked immediately (no payment needed).
+            return ApiResponse.success(MessageCodes.MSG_PAY_002, "Đã ghi danh khoá học miễn phí.", freeCheckout);
         }
 
         String paymentUrl = paymentService.initiatePayment(order, resolveClientIp(httpRequest));
@@ -65,7 +66,8 @@ public class OrderController {
                 order.getStatus().name(),
                 paymentUrl);
 
-        return ApiResponse.success(MessageCodes.ORDER_CREATED, "Order created; proceed to payment.", checkout);
+        // MSG-PAY-001: order is now Pending Payment, awaiting gateway confirmation.
+        return ApiResponse.success(MessageCodes.MSG_PAY_001, "Thanh toán đang được xử lý. Vui lòng chờ xác nhận.", checkout);
     }
 
     @GetMapping("/{orderId}")

@@ -199,6 +199,13 @@ public final class MessageCodes {
     public static final String PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND";
     public static final String PAYMENT_INITIATED = "PAYMENT_INITIATED";
 
+    // Canonical payment-result codes defined by the SRS (UC-08, message catalog).
+    public static final String MSG_PAY_001 = "MSG-PAY-001"; // Payment pending — awaiting confirmation
+    public static final String MSG_PAY_002 = "MSG-PAY-002"; // Payment successful — product unlocked
+    public static final String MSG_PAY_003 = "MSG-PAY-003"; // Payment failed
+    public static final String MSG_PAY_004 = "MSG-PAY-004"; // Invalid/unverifiable payment webhook
+    public static final String MSG_PAY_005 = "MSG-PAY-005"; // Duplicate payment (already processed)
+
     // ──────────────────────────────────────────────
     // WALLET — wallet operations
     // ──────────────────────────────────────────────

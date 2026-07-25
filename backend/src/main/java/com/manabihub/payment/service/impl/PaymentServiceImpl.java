@@ -1,6 +1,7 @@
 package com.manabihub.payment.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.course.entity.Course;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
@@ -65,7 +66,8 @@ public class PaymentServiceImpl implements PaymentService {
     public IpnAckResponse handleIpn(Map<String, String> params) {
         PaymentCallbackResult result = paymentGateway.parseCallback(params);
         if (!result.signatureValid()) {
-            log.warn("Rejected payment IPN with invalid checksum, txnRef={}", result.orderCode());
+            log.warn("[{}] Rejected payment IPN with invalid checksum, txnRef={}",
+                    MessageCodes.MSG_PAY_004, result.orderCode());
             return IpnAckResponse.of("97", "Invalid Checksum");
         }
 
@@ -78,13 +80,15 @@ public class PaymentServiceImpl implements PaymentService {
 
         long expectedMinor = order.getTotalAmount().multiply(MINOR_UNIT_FACTOR).longValue();
         if (result.amount() != expectedMinor) {
-            log.warn("Payment IPN amount mismatch for order {}: expected {}, got {}",
-                    order.getOrderCode(), expectedMinor, result.amount());
+            log.warn("[{}] Payment IPN amount mismatch for order {}: expected {}, got {}",
+                    MessageCodes.MSG_PAY_004, order.getOrderCode(), expectedMinor, result.amount());
             return IpnAckResponse.of("04", "Invalid Amount");
         }
 
         if (order.getStatus() == OrderStatus.PAID) {
             // Duplicate/replayed callback — already processed.
+            log.info("[{}] Duplicate payment IPN for already-paid order {}",
+                    MessageCodes.MSG_PAY_005, order.getOrderCode());
             return IpnAckResponse.of("02", "Order already confirmed");
         }
 
@@ -97,8 +101,8 @@ public class PaymentServiceImpl implements PaymentService {
             paymentTransactionRepository.save(transaction);
             order.setStatus(OrderStatus.FAILED);
             orderRepository.save(order);
-            log.info("Recorded FAILED payment for order {} (responseCode={})",
-                    order.getOrderCode(), result.responseCode());
+            log.info("[{}] Recorded FAILED payment for order {} (responseCode={})",
+                    MessageCodes.MSG_PAY_003, order.getOrderCode(), result.responseCode());
             return IpnAckResponse.of("00", "Confirm Success");
         }
 
@@ -112,7 +116,8 @@ public class PaymentServiceImpl implements PaymentService {
         escrowService.holdForOrder(order);
         notifyStudent(order);
 
-        log.info("Confirmed payment for order {} — enrollment + escrow created", order.getOrderCode());
+        log.info("[{}] Confirmed payment for order {} — enrollment + escrow created",
+                MessageCodes.MSG_PAY_002, order.getOrderCode());
         return IpnAckResponse.of("00", "Confirm Success");
     }
 
