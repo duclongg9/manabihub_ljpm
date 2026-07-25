@@ -240,8 +240,10 @@ function TeacherKycPageContent() {
             const response = await verifyTeacherIdentity(result);
             setIdentityEnvelope(response);
             await refreshStatus();
+            handleCloseIdentityDialog();
           } catch (error) {
             setPageError(readErrorMessage(error));
+            handleCloseIdentityDialog();
           }
         });
       } catch (error) {
