@@ -3,7 +3,11 @@ import type { PublicCourseDetail } from '../types/courseDetailTypes';
 import { PlayCircle, Target, BookOpen, Infinity as InfinityIcon } from 'lucide-react';
 import { Dialog, DialogContent, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { useNavigate } from 'react-router-dom';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
+import { createCheckout } from '../../checkout/services/checkoutService';
+import { getAuthSession } from '../../../shared/auth/authSession';
+import { ROUTES } from '../../../shared/constants/routes';
 
 interface CourseStickyCardProps {
   course: PublicCourseDetail;
@@ -11,6 +15,37 @@ interface CourseStickyCardProps {
 
 export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const handleContinueLearning = () => navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
+
+  const handleBuy = async () => {
+    if (!getAuthSession('public')) {
+      navigate(ROUTES.PUBLIC.LOGIN);
+      return;
+    }
+    setBuying(true);
+    setBuyError(null);
+    try {
+      const checkout = await createCheckout(course.id);
+      if (!checkout.paymentUrl) {
+        // Free course — the student was enrolled immediately, go straight to learning.
+        navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
+        return;
+      }
+      navigate(`/checkout/${checkout.orderId}`, { state: { paymentUrl: checkout.paymentUrl } });
+    } catch (err) {
+      const code = (err as { response?: { data?: { messageCode?: string } } })?.response?.data?.messageCode;
+      setBuyError(
+        code === 'ORDER_ALREADY_ENROLLED'
+          ? 'Bạn đã sở hữu khóa học này.'
+          : 'Không thể tạo đơn hàng. Vui lòng thử lại.',
+      );
+      setBuying(false);
+    }
+  };
 
   // Calculate course stats dynamically (partially offloaded to backend)
   let totalReadingBlocks = 0;
@@ -68,19 +103,27 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
         </div>
 
         {course.isEnrolled ? (
-          <button className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md hover:shadow-xl hover:-translate-y-0.5 mb-4">
+          <button
+            onClick={handleContinueLearning}
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md hover:shadow-xl hover:-translate-y-0.5 mb-4"
+          >
             Tiếp tục học
           </button>
         ) : (
           <>
-            <button className="bg-red-600 hover:bg-red-700 text-white w-full py-3 rounded-xl font-semibold mb-3 transition-colors">
-              {course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
+            <button
+              onClick={handleBuy}
+              disabled={buying}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white w-full py-3 rounded-xl font-semibold mb-3 transition-colors"
+            >
+              {buying ? 'Đang xử lý…' : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
             </button>
             {course.price > 0 && (
               <button className="border border-red-600 text-red-600 hover:bg-red-50 w-full py-3 rounded-xl font-semibold mb-2 transition-colors">
                 Thêm vào giỏ hàng
               </button>
             )}
+            {buyError && <p className="text-center text-xs text-red-600 font-medium mb-3">{buyError}</p>}
             <p className="text-center text-xs text-slate-500 font-medium mb-6">
               Đảm bảo hoàn tiền trong 30 ngày
             </p>

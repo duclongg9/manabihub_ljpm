@@ -180,12 +180,31 @@ public final class MessageCodes {
     public static final String MSG_AI_008 = "MSG-AI-008"; // AI is unavailable for this course or request
 
     // ──────────────────────────────────────────────
+    // ORDER — course purchase orders (UC-08)
+    // ──────────────────────────────────────────────
+    public static final String ORDER_CREATED = "ORDER_CREATED";
+    public static final String ORDER_NOT_FOUND = "ORDER_NOT_FOUND";
+    public static final String ORDER_RETRIEVED = "ORDER_RETRIEVED";
+    public static final String ORDER_COURSE_NOT_PUBLISHED = "ORDER_COURSE_NOT_PUBLISHED";
+    public static final String ORDER_ALREADY_ENROLLED = "ORDER_ALREADY_ENROLLED";
+    public static final String ORDER_ALREADY_PAID = "ORDER_ALREADY_PAID";
+
+    // ──────────────────────────────────────────────
     // PAYMENT — payment processing
     // ──────────────────────────────────────────────
     public static final String PAYMENT_SUCCESS = "PAYMENT_SUCCESS";
     public static final String PAYMENT_FAILED = "PAYMENT_FAILED";
     public static final String PAYMENT_WEBHOOK_INVALID = "PAYMENT_WEBHOOK_INVALID";
+    public static final String PAYMENT_WEBHOOK_PROCESSED = "PAYMENT_WEBHOOK_PROCESSED";
     public static final String PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND";
+    public static final String PAYMENT_INITIATED = "PAYMENT_INITIATED";
+
+    // Canonical payment-result codes defined by the SRS (UC-08, message catalog).
+    public static final String MSG_PAY_001 = "MSG-PAY-001"; // Payment pending — awaiting confirmation
+    public static final String MSG_PAY_002 = "MSG-PAY-002"; // Payment successful — product unlocked
+    public static final String MSG_PAY_003 = "MSG-PAY-003"; // Payment failed
+    public static final String MSG_PAY_004 = "MSG-PAY-004"; // Invalid/unverifiable payment webhook
+    public static final String MSG_PAY_005 = "MSG-PAY-005"; // Duplicate payment (already processed)
 
     // ──────────────────────────────────────────────
     // WALLET — wallet operations
