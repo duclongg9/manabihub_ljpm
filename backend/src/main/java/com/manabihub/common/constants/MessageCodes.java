@@ -180,12 +180,24 @@ public final class MessageCodes {
     public static final String MSG_AI_008 = "MSG-AI-008"; // AI is unavailable for this course or request
 
     // ──────────────────────────────────────────────
+    // ORDER — course purchase orders (UC-08)
+    // ──────────────────────────────────────────────
+    public static final String ORDER_CREATED = "ORDER_CREATED";
+    public static final String ORDER_NOT_FOUND = "ORDER_NOT_FOUND";
+    public static final String ORDER_RETRIEVED = "ORDER_RETRIEVED";
+    public static final String ORDER_COURSE_NOT_PUBLISHED = "ORDER_COURSE_NOT_PUBLISHED";
+    public static final String ORDER_ALREADY_ENROLLED = "ORDER_ALREADY_ENROLLED";
+    public static final String ORDER_ALREADY_PAID = "ORDER_ALREADY_PAID";
+
+    // ──────────────────────────────────────────────
     // PAYMENT — payment processing
     // ──────────────────────────────────────────────
     public static final String PAYMENT_SUCCESS = "PAYMENT_SUCCESS";
     public static final String PAYMENT_FAILED = "PAYMENT_FAILED";
     public static final String PAYMENT_WEBHOOK_INVALID = "PAYMENT_WEBHOOK_INVALID";
+    public static final String PAYMENT_WEBHOOK_PROCESSED = "PAYMENT_WEBHOOK_PROCESSED";
     public static final String PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND";
+    public static final String PAYMENT_INITIATED = "PAYMENT_INITIATED";
 
     // ──────────────────────────────────────────────
     // WALLET — wallet operations

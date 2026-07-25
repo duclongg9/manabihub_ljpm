@@ -7,7 +7,11 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import { Dialog, DialogContent, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { useNavigate } from 'react-router-dom';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
+import { createCheckout } from '../../checkout/services/checkoutService';
+import { getAuthSession } from '../../../shared/auth/authSession';
+import { ROUTES } from '../../../shared/constants/routes';
 
 interface CourseStickyCardProps {
   course: PublicCourseDetail;
@@ -15,6 +19,32 @@ interface CourseStickyCardProps {
 
 export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const handleContinueLearning = () => navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
+
+  const handleBuy = async () => {
+    if (!getAuthSession('public')) {
+      navigate(ROUTES.PUBLIC.LOGIN);
+      return;
+    }
+    setBuying(true);
+    setBuyError(null);
+    try {
+      const checkout = await createCheckout(course.id);
+      navigate(`/checkout/${checkout.orderId}`, { state: { paymentUrl: checkout.paymentUrl } });
+    } catch (err) {
+      const code = (err as { response?: { data?: { messageCode?: string } } })?.response?.data?.messageCode;
+      setBuyError(
+        code === 'ORDER_ALREADY_ENROLLED'
+          ? 'Bạn đã sở hữu khóa học này.'
+          : 'Không thể tạo đơn hàng. Vui lòng thử lại.',
+      );
+      setBuying(false);
+    }
+  };
 
   // Calculate course stats dynamically (partially offloaded to backend)
   let totalReadingBlocks = 0;
@@ -65,7 +95,10 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
         </div>
 
         {course.isEnrolled ? (
-          <button className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md hover:shadow-xl hover:-translate-y-0.5 mb-4">
+          <button
+            onClick={handleContinueLearning}
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md hover:shadow-xl hover:-translate-y-0.5 mb-4"
+          >
             Tiếp tục học
           </button>
         ) : (
@@ -75,9 +108,14 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
                 Thêm vào giỏ hàng
               </button>
             )}
-            <button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:-translate-y-0.5 mb-4">
-              {course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
+            <button
+              onClick={handleBuy}
+              disabled={buying}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-60 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:-translate-y-0.5 mb-4"
+            >
+              {buying ? 'Đang xử lý…' : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
             </button>
+            {buyError && <p className="text-center text-xs text-red-600 font-medium mb-3">{buyError}</p>}
             <p className="text-center text-xs text-slate-500 font-medium mb-6">
               Đảm bảo hoàn tiền trong 30 ngày
             </p>
