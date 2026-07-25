@@ -1,0 +1,41 @@
+export const ENDPOINTS = {
+  NOTIFICATIONS: {
+    LIST: '/v1/notifications',
+    UNREAD_COUNT: '/v1/notifications/unread-count',
+    MARK_READ: (id: string) => `/v1/notifications/${id}/read`,
+    MARK_ALL_READ: '/v1/notifications/read-all',
+  },
+  ADMIN_KYC: {
+    QUEUE: '/v1/admin/kyc-requests',
+    DETAIL: (id: string) => `/v1/admin/kyc-requests/${id}`,
+    REVIEW: (id: string) => `/v1/admin/kyc-requests/${id}/review`,
+  },
+  teacherKyc: {
+    status: '/v1/teacher/kyc/status',
+    identityVerifications: '/v1/teacher/kyc/identity-verifications',
+    restartVerification: '/v1/teacher/kyc/restart-verification',
+    certificateSubmissions: '/v1/teacher/kyc/certificate-submissions',
+  },
+  profile: {
+    student: '/v1/student/profile',
+    teacher: '/v1/teacher/profile',
+  },
+  teacherCourses: {
+    drafts: '/v1/teacher/courses/drafts',
+    draftDetail: (id: string) => `/v1/teacher/courses/drafts/${id}`,
+    builder: (id: string) => `/v1/teacher/courses/drafts/${id}/builder`,
+    builderModules: (id: string) => `/v1/teacher/courses/drafts/${id}/builder/modules`,
+    builderModuleDetail: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}`,
+    builderModuleOrder: (id: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/order`,
+    builderBlocks: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks`,
+    builderBlockDetail: (id: string, moduleId: string, blockId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/${blockId}`,
+    builderBlockOrder: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/order`,
+  },
+  teacherCourseAssets: {
+    thumbnails: '/v1/teacher/courses/assets/thumbnails',
+  },
+  courseCategories: {
+    list: '/v1/course-categories',
+  },
+  ADMIN_LOGIN: '/admin/auth/login',
+};
