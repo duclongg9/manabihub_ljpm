@@ -1,19 +1,17 @@
 import React from 'react';
-import { Box, Toolbar, Container } from '@mui/material';
+import { Box } from '@mui/material';
 import { Outlet } from 'react-router-dom';
-import { getAuthSession } from '../auth/authSession';
-import { Header } from './Header';
+import { LandingHeader } from '../../app/pages/PublicHomePage/LandingHeader';
+import { LandingFooter } from '../../app/pages/PublicHomePage/LandingFooter';
 
 export const PublicLayout: React.FC = () => {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Header session={getAuthSession('public') ?? undefined} showMenuIcon={false} />
-      <Toolbar /> {/* Spacer */}
-      <Box component="main" sx={{ flexGrow: 1, py: 4 }}>
-        <Container maxWidth="lg">
-          <Outlet />
-        </Container>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#FBF9F5' }}>
+      <LandingHeader />
+      <Box component="main" sx={{ flexGrow: 1 }}>
+        <Outlet />
       </Box>
+      <LandingFooter />
     </Box>
   );
 };

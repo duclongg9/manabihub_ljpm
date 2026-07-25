@@ -36,6 +36,8 @@ import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistP
 import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
 
+import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -51,16 +53,16 @@ export const router = createBrowserRouter([
     element: <AdminLoginPage />,
   },
   {
+    path: '/onboarding/student',
+    element: <StudentOnboardingPage />,
+  },
+  {
     path: '/',
     element: <PublicLayout />,
     children: [
       {
         path: 'auth/callback',
         element: <AuthCallbackPage />,
-      },
-      {
-        path: 'onboarding/student',
-        element: <StudentOnboardingPage />,
       },
       {
         path: 'courses',
@@ -101,6 +103,10 @@ export const router = createBrowserRouter([
         element: <StudentDashboardPage />,
       },
       {
+        path: 'browse',
+        element: <CourseCatalogPage />,
+      },
+      {
         path: 'profile',
         element: <StudentProfilePage />,
       },
@@ -110,7 +116,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'payments',
-        element: <div>Student Payments Placeholder</div>,
+        element: <StudentPaymentsPage />,
       },
       {
         path: 'courses',

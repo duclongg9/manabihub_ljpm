@@ -2,6 +2,7 @@ import React from 'react';
 import { Box } from '@mui/material';
 import { LandingHeader } from './LandingHeader';
 import { HeroSection } from './HeroSection';
+import { StatsBar } from './StatsBar';
 import { TopCategories } from './TopCategories';
 import { BestSellingCourses } from './BestSellingCourses';
 import { FeaturesSection } from './FeaturesSection';
@@ -12,11 +13,12 @@ import { LandingFooter } from './LandingFooter';
 
 export const PublicHomePage: React.FC = () => {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#ffffff' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#FBF9F5' }}>
       <LandingHeader />
 
       <Box component="main" sx={{ flexGrow: 1 }}>
         <HeroSection />
+        <StatsBar />
         <TopCategories />
         <BestSellingCourses />
         <FeaturesSection />
