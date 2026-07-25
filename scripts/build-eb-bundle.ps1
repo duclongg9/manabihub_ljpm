@@ -40,12 +40,24 @@ New-Item -ItemType Directory -Path $stagingDir | Out-Null
 Copy-Item -LiteralPath $jarPath -Destination (Join-Path $stagingDir $jarName)
 Copy-Item -LiteralPath (Join-Path $backendDir "Procfile") -Destination (Join-Path $stagingDir "Procfile")
 
+if (Test-Path -LiteralPath (Join-Path $backendDir ".platform")) {
+    Copy-Item -LiteralPath (Join-Path $backendDir ".platform") -Destination (Join-Path $stagingDir ".platform") -Recurse
+}
+
 if (Test-Path -LiteralPath $bundlePath) {
     Remove-Item -LiteralPath $bundlePath -Force
 }
 
-Compress-Archive -Path (Join-Path $stagingDir "*") -DestinationPath $bundlePath -CompressionLevel Optimal
+Push-Location $stagingDir
+try {
+    tar -a -c -f $bundlePath *
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create zip bundle using tar command. Exit code $LASTEXITCODE."
+    }
+} finally {
+    Pop-Location
+}
 
 Write-Host "Elastic Beanstalk bundle created:" -ForegroundColor Green
 Write-Host "  $bundlePath"
-Write-Host "The ZIP root contains only Procfile and $jarName."
+Write-Host "The ZIP root contains Procfile, .platform config, and $jarName."
