@@ -188,10 +188,28 @@ public final class MessageCodes {
     public static final String PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND";
 
     // ──────────────────────────────────────────────
-    // WALLET — wallet operations
+    // WALLET — wallet operations (UC-17 Manage My Wallet)
     // ──────────────────────────────────────────────
     public static final String WALLET_NOT_FOUND = "WALLET_NOT_FOUND";
     public static final String WALLET_INSUFFICIENT_BALANCE = "WALLET_INSUFFICIENT_BALANCE";
+    public static final String WALLET_LOADED = "WALLET_LOADED";
+    public static final String WALLET_TRANSACTIONS_LOADED = "WALLET_TRANSACTIONS_LOADED";
+    public static final String WALLET_WITHDRAWALS_LOADED = "WALLET_WITHDRAWALS_LOADED";
+    public static final String WALLET_TOP_UP_CREATED = "WALLET_TOP_UP_CREATED";
+    public static final String WALLET_TOP_UP_AMOUNT_INVALID = "WALLET_TOP_UP_AMOUNT_INVALID";
+    public static final String WALLET_TOP_UP_BELOW_MINIMUM = "WALLET_TOP_UP_BELOW_MINIMUM";
+    public static final String WALLET_TOP_UP_ALREADY_PENDING = "WALLET_TOP_UP_ALREADY_PENDING";
+    public static final String WALLET_FROZEN = "WALLET_FROZEN";
+    public static final String WALLET_ACTION_NOT_ALLOWED_FOR_ROLE = "WALLET_ACTION_NOT_ALLOWED_FOR_ROLE";
+    public static final String WALLET_STUDENT_PROFILE_NOT_FOUND = "WALLET_STUDENT_PROFILE_NOT_FOUND";
+    public static final String WALLET_TEACHER_PROFILE_NOT_FOUND = "WALLET_TEACHER_PROFILE_NOT_FOUND";
+
+    /** MSG-WALLET-001: Available balance is not enough for the request. */
+    public static final String MSG_WALLET_001 = "MSG-WALLET-001";
+    /** MSG-WALLET-002: Withdrawal request created. */
+    public static final String MSG_WALLET_002 = "MSG-WALLET-002";
+    /** MSG-WALLET-003: Teacher revenue wallet is frozen. */
+    public static final String MSG_WALLET_003 = "MSG-WALLET-003";
 
     // ──────────────────────────────────────────────
     // REFUND — refund processing

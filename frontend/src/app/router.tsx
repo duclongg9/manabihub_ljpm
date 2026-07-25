@@ -35,6 +35,7 @@ import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistPage';
 
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
+import { MyWalletPage } from '../features/my-wallet/pages/MyWalletPage';
 
 export const router = createBrowserRouter([
   {
@@ -109,6 +110,11 @@ export const router = createBrowserRouter([
         element: <StudentPaymentsPage />,
       },
       {
+        // UC-17: same screen as the teacher wallet, Student data set.
+        path: 'wallet',
+        element: <MyWalletPage role="STUDENT" />,
+      },
+      {
         path: 'courses',
         element: <StudentCoursesPage />,
       },
@@ -175,8 +181,9 @@ export const router = createBrowserRouter([
         element: <TeacherKycRoute />,
       },
       {
+        // UC-17: same screen as the student wallet, Teacher data set.
         path: 'wallet',
-        element: <Navigate to="/teacher/dashboard" replace />,
+        element: <MyWalletPage role="TEACHER" />,
       },
     ],
   },

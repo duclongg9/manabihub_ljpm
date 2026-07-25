@@ -33,6 +33,12 @@ import com.manabihub.learning.repository.LearningCertificateRepository;
 import com.manabihub.learning.repository.WishlistItemRepository;
 import com.manabihub.learning.repository.QuizAttemptRepository;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
+import com.manabihub.wallet.repository.EscrowEntryRepository;
+import com.manabihub.wallet.repository.PayoutSettlementRepository;
+import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.repository.WalletTopUpRequestRepository;
+import com.manabihub.wallet.repository.WalletTransactionRepository;
+import com.manabihub.wallet.repository.WithdrawalRequestRepository;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
 import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
@@ -170,6 +176,25 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private SystemSettingRepository systemSettingRepository;
+
+    // UC-17 Manage My Wallet
+    @MockBean
+    private WalletRepository walletRepository;
+
+    @MockBean
+    private WalletTransactionRepository walletTransactionRepository;
+
+    @MockBean
+    private WalletTopUpRequestRepository walletTopUpRequestRepository;
+
+    @MockBean
+    private EscrowEntryRepository escrowEntryRepository;
+
+    @MockBean
+    private WithdrawalRequestRepository withdrawalRequestRepository;
+
+    @MockBean
+    private PayoutSettlementRepository payoutSettlementRepository;
 
     @MockBean
     private TransactionTemplate transactionTemplate;

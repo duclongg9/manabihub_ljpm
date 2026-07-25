@@ -82,5 +82,15 @@ export const ENDPOINTS = {
     WRITING_SUBMISSION_POST: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions`,
     WRITING_SUBMISSION_AI: (blockId: string, submissionId: string) => `/v1/student/lessons/${blockId}/writing-submissions/${submissionId}/ai-assistance`,
   },
+  // UC-17 Manage My Wallet. Student and Teacher have separate paths because
+  // the backend enforces the role at the endpoint level (BR-RBAC-01).
+  wallet: {
+    studentWallet: '/v1/student/wallet',
+    studentTransactions: '/v1/student/wallet/transactions',
+    studentTopUps: '/v1/student/wallet/top-ups',
+    teacherWallet: '/v1/teacher/wallet',
+    teacherTransactions: '/v1/teacher/wallet/transactions',
+    teacherWithdrawals: '/v1/teacher/wallet/withdrawals',
+  },
   ADMIN_LOGIN: '/admin/auth/login',
 };

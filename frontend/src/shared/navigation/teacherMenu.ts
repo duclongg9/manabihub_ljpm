@@ -5,6 +5,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 
 export const TEACHER_MENU = [
   {
@@ -23,6 +24,12 @@ export const TEACHER_MENU = [
     title: 'Phản hồi bài viết',
     path: ROUTES.TEACHER.WRITING_REVIEWS,
     icon: RateReviewOutlinedIcon,
+    roles: [ROLES.TEACHER],
+  },
+  {
+    title: 'Ví doanh thu',
+    path: ROUTES.TEACHER.WALLET,
+    icon: AccountBalanceWalletIcon,
     roles: [ROLES.TEACHER],
   },
   {
