@@ -30,6 +30,11 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
     setBuyError(null);
     try {
       const checkout = await createCheckout(course.id);
+      if (!checkout.paymentUrl) {
+        // Free course — the student was enrolled immediately, go straight to learning.
+        navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
+        return;
+      }
       navigate(`/checkout/${checkout.orderId}`, { state: { paymentUrl: checkout.paymentUrl } });
     } catch (err) {
       const code = (err as { response?: { data?: { messageCode?: string } } })?.response?.data?.messageCode;

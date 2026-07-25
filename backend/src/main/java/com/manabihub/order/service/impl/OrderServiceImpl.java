@@ -96,6 +96,27 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
+    public void enrollFreeOrder(Order order) {
+        StudentProfile student = order.getStudent();
+        for (OrderItem item : orderItemRepository.findByOrder_Id(order.getId())) {
+            Course course = item.getCourse();
+            boolean alreadyEnrolled = enrollmentRepository
+                    .findByStudent_IdAndCourse_Id(student.getId(), course.getId())
+                    .isPresent();
+            if (!alreadyEnrolled) {
+                enrollmentRepository.save(Enrollment.builder()
+                        .student(student)
+                        .course(course)
+                        .status(EnrollmentStatus.ACTIVE)
+                        .build());
+            }
+        }
+        order.setStatus(com.manabihub.order.enums.OrderStatus.PAID);
+        orderRepository.save(order);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public OrderResponse getOrderForCurrentStudent(UUID orderId) {
         StudentProfile student = resolveCurrentStudent();

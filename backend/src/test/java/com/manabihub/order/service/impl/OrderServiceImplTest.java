@@ -118,4 +118,26 @@ class OrderServiceImplTest {
         assertThrows(BusinessException.class, () -> service.createOrder(course.getId()));
         verify(orderRepository, never()).save(any());
     }
+
+    @Test
+    void enrollFreeOrder_createsEnrollmentAndMarksOrderPaid() {
+        Order order = Order.builder()
+                .id(UUID.randomUUID())
+                .orderCode("OD-FREE")
+                .totalAmount(BigDecimal.ZERO)
+                .currency("VND")
+                .status(OrderStatus.PENDING)
+                .student(student)
+                .build();
+        when(orderItemRepository.findByOrder_Id(order.getId())).thenReturn(java.util.List.of(
+                OrderItem.builder().order(order).course(course).price(BigDecimal.ZERO).build()));
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId()))
+                .thenReturn(Optional.empty());
+
+        service.enrollFreeOrder(order);
+
+        assertEquals(OrderStatus.PAID, order.getStatus());
+        verify(enrollmentRepository).save(any(Enrollment.class));
+        verify(orderRepository).save(order);
+    }
 }

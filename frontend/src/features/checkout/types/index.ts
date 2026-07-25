@@ -4,7 +4,8 @@ export interface CheckoutResponse {
   amount: number;
   currency: string;
   status: string;
-  paymentUrl: string;
+  /** Provider payment URL for paid courses; null for free courses (enrolled immediately). */
+  paymentUrl: string | null;
 }
 
 export interface OrderItemResponse {

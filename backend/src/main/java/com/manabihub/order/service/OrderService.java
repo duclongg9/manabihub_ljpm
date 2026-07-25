@@ -17,6 +17,12 @@ public interface OrderService {
     Order createOrder(UUID courseId);
 
     /**
+     * Completes a free (zero-amount) order by enrolling the student immediately and marking
+     * the order paid — no payment provider or escrow is involved. Idempotent on enrollment.
+     */
+    void enrollFreeOrder(Order order);
+
+    /**
      * Returns an order owned by the current student, used by the frontend to poll
      * payment status after redirecting back from the payment provider.
      */

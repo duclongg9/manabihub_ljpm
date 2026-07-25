@@ -41,8 +41,22 @@ public class OrderController {
     public ApiResponse<CheckoutResponse> checkout(@Valid @RequestBody CreateOrderRequest request,
                                                   HttpServletRequest httpRequest) {
         Order order = orderService.createOrder(request.courseId());
-        String paymentUrl = paymentService.initiatePayment(order, resolveClientIp(httpRequest));
 
+        // Free course: enroll immediately, skip the payment provider entirely
+        // (paymentUrl is null so the frontend goes straight to the course).
+        if (order.getTotalAmount().signum() == 0) {
+            orderService.enrollFreeOrder(order);
+            CheckoutResponse freeCheckout = new CheckoutResponse(
+                    order.getId(),
+                    order.getOrderCode(),
+                    order.getTotalAmount(),
+                    order.getCurrency(),
+                    order.getStatus().name(),
+                    null);
+            return ApiResponse.success(MessageCodes.ORDER_CREATED, "Enrolled in free course.", freeCheckout);
+        }
+
+        String paymentUrl = paymentService.initiatePayment(order, resolveClientIp(httpRequest));
         CheckoutResponse checkout = new CheckoutResponse(
                 order.getId(),
                 order.getOrderCode(),
