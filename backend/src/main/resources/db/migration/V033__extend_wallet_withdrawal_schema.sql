@@ -1,4 +1,4 @@
--- V032: Extend wallet and withdrawal schema for payout feature
+-- V033: Extend wallet and withdrawal schema for payout feature
 -- Add new transaction types and withdrawal statuses needed by withdrawal module
 
 -- 1. Drop old CHECK constraint on wallet_transactions.transaction_type and add extended one

@@ -1,3 +1,4 @@
+-- V032: Create saved teacher bank accounts for the withdrawal feature.
 CREATE TABLE teacher_bank_accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     teacher_id UUID NOT NULL,
