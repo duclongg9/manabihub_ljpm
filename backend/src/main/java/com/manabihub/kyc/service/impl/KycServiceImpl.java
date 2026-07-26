@@ -18,6 +18,7 @@ import com.manabihub.notification.repository.NotificationRepository;
 // removed UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class KycServiceImpl implements KycService {
 
+    private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
+
     private final KycRequestRepository kycRequestRepository;
     private final InternalAdminAccountRepository adminAccountRepository;
     private final TeacherProfileRepository teacherProfileRepository;
@@ -41,6 +44,7 @@ public class KycServiceImpl implements KycService {
     private final AuditLogRepository auditLogRepository;
     private final NotificationRepository notificationRepository;
     private final ObjectMapper objectMapper;
+    private final EntityManager entityManager;
 
     private void checkCourseManagerAccess(UUID adminId) {
         boolean hasAccess = adminAccountRepository.existsByAdminIdAndRoleCodes(adminId, List.of("COURSE_MANAGER", "SYSTEM_ADMIN"));
@@ -57,7 +61,9 @@ public class KycServiceImpl implements KycService {
     @Transactional(readOnly = true)
     public List<KycRequestResponse> getPendingKycQueue(UUID adminId) {
         checkCourseManagerAccess(adminId);
-        List<KycRequest> requests = kycRequestRepository.findByStatusOrderByCreatedAtDesc(KycRequestStatus.PENDING);
+        // UC-28: hiển thị tất cả hồ sơ KYC (kể cả đã auto-approve) để Course Manager
+        // có thể tra soát lại khi có tố cáo và thu hồi vai trò nếu phát hiện sai sót.
+        List<KycRequest> requests = kycRequestRepository.findAllByOrderByCreatedAtDesc();
         return requests.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -88,10 +94,17 @@ public class KycServiceImpl implements KycService {
                         HttpStatus.NOT_FOUND
                 ));
 
-        if (kycRequest.getStatus() != KycRequestStatus.PENDING) {
+        KycRequestStatus currentStatus = kycRequest.getStatus();
+        KycRequestStatus targetStatus = request.getStatus();
+
+        // UC-28: an already-APPROVED request can be revoked after a complaint;
+        // otherwise only PENDING requests are reviewable.
+        boolean isRevoke = currentStatus == KycRequestStatus.APPROVED
+                && targetStatus == KycRequestStatus.REVOKED;
+        if (currentStatus != KycRequestStatus.PENDING && !isRevoke) {
             throw new BusinessException(
                     MessageCodes.COMMON_CONFLICT,
-                    "KYC request has already been processed or is not pending review",
+                    "KYC request has already been processed or cannot transition to " + targetStatus,
                     HttpStatus.CONFLICT
             );
         }
@@ -99,8 +112,7 @@ public class KycServiceImpl implements KycService {
         InternalAdminAccount admin = adminAccountRepository.findById(adminId)
                 .orElseThrow(() -> new BusinessException(MessageCodes.AUTH_UNAUTHORIZED, "Admin not found", HttpStatus.UNAUTHORIZED));
 
-        // Validate decision note for Reject or Request Correction
-        KycRequestStatus targetStatus = request.getStatus();
+        // DRAFT / PENDING are never valid review outcomes
         if (targetStatus == KycRequestStatus.DRAFT || targetStatus == KycRequestStatus.PENDING) {
             throw new BusinessException(
                     MessageCodes.VALIDATION_FAILED,
@@ -109,11 +121,14 @@ public class KycServiceImpl implements KycService {
             );
         }
 
-        if (targetStatus == KycRequestStatus.REJECTED || targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
+        // Decision reason is required for Reject, Request Correction, and Revoke
+        if (targetStatus == KycRequestStatus.REJECTED
+                || targetStatus == KycRequestStatus.CORRECTION_REQUIRED
+                || targetStatus == KycRequestStatus.REVOKED) {
             if (request.getDecisionNote() == null || request.getDecisionNote().trim().isEmpty()) {
                 throw new BusinessException(
                         MessageCodes.VALIDATION_FAILED,
-                        "Decision reason is required for rejection or correction request",
+                        "Decision reason is required for rejection, correction, or revocation",
                         HttpStatus.BAD_REQUEST
                 );
             }
@@ -138,6 +153,13 @@ public class KycServiceImpl implements KycService {
             TeacherProfile teacher = kycRequest.getTeacherProfile();
             teacher.setKycStatus(TeacherKycStatus.CORRECTION_REQUIRED);
             teacherProfileRepository.save(teacher);
+        } else if (targetStatus == KycRequestStatus.REVOKED) {
+            TeacherProfile teacher = kycRequest.getTeacherProfile();
+            teacher.setKycStatus(TeacherKycStatus.REVOKED);
+            teacher.setCanPublishCourse(false);
+            teacherProfileRepository.save(teacher);
+            // Gỡ vai trò TEACHER khỏi tài khoản người dùng khi thu hồi
+            revokeTeacherRole(teacher.getUser().getId());
         }
 
         KycRequest savedRequest = kycRequestRepository.save(kycRequest);
@@ -150,7 +172,7 @@ public class KycServiceImpl implements KycService {
                 .action("KYC_REVIEW")
                 .targetType("KYC_REQUEST")
                 .targetId(kycRequest.getId())
-                .beforeValue(Map.of("status", KycRequestStatus.PENDING.name()))
+                .beforeValue(Map.of("status", currentStatus.name()))
                 .afterValue(Map.of("status", targetStatus.name()))
                 .metadata(Map.of("decisionNote", request.getDecisionNote() != null ? request.getDecisionNote() : ""))
                 .build();
@@ -165,6 +187,9 @@ public class KycServiceImpl implements KycService {
             message = "Rất tiếc, hồ sơ KYC của bạn đã bị từ chối. Lý do: " + request.getDecisionNote();
         } else if (targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
             message = "Hồ sơ KYC của bạn cần được chỉnh sửa. Lý do: " + request.getDecisionNote();
+        } else if (targetStatus == KycRequestStatus.REVOKED) {
+            title = "Vai trò giảng viên đã bị thu hồi";
+            message = "Vai trò giảng viên của bạn đã bị thu hồi và quyền xuất bản khóa học đã bị gỡ bỏ. Lý do: " + request.getDecisionNote();
         }
 
         Notification notification = Notification.builder()
@@ -244,5 +269,13 @@ public class KycServiceImpl implements KycService {
                 .map(KycDocument::getFileUrl)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private void revokeTeacherRole(UUID userId) {
+        entityManager.createNativeQuery(
+                "DELETE FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
+        ).setParameter("userId", userId)
+         .setParameter("roleId", TEACHER_ROLE_ID)
+         .executeUpdate();
     }
 }

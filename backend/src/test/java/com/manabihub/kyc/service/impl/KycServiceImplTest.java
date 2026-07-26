@@ -55,6 +55,12 @@ class KycServiceImplTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private jakarta.persistence.EntityManager entityManager;
+
+    @Mock
+    private jakarta.persistence.Query nativeQuery;
+
     @InjectMocks
     private KycServiceImpl kycService;
 
@@ -160,6 +166,62 @@ class KycServiceImplTest {
         assertEquals(TeacherKycStatus.APPROVED, teacherProfile.getKycStatus());
         assertTrue(teacherProfile.isCanPublishCourse());
         verify(teacherProfileRepository).save(teacherProfile);
+    }
+
+    @Test
+    void testReviewKyc_WhenRevokeApproved_ShouldRemoveTeacherRoleAndDowngrade() {
+        when(adminAccountRepository.existsByAdminIdAndRoleCodes(eq(courseManager.getId()), anyList())).thenReturn(true);
+        when(adminAccountRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
+
+        teacherProfile.setKycStatus(TeacherKycStatus.APPROVED);
+        teacherProfile.setCanPublishCourse(true);
+
+        KycRequest approvedRequest = new KycRequest();
+        approvedRequest.setId(kycId);
+        approvedRequest.setTeacherProfile(teacherProfile);
+        approvedRequest.setStatus(KycRequestStatus.APPROVED);
+        approvedRequest.setCreatedAt(Instant.now());
+        approvedRequest.setUpdatedAt(Instant.now());
+        when(kycRequestRepository.findById(kycId)).thenReturn(Optional.of(approvedRequest));
+        when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(any())).thenReturn(List.of());
+        when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
+        when(nativeQuery.setParameter(anyString(), any())).thenReturn(nativeQuery);
+        when(nativeQuery.executeUpdate()).thenReturn(1);
+
+        KycReviewRequest request = new KycReviewRequest(KycRequestStatus.REVOKED, "Phát hiện gian lận sau tố cáo");
+
+        KycRequestResponse response = kycService.reviewKyc(kycId, request, courseManager.getId(), "COURSE_MANAGER", "manager@manabihub.local");
+
+        assertNotNull(response);
+        assertEquals(KycRequestStatus.REVOKED, response.getStatus());
+        assertEquals(TeacherKycStatus.REVOKED, teacherProfile.getKycStatus());
+        assertFalse(teacherProfile.isCanPublishCourse());
+        verify(teacherProfileRepository).save(teacherProfile);
+        verify(entityManager).createNativeQuery(contains("DELETE FROM user_roles"));
+        verify(nativeQuery).executeUpdate();
+    }
+
+    @Test
+    void testReviewKyc_WhenRevokeWithoutNote_ShouldThrowValidation() {
+        when(adminAccountRepository.existsByAdminIdAndRoleCodes(eq(courseManager.getId()), anyList())).thenReturn(true);
+        when(adminAccountRepository.findById(courseManager.getId())).thenReturn(Optional.of(courseManager));
+
+        KycRequest approvedRequest = new KycRequest();
+        approvedRequest.setId(kycId);
+        approvedRequest.setTeacherProfile(teacherProfile);
+        approvedRequest.setStatus(KycRequestStatus.APPROVED);
+        when(kycRequestRepository.findById(kycId)).thenReturn(Optional.of(approvedRequest));
+
+        KycReviewRequest request = new KycReviewRequest(KycRequestStatus.REVOKED, "  ");
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                kycService.reviewKyc(kycId, request, courseManager.getId(), "COURSE_MANAGER", "manager@manabihub.local")
+        );
+
+        assertEquals("VALIDATION_FAILED", exception.getMessageCode());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getHttpStatus());
+        verify(kycRequestRepository, never()).save(any());
     }
 
     @Test

@@ -5,5 +5,6 @@ public enum TeacherKycStatus {
     PENDING,
     APPROVED,
     REJECTED,
-    CORRECTION_REQUIRED
+    CORRECTION_REQUIRED,
+    REVOKED
 }
