@@ -73,4 +73,33 @@ public class WalletServiceImpl implements WalletService {
 
         return walletTransactionRepository.save(transaction);
     }
+
+    @Override
+    @Transactional
+    public WalletTransaction releaseEscrow(TeacherProfile teacher, BigDecimal amount,
+                                           String referenceType, UUID referenceId, String note) {
+        Wallet wallet = getOrCreateTeacherWallet(teacher);
+
+        Wallet locked = walletRepository.findByIdForUpdate(wallet.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.WALLET_NOT_FOUND,
+                        "Teacher wallet was not found",
+                        HttpStatus.NOT_FOUND));
+
+        locked.setFrozenBalance(locked.getFrozenBalance().subtract(amount));
+        locked.setBalance(locked.getBalance().add(amount));
+        walletRepository.save(locked);
+
+        WalletTransaction transaction = WalletTransaction.builder()
+                .wallet(locked)
+                .transactionType(WalletTransactionType.ESCROW_RELEASE)
+                .amount(amount)
+                .direction(WalletDirection.IN)
+                .referenceType(referenceType)
+                .referenceId(referenceId)
+                .note(note)
+                .build();
+
+        return walletTransactionRepository.save(transaction);
+    }
 }
