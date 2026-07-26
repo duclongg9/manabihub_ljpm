@@ -1,145 +1,145 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { Box, Container, Typography, Button } from '@mui/material';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
 
-const SLIDER_DATA = [
-  {
-    teacherImg: getAsset('teacher1.png'),
-    courseBg: getAsset('course1.png'),
-    teacherName: 'Giảng viên 1'
-  },
-  {
-    teacherImg: getAsset('teacher2.png'),
-    courseBg: getAsset('course2.png'),
-    teacherName: 'Giảng viên 2'
-  },
-  {
-    teacherImg: getAsset('teacher3.png'),
-    courseBg: getAsset('course3.png'),
-    teacherName: 'Giảng viên 3'
-  },
-];
+// Japanese wave pattern as inline SVG data URI
+const WAVE_PATTERN = `url("data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21.184 20c.357-.13.72-.264 1.088-.402l1.768-.661C33.64 15.347 39.647 14 50 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072h6.225c-2.51-.73-5.139-1.691-8.233-2.928C65.888 13.278 60.562 12 50 12c-10.626 0-16.855 1.397-26.66 5.063l-1.767.662c-2.475.923-4.66 1.674-6.724 2.275h6.335zm0-20C13.258 2.892 8.077 4 0 4V2c5.744 0 9.951-.574 14.85-2h6.334zM77.38 0C85.239 2.966 90.502 4 100 4V2c-6.842 0-11.386-.542-16.396-2h-6.225zM0 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072H21.18c-.358-.13-.72-.264-1.088-.402l-1.768-.661C9.73 15.347 3.723 14 0 14v0z' fill='%23ffffff' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E")`;
 
 export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  const handleNext = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % SLIDER_DATA.length);
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      handleNext();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [handleNext]);
 
   return (
     <Box
       sx={{
         position: 'relative',
-        minHeight: { xs: '80vh', md: '90vh' },
+        minHeight: { xs: '75vh', md: '85vh' },
         display: 'flex',
         alignItems: 'center',
         overflow: 'hidden',
-        bgcolor: '#000000',
+        background: 'linear-gradient(135deg, #1B2A4A 0%, #0F1D36 60%, #0A1628 100%)',
       }}
     >
-      {/* Dynamic Backgrounds with Crossfade */}
-      {SLIDER_DATA.map((data, index) => (
+      {/* Wave pattern overlay */}
+      <Box
+        sx={{
+          position: 'absolute', top: 0, left: 0,
+          width: '100%', height: '100%',
+          backgroundImage: WAVE_PATTERN,
+          backgroundRepeat: 'repeat',
+          zIndex: 0,
+        }}
+      />
+
+      {/* Ambient glow - vermilion */}
+      <Box
+        sx={{
+          position: 'absolute', top: '10%', right: '20%',
+          width: '40%', height: '60%',
+          background: 'radial-gradient(circle, rgba(196, 30, 58, 0.07) 0%, rgba(0,0,0,0) 70%)',
+          zIndex: 0,
+        }}
+      />
+
+      {/* Floating sakura-inspired particles */}
+      {[...Array(5)].map((_, i) => (
         <Box
-          key={`bg-${index}`}
+          key={i}
           sx={{
             position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundImage: `url(${data.courseBg})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            opacity: currentIndex === index ? 1 : 0,
-            transform: currentIndex === index ? 'scale(1)' : 'scale(1.05)',
-            transition: 'opacity 1.5s ease-in-out, transform 1.5s ease-in-out',
-            zIndex: 0
+            width: { xs: 6, md: 8 },
+            height: { xs: 6, md: 8 },
+            borderRadius: '50%',
+            bgcolor: i % 2 === 0 ? 'rgba(196, 30, 58, 0.15)' : 'rgba(255, 183, 197, 0.12)',
+            left: `${15 + i * 18}%`,
+            top: `${20 + (i % 3) * 25}%`,
+            zIndex: 0,
+            animation: `sakuraFloat${i} ${6 + i * 2}s ease-in-out infinite`,
+            [`@keyframes sakuraFloat${i}`]: {
+              '0%, 100%': { transform: 'translateY(0) rotate(0deg)', opacity: 0.6 },
+              '50%': { transform: `translateY(-${15 + i * 5}px) rotate(${45 + i * 30}deg)`, opacity: 1 },
+            },
           }}
         />
       ))}
 
-      {/* Dark Overlay for Text Readability */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          bgcolor: 'rgba(0, 0, 0, 0.75)',
-          zIndex: 1
-        }}
-      />
-
-      {/* Content overlayed on top */}
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
         <Box
           sx={{
             display: 'flex',
             flexDirection: { xs: 'column-reverse', md: 'row' },
             alignItems: 'center',
-            gap: { xs: 6, md: 4 }
+            gap: { xs: 4, md: 6 }
           }}
         >
-          {/* Left Content (Text + Buttons) - 55% to give right more space */}
-          <Box sx={{ width: { xs: '100%', md: '55%' } }}>
+          {/* Left Content (Text + Buttons) - 50% */}
+          <Box sx={{ width: { xs: '100%', md: '50%' } }}>
             <Box
-              key={currentIndex}
               sx={{
-                animation: 'flowOut 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards',
-                '@keyframes flowOut': {
-                  '0%': {
-                    opacity: 0,
-                    transform: 'translateX(-100px)',
-                    filter: 'blur(8px)'
-                  },
-                  '100%': {
-                    opacity: 1,
-                    transform: 'translateX(0)',
-                    filter: 'blur(0)'
-                  }
+                animation: 'heroFadeIn 1s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+                '@keyframes heroFadeIn': {
+                  '0%': { opacity: 0, transform: 'translateY(24px)' },
+                  '100%': { opacity: 1, transform: 'translateY(0)' }
                 }
               }}
             >
+              {/* Japanese accent */}
+              <Typography
+                sx={{
+                  fontFamily: '"Noto Sans JP", sans-serif',
+                  color: 'rgba(196, 30, 58, 0.75)',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  letterSpacing: '0.12em',
+                  mb: 2,
+                }}
+              >
+                学ぶ ・ 成長する ・ 繋がる
+              </Typography>
+
               <Typography
                 variant="h1"
                 sx={{
                   fontWeight: 800,
                   color: '#ffffff',
-                  lineHeight: 1.2,
+                  lineHeight: 1.15,
                   mb: 3,
-                  fontSize: { xs: '2.5rem', md: '4rem' },
+                  fontSize: { xs: '2.4rem', md: '3.5rem' },
                   letterSpacing: '-1px'
                 }}
               >
-                {'Học tiếng Nhật'} <br />
-                <Box component="span" sx={{ color: '#60a5fa' }}>{'Dễ dàng & Hiệu quả'}</Box>
+                Hành trình chinh phục{' '}
+                <Box
+                  component="span"
+                  sx={{
+                    background: 'linear-gradient(135deg, #C41E3A, #E8432A)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
+                  tiếng Nhật
+                </Box>
+                {' '}bắt đầu tại đây
               </Typography>
 
               <Typography
                 variant="h6"
                 sx={{
-                  color: '#e2e8f0',
+                  color: '#b0bdd0',
                   fontWeight: 400,
-                  lineHeight: 1.6,
+                  lineHeight: 1.7,
                   mb: 5,
-                  fontSize: { xs: '1.05rem', md: '1.2rem' },
-                  pr: { md: 4 }
+                  fontSize: { xs: '1rem', md: '1.1rem' },
+                  pr: { md: 2 },
+                  maxWidth: 520,
                 }}
               >
-                {'Nền tảng học tiếng Nhật trực tuyến hàng đầu. Kết nối bạn với những giảng viên xuất sắc nhất. Học mọi lúc, mọi nơi với giáo trình chuẩn JLPT, hỗ trợ tận tình và cam kết chất lượng đầu ra.'}
+                Nền tảng học tiếng Nhật trực tuyến hàng đầu. Giáo trình chuẩn JLPT N5→N1, hỗ trợ AI thông minh và đội ngũ giảng viên được kiểm duyệt KYC nghiêm ngặt.
               </Typography>
 
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -149,24 +149,23 @@ export const HeroSection: React.FC = () => {
                   onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
                   endIcon={<AutoStoriesIcon />}
                   sx={{
-                    py: 1.8,
-                    px: 5,
-                    borderRadius: 3,
-                    bgcolor: '#2563eb',
+                    py: 1.8, px: 5,
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)',
                     color: '#ffffff',
                     fontWeight: 700,
                     textTransform: 'none',
                     fontSize: '1.1rem',
-                    boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.3)',
+                    boxShadow: '0 8px 24px rgba(196, 30, 58, 0.35)',
                     transition: 'all 0.3s ease',
                     '&:hover': {
-                      bgcolor: '#1d4ed8',
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 20px 25px -5px rgba(37, 99, 235, 0.4)'
+                      background: 'linear-gradient(135deg, #A8182F 0%, #D13A24 100%)',
+                      transform: 'translateY(-3px)',
+                      boxShadow: '0 16px 32px rgba(196, 30, 58, 0.45)'
                     }
                   }}
                 >
-                  {'Khám phá khóa học'}
+                  Khám phá khóa học
                 </Button>
 
                 <Button
@@ -174,102 +173,133 @@ export const HeroSection: React.FC = () => {
                   size="large"
                   onClick={() => navigate(ROUTES.TEACHER.KYC)}
                   sx={{
-                    py: 1.8,
-                    px: 5,
-                    borderRadius: 3,
-                    borderColor: 'rgba(255,255,255,0.5)',
+                    py: 1.8, px: 5,
+                    borderRadius: '12px',
+                    borderColor: '#ffffff',
+                    borderWidth: '2px',
                     color: '#ffffff',
                     fontWeight: 700,
                     textTransform: 'none',
                     fontSize: '1.1rem',
                     transition: 'all 0.3s ease',
                     '&:hover': {
-                      borderColor: '#ffffff',
-                      bgcolor: 'rgba(255,255,255,0.1)',
-                      transform: 'translateY(-2px)'
+                      borderColor: 'rgba(196, 30, 58, 0.6)',
+                      bgcolor: 'rgba(196, 30, 58, 0.08)',
+                      transform: 'translateY(-3px)'
                     }
                   }}
                 >
-                  {'Trở thành giảng viên'}
+                  Trở thành giảng viên
                 </Button>
               </Box>
             </Box>
           </Box>
 
-          {/* Right Content (Teacher Images Slider in a Circle) - 45% */}
+          {/* Right Content (Illustration) - 50% */}
           <Box
             sx={{
-              width: { xs: '100%', md: '45%' },
+              width: { xs: '100%', md: '50%' },
               display: 'flex',
-              flexDirection: 'column',
               justifyContent: 'center',
-              alignItems: { xs: 'center', md: 'flex-end' },
-              position: 'relative'
+              alignItems: 'center',
+              position: 'relative',
+              animation: 'heroImgIn 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both',
+              '@keyframes heroImgIn': {
+                '0%': { opacity: 0, transform: 'translateY(30px) scale(0.95)' },
+                '100%': { opacity: 1, transform: 'translateY(0) scale(1)' }
+              }
             }}
           >
-            {/* Circular Image Container */}
+            {/* Kanji watermark behind illustration */}
+            <Typography
+              sx={{
+                position: 'absolute',
+                top: { xs: -10, md: -20 },
+                right: { xs: 0, md: 20 },
+                fontSize: { xs: '7rem', md: '10rem' },
+                fontWeight: 900,
+                fontFamily: '"Noto Sans JP", serif',
+                color: 'rgba(255,255,255,0.025)',
+                lineHeight: 1,
+                zIndex: 0,
+                userSelect: 'none',
+                pointerEvents: 'none',
+              }}
+            >
+              学
+            </Typography>
+
+            {/* Illustration image */}
             <Box
+              component="img"
+              src={getAsset('hero_illustration.png')}
+              alt="Học tiếng Nhật cùng ManabiHub"
               sx={{
                 width: '100%',
-                maxWidth: { xs: '450px', md: '560px' },
-                aspectRatio: '1/1',
-                borderRadius: '50%',
-                overflow: 'hidden',
+                maxWidth: { xs: 360, md: 520 },
+                height: 'auto',
+                objectFit: 'contain',
                 position: 'relative',
-                boxShadow: '0 15px 40px rgba(0, 0, 0, 0.3)',
-                border: { xs: '12px solid #ffffff', md: '18px solid #ffffff' },
-                bgcolor: '#e2e8f0', // In case of transparent images
                 zIndex: 1,
-                mb: 4, // Margin bottom to make space for buttons
-                transition: 'transform 0.3s ease',
+                filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.3))',
+                transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
-                  transform: 'scale(1.02)'
+                  transform: 'scale(1.03) translateY(-4px)',
+                }
+              }}
+            />
+
+            {/* Floating JLPT badge */}
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: { xs: 10, md: 30 },
+                left: { xs: 0, md: -10 },
+                bgcolor: '#FFF8E1',
+                color: '#1A1A2E',
+                display: 'flex', alignItems: 'center', gap: 1,
+                px: 2.5, py: 1.2,
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                letterSpacing: '0.02em',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                zIndex: 10,
+                animation: 'floatBadge 4s ease-in-out infinite',
+                '@keyframes floatBadge': {
+                  '0%, 100%': { transform: 'translateY(0)' },
+                  '50%': { transform: 'translateY(-8px)' },
                 }
               }}
             >
-              {SLIDER_DATA.map((data, index) => (
-                <Box
-                  key={`teacher-${index}`}
-                  component="img"
-                  src={data.teacherImg}
-                  alt={data.teacherName}
-                  sx={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    opacity: currentIndex === index ? 1 : 0,
-                    transform: currentIndex === index ? 'scale(1)' : 'scale(1.15)',
-                    transition: 'opacity 1.5s ease-in-out, transform 1.5s ease-in-out',
-                  }}
-                />
-              ))}
+              <MenuBookIcon sx={{ color: '#D4A017', fontSize: 18 }} />
+              JLPT N5 → N1
             </Box>
 
-            {/* Slider Navigation Buttons */}
-            <Box sx={{ display: 'flex', gap: 2, zIndex: 2, justifyContent: 'center', width: { xs: '100%', md: 'auto' }, mr: { md: '180px' } }}>
-              {/* Pagination Dots */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1, borderRadius: '20px', background: 'rgba(0, 0, 0, 0.2)', backdropFilter: 'blur(5px)' }}>
-                {SLIDER_DATA.map((_, index) => (
-                  <Box
-                    key={`dot-${index}`}
-                    onClick={() => setCurrentIndex(index)}
-                    sx={{
-                      width: currentIndex === index ? 32 : 10,
-                      height: 10,
-                      borderRadius: 5,
-                      bgcolor: currentIndex === index ? '#60a5fa' : 'rgba(255, 255, 255, 0.4)',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      '&:hover': {
-                        bgcolor: currentIndex === index ? '#60a5fa' : 'rgba(255, 255, 255, 0.8)',
-                      }
-                    }}
-                  />
-                ))}
-              </Box>
+            {/* Floating sakura badge */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: { xs: 20, md: 40 },
+                right: { xs: 10, md: 0 },
+                bgcolor: 'rgba(255, 255, 255, 0.95)',
+                color: '#1A1A2E',
+                display: 'flex', alignItems: 'center', gap: 1,
+                px: 2.5, py: 1.2,
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                zIndex: 10,
+                animation: 'floatBadge2 5s ease-in-out 1s infinite',
+                '@keyframes floatBadge2': {
+                  '0%, 100%': { transform: 'translateY(0)' },
+                  '50%': { transform: 'translateY(-6px)' },
+                }
+              }}
+            >
+              <AutoAwesomeIcon sx={{ color: '#C41E3A', fontSize: 18 }} />
+              AI Trợ lý học tập
             </Box>
           </Box>
         </Box>

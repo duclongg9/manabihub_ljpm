@@ -50,16 +50,16 @@ export const router = createBrowserRouter([
     element: <AdminLoginPage />,
   },
   {
+    path: '/onboarding/student',
+    element: <StudentOnboardingPage />,
+  },
+  {
     path: '/',
     element: <PublicLayout />,
     children: [
       {
         path: 'auth/callback',
         element: <AuthCallbackPage />,
-      },
-      {
-        path: 'onboarding/student',
-        element: <StudentOnboardingPage />,
       },
       {
         path: 'courses',
@@ -77,6 +77,14 @@ export const router = createBrowserRouter([
         path: 'about',
         element: <AboutUsPage />,
       },
+      {
+        path: 'checkout/return',
+        element: <CheckoutReturnPage />,
+      },
+      {
+        path: 'checkout/:orderId',
+        element: <CheckoutPage />,
+      },
     ],
   },
   {
@@ -92,6 +100,10 @@ export const router = createBrowserRouter([
         element: <StudentDashboardPage />,
       },
       {
+        path: 'browse',
+        element: <CourseCatalogPage />,
+      },
+      {
         path: 'profile',
         element: <StudentProfilePage />,
       },
@@ -101,7 +113,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'payments',
-        element: <div>Student Payments Placeholder</div>,
+        element: <StudentPaymentsPage />,
       },
       {
         path: 'courses',

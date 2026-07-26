@@ -171,6 +171,25 @@ class ManabiHubApplicationTests {
     @MockBean
     private SystemSettingRepository systemSettingRepository;
 
+    // UC-08 purchase flow repositories.
+    @MockBean
+    private com.manabihub.order.repository.OrderRepository orderRepository;
+
+    @MockBean
+    private com.manabihub.order.repository.OrderItemRepository orderItemRepository;
+
+    @MockBean
+    private com.manabihub.payment.repository.PaymentTransactionRepository paymentTransactionRepository;
+
+    @MockBean
+    private com.manabihub.wallet.repository.WalletRepository walletRepository;
+
+    @MockBean
+    private com.manabihub.wallet.repository.WalletTransactionRepository walletTransactionRepository;
+
+    @MockBean
+    private com.manabihub.wallet.repository.EscrowLedgerRepository escrowLedgerRepository;
+
     @MockBean
     private TransactionTemplate transactionTemplate;
 

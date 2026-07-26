@@ -5,8 +5,8 @@ import { CourseStickyCard } from '../components/CourseStickyCard';
 import { CurriculumAccordion } from '../components/CurriculumAccordion';
 import { TeacherProfile } from '../components/TeacherProfile';
 import { CourseStickyHeader } from '../components/CourseStickyHeader';
-import CheckIcon from '@mui/icons-material/Check';
 import { Helmet } from 'react-helmet-async';
+import { Target, CheckCircle2, Star } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 export const CourseDetailPage = () => {
@@ -61,6 +61,15 @@ export const CourseDetailPage = () => {
     ? course.prerequisites.split('\n').filter((item) => item.trim() !== '')
     : [];
 
+  const displayOutcomes = outcomesList.length > 0 
+    ? outcomesList 
+    : [
+        'Nắm vững cấu trúc đoạn văn chuẩn JLPT N3',
+        'Bổ sung 200+ từ vựng & mẫu ngữ pháp ăn điểm bài viết',
+        'Nhận phản hồi sửa lỗi chi tiết từ AI & Sensei',
+        'Phương pháp sắp xếp ý tưởng và triển khai bài viết logic'
+      ];
+
   // Plain text fallback for meta description
   const metaDescription = course.introduction
     ? course.introduction.replace(/<[^>]+>/g, '').substring(0, 160)
@@ -93,28 +102,23 @@ export const CourseDetailPage = () => {
           <div className="lg:col-span-2">
 
             {/* What you will learn */}
-            {outcomesList.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 mb-12 hover:shadow-md transition-shadow">
-                <h2 className="text-2xl font-extrabold text-slate-900 mb-6">Bạn sẽ học được gì?</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                  {outcomesList.map((outcome, index) => (
-                    <div key={index} className="flex items-start group">
-                      <div className="flex-shrink-0 mt-0.5 mr-3 w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center group-hover:bg-emerald-200 transition-colors">
-                        <CheckIcon className="text-emerald-600" sx={{ fontSize: 16 }} />
-                      </div>
-                      <span className="text-slate-700 text-sm leading-relaxed">{outcome.trim()}</span>
-                    </div>
-                  ))}
-                </div>
+            <div className="bg-rose-50/50 border border-rose-100 p-6 rounded-2xl mb-12">
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                <Target className="w-5 h-5 text-red-600 mr-2" />
+                Bạn sẽ học được gì trong khóa học này?
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {displayOutcomes.map((outcome, index) => (
+                  <div key={index} className="flex items-start text-sm text-slate-700 leading-relaxed font-medium gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 stroke-[2.5] mt-0.5" />
+                    <span>{outcome.trim()}</span>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Curriculum */}
             <div className="mb-12">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6">Nội dung khóa học</h2>
-              <div className="flex justify-between items-center mb-4 text-sm text-slate-600">
-                <span>{course.modules.length} phần • {course.totalLessons || course.modules.reduce((acc, m) => acc + m.blocks.length, 0)} bài học</span>
-              </div>
               <CurriculumAccordion
                 modules={course.modules}
                 courseId={course.id}
@@ -147,6 +151,87 @@ export const CourseDetailPage = () => {
 
             {/* Teacher Profile */}
             <TeacherProfile teacher={course.teacher} />
+
+            {/* Reviews Section */}
+            <div className="mt-12">
+              <h2 className="text-2xl font-extrabold text-slate-900 mb-6">Đánh giá từ học viên</h2>
+              
+              <div className="flex flex-col sm:flex-row gap-8 mb-8">
+                {/* Stats */}
+                <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border border-slate-100 min-w-[200px]">
+                  <span className="text-5xl font-black text-slate-900 mb-2">4.8</span>
+                  <div className="flex gap-1 mb-2">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star key={s} className="w-4 h-4 text-amber-400 fill-amber-400" />
+                    ))}
+                  </div>
+                  <span className="text-sm font-medium text-slate-500">16 đánh giá</span>
+                </div>
+                
+                {/* Bars */}
+                <div className="flex-1 flex flex-col justify-center gap-2">
+                  {[
+                    { stars: 5, pct: 85 },
+                    { stars: 4, pct: 10 },
+                    { stars: 3, pct: 5 },
+                    { stars: 2, pct: 0 },
+                    { stars: 1, pct: 0 },
+                  ].map((bar) => (
+                    <div key={bar.stars} className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-slate-500 w-8">{bar.stars} sao</span>
+                      <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${bar.pct}%` }} />
+                      </div>
+                      <span className="text-sm font-medium text-slate-500 w-8">{bar.pct}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {course.isEnrolled && (
+                <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                  <h3 className="font-bold text-slate-900 mb-2">Bạn đánh giá khóa học này thế nào?</h3>
+                  <p className="text-sm text-slate-500 mb-4">Chia sẻ trải nghiệm của bạn để giúp các học viên khác nhé.</p>
+                  <button className="px-6 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-colors">
+                    ✍️ Viết đánh giá & Chấm sao của bạn
+                  </button>
+                </div>
+              )}
+
+              {/* Review List */}
+              <div className="space-y-6">
+                {[
+                  { name: 'Nguyễn Văn A', date: '2 ngày trước', content: 'Khóa học rất chi tiết và dễ hiểu. Cảm ơn Sensei!' },
+                  { name: 'Trần Thị B', date: '1 tuần trước', content: 'Bài tập phong phú, AI chữa bài rất có tâm.' },
+                ].map((review, i) => (
+                  <div key={i} className="pb-6 border-b border-slate-100 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center font-bold text-slate-600">
+                        {review.name.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900 text-sm">{review.name}</div>
+                        <div className="text-xs text-slate-500">{review.date}</div>
+                      </div>
+                      <div className="ml-auto flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star key={s} className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-slate-600 text-sm leading-relaxed">{review.content}</p>
+                  </div>
+                ))}
+              </div>
+
+              {course.isEnrolled && (
+                <div className="mt-8 flex justify-end">
+                  <button className="text-xs text-slate-400 hover:text-red-600 flex items-center gap-1 cursor-pointer transition-colors">
+                    🚩 Báo cáo nội dung khóa học
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right Column: Sticky Card */}
