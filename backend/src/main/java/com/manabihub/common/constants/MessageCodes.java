@@ -242,6 +242,12 @@ public final class MessageCodes {
     public static final String MSG_ADM_005 = "MSG-ADM-005";
 
     // ──────────────────────────────────────────────
+    // WALLET — wallet operations
+    // ──────────────────────────────────────────────
+    public static final String WALLET_FROZEN = "WALLET_FROZEN";
+    public static final String WALLET_RESERVATION_FAILED = "WALLET_RESERVATION_FAILED";
+
+    // ──────────────────────────────────────────────
     // ADMIN — admin operations
     // ──────────────────────────────────────────────
     public static final String ADMIN_ACTION_SUCCESS = "ADMIN_ACTION_SUCCESS";
