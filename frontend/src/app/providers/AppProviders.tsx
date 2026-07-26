@@ -29,11 +29,14 @@ interface AppProvidersProps {
   children: ReactNode;
 }
 
+import { Toaster } from 'react-hot-toast';
+
 export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
+        <Toaster position="top-right" />
         {children}
       </ThemeProvider>
     </QueryClientProvider>

@@ -1,8 +1,10 @@
 manabihub:
   security:
-    mock-jwt: true
+    mock-jwt: false
   kyc:
     identity-secret: ${KYC_IDENTITY_SECRET:local-dev-only-identity-secret-key-32chars}
+  wallet:
+    minimum-payout-amount: 500000
 
 spring:
   config:
@@ -31,8 +33,8 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:your-client-id-here}
-            client-secret: ${GOOGLE_CLIENT_SECRET:your-client-secret-here}
+            client-id: ${GOOGLE_CLIENT_ID:your-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-client-secret}
             scope: profile, email
         provider:
           google:

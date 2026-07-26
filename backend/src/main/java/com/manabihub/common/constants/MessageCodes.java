@@ -225,6 +225,19 @@ public final class MessageCodes {
     public static final String PAYOUT_NOT_ELIGIBLE = "PAYOUT_NOT_ELIGIBLE";
     public static final String PAYOUT_REQUESTED = "PAYOUT_REQUESTED";
     public static final String PAYOUT_PROCESSED = "PAYOUT_PROCESSED";
+    public static final String PAYOUT_WITHDRAWAL_REQUEST_CREATED = "PAYOUT_WITHDRAWAL_REQUEST_CREATED";
+    public static final String PAYOUT_WITHDRAWAL_NOT_FOUND = "PAYOUT_WITHDRAWAL_NOT_FOUND";
+    public static final String PAYOUT_AMOUNT_BELOW_MINIMUM = "PAYOUT_AMOUNT_BELOW_MINIMUM";
+    public static final String PAYOUT_BANK_ACCOUNT_REQUIRED = "PAYOUT_BANK_ACCOUNT_REQUIRED";
+    public static final String PAYOUT_BANK_ACCOUNT_INVALID = "PAYOUT_BANK_ACCOUNT_INVALID";
+    public static final String PAYOUT_PENDING_REQUEST_EXISTS = "PAYOUT_PENDING_REQUEST_EXISTS";
+    public static final String PAYOUT_MONTHLY_LIMIT_EXCEEDED = "PAYOUT_MONTHLY_LIMIT_EXCEEDED";
+
+    // ──────────────────────────────────────────────
+    // WALLET — wallet operations
+    // ──────────────────────────────────────────────
+    public static final String WALLET_FROZEN = "WALLET_FROZEN";
+    public static final String WALLET_RESERVATION_FAILED = "WALLET_RESERVATION_FAILED";
 
     // ──────────────────────────────────────────────
     // ADMIN — admin operations

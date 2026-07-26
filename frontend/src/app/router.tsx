@@ -33,9 +33,9 @@ import { TeacherWritingReviewsPage } from '../features/writing-review/pages/Teac
 import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages/TeacherWritingReviewDetailPage';
 import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistPage';
+import { TeacherWalletPage } from '../features/my-wallet/pages/TeacherWalletPage';
 import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
-
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
 
 export const router = createBrowserRouter([
@@ -186,7 +186,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'wallet',
-        element: <Navigate to="/teacher/dashboard" replace />,
+        element: <TeacherWalletPage />,
       },
     ],
   },
