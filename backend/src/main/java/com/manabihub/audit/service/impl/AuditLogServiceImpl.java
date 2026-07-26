@@ -43,4 +43,30 @@ public class AuditLogServiceImpl implements AuditLogService {
 
         auditLogRepository.save(auditLog);
     }
+
+    @Override
+    public void logAdminAction(
+            UUID adminId,
+            String roleCode,
+            String action,
+            String targetType,
+            UUID targetId,
+            Map<String, Object> beforeValue,
+            Map<String, Object> afterValue,
+            Map<String, Object> metadata
+    ) {
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("INTERNAL_ADMIN")
+                .actorAdminId(adminId)
+                .actorRoleCode(roleCode)
+                .action(action)
+                .targetType(targetType)
+                .targetId(targetId)
+                .beforeValue(beforeValue)
+                .afterValue(afterValue)
+                .metadata(metadata)
+                .build();
+
+        auditLogRepository.save(auditLog);
+    }
 }

@@ -1,126 +1,237 @@
-import type { WithdrawalRequest } from '../types/wallet.types';
-import { WithdrawalStatusBadge } from './WithdrawalStatusBadge';
-import { formatCurrency } from '../../../shared/utils/formatCurrency';
-import { useCancelWithdrawal } from '../hooks/useCancelWithdrawal';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  IconButton,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button } from '@mui/material';
+import { formatCurrency } from '../../../shared/utils/formatCurrency';
+import { useCancelWithdrawal } from '../hooks/useCancelWithdrawal';
+import type { WithdrawalRequest } from '../types/wallet.types';
+import { WithdrawalStatusBadge } from './WithdrawalStatusBadge';
 
 interface WithdrawalHistoryTableProps {
   withdrawals: WithdrawalRequest[];
 }
 
 export function WithdrawalHistoryTable({ withdrawals }: WithdrawalHistoryTableProps) {
-  const { mutate: cancelWithdrawal, isPending } = useCancelWithdrawal();
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  const handleOpenDialog = (id: string) => {
-    setSelectedId(id);
-    setDialogOpen(true);
-  };
-
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setSelectedId(null);
-  };
+  const cancelMutation = useCancelWithdrawal();
+  const [selected, setSelected] = useState<WithdrawalRequest | null>(null);
 
   const handleConfirmCancel = () => {
-    if (!selectedId) return;
-    setCancellingId(selectedId);
-    cancelWithdrawal(selectedId, {
+    if (!selected) return;
+
+    cancelMutation.mutate(selected.id, {
       onSuccess: () => {
-        toast.success('Hủy lệnh thành công');
-        setCancellingId(null);
-        handleCloseDialog();
+        toast.success('Đã hủy yêu cầu rút tiền');
+        setSelected(null);
       },
       onError: () => {
-        toast.error('Hủy lệnh thất bại, vui lòng thử lại');
-        setCancellingId(null);
-        handleCloseDialog();
-      }
+        toast.error('Không thể hủy yêu cầu. Vui lòng thử lại.');
+      },
     });
   };
 
-  if (!withdrawals || withdrawals.length === 0) {
+  if (withdrawals.length === 0) {
     return (
-      <div className="text-center py-8 text-slate-500 border rounded-lg border-slate-200 bg-white">
-        Chưa có yêu cầu rút tiền nào.
-      </div>
+      <Box sx={{ px: 3, py: { xs: 6, md: 8 }, textAlign: 'center' }}>
+        <Box
+          sx={{
+            alignItems: 'center',
+            bgcolor: '#fef2f2',
+            borderRadius: '50%',
+            color: 'primary.main',
+            display: 'inline-flex',
+            height: 56,
+            justifyContent: 'center',
+            mb: 2,
+            width: 56,
+          }}
+        >
+          <PaymentsOutlinedIcon />
+        </Box>
+        <Typography sx={{ fontWeight: 700 }}>Chưa có yêu cầu rút tiền</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          Yêu cầu mới sẽ xuất hiện tại đây để bạn theo dõi tiến trình.
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white overflow-x-auto">
-      <table className="w-full text-sm text-left">
-        <thead className="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200">
-          <tr>
-            <th className="px-6 py-3 font-medium whitespace-nowrap">Mã Y/C</th>
-            <th className="px-6 py-3 font-medium whitespace-nowrap">Ngày yêu cầu</th>
-            <th className="px-6 py-3 font-medium whitespace-nowrap">Số tiền (VND)</th>
-            <th className="px-6 py-3 font-medium whitespace-nowrap">Ngân hàng</th>
-            <th className="px-6 py-3 font-medium whitespace-nowrap">Số tài khoản</th>
-            <th className="px-6 py-3 font-medium whitespace-nowrap">Trạng thái</th>
-            <th className="px-6 py-3 font-medium text-right whitespace-nowrap">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200">
+    <>
+      <Box sx={{ display: { xs: 'block', md: 'none' }, p: 2 }}>
+        <Stack spacing={1.5}>
           {withdrawals.map((item) => (
-            <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-              <td className="px-6 py-4 font-medium text-slate-600 whitespace-nowrap">
-                {item.id.substring(0, 8)}...
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                {new Date(item.requestedAt).toLocaleString('vi-VN')}
-              </td>
-              <td className="px-6 py-4 font-semibold text-slate-900 whitespace-nowrap">
-                {formatCurrency(item.requestedAmount)}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">{item.bankName}</td>
-              <td className="px-6 py-4 whitespace-nowrap">{item.accountNumberMasked}</td>
-              <td className="px-6 py-4 whitespace-nowrap">
+            <Box
+              key={item.id}
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+                p: 2,
+              }}
+            >
+              <Stack direction="row" sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography sx={{ fontWeight: 800 }}>
+                    {formatCurrency(item.requestedAmount)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {formatDate(item.requestedAt)}
+                  </Typography>
+                </Box>
                 <WithdrawalStatusBadge status={item.status} />
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right">
-                {item.status === 'PENDING' && (
-                  <button
-                    onClick={() => handleOpenDialog(item.id)}
-                    disabled={isPending && cancellingId === item.id}
-                    className="text-red-600 hover:text-red-900 font-medium text-sm disabled:opacity-50"
-                  >
-                    {isPending && cancellingId === item.id ? 'Đang hủy...' : 'Hủy lệnh'}
-                  </button>
-                )}
-              </td>
-            </tr>
+              </Stack>
+              <Stack spacing={0.75} sx={{ mt: 2 }}>
+                <DetailLine label="Ngân hàng" value={item.bankName} />
+                <DetailLine label="Tài khoản" value={item.accountNumberMasked} />
+                <DetailLine label="Mã yêu cầu" value={shortId(item.id)} />
+              </Stack>
+              {item.status === 'PENDING' && (
+                <Button
+                  color="error"
+                  startIcon={<CancelOutlinedIcon />}
+                  onClick={() => setSelected(item)}
+                  sx={{ fontWeight: 700, mt: 1.5, textTransform: 'none' }}
+                >
+                  Hủy yêu cầu
+                </Button>
+              )}
+            </Box>
           ))}
-        </tbody>
-      </table>
+        </Stack>
+      </Box>
 
-      <Dialog
-        open={dialogOpen}
-        onClose={handleCloseDialog}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-      >
-        <DialogTitle id="alert-dialog-title">
-          Xác nhận hủy lệnh rút tiền
-        </DialogTitle>
+      <TableContainer sx={{ display: { xs: 'none', md: 'block' } }}>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ bgcolor: '#f8fafc' }}>
+              <TableCell sx={headerCellSx}>Mã yêu cầu</TableCell>
+              <TableCell sx={headerCellSx}>Ngày yêu cầu</TableCell>
+              <TableCell sx={headerCellSx}>Số tiền</TableCell>
+              <TableCell sx={headerCellSx}>Tài khoản nhận</TableCell>
+              <TableCell sx={headerCellSx}>Trạng thái</TableCell>
+              <TableCell align="right" sx={headerCellSx}>Thao tác</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {withdrawals.map((item) => (
+              <TableRow key={item.id} hover>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                    {shortId(item.id)}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">{formatDate(item.requestedAt)}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                    {formatCurrency(item.requestedAmount)}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {item.bankName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {item.accountNumberMasked}
+                  </Typography>
+                </TableCell>
+                <TableCell><WithdrawalStatusBadge status={item.status} /></TableCell>
+                <TableCell align="right">
+                  {item.status === 'PENDING' ? (
+                    <Tooltip title="Hủy yêu cầu đang chờ duyệt">
+                      <IconButton
+                        color="error"
+                        aria-label={`Hủy yêu cầu ${shortId(item.id)}`}
+                        onClick={() => setSelected(item)}
+                      >
+                        <CancelOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  ) : (
+                    <Typography variant="caption" color="text.disabled">—</Typography>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Dialog open={Boolean(selected)} onClose={() => setSelected(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800 }}>Hủy yêu cầu rút tiền?</DialogTitle>
         <DialogContent>
-          <DialogContentText id="alert-dialog-description">
-            Bạn có chắc chắn muốn hủy lệnh rút tiền này không? Số tiền đang bị khóa sẽ được cộng lại vào số dư khả dụng ngay lập tức.
+          <DialogContentText>
+            {selected && (
+              <>
+                Yêu cầu <strong>{formatCurrency(selected.requestedAmount)}</strong> sẽ bị hủy.
+                Số tiền đang giữ được hoàn lại vào số dư khả dụng.
+              </>
+            )}
           </DialogContentText>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} color="inherit">
-            Đóng
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button color="inherit" onClick={() => setSelected(null)} sx={{ textTransform: 'none' }}>
+            Giữ yêu cầu
           </Button>
-          <Button onClick={handleConfirmCancel} color="error" variant="contained" autoFocus disabled={isPending}>
-            {isPending ? 'Đang xử lý...' : 'Xác nhận hủy'}
+          <Button
+            color="error"
+            variant="contained"
+            disabled={cancelMutation.isPending}
+            onClick={handleConfirmCancel}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            {cancelMutation.isPending ? 'Đang hủy...' : 'Xác nhận hủy'}
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </>
   );
+}
+
+const headerCellSx = {
+  color: 'text.secondary',
+  fontSize: 12,
+  fontWeight: 800,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+};
+
+function DetailLine({ label, value }: { label: string; value: string }) {
+  return (
+    <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between' }}>
+      <Typography variant="body2" color="text.secondary">{label}</Typography>
+      <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right' }}>{value}</Typography>
+    </Stack>
+  );
+}
+
+function shortId(value: string) {
+  return `${value.slice(0, 8).toUpperCase()}…`;
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('vi-VN', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(value));
 }

@@ -30,4 +30,10 @@ export const ADMIN_MENU = [
     icon: RuleIcon,
     roles: [ROLES.COURSE_MANAGER],
   },
+  {
+    title: 'Payout Settlement',
+    path: ROUTES.ADMIN.PAYOUTS,
+    icon: FactCheckIcon, // using a generic icon for now
+    roles: [ROLES.FINANCE_MANAGER],
+  },
 ];

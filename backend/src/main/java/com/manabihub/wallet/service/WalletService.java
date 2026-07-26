@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public interface WalletService {
-    TeacherWalletResponse getTeacherWallet(String teacherId);
+    TeacherWalletResponse getTeacherWalletByUserId(UUID userId);
 
     Wallet getOrCreatePlatformWallet();
 

@@ -200,6 +200,12 @@ class ManabiHubApplicationTests {
     private com.manabihub.payout.repository.WithdrawalRequestRepository withdrawalRequestRepository;
 
     @MockBean
+    private com.manabihub.payout.repository.PayoutSettlementRepository payoutSettlementRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.PayoutReconciliationLogRepository payoutReconciliationLogRepository;
+
+    @MockBean
     private com.manabihub.payout.repository.TeacherBankAccountRepository teacherBankAccountRepository;
 
     @Test

@@ -1,109 +1,247 @@
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Paper,
+  Skeleton,
+  Stack,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import { useState } from 'react';
-import { useTeacherWallet } from '../hooks/useTeacherWallet';
-import { useTeacherWithdrawals } from '../hooks/useTeacherWithdrawals';
+import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { WalletBalanceCards } from '../components/WalletBalanceCards';
 import { WithdrawalHistoryTable } from '../components/WithdrawalHistoryTable';
 import { WithdrawalRequestModal } from '../components/WithdrawalRequestModal';
-import { Tooltip } from '@mui/material';
+import { useTeacherWallet } from '../hooks/useTeacherWallet';
+import { useTeacherWithdrawals } from '../hooks/useTeacherWithdrawals';
 
 export function TeacherWalletPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { data: wallet, isLoading: isLoadingWallet, isError: isWalletError, error: walletError } = useTeacherWallet();
-  const { data: withdrawalsPage, isLoading: isLoadingWithdrawals } = useTeacherWithdrawals();
+  const walletQuery = useTeacherWallet();
+  const withdrawalsQuery = useTeacherWithdrawals();
 
-  if (isLoadingWallet) {
+  if (walletQuery.isLoading) {
     return (
-      <div className="flex h-full items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
+      <Box>
+        <Skeleton variant="text" width={280} height={52} />
+        <Skeleton variant="text" width={420} height={26} sx={{ mb: 3 }} />
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+          {[0, 1, 2].map((item) => (
+            <Skeleton key={item} variant="rounded" height={164} sx={{ flex: 1 }} />
+          ))}
+        </Stack>
+      </Box>
     );
   }
 
-  if (isWalletError || !wallet) {
-    const messageCode = (walletError as any)?.response?.data?.messageCode;
-    
+  if (walletQuery.isError || !walletQuery.data) {
+    const messageCode = (walletQuery.error as {
+      response?: { data?: { messageCode?: string } };
+    })?.response?.data?.messageCode;
+
     if (messageCode === 'WALLET_NOT_FOUND') {
       return (
-        <div className="p-8 max-w-4xl mx-auto h-[60vh] flex flex-col items-center justify-center text-center">
-          <div className="w-24 h-24 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6">
-            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Bạn chưa kích hoạt Ví Doanh Thu</h2>
-          <p className="text-slate-500 mb-8 max-w-md">
-            Ví doanh thu giúp bạn nhận thanh toán từ các khóa học đã bán trên ManabiHub. Hãy thiết lập ví để bắt đầu nhận tiền.
-          </p>
-          <button 
-            onClick={() => window.location.href = '/teacher/kyc'} 
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm"
+        <Box>
+          <PageHeader
+            title="Ví doanh thu"
+            breadcrumbs={[
+              { label: 'Giảng viên' },
+              { label: 'Tài chính' },
+            ]}
+          />
+          <Paper
+            elevation={0}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              px: 3,
+              py: { xs: 7, md: 10 },
+              textAlign: 'center',
+            }}
           >
-            Kích hoạt Ví ngay
-          </button>
-        </div>
+            <Box
+              sx={{
+                alignItems: 'center',
+                bgcolor: '#fef2f2',
+                borderRadius: '50%',
+                color: 'primary.main',
+                display: 'inline-flex',
+                height: 80,
+                justifyContent: 'center',
+                mb: 2.5,
+                width: 80,
+              }}
+            >
+              <AccountBalanceWalletOutlinedIcon sx={{ fontSize: 40 }} />
+            </Box>
+            <Typography variant="h5" sx={{ fontWeight: 800 }}>
+              Bạn chưa kích hoạt Ví doanh thu
+            </Typography>
+            <Typography color="text.secondary" sx={{ maxWidth: 520, mx: 'auto', mt: 1 }}>
+              Hoàn tất xác minh giáo viên để nhận doanh thu khóa học và tạo yêu cầu rút tiền.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => { window.location.href = '/teacher/kyc'; }}
+              sx={{ fontWeight: 700, mt: 3, textTransform: 'none' }}
+            >
+              Kích hoạt ví ngay
+            </Button>
+          </Paper>
+        </Box>
       );
     }
 
     return (
-      <div className="p-8">
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex">
-            <div className="ml-3">
-              <p className="text-sm text-red-700">
-                Không thể tải thông tin ví doanh thu. Vui lòng thử lại sau.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Alert
+        severity="error"
+        action={(
+          <Button color="inherit" onClick={() => void walletQuery.refetch()} sx={{ fontWeight: 700 }}>
+            Thử lại
+          </Button>
+        )}
+      >
+        Không thể tải thông tin ví doanh thu. Vui lòng kiểm tra kết nối và thử lại.
+      </Alert>
     );
   }
 
-  const isWithdrawalDisabled = wallet.walletFrozen || wallet.availableBalance < wallet.minimumPayoutAmount;
+  const wallet = walletQuery.data;
+  const isWithdrawalDisabled = wallet.walletFrozen
+    || wallet.availableBalance < wallet.minimumPayoutAmount;
+  const disableReason = wallet.walletFrozen
+    ? 'Ví doanh thu đang bị khóa'
+    : `Số dư khả dụng phải từ ${formatCurrency(wallet.minimumPayoutAmount)}`;
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Ví doanh thu</h1>
-          <p className="text-slate-500 mt-1">Quản lý doanh thu khóa học và yêu cầu rút tiền</p>
-        </div>
-        <Tooltip title={isWithdrawalDisabled ? "Ví đang bị khóa hoặc số dư không đủ" : ""}>
-          <span>
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              disabled={isWithdrawalDisabled}
-              className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isWithdrawalDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              Yêu cầu Rút tiền
-            </button>
-          </span>
-        </Tooltip>
-      </div>
+    <Box>
+      <PageHeader
+        title="Ví doanh thu"
+        subtitle="Quản lý thu nhập và yêu cầu rút tiền"
+        breadcrumbs={[
+          { label: 'Giảng viên' },
+          { label: 'Tài chính' },
+        ]}
+        action={(
+          <Tooltip title={isWithdrawalDisabled ? disableReason : ''}>
+            <span>
+              <Button
+                variant="contained"
+                startIcon={<PaymentsOutlinedIcon />}
+                disabled={isWithdrawalDisabled}
+                onClick={() => setIsModalOpen(true)}
+                sx={{ fontWeight: 700, textTransform: 'none' }}
+              >
+                Yêu cầu rút tiền
+              </Button>
+            </span>
+          </Tooltip>
+        )}
+      />
 
       {wallet.walletFrozen && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <strong className="font-bold">Ví đang bị khóa!</strong>
-          <span className="block sm:inline"> Ví doanh thu của bạn đang bị tạm khóa. Vui lòng liên hệ bộ phận hỗ trợ để biết thêm chi tiết.</span>
-        </div>
+        <Alert severity="error" sx={{ mb: 2.5 }}>
+          <strong>Ví đang bị khóa.</strong> Bạn chưa thể tạo yêu cầu rút tiền. Vui lòng liên hệ bộ phận hỗ trợ.
+        </Alert>
       )}
 
       <WalletBalanceCards wallet={wallet} />
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-slate-900">Lịch sử rút tiền</h2>
-        {isLoadingWithdrawals ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400"></div>
-          </div>
-        ) : (
-          <WithdrawalHistoryTable withdrawals={withdrawalsPage?.content || []} />
-        )}
-      </div>
+      <Alert severity="info" sx={{ mb: 2.5 }}>
+        Doanh thu được đối soát trong {wallet.clearingPeriodDays} ngày. Mức rút tối thiểu là{' '}
+        <strong>{formatCurrency(wallet.minimumPayoutAmount)}</strong>
+        {wallet.nextPayoutDate
+          ? `; kỳ thanh toán kế tiếp dự kiến ${formatDate(wallet.nextPayoutDate)}.`
+          : '.'}
+      </Alert>
 
-      <WithdrawalRequestModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <Paper
+        elevation={0}
+        sx={{
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          overflow: 'hidden',
+        }}
+      >
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{
+            alignItems: { xs: 'stretch', sm: 'center' },
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            justifyContent: 'space-between',
+            p: { xs: 2, md: 3 },
+          }}
+        >
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              Lịch sử rút tiền
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Theo dõi tiến trình duyệt, quyết toán và khoản tiền đã nhận.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            startIcon={withdrawalsQuery.isFetching
+              ? <CircularProgress size={16} color="inherit" />
+              : <RefreshIcon />}
+            disabled={withdrawalsQuery.isFetching}
+            onClick={() => void withdrawalsQuery.refetch()}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            Tải lại
+          </Button>
+        </Stack>
+
+        {withdrawalsQuery.isError ? (
+          <Alert
+            severity="error"
+            action={(
+              <Button color="inherit" onClick={() => void withdrawalsQuery.refetch()}>
+                Thử lại
+              </Button>
+            )}
+            sx={{ m: 3 }}
+          >
+            Không thể tải lịch sử rút tiền.
+          </Alert>
+        ) : withdrawalsQuery.isLoading ? (
+          <Box sx={{ p: 3 }}>
+            {[0, 1, 2].map((item) => (
+              <Skeleton key={item} height={58} />
+            ))}
+          </Box>
+        ) : (
+          <WithdrawalHistoryTable withdrawals={withdrawalsQuery.data?.content ?? []} />
+        )}
+      </Paper>
+
+      <WithdrawalRequestModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         wallet={wallet}
       />
-    </div>
+    </Box>
   );
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('vi-VN', {
+    currency: 'VND',
+    maximumFractionDigits: 0,
+    style: 'currency',
+  }).format(value);
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'long' }).format(new Date(value));
 }

@@ -1,32 +1,76 @@
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
+import HourglassTopOutlinedIcon from '@mui/icons-material/HourglassTopOutlined';
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
+import { Chip } from '@mui/material';
+import type { ReactElement } from 'react';
 import type { WithdrawalStatus } from '../types/wallet.types';
 
 interface WithdrawalStatusBadgeProps {
   status: WithdrawalStatus;
 }
 
-const STATUS_CONFIG: Record<WithdrawalStatus, { label: string; color: string }> = {
-  PENDING: { label: 'Chờ duyệt', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  APPROVED: { label: 'Đã duyệt', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  REJECTED: { label: 'Từ chối', color: 'bg-red-100 text-red-800 border-red-200' },
-  EXECUTED: { label: 'Đã chuyển khoản', color: 'bg-green-100 text-green-800 border-green-200' },
-  FAILED: { label: 'Thất bại', color: 'bg-red-100 text-red-800 border-red-200' },
-  CANCELLED: { label: 'Đã hủy', color: 'bg-slate-100 text-slate-800 border-slate-200' },
+const STATUS_CONFIG: Record<WithdrawalStatus, {
+  background: string;
+  color: string;
+  icon: ReactElement;
+  label: string;
+}> = {
+  PENDING: {
+    background: '#fffbeb',
+    color: '#b45309',
+    icon: <HourglassTopOutlinedIcon />,
+    label: 'Chờ duyệt',
+  },
+  APPROVED: {
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    icon: <CheckCircleOutlineIcon />,
+    label: 'Đã duyệt',
+  },
+  REJECTED: {
+    background: '#fef2f2',
+    color: '#b91c1c',
+    icon: <CancelOutlinedIcon />,
+    label: 'Từ chối',
+  },
+  EXECUTED: {
+    background: '#f0fdf4',
+    color: '#15803d',
+    icon: <PaymentsOutlinedIcon />,
+    label: 'Đã chuyển khoản',
+  },
+  FAILED: {
+    background: '#fef2f2',
+    color: '#b91c1c',
+    icon: <ReportProblemOutlinedIcon />,
+    label: 'Thất bại',
+  },
+  CANCELLED: {
+    background: '#f1f5f9',
+    color: '#475569',
+    icon: <CancelOutlinedIcon />,
+    label: 'Đã hủy',
+  },
 };
 
 export function WithdrawalStatusBadge({ status }: WithdrawalStatusBadgeProps) {
   const config = STATUS_CONFIG[status];
-  
-  if (!config) {
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-        {status}
-      </span>
-    );
-  }
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-      {config.label}
-    </span>
+    <Chip
+      size="small"
+      icon={config.icon}
+      label={config.label}
+      sx={{
+        bgcolor: config.background,
+        border: '1px solid',
+        borderColor: `${config.color}33`,
+        color: config.color,
+        fontWeight: 700,
+        '& .MuiChip-icon': { color: 'inherit', fontSize: 16 },
+      }}
+    />
   );
 }

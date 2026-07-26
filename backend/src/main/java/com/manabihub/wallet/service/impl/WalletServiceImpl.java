@@ -3,6 +3,7 @@ package com.manabihub.wallet.service.impl;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
 import com.manabihub.wallet.entity.TeacherWallet;
 import com.manabihub.wallet.entity.Wallet;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class WalletServiceImpl implements WalletService {
 
     private final TeacherWalletRepository teacherWalletRepository;
+    private final TeacherProfileRepository teacherProfileRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository transactionRepository;
     private final WalletMapper walletMapper;
@@ -39,8 +41,14 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional(readOnly = true)
-    public TeacherWalletResponse getTeacherWallet(String teacherId) {
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherId(UUID.fromString(teacherId))
+    public TeacherWalletResponse getTeacherWalletByUserId(UUID userId) {
+        TeacherProfile teacherProfile = teacherProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.KYC_TEACHER_NOT_FOUND,
+                        "Teacher profile not found",
+                        HttpStatus.NOT_FOUND));
+
+        TeacherWallet wallet = teacherWalletRepository.findByTeacherId(teacherProfile.getId())
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         // Hardcoding clearing period and next payout date for now as per requirement constraints
