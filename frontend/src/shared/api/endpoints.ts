@@ -10,6 +10,23 @@ export const ENDPOINTS = {
     DETAIL: (id: string) => `/v1/admin/kyc-requests/${id}`,
     REVIEW: (id: string) => `/v1/admin/kyc-requests/${id}/review`,
   },
+  ADMIN_COURSE_APPROVAL: {
+    QUEUE: '/v1/admin/course-approvals',
+    DETAIL: (id: string) => `/v1/admin/course-approvals/${id}`,
+    REVIEW: (id: string) => `/v1/admin/course-approvals/${id}/review`,
+  },
+  ADMIN_PAYOUT: {
+    QUEUE: '/admin/payouts',
+    DETAIL: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}`,
+    RECONCILE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/reconcile`,
+    APPROVE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/approve`,
+    RETRY: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/retry`,
+    REJECT: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/reject`,
+    MANUAL_TRANSFER: (withdrawalRequestId: string) =>
+      `/admin/payouts/${withdrawalRequestId}/manual-transfer`,
+    MANUAL_PROOF: (withdrawalRequestId: string) =>
+      `/admin/payouts/${withdrawalRequestId}/manual-transfer/proof`,
+  },
   teacherKyc: {
     status: '/v1/teacher/kyc/status',
     identityVerifications: '/v1/teacher/kyc/identity-verifications',
@@ -19,6 +36,26 @@ export const ENDPOINTS = {
   profile: {
     student: '/v1/student/profile',
     teacher: '/v1/teacher/profile',
+  },
+  teacherDashboard: {
+    stats: '/v1/teacher/dashboard',
+  },
+  teacherWriting: {
+    submissions: '/v1/teacher/writing-submissions',
+    detail: (submissionId: string) => `/v1/teacher/writing-submissions/${submissionId}`,
+    feedback: (submissionId: string) => `/v1/teacher/writing-submissions/${submissionId}/feedback`,
+  },
+  student: {
+    dashboardStats: '/v1/student/dashboard/stats',
+    courses: '/v1/student/courses',
+    wishlist: '/v1/student/wishlist',
+    wishlistCourse: (courseId: string) => `/v1/student/wishlist/${courseId}`,
+  },
+  studentAiChat: {
+    eligibility: (courseId: string, lessonBlockId: string) =>
+      `/v1/student/courses/${courseId}/lesson-blocks/${lessonBlockId}/ai-chat/eligibility`,
+    messages: (courseId: string, lessonBlockId: string) =>
+      `/v1/student/courses/${courseId}/lesson-blocks/${lessonBlockId}/ai-chat/messages`,
   },
   teacherCourses: {
     drafts: '/v1/teacher/courses/drafts',
@@ -30,12 +67,42 @@ export const ENDPOINTS = {
     builderBlocks: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks`,
     builderBlockDetail: (id: string, moduleId: string, blockId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/${blockId}`,
     builderBlockOrder: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/order`,
+    validate: (id: string) => `/v1/teacher/courses/drafts/${id}/validate`,
+    submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`
   },
   teacherCourseAssets: {
     thumbnails: '/v1/teacher/courses/assets/thumbnails',
   },
   courseCategories: {
     list: '/v1/course-categories',
+  },
+  publicCourses: {
+    list: '/v1/public/courses',
+  },
+  orders: {
+    create: '/v1/orders',
+    detail: (orderId: string) => `/v1/orders/${orderId}`,
+  },
+  payments: {
+    // Local dev simulator for the VNPay IPN callback (no tunnel needed).
+    devIpn: '/v1/payments/dev/ipn',
+    // Confirms an order from the browser return redirect (checksum-verified backend-side).
+    confirmReturn: '/v1/payments/vnpay/confirm-return',
+  },
+  LEARNING: {
+    COURSE_LEARN: (courseId: string) => `/v1/student/courses/${courseId}/learn`,
+    COURSE_PROGRESS: (courseId: string) => `/v1/student/courses/${courseId}/progress`,
+    VIDEO_PROGRESS: (blockId: string) => `/v1/student/lessons/${blockId}/video-progress`,
+    MARK_COMPLETE: (blockId: string) => `/v1/student/lessons/${blockId}/complete`,
+    FLASHCARD_REVIEW: (blockId: string) => `/v1/student/lessons/${blockId}/flashcards/review`,
+    QUIZ_SUBMIT: (blockId: string) => `/v1/student/lessons/${blockId}/quiz-submissions`,
+    FINAL_TEST_ELIGIBILITY: (courseId: string) => `/v1/student/courses/${courseId}/final-test/eligibility`,
+    FINAL_TEST_START: (courseId: string) => `/v1/student/courses/${courseId}/final-test/attempts`,
+    FINAL_TEST_SUBMIT: (courseId: string) => `/v1/student/courses/${courseId}/final-test/submissions`,
+    CERTIFICATE: (courseId: string) => `/v1/student/courses/${courseId}/certificate`,
+    WRITING_SUBMISSION_GET: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions/me`,
+    WRITING_SUBMISSION_POST: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions`,
+    WRITING_SUBMISSION_AI: (blockId: string, submissionId: string) => `/v1/student/lessons/${blockId}/writing-submissions/${submissionId}/ai-assistance`,
   },
   ADMIN_LOGIN: '/admin/auth/login',
 };

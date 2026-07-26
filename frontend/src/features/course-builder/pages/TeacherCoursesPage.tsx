@@ -26,7 +26,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -37,6 +37,8 @@ import {
   type CourseCategory,
   type CourseDraftResponse,
   type JlptLevel,
+  submitCourseForReview,
+  validateCourseDraft
 } from '../services/courseDraftService';
 
 interface CourseDraftSavedState {
@@ -53,6 +55,7 @@ type Feedback = {
 const allFilterValue = 'ALL';
 const draftPageSize = 6;
 const jlptLevels: JlptLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1'];
+
 
 const priceFormatter = new Intl.NumberFormat('vi-VN', {
   currency: 'VND',
@@ -83,6 +86,7 @@ export function TeacherCoursesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
 
   const categoryNames = useMemo(
     () => new Map(categories.map((category) => [category.code, category.name])),
@@ -186,6 +190,53 @@ export function TeacherCoursesPage() {
     }
   }
 
+  async function submitDraft(course: CourseDraftResponse) {
+    setSubmittingId(course.id);
+
+    try {
+
+      const validation =
+          await validateCourseDraft(course.id);
+
+      if (!validation.isValid) {
+
+        const errorMessage = [
+          "Không thể gửi khóa học để xét duyệt.",
+          "",
+          ...validation.errors.map(error => `• ${error.message}`),
+        ].join("\n");
+
+        setFeedback({
+          severity: "error",
+          message: errorMessage,
+        });
+
+        return;
+      }
+
+      await submitCourseForReview(course.id);
+
+      setFeedback({
+        severity: "success",
+        message: "Đã gửi khóa học để xét duyệt.",
+      });
+
+      await loadDrafts();
+
+    } catch {
+
+      setFeedback({
+        severity: "error",
+        message: "Không thể gửi khóa học.",
+      });
+
+    } finally {
+
+      setSubmittingId(null);
+
+    }
+  }
+
   return (
     <Box>
       <PageHeader
@@ -226,7 +277,7 @@ export function TeacherCoursesPage() {
       )}
 
       {feedback && (
-        <Alert severity={feedback.severity} sx={{ mb: 2 }} onClose={() => setFeedback(null)}>
+        <Alert severity={feedback.severity} sx={{ mb: 2, whiteSpace: "pre-line" }} onClose={() => setFeedback(null)}>
           {feedback.message}
         </Alert>
       )}
@@ -296,9 +347,9 @@ export function TeacherCoursesPage() {
               onChange={(event) => setLevelFilter(event.target.value)}
               sx={{ minWidth: { xs: '100%', md: 150 } }}
             >
-              <MenuItem value={allFilterValue}>Tất cả</MenuItem>
+              <MenuItemValue value={allFilterValue}>Tất cả</MenuItemValue>
               {jlptLevels.map((level) => (
-                <MenuItem key={level} value={level}>{level}</MenuItem>
+                <MenuItemValue key={level} value={level}>{level}</MenuItemValue>
               ))}
             </TextField>
             <TextField
@@ -309,11 +360,11 @@ export function TeacherCoursesPage() {
               onChange={(event) => setCategoryFilter(event.target.value)}
               sx={{ minWidth: { xs: '100%', md: 210 } }}
             >
-              <MenuItem value={allFilterValue}>Tất cả danh mục</MenuItem>
+              <MenuItemValue value={allFilterValue}>Tất cả danh mục</MenuItemValue>
               {categories.map((category) => (
-                <MenuItem key={category.code} value={category.code}>
+                <MenuItemValue key={category.code} value={category.code}>
                   {category.name}
-                </MenuItem>
+                </MenuItemValue>
               ))}
             </TextField>
             <Button
@@ -359,10 +410,12 @@ export function TeacherCoursesPage() {
                     course={course}
                     deleting={deletingId === course.id}
                     highlighted={course.id === draftState?.draftId}
+                    submitting={submittingId === course.id}
                     onBuild={() => buildCourseContent(course)}
                     onConfigureFinalTest={() => navigate(`/teacher/courses/${course.id}/final-test`)}
                     onDelete={() => void deleteDraft(course)}
                     onEdit={() => editDraft(course)}
+                    onSubmit={() => void submitDraft(course)}
                   />
                 ))}
               </Stack>
@@ -389,7 +442,18 @@ export function TeacherCoursesPage() {
   );
 }
 
+interface MenuItemValueProps {
+  children: ReactNode;
+  value: string;
+}
 
+function MenuItemValue({ children, value }: MenuItemValueProps) {
+  return (
+    <MenuItem value={value}>
+      {children}
+    </MenuItem>
+  );
+}
 
 interface CourseDraftRowProps {
   categoryName?: string;
@@ -400,6 +464,8 @@ interface CourseDraftRowProps {
   onConfigureFinalTest: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  submitting: boolean;
+  onSubmit: () => void;
 }
 
 function CourseDraftRow({
@@ -407,10 +473,12 @@ function CourseDraftRow({
   course,
   deleting,
   highlighted,
+  submitting,
   onBuild,
   onConfigureFinalTest,
   onDelete,
   onEdit,
+  onSubmit,
 }: CourseDraftRowProps) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const thumbnailSrc = resolveAssetUrl(course.thumbnailUrl);
@@ -481,7 +549,17 @@ function CourseDraftRow({
           >
             {title}
           </Typography>
-          <Chip color="warning" label="Bản nháp" size="small" />
+          <Chip color={
+            course.status === "PENDING"
+              ? "warning"
+              : course.status === "APPROVED"
+                ? "info"
+                : "default"}
+                label={
+                  course.status === "PENDING"
+                      ? "Chờ duyệt"
+                      : "Bản nháp"}
+                size="small" />
         </Stack>
 
         <Typography
@@ -566,7 +644,11 @@ function CourseDraftRow({
             </MenuItem>
             <Tooltip title="Vui lòng vào phần Xây nội dung để thêm ít nhất 1 bài học trước khi gửi duyệt." placement="left">
               <span>
-                <MenuItem disabled>
+                <MenuItem disabled={deleting || submitting}
+                          onClick={() => {
+                            closeMenu();
+                            onSubmit();
+                          }}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <SendOutlinedIcon fontSize="small" />
                     <Typography variant="body2">Gửi duyệt</Typography>

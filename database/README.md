@@ -100,7 +100,7 @@ It will be available at `http://localhost:5050` with the following credentials:
 ## AI Writing — Suggestion Only
 
 > [!IMPORTANT]
-> **AI Writing is suggestion-only.** AI does NOT provide grading, scoring, or official assessment.
+> **AI Writing is suggestion-only.** AI output is preliminary learning support and is never stored or presented as an authoritative evaluation.
 
 AI Writing features provide **preliminary suggestions** only:
 - Grammar suggestions

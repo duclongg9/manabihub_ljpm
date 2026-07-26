@@ -38,7 +38,7 @@ export const FinalTestConfigPage = () => {
     passingScore: '',
     maxRetakes: '',
     jlptLevel: '',
-    skillFocus: 'Tá»•ng há»£p',
+    skillFocus: 'Tổng hợp',
     questions: [],
   });
 
@@ -74,37 +74,37 @@ export const FinalTestConfigPage = () => {
     };
 
     if (form.questions.length < 20) {
-      showError('Final Test cáº§n cÃ³ tá»‘i thiá»ƒu 20 cÃ¢u há»i Ä‘ang hoáº¡t Ä‘á»™ng');
+      showError('Final Test cần có tối thiểu 20 câu hỏi đang hoạt động');
       return;
     }
 
     if (form.timeLimitMinutes === '' || Number(form.timeLimitMinutes) < 1 || Number(form.timeLimitMinutes) > 180) {
-      showError('Vui lÃ²ng nháº­p thá»i gian lÃ m bÃ i (tá»« 1 Ä‘áº¿n 180 phÃºt).');
+      showError('Vui lòng nhập thời gian làm bài (từ 1 đến 180 phút).');
       return;
     }
 
     if (form.passingScore === '' || Number(form.passingScore) < 0 || Number(form.passingScore) > 100) {
-      showError('Vui lÃ²ng nháº­p Ä‘iá»ƒm Ä‘áº¡t (tá»« 0 Ä‘áº¿n 100%).');
+      showError('Vui lòng nhập điểm đạt (từ 0 đến 100%).');
       return;
     }
 
     if (form.maxRetakes === '' || Number(form.maxRetakes) < 1 || Number(form.maxRetakes) > 10) {
-      showError('Vui lÃ²ng nháº­p sá»‘ láº§n thi láº¡i (tá»« 1 Ä‘áº¿n 10 láº§n).');
+      showError('Vui lòng nhập số lần thi lại (từ 1 đến 10 lần).');
       return;
     }
 
     if (!form.jlptLevel) {
-      showError('Vui lÃ²ng chá»n trÃ¬nh Ä‘á»™ JLPT.');
+      showError('Vui lòng chọn trình độ JLPT.');
       return;
     }
 
     if (!form.skillFocus || !form.skillFocus.trim()) {
-      showError('Vui lÃ²ng nháº­p ká»¹ nÄƒng táº­p trung.');
+      showError('Vui lòng nhập kỹ năng tập trung.');
       return;
     }
 
     if (form.skillFocus.length > 50) {
-      showError('Ká»¹ nÄƒng táº­p trung khÃ´ng Ä‘Æ°á»£c vÆ°á»£t quÃ¡ 50 kÃ½ tá»±.');
+      showError('Kỹ năng tập trung không được vượt quá 50 ký tự.');
       return;
     }
 
@@ -119,12 +119,12 @@ export const FinalTestConfigPage = () => {
         }, 100);
       };
 
-      if (!q.content.trim()) { validateError(`Lá»—i á»Ÿ CÃ¢u ${i + 1}: Ná»™i dung cÃ¢u há»i khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.`); return; }
-      if (!q.explanation.trim()) { validateError(`Lá»—i á»Ÿ CÃ¢u ${i + 1}: Vui lÃ²ng Ä‘iá»n giáº£i thÃ­ch Ä‘Ã¡p Ã¡n.`); return; }
+      if (!q.content.trim()) { validateError(`Lỗi ở Câu ${i + 1}: Nội dung câu hỏi không được để trống.`); return; }
+      if (!q.explanation.trim()) { validateError(`Lỗi ở Câu ${i + 1}: Vui lòng điền giải thích đáp án.`); return; }
       for (let j = 0; j < q.choices.length; j++) {
-        if (!q.choices[j].content.trim()) { validateError(`Lá»—i á»Ÿ CÃ¢u ${i + 1}: Lá»±a chá»n sá»‘ ${j + 1} Ä‘ang bá»‹ bá» trá»‘ng.`); return; }
+        if (!q.choices[j].content.trim()) { validateError(`Lỗi ở Câu ${i + 1}: Lựa chọn số ${j + 1} đang bị bỏ trống.`); return; }
       }
-      if (!q.choices.some(c => c.isCorrect)) { validateError(`Lá»—i á»Ÿ CÃ¢u ${i + 1}: ChÆ°a cÃ³ Ä‘Ã¡p Ã¡n Ä‘Ãºng nÃ o Ä‘Æ°á»£c chá»n.`); return; }
+      if (!q.choices.some(c => c.isCorrect)) { validateError(`Lỗi ở Câu ${i + 1}: Chưa có đáp án đúng nào được chọn.`); return; }
     }
 
     setSaving(true);
@@ -140,7 +140,7 @@ export const FinalTestConfigPage = () => {
       await finalTestService.updateFinalTest(courseId, request);
       setSnackbar({
         open: true,
-        message: 'LÆ°u cáº¥u hÃ¬nh thÃ nh cÃ´ng!',
+        message: 'Lưu cấu hình thành công!',
         severity: 'success',
       });
       if (shouldExit) {
@@ -154,7 +154,7 @@ export const FinalTestConfigPage = () => {
       } else if (err.response?.data?.message) {
         showError(err.response.data.message);
       } else {
-        showError('CÃ³ lá»—i xáº£y ra, vui lÃ²ng thá»­ láº¡i.');
+        showError('Có lỗi xảy ra, vui lòng thử lại.');
       }
     } finally {
       setSaving(false);
@@ -168,21 +168,21 @@ export const FinalTestConfigPage = () => {
   return (
     <Box sx={{ pb: 10 }}>
       <PageHeader
-        title="Cáº¥u hÃ¬nh BÃ i thi cuá»‘i khÃ³a"
+        title="Cấu hình Bài thi cuối khóa"
         breadcrumbs={[
-          { label: 'KhÃ³a há»c cá»§a tÃ´i', href: '/teacher/courses' },
-          { label: 'BÃ i thi cuá»‘i khÃ³a' },
+          { label: 'Khóa học của tôi', href: '/teacher/courses' },
+          { label: 'Bài thi cuối khóa' },
         ]}
       />
 
       <Box sx={{ mt: 3, maxWidth: 800 }}>
         <Stack spacing={3}>
-          <Typography variant="h6">Cáº¥u hÃ¬nh chung</Typography>
+          <Typography variant="h6">Cấu hình chung</Typography>
 
           <Stack direction="row" spacing={2}>
             <TextField
               variant="outlined"
-              label="Thá»i gian lÃ m bÃ i (phÃºt)"
+              label="Thời gian làm bài (phút)"
               type="number"
               fullWidth
               value={form.timeLimitMinutes as number}
@@ -191,7 +191,7 @@ export const FinalTestConfigPage = () => {
             />
             <TextField
               variant="outlined"
-              label="Äiá»ƒm Ä‘áº¡t (%)"
+              label="Điểm đạt (%)"
               type="number"
               fullWidth
               value={form.passingScore as number}
@@ -203,7 +203,7 @@ export const FinalTestConfigPage = () => {
             />
             <TextField
               variant="outlined"
-              label="Sá»‘ láº§n thi láº¡i tá»‘i Ä‘a"
+              label="Số lần thi lại tối đa"
               type="number"
               fullWidth
               value={form.maxRetakes as number}
@@ -217,7 +217,7 @@ export const FinalTestConfigPage = () => {
               variant="outlined"
               select
               required
-              label="TrÃ¬nh Ä‘á»™ JLPT"
+              label="Trình độ JLPT"
               fullWidth
               value={form.jlptLevel}
               onChange={(e) => setForm({ ...form, jlptLevel: e.target.value })}
@@ -228,16 +228,16 @@ export const FinalTestConfigPage = () => {
             </TextField>
             <TextField
               variant="outlined"
-              label="Ká»¹ nÄƒng táº­p trung"
+              label="Kỹ năng tập trung"
               fullWidth
               value={form.skillFocus}
               onChange={(e) => setForm({ ...form, skillFocus: e.target.value })}
-              placeholder="VD: Tá»« vá»±ng, Ngá»¯ phÃ¡p, Nghe hiá»ƒu..."
+              placeholder="VD: Từ vựng, Ngữ pháp, Nghe hiểu..."
             />
           </Stack>
 
           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 4 }}>
-            <Typography variant="h6">Danh sÃ¡ch cÃ¢u há»i ({form.questions.length}/20 tá»‘i thiá»ƒu)</Typography>
+            <Typography variant="h6">Danh sách câu hỏi ({form.questions.length}/20 tối thiểu)</Typography>
           </Stack>
 
           <FinalTestQuestionsEditor
@@ -266,12 +266,12 @@ export const FinalTestConfigPage = () => {
           variant="outlined"
           color="inherit"
           onClick={() => {
-            if (window.confirm("Báº¡n cÃ³ nhá»¯ng thay Ä‘á»•i chÆ°a Ä‘Æ°á»£c lÆ°u. Báº¡n cÃ³ cháº¯c cháº¯n muá»‘n rá»i Ä‘i khÃ´ng?")) {
+            if (window.confirm("Bạn có những thay đổi chưa được lưu. Bạn có chắc chắn muốn rời đi không?")) {
               navigate('/teacher/courses');
             }
           }}
         >
-          Há»§y
+          Hủy
         </Button>
         <Button
           variant="outlined"
@@ -279,7 +279,7 @@ export const FinalTestConfigPage = () => {
           onClick={() => handleSave(false)}
           disabled={saving}
         >
-          {saving ? 'Äang lÆ°u...' : 'LÆ°u & Tiáº¿p tá»¥c'}
+          {saving ? 'Đang lưu...' : 'Lưu & Tiếp tục'}
         </Button>
         <Button
           variant="contained"
@@ -287,7 +287,7 @@ export const FinalTestConfigPage = () => {
           onClick={() => handleSave(true)}
           disabled={saving}
         >
-          {saving ? 'Äang lÆ°u...' : 'LÆ°u & ThoÃ¡t'}
+          {saving ? 'Đang lưu...' : 'Lưu & Thoát'}
         </Button>
       </Paper>
     </Box>

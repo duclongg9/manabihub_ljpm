@@ -3,7 +3,7 @@ import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 
 export type JlptLevel = 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
-export type CourseStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'FORCED_DRAFT' | 'ARCHIVED';
+export type CourseStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'FORCED_DRAFT' | 'ARCHIVED';
 export type LessonBlockType = 'VIDEO' | 'TEXT' | 'QUIZ' | 'FLASHCARD' | 'WRITING';
 
 export interface CreateCourseDraftPayload {
@@ -111,6 +111,17 @@ export interface CourseBuilderResponse {
   srsTrace: Record<string, unknown>;
 }
 
+export interface ValidationError {
+  code: string;
+  message: string;
+  severity: string;
+}
+
+export interface ValidationResultResponse {
+  isValid: boolean;
+  errors: ValidationError[];
+}
+
 interface ApiResponse<T> {
   success: boolean;
   messageCode?: string;
@@ -146,8 +157,23 @@ export async function deleteCourseDraft(id: string) {
   await axiosClient.delete<ApiResponse<void>>(ENDPOINTS.teacherCourses.draftDetail(id));
 }
 
+export async function submitCourseForReview(draftId: string) {
+  await axiosClient.post<ApiResponse<void>>(
+      ENDPOINTS.teacherCourses.submitReview(draftId),
+  );
+}
+
 export async function fetchCourseBuilder(draftId: string) {
   const response = await axiosClient.get<ApiResponse<CourseBuilderResponse>>(ENDPOINTS.teacherCourses.builder(draftId));
+
+  return response.data.data;
+}
+
+export async function validateCourseDraft(draftId: string) {
+  const response =
+      await axiosClient.get<ApiResponse<ValidationResultResponse>>(
+          ENDPOINTS.teacherCourses.validate(draftId),
+      );
 
   return response.data.data;
 }

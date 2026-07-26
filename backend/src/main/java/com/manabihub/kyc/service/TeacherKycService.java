@@ -69,6 +69,7 @@ public class TeacherKycService {
     private final AuditLogRepository auditLogRepository;
     private final NationalIdRegistryPort nationalIdRegistryPort;
     private final JlptRegistryPort jlptRegistryPort;
+    private final TeacherIdentityClaimService teacherIdentityClaimService;
     private final EntityManager entityManager;
     private final Path storageRoot;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -80,6 +81,7 @@ public class TeacherKycService {
             AuditLogRepository auditLogRepository,
             NationalIdRegistryPort nationalIdRegistryPort,
             JlptRegistryPort jlptRegistryPort,
+            TeacherIdentityClaimService teacherIdentityClaimService,
             EntityManager entityManager,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
@@ -89,11 +91,12 @@ public class TeacherKycService {
         this.auditLogRepository = auditLogRepository;
         this.nationalIdRegistryPort = nationalIdRegistryPort;
         this.jlptRegistryPort = jlptRegistryPort;
+        this.teacherIdentityClaimService = teacherIdentityClaimService;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public KycStatusResponse getStatus(UUID userId) {
         TeacherProfile teacherProfile = resolveTeacher(userId);
         KycRequest latestRequest = kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
@@ -138,35 +141,56 @@ public class TeacherKycService {
 
         if (verified && sdkDecision.identityOcr() != null) {
             Map<String, String> ocr = sdkDecision.identityOcr();
-            String idNumber = ocr.get("idNumber");
+            String rawIdNumber = ocr.get("idNumber");
             String ocrFullName = ocr.get("fullName");
             String ocrDob = ocr.get("dateOfBirth");
 
-            NationalIdRecordDto mockRecord = nationalIdRegistryPort.findActiveByIdNumber(idNumber).orElse(null);
-            if (mockRecord == null) {
+            String normalizedCccd = null;
+            try {
+                normalizedCccd = teacherIdentityClaimService.normalizeCccd(rawIdNumber);
+            } catch (BusinessException ex) {
                 verified = false;
-                failureReasons.add("Thông tin CCCD không tồn tại trong cơ sở dữ liệu quốc gia (Mock)");
-            } else {
-                if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.fullName()))) {
+                failureReasons.add(ex.getMessage());
+            }
+
+            if (verified && normalizedCccd != null) {
+                NationalIdRecordDto mockRecord = nationalIdRegistryPort.findActiveByIdNumber(normalizedCccd).orElse(null);
+                if (mockRecord == null) {
                     verified = false;
-                    failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia");
-                }
-                if (StringUtils.hasText(ocrDob)) {
-                    try {
-                        LocalDate dob;
-                        if (ocrDob.length() == 8 && !ocrDob.contains("/")) {
-                            dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("ddMMyyyy"));
-                        } else {
-                            dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-                        }
-                        if (!dob.equals(mockRecord.dateOfBirth())) {
-                            verified = false;
-                            failureReasons.add("Ngày sinh không khớp với cơ sở dữ liệu quốc gia");
-                        }
-                    } catch (Exception e) {
+                    failureReasons.add("Thông tin CCCD không tồn tại trong cơ sở dữ liệu quốc gia (Mock)");
+                } else {
+                    if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.fullName()))) {
                         verified = false;
-                        failureReasons.add("Ngày sinh trên CCCD không hợp lệ");
+                        failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia");
                     }
+                    if (StringUtils.hasText(ocrDob)) {
+                        try {
+                            LocalDate dob;
+                            if (ocrDob.length() == 8 && !ocrDob.contains("/")) {
+                                dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("ddMMyyyy"));
+                            } else {
+                                dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                            }
+                            if (!dob.equals(mockRecord.dateOfBirth())) {
+                                verified = false;
+                                failureReasons.add("Ngày sinh không khớp với cơ sở dữ liệu quốc gia");
+                            }
+                        } catch (Exception e) {
+                            verified = false;
+                            failureReasons.add("Ngày sinh trên CCCD không hợp lệ");
+                        }
+                    }
+                }
+
+                if (verified) {
+                    // Check identity claim duplicate before marking identity as verified
+                    teacherIdentityClaimService.processIdentityClaim(
+                            teacherProfile.getId(),
+                            normalizedCccd,
+                            user,
+                            ipAddress,
+                            userAgent
+                    );
                 }
             }
         }
@@ -311,11 +335,19 @@ public class TeacherKycService {
 
     private TeacherProfile resolveTeacher(UUID userId) {
         return teacherProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.KYC_TEACHER_NOT_FOUND,
-                        "Teacher profile was not found for the current user",
-                        HttpStatus.NOT_FOUND
-                ));
+                .orElseGet(() -> {
+                    teacherProfileRepository.createCandidateIfAbsent(UUID.randomUUID(), userId);
+                    return teacherProfileRepository.findByUserId(userId)
+                            .orElseThrow(() -> teacherProfileNotFound());
+                });
+    }
+
+    private BusinessException teacherProfileNotFound() {
+        return new BusinessException(
+                MessageCodes.KYC_TEACHER_NOT_FOUND,
+                "Teacher profile could not be initialized for the current user",
+                HttpStatus.NOT_FOUND
+        );
     }
 
     private void validateIdentityAllowed(AppUser user, TeacherProfile teacherProfile, KycRequest latestRequest) {
@@ -585,9 +617,40 @@ public class TeacherKycService {
                 request.getRiskLevel() == null ? null : request.getRiskLevel().name(),
                 request.getCertificateCode(),
                 request.isCopyrightAgreed(),
-                request.getVerificationPayload(),
+                sanitizeVerificationPayloadForTeacher(request.getVerificationPayload()),
                 documents.stream().map(this::toDocumentResponse).toList()
         );
+    }
+
+    private Map<String, Object> sanitizeVerificationPayloadForTeacher(Map<String, Object> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> sanitized = new LinkedHashMap<>(payload);
+        sanitized.remove("providerResult");
+
+        Object ocrObj = sanitized.get("identityOcr");
+        if (ocrObj instanceof Map<?, ?> ocrMap) {
+            Map<String, Object> sanitizedOcr = new LinkedHashMap<>();
+            ocrMap.forEach((k, v) -> {
+                if ("idNumber".equals(k)) {
+                    if (v != null) {
+                        String clean = String.valueOf(v).replaceAll("[^0-9]", "");
+                        if (clean.length() == 12) {
+                            sanitizedOcr.put("idNumber", clean.substring(0, 3) + "******" + clean.substring(9));
+                        } else {
+                            sanitizedOcr.put("idNumber", "************");
+                        }
+                    } else {
+                        sanitizedOcr.put("idNumber", "************");
+                    }
+                } else {
+                    sanitizedOcr.put(String.valueOf(k), v);
+                }
+            });
+            sanitized.put("identityOcr", sanitizedOcr);
+        }
+        return sanitized;
     }
 
     private KycDocumentResponse toDocumentResponse(KycDocument document) {
@@ -650,7 +713,7 @@ public class TeacherKycService {
     private CertificateVerificationStatus resolvedCertificateStatus(KycRequest request) {
         return switch (request.getStatus()) {
             case APPROVED -> CertificateVerificationStatus.APPROVED;
-            case REJECTED, CORRECTION_REQUIRED -> CertificateVerificationStatus.REJECTED;
+            case REJECTED, CORRECTION_REQUIRED, REVOKED -> CertificateVerificationStatus.REJECTED;
             case DRAFT, PENDING -> request.getCertificateStatus();
         };
     }
@@ -1077,6 +1140,7 @@ public class TeacherKycService {
             case APPROVED -> "Đã duyệt";
             case REJECTED -> "Bị từ chối";
             case CORRECTION_REQUIRED -> "Yêu cầu bổ sung";
+            case REVOKED -> "Đã thu hồi";
         };
     }
 
@@ -1087,6 +1151,7 @@ public class TeacherKycService {
             case APPROVED -> "Đã duyệt";
             case REJECTED -> "Bị từ chối";
             case CORRECTION_REQUIRED -> "Yêu cầu bổ sung";
+            case REVOKED -> "Đã thu hồi";
         };
     }
 

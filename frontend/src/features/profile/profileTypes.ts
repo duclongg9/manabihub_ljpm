@@ -14,8 +14,8 @@ export interface UserProfileResponse {
     id: string;
     email: string;
     fullName: string;
-    phoneNumber: string;
-    avatarUrl: string;
+    phoneNumber: string | null;
+    avatarUrl: string | null;
 }
 
 export interface StudentProfileResponse
@@ -42,9 +42,7 @@ export interface UpdateStudentProfileRequest {
 
     fullName: string;
 
-    phoneNumber: string;
-
-    avatarUrl: string;
+    phoneNumber: string | null;
 
     displayName: string;
 

@@ -31,3 +31,31 @@ management:
   endpoint:
     health:
       show-details: always
+
+manabihub:
+  kyc:
+    identity-secret: ${KYC_IDENTITY_SECRET:}
+  ai:
+    chat:
+      base-url: ${AI_CHAT_PROVIDER_BASE_URL:}
+      endpoint: ${AI_CHAT_PROVIDER_ENDPOINT:/v1/chat/completions}
+      api-key: ${AI_CHAT_PROVIDER_API_KEY:}
+      model: ${AI_CHAT_PROVIDER_MODEL:gpt-4o-mini}
+      rate-limit-per-minute: ${AI_CHAT_RATE_LIMIT_PER_MINUTE:10}
+      daily-limit: ${AI_CHAT_DAILY_LIMIT:50}
+      timeout-seconds: ${AI_CHAT_TIMEOUT_SECONDS:20}
+  # UC-08 course purchase — VNPay sandbox. Secret values (tmn-code, hash-secret) are
+  # supplied via application-secrets.yml / env vars and must never be committed.
+  payment:
+    vnpay:
+      tmn-code: ${VNPAY_TMN_CODE:}
+      hash-secret: ${VNPAY_HASH_SECRET:}
+      pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      api-url: ${VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+      return-url: ${VNPAY_RETURN_URL:http://localhost:5173/checkout/return}
+      version: ${VNPAY_VERSION:2.1.0}
+      command: ${VNPAY_COMMAND:pay}
+      order-type: ${VNPAY_ORDER_TYPE:other}
+      locale: ${VNPAY_LOCALE:vn}
+      currency: ${VNPAY_CURRENCY:VND}
+      dev-simulator-enabled: ${VNPAY_DEV_SIMULATOR_ENABLED:true}

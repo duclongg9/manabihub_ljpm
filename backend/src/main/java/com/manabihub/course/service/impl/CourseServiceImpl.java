@@ -4,24 +4,34 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.dto.request.CreateCourseDraftRequest;
 import com.manabihub.course.dto.response.CourseDraftResponse;
+import com.manabihub.course.dto.response.PublicCourseDetailResponse;
+import com.manabihub.course.dto.response.PublicCourseSummaryResponse;
+import com.manabihub.course.dto.response.PublicModuleResponse;
+import com.manabihub.course.dto.response.PublicLessonBlockResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseLearningGoal;
+import com.manabihub.course.entity.CourseModule;
+import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.repository.PublicCourseSpecification;
 import com.manabihub.course.service.CourseService;
 import com.manabihub.course.service.CourseValidationService;
 import com.manabihub.course.dto.response.ValidationResultResponse;
-import com.manabihub.course.dto.response.ValidationError;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import com.manabihub.audit.service.AuditLogService;
+import com.manabihub.notification.service.NotificationService;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -50,6 +60,8 @@ public class CourseServiceImpl implements CourseService {
     private final TeacherProfileRepository teacherProfileRepository;
     private final CurrentUserService currentUserService;
     private final CourseValidationService courseValidationService;
+    private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -98,6 +110,40 @@ public class CourseServiceImpl implements CourseService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.manabihub.course.dto.response.TeacherDashboardResponse getTeacherDashboardStats() {
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+
+        List<Course> allCourses = courseRepository.findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(
+                teacherProfile.getId(), CourseStatus.ARCHIVED);
+
+        long totalCourses = allCourses.size();
+        long draftOrCorrection = allCourses.stream()
+                .filter(c -> c.getStatus() == CourseStatus.DRAFT || c.getStatus() == CourseStatus.FORCED_DRAFT || c.getStatus() == CourseStatus.REJECTED)
+                .count();
+        long pendingApproval = allCourses.stream()
+                .filter(c -> c.getStatus() == CourseStatus.PENDING)
+                .count();
+        long published = allCourses.stream()
+                .filter(c -> c.getStatus() == CourseStatus.PUBLISHED)
+                .count();
+
+        List<CourseDraftResponse> recentCourses = allCourses.stream()
+                .limit(4)
+                .map(this::toResponse)
+                .toList();
+
+        return com.manabihub.course.dto.response.TeacherDashboardResponse.builder()
+                .totalCourses(totalCourses)
+                .draftOrCorrection(draftOrCorrection)
+                .pendingApproval(pendingApproval)
+                .published(published)
+                .recentCourses(recentCourses)
+                .build();
     }
 
     @Override
@@ -163,8 +209,134 @@ public class CourseServiceImpl implements CourseService {
             );
         }
 
-        course.setStatus(CourseStatus.SUBMITTED);
+        course.setStatus(CourseStatus.PENDING);
         course.setSubmittedAt(Instant.now());
+
+        notificationService.createNotificationForRole(
+                "ADMIN",
+                "Course submitted for review",
+                "Teacher submitted course \"" + course.getTitle() + "\" for review.",
+                "COURSE_REVIEW",
+                "/admin/courses/" + course.getId()
+        );
+
+        auditLogService.logUserAction(
+                currentUserId,
+                "TEACHER",
+                "SUBMIT_COURSE",
+                "COURSE",
+                course.getId(),
+                Map.of("status", CourseStatus.DRAFT.name()),
+                Map.of("status", CourseStatus.PENDING.name()),
+                Map.of("courseTitle", course.getTitle())
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PublicCourseDetailResponse getPublicCourseDetail(String identifier) {
+        Course course;
+        try {
+            UUID courseId = UUID.fromString(identifier);
+            course = courseRepository.findByIdWithDetails(courseId)
+                    .orElseThrow(() -> new BusinessException(
+                            MessageCodes.MSG_CATALOG_001,
+                            "Course was not found",
+                            HttpStatus.NOT_FOUND
+                    ));
+        } catch (IllegalArgumentException e) {
+            course = courseRepository.findBySlugWithDetails(identifier)
+                    .orElseThrow(() -> new BusinessException(
+                            MessageCodes.MSG_CATALOG_001,
+                            "Course was not found",
+                            HttpStatus.NOT_FOUND
+                    ));
+        }
+
+        java.util.Optional<UUID> currentUserIdOpt = currentUserService.getCurrentUserIdOptional();
+
+        boolean isAuthor = currentUserIdOpt.isPresent() &&
+                           course.getTeacher() != null &&
+                           course.getTeacher().getUser() != null &&
+                           currentUserIdOpt.get().equals(course.getTeacher().getUser().getId());
+
+        boolean isAdmin = currentUserService.hasRole("ADMIN") || currentUserService.hasRole("SUPER_ADMIN");
+
+        if (course.getStatus() != CourseStatus.PUBLISHED && !isAuthor && !isAdmin) {
+            throw new BusinessException(
+                    MessageCodes.MSG_CATALOG_001,
+                    "Course was not found or is not published yet",
+                    HttpStatus.NOT_FOUND
+            );
+        }
+
+        boolean isEnrolled = false;
+        if (currentUserIdOpt.isPresent()) {
+            isEnrolled = courseRepository.checkEnrollmentExists(course.getId(), currentUserIdOpt.get());
+        }
+
+        // Aggregate stats
+        int totalDurationMinutes = 0;
+        int totalLessons = 0;
+
+        List<PublicModuleResponse> moduleResponses = new ArrayList<>();
+        for (CourseModule module : course.getModules()) {
+            PublicModuleResponse modRes = mapModuleToPublicResponse(module);
+            moduleResponses.add(modRes);
+            for (PublicLessonBlockResponse block : modRes.getBlocks()) {
+                if ("VIDEO".equals(block.getType()) && block.getDurationMinutes() != null) {
+                    totalDurationMinutes += block.getDurationMinutes();
+                }
+                totalLessons++;
+            }
+        }
+
+        return PublicCourseDetailResponse.builder()
+                .id(course.getId())
+                .title(course.getTitle())
+                .slug(course.getSlug())
+                .description(course.getDescription())
+                .introduction(course.getIntroduction())
+                .jlptLevel(course.getJlptLevel())
+                .category(course.getCategory())
+                .thumbnailUrl(course.getThumbnailUrl())
+                .outcomes(course.getOutcomes())
+                .price(course.getPrice())
+                .currency(course.getCurrency())
+                .prerequisites(course.getPrerequisites())
+                .targetStudents(course.getTargetStudents())
+                .publishedAt(course.getPublishedAt())
+                .aiSupported(course.isAiSupported())
+                .teacher(PublicCourseDetailResponse.TeacherDto.builder()
+                        .id(course.getTeacher().getId())
+                        .name(course.getTeacher().getDisplayName())
+                        .avatarUrl(course.getTeacher().getUser() != null ? course.getTeacher().getUser().getAvatarUrl() : null)
+                        .bio(course.getTeacher().getBio())
+                        .build())
+                .isEnrolled(isEnrolled)
+                .totalDurationMinutes(totalDurationMinutes)
+                .totalLessons(totalLessons)
+                .modules(moduleResponses)
+                .build();
+    }
+
+    private PublicModuleResponse mapModuleToPublicResponse(CourseModule module) {
+        return PublicModuleResponse.builder()
+                .id(module.getId())
+                .title(module.getTitle())
+                .orderIndex(module.getOrderIndex())
+                .blocks(module.getBlocks().stream().map(this::mapBlockToPublicResponse).toList())
+                .build();
+    }
+
+    private PublicLessonBlockResponse mapBlockToPublicResponse(LessonBlock block) {
+        return PublicLessonBlockResponse.builder()
+                .id(block.getId())
+                .title(block.getTitle())
+                .type(block.getType())
+                .durationMinutes(block.getDurationMinutes())
+                .orderIndex(block.getOrderIndex())
+                .build();
     }
 
     private TeacherProfile resolveApprovedTeacher(UUID userId) {
@@ -344,6 +516,53 @@ public class CourseServiceImpl implements CourseService {
 
     private String blankToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PublicCourseSummaryResponse> searchPublicCourses(
+            String keyword,
+            String category,
+            com.manabihub.course.enums.JlptLevel jlptLevel,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Pageable pageable
+    ) {
+        var spec = PublicCourseSpecification.buildSearch(keyword, category, jlptLevel, minPrice, maxPrice);
+        Page<Course> coursePage = courseRepository.findAll(spec, pageable);
+
+        return coursePage.map(this::toSummaryResponse);
+    }
+
+    private PublicCourseSummaryResponse toSummaryResponse(Course course) {
+        int totalLessons = 0;
+        for (CourseModule module : course.getModules()) {
+            totalLessons += module.getBlocks().size();
+        }
+
+        String teacherName = null;
+        String teacherAvatarUrl = null;
+        if (course.getTeacher() != null) {
+            teacherName = course.getTeacher().getDisplayName();
+            if (course.getTeacher().getUser() != null) {
+                teacherAvatarUrl = course.getTeacher().getUser().getAvatarUrl();
+            }
+        }
+
+        return PublicCourseSummaryResponse.builder()
+                .id(course.getId())
+                .title(course.getTitle())
+                .slug(course.getSlug())
+                .thumbnailUrl(course.getThumbnailUrl())
+                .jlptLevel(course.getJlptLevel())
+                .category(course.getCategory())
+                .price(course.getPrice())
+                .currency(course.getCurrency())
+                .teacherName(teacherName)
+                .teacherAvatarUrl(teacherAvatarUrl)
+                .totalLessons(totalLessons)
+                .publishedAt(course.getPublishedAt())
+                .build();
     }
 
 }

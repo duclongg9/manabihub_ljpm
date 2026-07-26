@@ -18,6 +18,8 @@ import java.io.IOException;
 // lại Frontend báo lỗi.
 public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
+    private static final String OAUTH_FAILURE_CODE = "oauth2-login-failed";
+
     @Value("${app.frontend.login-url:http://localhost:5173/login}")
     private String frontendLoginUrl;
 
@@ -27,10 +29,10 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
     // Gắn thêm tham số ?error=... vào cuối URL.
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
             AuthenticationException exception) throws IOException, ServletException {
-        log.error("OAuth2 Authentication failed: {}", exception.getMessage());
+        log.warn("OAuth2 authentication failed: {}", exception.getClass().getSimpleName());
 
         // Redirect to frontend login page with error parameter
-        String targetUrl = frontendLoginUrl + "?error=" + exception.getMessage();
+        String targetUrl = frontendLoginUrl + "?error=" + OAUTH_FAILURE_CODE;
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 }

@@ -20,6 +20,7 @@ public class UpdateUserProfileRequest {
     )
     private String phoneNumber;
 
+    @Size(max = 2048)
     private String avatarUrl;
 
 }

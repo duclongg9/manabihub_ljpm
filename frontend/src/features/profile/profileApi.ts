@@ -66,3 +66,19 @@ export async function updateMyTeacherProfile(
     return response.data.data;
 
 }
+
+/* ==========================
+   SHARED
+========================== */
+
+export async function uploadAvatar(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await axiosClient.post<ApiEnvelope<string>>(
+        "/api/v1/users/avatar",
+        formData
+    );
+
+    return response.data.data;
+}

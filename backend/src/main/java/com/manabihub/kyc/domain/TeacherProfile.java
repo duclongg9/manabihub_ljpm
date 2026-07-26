@@ -41,6 +41,17 @@ public class TeacherProfile {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @PrePersist
+    void prePersist() {
+        Instant now = Instant.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
     @PreUpdate
     void preUpdate() {
         updatedAt = Instant.now();

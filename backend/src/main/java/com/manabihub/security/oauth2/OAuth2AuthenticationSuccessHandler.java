@@ -53,7 +53,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                 String targetUrl = isOnboardingCompleted ? frontendSuccessUrl + "?token=" + token
                                 : frontendOnboardingUrl + "?token=" + token;
 
-                log.info("OAuth2 login successful for {}. Redirecting to {}", appUser.getEmail(), targetUrl);
+                log.info("OAuth2 login successful for user {}", appUser.getId());
                 getRedirectStrategy().sendRedirect(request, response, targetUrl);
         }
 

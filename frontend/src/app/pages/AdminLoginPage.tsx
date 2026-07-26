@@ -6,10 +6,18 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { getAsset } from '../../shared/utils/assets';
 import { axiosClient } from '../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../shared/api/endpoints';
+import {
+  clearAuthSession,
+  consumePostLoginRoute,
+  hasAnyRole,
+  rememberPostLoginRoute,
+  storeAuthToken,
+} from '../../shared/auth/authSession';
+import { ROLES } from '../../shared/constants/roles';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(20px); }
@@ -24,10 +32,16 @@ const pulseGlow = keyframes`
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(() =>
+    searchParams.get('reason') === 'session-expired'
+      ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.'
+      : null,
+  );
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,8 +54,21 @@ export function AdminLoginPage() {
       const token = response.data?.data?.token;
 
       if (token) {
-        localStorage.setItem('admin_token', token);
-        navigate('/admin', { replace: true });
+        const session = storeAuthToken('admin', token);
+        const internalRoles = [ROLES.SYSTEM_ADMIN, ROLES.COURSE_MANAGER, ROLES.FINANCE_MANAGER];
+
+        if (!session || !hasAnyRole(session, internalRoles)) {
+          clearAuthSession('admin');
+          setErrorMsg('Tài khoản không có quyền truy cập Cổng quản trị.');
+          return;
+        }
+
+        const returnTo = (location.state as { from?: unknown } | null)?.from;
+        if (typeof returnTo === 'string') {
+          rememberPostLoginRoute('admin', returnTo);
+        }
+
+        navigate(consumePostLoginRoute('admin', session), { replace: true });
       } else {
         setErrorMsg('Không nhận được token từ máy chủ.');
       }

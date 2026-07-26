@@ -98,6 +98,15 @@ public class Course {
     @Column(name = "submitted_at")
     private Instant submittedAt;
 
+    @Column(name = "approved_by")
+    private UUID approvedBy;
+
+    @Column(name = "approved_at")
+    private Instant approvedAt;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @Column(name = "published_at")
     private Instant publishedAt;
 

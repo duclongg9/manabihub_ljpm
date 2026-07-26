@@ -1,0 +1,317 @@
+import React, { useEffect, useState } from 'react';
+import {
+  Box,
+  Button,
+  Divider,
+  Drawer,
+  FormControl,
+  IconButton,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from '@mui/material';
+import InputAdornment from '@mui/material/InputAdornment';
+import CloseIcon from '@mui/icons-material/Close';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import type { SelectChangeEvent } from '@mui/material';
+import type { CourseCatalogFilters, CourseCategory } from '../types/catalogTypes';
+
+const JLPT_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
+
+interface CourseCatalogFiltersBarProps {
+  filters: CourseCatalogFilters;
+  onFiltersChange: (filters: CourseCatalogFilters) => void;
+  categories: CourseCategory[];
+  categoriesLoading?: boolean;
+  sort: string;
+  onSortChange: (sort: string) => void;
+}
+
+function formatPriceInput(value?: number): string {
+  return value === undefined ? '' : value.toLocaleString('en-US');
+}
+
+function parsePrice(value: string): number | undefined {
+  const numericStr = value.replace(/\D/g, '');
+  if (!numericStr) return undefined;
+  const parsed = Number(numericStr);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = ({
+  filters,
+  onFiltersChange,
+  categories,
+  categoriesLoading,
+  sort,
+  onSortChange,
+}) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [minPrice, setMinPrice] = useState(formatPriceInput(filters.minPrice));
+  const [maxPrice, setMaxPrice] = useState(formatPriceInput(filters.maxPrice));
+  const [priceError, setPriceError] = useState('');
+  const [keyword, setKeyword] = useState(filters.keyword || '');
+
+  useEffect(() => {
+    setMinPrice(formatPriceInput(filters.minPrice));
+    setMaxPrice(formatPriceInput(filters.maxPrice));
+  }, [filters.minPrice, filters.maxPrice]);
+
+  useEffect(() => {
+    setKeyword(filters.keyword || '');
+  }, [filters.keyword]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (keyword !== (filters.keyword || '')) {
+        updateFilter('keyword', keyword);
+      }
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [keyword]);
+
+  const handlePriceChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const numericStr = e.target.value.replace(/\D/g, '');
+    setter(numericStr ? Number(numericStr).toLocaleString('en-US') : '');
+  };
+
+  const updateFilter = (field: keyof CourseCatalogFilters, value?: string) => {
+    onFiltersChange({
+      ...filters,
+      [field]: value || undefined,
+    });
+  };
+
+  const applyPrice = () => {
+    const parsedMin = parsePrice(minPrice);
+    const parsedMax = parsePrice(maxPrice);
+    const hasInvalidValue =
+      (minPrice.trim() !== '' && parsedMin === undefined) ||
+      (maxPrice.trim() !== '' && parsedMax === undefined);
+
+    if (hasInvalidValue) {
+      setPriceError('Giá phải là số không âm.');
+      return;
+    }
+
+    if (parsedMin !== undefined && parsedMax !== undefined && parsedMin > parsedMax) {
+      setPriceError('Giá tối thiểu không được lớn hơn giá tối đa.');
+      return;
+    }
+
+    setPriceError('');
+    onFiltersChange({
+      ...filters,
+      minPrice: parsedMin,
+      maxPrice: parsedMax,
+    });
+    setDrawerOpen(false);
+  };
+
+  const clearFilters = () => {
+    setMinPrice('');
+    setMaxPrice('');
+    setKeyword('');
+    setPriceError('');
+    onFiltersChange({});
+    setDrawerOpen(false);
+  };
+
+  const handleSortChange = (event: SelectChangeEvent) => {
+    onSortChange(event.target.value);
+  };
+
+  const filterFields = (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(7, minmax(0, 1fr))',
+        gap: 2,
+        alignItems: 'center',
+      }}
+    >
+      <FormControl fullWidth size="small" sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
+        <TextField
+          placeholder="Tìm khóa học..."
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          size="small"
+          sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+        />
+      </FormControl>
+
+      <FormControl fullWidth size="small">
+        <Select
+          displayEmpty
+          value={filters.category ?? ''}
+          disabled={categoriesLoading}
+          onChange={(event) => updateFilter('category', event.target.value)}
+          sx={{ '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+        >
+          <MenuItem value=""><Typography color="text.secondary">Danh mục</Typography></MenuItem>
+          {categories.map((category) => (
+            <MenuItem key={category.id} value={category.code}>
+              {category.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <FormControl fullWidth size="small">
+        <Select
+          displayEmpty
+          value={filters.jlptLevel ?? ''}
+          onChange={(event) => updateFilter('jlptLevel', event.target.value)}
+          sx={{ '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+        >
+          <MenuItem value=""><Typography color="text.secondary">Trình độ</Typography></MenuItem>
+          {JLPT_LEVELS.map((level) => (
+            <MenuItem key={level} value={level}>
+              JLPT {level}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <Stack direction="column" sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+        >
+          <TextField
+            placeholder="Giá từ"
+            type="text"
+            value={minPrice}
+            onChange={handlePriceChange(setMinPrice)}
+            onBlur={applyPrice}
+            onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
+            size="small"
+            fullWidth
+            slotProps={{
+              input: { endAdornment: <InputAdornment position="end" sx={{ mr: 1 }}>đ</InputAdornment> },
+              htmlInput: { inputMode: 'numeric' }
+            }}
+            sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+          />
+          <TextField
+            placeholder="Giá đến"
+            type="text"
+            value={maxPrice}
+            onChange={handlePriceChange(setMaxPrice)}
+            onBlur={applyPrice}
+            onKeyDown={(e) => { if (e.key === 'Enter') applyPrice(); }}
+            size="small"
+            fullWidth
+            slotProps={{
+              input: { endAdornment: <InputAdornment position="end" sx={{ mr: 1 }}>đ</InputAdornment> },
+              htmlInput: { inputMode: 'numeric' }
+            }}
+            sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+          />
+        </Stack>
+        {priceError && (
+          <Typography variant="caption" color="error" sx={{ mt: 0.5, px: 0.5 }}>
+            {priceError}
+          </Typography>
+        )}
+      </Stack>
+
+      <FormControl fullWidth size="small">
+        <Select
+          displayEmpty
+          value={sort}
+          onChange={handleSortChange}
+          sx={{ '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+        >
+          <MenuItem value="publishedAt,desc">Mới xuất bản</MenuItem>
+          <MenuItem value="price,asc">Giá thấp đến cao</MenuItem>
+          <MenuItem value="price,desc">Giá cao đến thấp</MenuItem>
+          <MenuItem value="title,asc">Tên A-Z</MenuItem>
+        </Select>
+      </FormControl>
+
+      <Button
+        variant="text"
+        onClick={clearFilters}
+        startIcon={<RestartAltIcon />}
+        sx={{
+          color: '#475569',
+          fontWeight: 600,
+          bgcolor: '#f1f5f9',
+          borderRadius: 2,
+          px: 2, py: 1,
+          transition: 'all 0.2s',
+          '&:hover': { color: '#C41E3A', bgcolor: '#fef2f2' }
+        }}
+      >
+        Xóa bộ lọc
+      </Button>
+    </Box>
+  );
+
+  return (
+    <Box>
+      {isMobile ? (
+        <Stack direction="row" sx={{ mb: 2, justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Bộ lọc</Typography>
+          <Button
+            variant="outlined"
+            startIcon={<FilterListIcon />}
+            onClick={() => setDrawerOpen(true)}
+            sx={{
+              borderColor: '#e2e8f0', color: '#475569',
+              '&:hover': { borderColor: '#C41E3A', color: '#C41E3A' }
+            }}
+          >
+            Mở bộ lọc
+          </Button>
+        </Stack>
+      ) : (
+        <Box
+          sx={{
+            p: 2,
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            borderRadius: 3,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+          }}
+        >
+          {filterFields}
+        </Box>
+      )}
+
+      <Drawer
+        anchor="bottom"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        slotProps={{ paper: { sx: { maxHeight: '88vh', borderRadius: '8px 8px 0 0' } } }}
+      >
+        <Box sx={{ p: 2.5 }}>
+          <Stack
+            direction="row"
+            sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <Typography variant="h6">Bộ lọc khóa học</Typography>
+            <IconButton
+              aria-label="Đóng bộ lọc"
+              title="Đóng"
+              onClick={() => setDrawerOpen(false)}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+          <Divider sx={{ my: 2 }} />
+          {filterFields}
+        </Box>
+      </Drawer>
+    </Box>
+  );
+};

@@ -6,8 +6,10 @@ import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -24,9 +26,12 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.util.List;
@@ -43,24 +48,32 @@ public class SecurityConfig {
     @Value("${CORS_ALLOWED_ORIGINS:*}")
     private List<String> allowedOrigins;
 
+    private final TeacherEligibilityFilter teacherEligibilityFilter;
+
+    public SecurityConfig(TeacherEligibilityFilter teacherEligibilityFilter) {
+        this.teacherEligibilityFilter = teacherEligibilityFilter;
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http,
-            CustomOAuth2UserService customOAuth2UserService,
-            OAuth2AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler,
-            OAuth2AuthenticationFailureHandler oauth2AuthenticationFailureHandler
-    ) throws Exception {
+    @Order(1)
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
+                .securityMatcher(
+                        "/api/**",
+                        "/actuator/**",
+                        "/uploads/**",
+                        "/v3/api-docs/**",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html")
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(e -> e.authenticationEntryPoint(
-                        new org.springframework.security.web.authentication.HttpStatusEntryPoint(
-                                org.springframework.http.HttpStatus.UNAUTHORIZED)))
+                        new HttpStatusEntryPoint(org.springframework.http.HttpStatus.UNAUTHORIZED)))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -71,18 +84,38 @@ public class SecurityConfig {
                                 "/api/v1/demo/**",
                                 "/api/v1/mock/**",
                                 "/api/v1/course-categories",
-                                "/api/v1/teacher/kyc/**",
-                                "/api/v1/teacher/courses/**",
+                                "/api/v1/public/courses/**",
+                                "/api/v1/payments/vnpay/ipn",
+                                "/api/v1/payments/vnpay/confirm-return",
+                                "/api/v1/payments/dev/ipn",
                                 "/uploads/course-thumbnails/**",
-                                "/api/v1/student/profile/**",
-                                "/api/v1/teacher/profile/**",
-                                "/api/admin/auth/login",
+                                "/uploads/user-avatars/**",
+                                "/api/admin/auth/login")
+                        .permitAll()
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(
+                        jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+
+        http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
+    public SecurityFilterChain oauth2SecurityFilterChain(
+            HttpSecurity http,
+            CustomOAuth2UserService customOAuth2UserService,
+            OAuth2AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler,
+            OAuth2AuthenticationFailureHandler oauth2AuthenticationFailureHandler
+    ) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
                                 "/oauth2/**",
                                 "/login/oauth2/**")
                         .permitAll()
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(
-                        jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService))
@@ -122,10 +155,40 @@ public class SecurityConfig {
     public JwtDecoder mockJwtDecoder() {
         return token -> {
             try {
-                UUID.fromString(token);
+                String subject = token;
+                String role = "STUDENT";
+                
+                if (token.contains(".")) {
+                    String[] parts = token.split("\\.");
+                    if (parts.length >= 2) {
+                        try {
+                            String base64Url = parts[1];
+                            int pad = 4 - (base64Url.length() % 4);
+                            if (pad > 0 && pad < 4) {
+                                StringBuilder sb = new StringBuilder(base64Url);
+                                for (int i = 0; i < pad; i++) sb.append("=");
+                                base64Url = sb.toString();
+                            }
+                            String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(base64Url));
+                            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                            java.util.Map<String, Object> payloadMap = mapper.readValue(payloadJson, java.util.Map.class);
+                            if (payloadMap.containsKey("sub")) {
+                                subject = payloadMap.get("sub").toString();
+                            }
+                            if (payloadMap.containsKey("role")) {
+                                role = payloadMap.get("role").toString();
+                            }
+                        } catch (Exception ex) {
+                            // If parsing fails, we shouldn't pass the whole JWT as subject, just fallback to a dummy UUID
+                            subject = "c0000000-0000-0000-0000-000000000001";
+                        }
+                    }
+                }
+                
                 return org.springframework.security.oauth2.jwt.Jwt.withTokenValue(token)
                         .header("alg", "none")
-                        .claim("sub", token)
+                        .claim("sub", subject)
+                        .claim("role", role)
                         .build();
             } catch (Exception e) {
                 throw new JwtException("Invalid mock token: " + token);
@@ -150,4 +213,14 @@ public class SecurityConfig {
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
         return jwtAuthenticationConverter;
     }
+
+    @Bean
+    public FilterRegistrationBean<TeacherEligibilityFilter> teacherEligibilityFilterRegistration(
+            TeacherEligibilityFilter filter
+    ) {
+        FilterRegistrationBean<TeacherEligibilityFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
 }

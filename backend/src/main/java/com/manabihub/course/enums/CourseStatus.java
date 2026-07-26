@@ -2,7 +2,7 @@ package com.manabihub.course.enums;
 
 public enum CourseStatus {
     DRAFT,
-    SUBMITTED,
+    PENDING,
     APPROVED,
     PUBLISHED,
     REJECTED,

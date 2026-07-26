@@ -240,8 +240,10 @@ function TeacherKycPageContent() {
             const response = await verifyTeacherIdentity(result);
             setIdentityEnvelope(response);
             await refreshStatus();
+            handleCloseIdentityDialog();
           } catch (error) {
             setPageError(readErrorMessage(error));
+            handleCloseIdentityDialog();
           }
         });
       } catch (error) {
@@ -1087,8 +1089,21 @@ function readErrorMessage(error: unknown) {
     const messageCode = response?.data?.messageCode;
     const message = response?.data?.message;
 
-    return [messageCode, message].filter(Boolean).join(': ') || 'Đã xảy ra lỗi. Vui lòng thử lại.';
+    if (messageCode && KYC_ERROR_MESSAGES[messageCode]) {
+      return KYC_ERROR_MESSAGES[messageCode];
+    }
+
+    return message || 'Đã xảy ra lỗi. Vui lòng thử lại.';
   }
 
   return error instanceof Error ? error.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
 }
+
+const KYC_ERROR_MESSAGES: Record<string, string> = {
+  KYC_TEACHER_NOT_FOUND: 'Không thể khởi tạo hồ sơ xác minh. Vui lòng thử lại hoặc liên hệ bộ phận hỗ trợ.',
+  KYC_ALREADY_PENDING: 'Hồ sơ của bạn đang được xét duyệt. Vui lòng chờ kết quả trước khi gửi lại.',
+  KYC_ALREADY_APPROVED: 'Hồ sơ Giảng viên của bạn đã được phê duyệt.',
+  'MSG-KYC-002': 'Thông tin xác minh chưa hợp lệ. Vui lòng kiểm tra và thực hiện lại.',
+  'MSG-KYC-006': 'Thông tin chứng chỉ không khớp với thông tin định danh.',
+  'MSG-KYC-008': 'Thông tin định danh này đã được sử dụng cho một tài khoản Giảng viên khác.',
+};
