@@ -158,11 +158,36 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
           <label className="block text-sm font-medium text-slate-700 mb-1">
             Số tiền rút (VND)
           </label>
-          <input
-            type="number"
-            {...register('amount', { valueAsNumber: true, required: 'Vui lòng nhập số tiền', min: { value: 1, message: 'Số tiền phải lớn hơn 0' } })}
-            className={`w-full rounded-lg border px-3 py-2.5 shadow-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 ${errors.amount ? 'border-red-500' : 'border-slate-300'}`}
-            placeholder="Nhập số tiền..."
+          <Controller
+            name="amount"
+            control={control}
+            rules={{
+              required: 'Vui lòng nhập số tiền',
+              min: {
+                value: 1,
+                message: 'Số tiền phải lớn hơn 0',
+              },
+            }}
+            render={({ field }) => (
+              <input
+                ref={field.ref}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={field.value
+                  ? new Intl.NumberFormat('vi-VN', {
+                      maximumFractionDigits: 0,
+                    }).format(field.value)
+                  : ''}
+                onBlur={field.onBlur}
+                onChange={(event) => {
+                  const digits = event.target.value.replace(/\D/g, '');
+                  field.onChange(digits ? Number(digits) : undefined);
+                }}
+                className={`w-full rounded-lg border px-3 py-2.5 shadow-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 ${errors.amount ? 'border-red-500' : 'border-slate-300'}`}
+                placeholder="Nhập số tiền..."
+              />
+            )}
           />
           {errors.amount && (
             <p className="mt-1 text-sm text-red-600">{errors.amount.message as string}</p>

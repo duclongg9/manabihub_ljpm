@@ -42,6 +42,8 @@ class WithdrawalServiceImplTest {
     @Mock
     private com.manabihub.identity.repository.AppUserRepository appUserRepository;
     @Mock
+    private com.manabihub.kyc.repository.TeacherProfileRepository teacherProfileRepository;
+    @Mock
     private com.manabihub.common.mail.EmailService emailService;
     @Mock
     private WalletService walletService;
@@ -53,8 +55,10 @@ class WithdrawalServiceImplTest {
     @InjectMocks
     private WithdrawalServiceImpl withdrawalService;
 
-    private final String teacherIdStr = "d290f1ee-6c54-4b01-90e6-d701748f0851";
-    private final java.util.UUID teacherId = java.util.UUID.fromString(teacherIdStr);
+    private final String userIdStr = "d290f1ee-6c54-4b01-90e6-d701748f0851";
+    private final java.util.UUID userId = java.util.UUID.fromString(userIdStr);
+    private final java.util.UUID teacherProfileId =
+            java.util.UUID.fromString("b82e8ebf-9997-45a6-bdbe-3fbe6ad25b04");
     private final BigDecimal minimumPayout = new BigDecimal("500000");
 
     @BeforeEach
@@ -62,16 +66,23 @@ class WithdrawalServiceImplTest {
         ReflectionTestUtils.setField(withdrawalService, "minimumPayoutAmount", minimumPayout);
         
         com.manabihub.identity.entity.AppUser mockUser = new com.manabihub.identity.entity.AppUser();
-        mockUser.setId(teacherId);
+        mockUser.setId(userId);
         mockUser.setEmail("teacher@example.com");
-        org.mockito.Mockito.lenient().when(appUserRepository.findById(teacherId)).thenReturn(Optional.of(mockUser));
+        org.mockito.Mockito.lenient().when(appUserRepository.findById(userId)).thenReturn(Optional.of(mockUser));
+
+        com.manabihub.kyc.domain.TeacherProfile teacherProfile =
+                new com.manabihub.kyc.domain.TeacherProfile();
+        teacherProfile.setId(teacherProfileId);
+        org.mockito.Mockito.lenient()
+                .when(teacherProfileRepository.findByUserId(userId))
+                .thenReturn(Optional.of(teacherProfile));
     }
 
     private String seedAndGetOtp() {
-        withdrawalService.sendWithdrawalOtp(teacherIdStr);
+        withdrawalService.sendWithdrawalOtp(userIdStr);
         java.util.concurrent.ConcurrentHashMap<String, Object> cache = 
             (java.util.concurrent.ConcurrentHashMap<String, Object>) ReflectionTestUtils.getField(withdrawalService, "otpCache");
-        Object entry = cache.get(teacherIdStr);
+        Object entry = cache.get(userIdStr);
         return (String) ReflectionTestUtils.getField(entry, "code");
     }
 
@@ -93,7 +104,7 @@ class WithdrawalServiceImplTest {
         java.util.UUID walletId = java.util.UUID.randomUUID();
         TeacherWallet wallet = TeacherWallet.builder()
                 .id(walletId)
-                .teacherId(teacherId)
+                .teacherId(teacherProfileId)
                 .balance(new BigDecimal("2000000"))
                 .frozenBalance(BigDecimal.ZERO)
                 .build();
@@ -108,17 +119,21 @@ class WithdrawalServiceImplTest {
         responseDto.setId(withdrawalId.toString());
         responseDto.setStatus(WithdrawalStatus.PENDING);
 
-        when(withdrawalRepository.countByTeacherIdAndStatus(teacherId, WithdrawalStatus.PENDING)).thenReturn(0L);
-        when(withdrawalRepository.countByTeacherIdAndCreatedAtAfter(eq(teacherId), any(LocalDateTime.class))).thenReturn(0L);
-        when(teacherWalletRepository.findByTeacherId(teacherId)).thenReturn(Optional.of(wallet));
+        when(withdrawalRepository.countByTeacherIdAndStatus(teacherProfileId, WithdrawalStatus.PENDING)).thenReturn(0L);
+        when(withdrawalRepository.countByTeacherIdAndCreatedAtAfter(eq(teacherProfileId), any(LocalDateTime.class))).thenReturn(0L);
+        when(teacherWalletRepository.findByTeacherId(teacherProfileId)).thenReturn(Optional.of(wallet));
         when(withdrawalRepository.save(any(WithdrawalRequest.class))).thenReturn(savedRequest);
         when(withdrawalMapper.toResponse(any(WithdrawalRequest.class))).thenReturn(responseDto);
 
-        WithdrawalRequestResponse result = withdrawalService.createWithdrawalRequest(teacherIdStr, request);
+        WithdrawalRequestResponse result = withdrawalService.createWithdrawalRequest(userIdStr, request);
 
         assertNotNull(result);
         assertEquals(WithdrawalStatus.PENDING, result.getStatus());
-        verify(walletService, times(1)).reserveBalance(eq(teacherIdStr), eq(request.getAmount()), eq(withdrawalId.toString()));
+        verify(walletService, times(1)).reserveBalance(
+                eq(teacherProfileId.toString()),
+                eq(request.getAmount()),
+                eq(withdrawalId.toString())
+        );
         verify(notificationService, times(1)).createNotificationForRole(anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
@@ -128,7 +143,7 @@ class WithdrawalServiceImplTest {
         request.setAmount(new BigDecimal("100000")); // Below 500k
 
         BusinessException exception = assertThrows(BusinessException.class, 
-            () -> withdrawalService.createWithdrawalRequest(teacherIdStr, request));
+            () -> withdrawalService.createWithdrawalRequest(userIdStr, request));
             
         assertEquals(MessageCodes.PAYOUT_AMOUNT_BELOW_MINIMUM, exception.getMessageCode());
         verify(walletService, never()).reserveBalance(any(), any(), any());
@@ -150,12 +165,12 @@ class WithdrawalServiceImplTest {
         bankAccountDto.setAccountNumber("12345");
         request.setBankAccount(bankAccountDto);
 
-        when(withdrawalRepository.countByTeacherIdAndStatus(teacherId, WithdrawalStatus.PENDING)).thenReturn(0L);
-        when(withdrawalRepository.countByTeacherIdAndCreatedAtAfter(eq(teacherId), any(LocalDateTime.class))).thenReturn(0L);
-        when(teacherWalletRepository.findByTeacherId(teacherId)).thenReturn(Optional.empty());
+        when(withdrawalRepository.countByTeacherIdAndStatus(teacherProfileId, WithdrawalStatus.PENDING)).thenReturn(0L);
+        when(withdrawalRepository.countByTeacherIdAndCreatedAtAfter(eq(teacherProfileId), any(LocalDateTime.class))).thenReturn(0L);
+        when(teacherWalletRepository.findByTeacherId(teacherProfileId)).thenReturn(Optional.empty());
 
         BusinessException exception = assertThrows(BusinessException.class, 
-            () -> withdrawalService.createWithdrawalRequest(teacherIdStr, request));
+            () -> withdrawalService.createWithdrawalRequest(userIdStr, request));
             
         assertEquals(MessageCodes.WALLET_NOT_FOUND, exception.getMessageCode());
         verify(walletService, never()).reserveBalance(any(), any(), any());
