@@ -1,6 +1,7 @@
 package com.manabihub.wallet.entity;
 
-import com.manabihub.wallet.enums.WalletLedgerType;
+import com.manabihub.wallet.enums.WalletDirection;
+import com.manabihub.wallet.enums.WalletTransactionType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -29,13 +30,14 @@ public class WalletTransaction {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false, length = 50)
-    private WalletLedgerType transactionType;
+    private WalletTransactionType transactionType;
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "direction", nullable = false, length = 10)
-    private String direction;
+    private WalletDirection direction;
 
     @Column(name = "reference_type", length = 30)
     private String referenceType;

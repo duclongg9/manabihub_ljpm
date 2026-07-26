@@ -2,27 +2,35 @@ package com.manabihub.wallet.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
 import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
-import com.manabihub.wallet.enums.WalletLedgerType;
+import com.manabihub.wallet.enums.WalletDirection;
+import com.manabihub.wallet.enums.WalletOwnerType;
+import com.manabihub.wallet.enums.WalletTransactionType;
 import com.manabihub.wallet.mapper.WalletMapper;
 import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import com.manabihub.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class WalletServiceImpl implements WalletService {
 
-    private final TeacherWalletRepository walletRepository;
+    private final TeacherWalletRepository teacherWalletRepository;
+    private final WalletRepository walletRepository;
     private final WalletTransactionRepository transactionRepository;
     private final WalletMapper walletMapper;
 
@@ -32,7 +40,7 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional(readOnly = true)
     public TeacherWalletResponse getTeacherWallet(String teacherId) {
-        TeacherWallet wallet = walletRepository.findByTeacherId(java.util.UUID.fromString(teacherId))
+        TeacherWallet wallet = teacherWalletRepository.findByTeacherId(UUID.fromString(teacherId))
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         // Hardcoding clearing period and next payout date for now as per requirement constraints
@@ -44,8 +52,52 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
+    public Wallet getOrCreatePlatformWallet() {
+        return walletRepository.findFirstByOwnerType(WalletOwnerType.PLATFORM)
+                .orElseGet(() -> walletRepository.save(Wallet.builder()
+                        .ownerType(WalletOwnerType.PLATFORM)
+                        .build()));
+    }
+
+    @Override
+    @Transactional
+    public Wallet getOrCreateTeacherWallet(TeacherProfile teacher) {
+        return walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId())
+                .orElseGet(() -> walletRepository.save(Wallet.builder()
+                        .ownerType(WalletOwnerType.TEACHER)
+                        .teacher(teacher)
+                        .build()));
+    }
+
+    @Override
+    @Transactional
+    public WalletTransaction holdEscrow(TeacherProfile teacher, BigDecimal amount,
+                                        String referenceType, UUID referenceId, String note) {
+        Wallet wallet = getOrCreateTeacherWallet(teacher);
+        Wallet locked = walletRepository.findByIdForUpdate(wallet.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.WALLET_NOT_FOUND,
+                        "Teacher wallet was not found",
+                        HttpStatus.NOT_FOUND));
+
+        locked.setFrozenBalance(locked.getFrozenBalance().add(amount));
+        walletRepository.save(locked);
+
+        return transactionRepository.save(WalletTransaction.builder()
+                .walletId(locked.getId())
+                .transactionType(WalletTransactionType.ESCROW_HOLD)
+                .amount(amount)
+                .direction(WalletDirection.IN)
+                .referenceType(referenceType)
+                .referenceId(referenceId)
+                .note(note)
+                .build());
+    }
+
+    @Override
+    @Transactional
     public void reserveBalance(String teacherId, BigDecimal amount, String withdrawalId) {
-        TeacherWallet wallet = walletRepository.findByTeacherIdForUpdate(java.util.UUID.fromString(teacherId))
+        TeacherWallet wallet = teacherWalletRepository.findByTeacherIdForUpdate(UUID.fromString(teacherId))
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         // V002 schema does not have a explicit frozen flag on the wallet itself.
@@ -55,23 +107,21 @@ public class WalletServiceImpl implements WalletService {
             throw new BusinessException(MessageCodes.WALLET_INSUFFICIENT_BALANCE, "Insufficient available balance");
         }
 
-        BigDecimal balanceBefore = wallet.getAvailableBalance();
-        
         // Update balances for V002 schema
         // Available balance is inherently (balance - frozenBalance)
         // To reserve money, we just increase frozenBalance. The total balance remains unchanged until actual payout.
         wallet.setFrozenBalance(wallet.getFrozenBalance().add(amount));
         
-        walletRepository.save(wallet);
+        teacherWalletRepository.save(wallet);
 
         // Create Transaction
         WalletTransaction transaction = WalletTransaction.builder()
                 .walletId(wallet.getId())
-                .transactionType(WalletLedgerType.WITHDRAWAL_RESERVATION)
+                .transactionType(WalletTransactionType.WITHDRAWAL_RESERVATION)
                 .amount(amount.negate()) // negative for deduction from available
-                .direction("OUT")
+                .direction(WalletDirection.OUT)
                 .referenceType("WITHDRAWAL_REQUEST")
-                .referenceId(java.util.UUID.fromString(withdrawalId))
+                .referenceId(UUID.fromString(withdrawalId))
                 .build();
                 
         transactionRepository.save(transaction);
@@ -80,28 +130,26 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void releaseBalance(String teacherId, BigDecimal amount, String withdrawalId) {
-        TeacherWallet wallet = walletRepository.findByTeacherIdForUpdate(java.util.UUID.fromString(teacherId))
+        TeacherWallet wallet = teacherWalletRepository.findByTeacherIdForUpdate(UUID.fromString(teacherId))
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         if (wallet.getFrozenBalance().compareTo(amount) < 0) {
             throw new BusinessException(MessageCodes.WALLET_INSUFFICIENT_BALANCE, "Insufficient frozen balance to release");
         }
 
-        BigDecimal balanceBefore = wallet.getAvailableBalance();
-        
         // Update balances: decrease frozen, which inherently increases available balance
         wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(amount));
         
-        walletRepository.save(wallet);
+        teacherWalletRepository.save(wallet);
 
         // Create Transaction
         WalletTransaction transaction = WalletTransaction.builder()
                 .walletId(wallet.getId())
-                .transactionType(WalletLedgerType.WITHDRAWAL_CANCELLED) 
+                .transactionType(WalletTransactionType.WITHDRAWAL_CANCELLED)
                 .amount(amount) // positive for adding back to available
-                .direction("IN")
+                .direction(WalletDirection.IN)
                 .referenceType("WITHDRAWAL_REQUEST")
-                .referenceId(java.util.UUID.fromString(withdrawalId))
+                .referenceId(UUID.fromString(withdrawalId))
                 .note("Refund for cancelled withdrawal")
                 .build();
                 

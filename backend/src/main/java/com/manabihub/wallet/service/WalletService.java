@@ -1,10 +1,22 @@
 package com.manabihub.wallet.service;
 
+import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.entity.WalletTransaction;
+
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public interface WalletService {
     TeacherWalletResponse getTeacherWallet(String teacherId);
+
+    Wallet getOrCreatePlatformWallet();
+
+    Wallet getOrCreateTeacherWallet(TeacherProfile teacher);
+
+    WalletTransaction holdEscrow(TeacherProfile teacher, BigDecimal amount,
+                                 String referenceType, UUID referenceId, String note);
     
     /**
      * Reserves balance for withdrawal.
