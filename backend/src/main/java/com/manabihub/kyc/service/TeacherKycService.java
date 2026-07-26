@@ -713,7 +713,7 @@ public class TeacherKycService {
     private CertificateVerificationStatus resolvedCertificateStatus(KycRequest request) {
         return switch (request.getStatus()) {
             case APPROVED -> CertificateVerificationStatus.APPROVED;
-            case REJECTED, CORRECTION_REQUIRED -> CertificateVerificationStatus.REJECTED;
+            case REJECTED, CORRECTION_REQUIRED, REVOKED -> CertificateVerificationStatus.REJECTED;
             case DRAFT, PENDING -> request.getCertificateStatus();
         };
     }
@@ -1140,6 +1140,7 @@ public class TeacherKycService {
             case APPROVED -> "Đã duyệt";
             case REJECTED -> "Bị từ chối";
             case CORRECTION_REQUIRED -> "Yêu cầu bổ sung";
+            case REVOKED -> "Đã thu hồi";
         };
     }
 
@@ -1150,6 +1151,7 @@ public class TeacherKycService {
             case APPROVED -> "Đã duyệt";
             case REJECTED -> "Bị từ chối";
             case CORRECTION_REQUIRED -> "Yêu cầu bổ sung";
+            case REVOKED -> "Đã thu hồi";
         };
     }
 

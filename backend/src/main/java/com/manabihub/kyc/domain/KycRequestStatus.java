@@ -5,5 +5,6 @@ public enum KycRequestStatus {
     PENDING,
     APPROVED,
     REJECTED,
-    CORRECTION_REQUIRED
+    CORRECTION_REQUIRED,
+    REVOKED
 }
