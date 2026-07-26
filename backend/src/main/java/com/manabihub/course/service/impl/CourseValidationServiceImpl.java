@@ -1,6 +1,7 @@
 package com.manabihub.course.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.course.dto.response.ValidationError;
 import com.manabihub.course.dto.response.ValidationResultResponse;
@@ -254,20 +255,37 @@ public class CourseValidationServiceImpl implements CourseValidationService {
         }
 
         try {
-            List<Map<String, Object>> options = objectMapper.readValue(block.getQuizOptionsJson(),
-                    new TypeReference<>() {
-                    });
-            boolean answerMatches = options.stream()
-                    .anyMatch(opt -> block.getQuizAnswer().equals(opt.get("id"))
-                            || block.getQuizAnswer().equals(opt.get("value"))
-                            || block.getQuizAnswer().equals(opt.get("text")));
+            JsonNode options = objectMapper.readTree(block.getQuizOptionsJson());
+            boolean answerMatches = options != null
+                    && options.isArray()
+                    && matchesQuizAnswer(options, block.getQuizAnswer());
             if (!answerMatches) {
                 errors.add(new ValidationError("MSG-COURSE-014",
                         "Đáp án đúng không khớp với bất kỳ lựa chọn nào trong danh sách.", "error"));
             }
         } catch (Exception e) {
-            log.error("Failed to parse quiz options JSON for block {}", block.getId(), e);
+            log.warn("Failed to parse quiz options JSON for block {}", block.getId(), e);
+            errors.add(new ValidationError(
+                    "MSG-COURSE-014",
+                    "Danh sách lựa chọn quiz không hợp lệ.",
+                    "error"
+            ));
         }
+    }
+
+    private boolean matchesQuizAnswer(JsonNode options, String answer) {
+        for (JsonNode option : options) {
+            if (option.isTextual() && answer.equals(option.asText())) {
+                return true;
+            }
+            if (option.isObject()
+                    && (answer.equals(option.path("id").asText())
+                    || answer.equals(option.path("value").asText())
+                    || answer.equals(option.path("text").asText()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void validateFlashcardBlock(LessonBlock block, List<ValidationError> errors) {
