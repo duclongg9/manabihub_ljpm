@@ -13,8 +13,10 @@ export const LandingHeader: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [scrolled, setScrolled] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
   const session = getAuthSession('public');
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
+  const username = session?.email?.split('@')[0] || 'User';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -153,21 +155,23 @@ export const LandingHeader: React.FC = () => {
 
         {/* Right Section: Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
-          <Typography
-            component={Link}
-            to={ROUTES.TEACHER.KYC}
-            sx={{
-              textDecoration: 'none',
-              color: '#475569',
-              fontWeight: 600,
-              fontSize: '0.9rem',
-              display: { xs: 'none', lg: 'block' },
-              transition: 'color 0.3s ease',
-              '&:hover': { color: '#C41E3A' }
-            }}
-          >
-            Trở thành giảng viên
-          </Typography>
+          {!session && (
+            <Typography
+              component={Link}
+              to={ROUTES.TEACHER.KYC}
+              sx={{
+                textDecoration: 'none',
+                color: '#475569',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                display: { xs: 'none', lg: 'block' },
+                transition: 'color 0.3s ease',
+                '&:hover': { color: '#C41E3A' }
+              }}
+            >
+              Trở thành giảng viên
+            </Typography>
+          )}
 
           <IconButton color="inherit" sx={{ display: { xs: 'none', sm: 'flex' } }}>
             <Badge badgeContent={0} color="error">
@@ -176,23 +180,48 @@ export const LandingHeader: React.FC = () => {
           </IconButton>
 
           {session ? (
-            <Button
-              variant="contained"
-              startIcon={<Avatar sx={{ width: 24, height: 24, bgcolor: '#5B8C5A', fontSize: '0.8rem' }}>{avatarLabel}</Avatar>}
-              onClick={() => navigate(getDefaultRoute(session))}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                bgcolor: '#1B2A4A',
-                color: 'white',
-                borderRadius: 2,
-                px: 2.5,
-                transition: 'all 0.3s ease',
-                '&:hover': { bgcolor: '#2A3F6A', transform: 'translateY(-1px)' }
-              }}
-            >
-              Trang của tôi
-            </Button>
+            <>
+              <IconButton 
+                onClick={(e) => setProfileAnchorEl(e.currentTarget)}
+                sx={{ ml: 1, p: 0.5, border: '2px solid transparent', transition: 'border 0.2s', '&:hover': { borderColor: '#e2e8f0' } }}
+              >
+                <Avatar sx={{ width: 36, height: 36, bgcolor: '#C41E3A', fontSize: '1rem', fontWeight: 700 }}>{avatarLabel}</Avatar>
+              </IconButton>
+              <Menu
+                anchorEl={profileAnchorEl}
+                open={Boolean(profileAnchorEl)}
+                onClose={() => setProfileAnchorEl(null)}
+                disableScrollLock
+                sx={{ 
+                  zIndex: 9999, 
+                  '& .MuiPaper-root': { 
+                    mt: 1.5, 
+                    borderRadius: '12px', 
+                    minWidth: 220, 
+                    boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)', 
+                    border: '1px solid #f1f5f9' 
+                  } 
+                }}
+              >
+                <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #f1f5f9', mb: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a' }}>{username}</Typography>
+                  <Typography variant="body2" sx={{ color: '#64748b' }}>{session.email}</Typography>
+                </Box>
+                <MenuItem onClick={() => { setProfileAnchorEl(null); navigate(getDefaultRoute(session)); }} sx={{ py: 1.5, fontWeight: 600, color: '#1A1A2E' }}>
+                  Bảng điều khiển
+                </MenuItem>
+                <MenuItem onClick={() => { setProfileAnchorEl(null); navigate('/student/profile'); }} sx={{ py: 1.5, color: '#475569' }}>
+                  Hồ sơ cá nhân
+                </MenuItem>
+                <MenuItem onClick={() => { 
+                  setProfileAnchorEl(null); 
+                  localStorage.removeItem('auth_session');
+                  window.location.reload(); 
+                }} sx={{ py: 1.5, color: '#C41E3A' }}>
+                  Đăng xuất
+                </MenuItem>
+              </Menu>
+            </>
           ) : (
             <Button
               variant="contained"

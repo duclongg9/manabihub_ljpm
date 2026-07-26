@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   Box,
-  Container,
   Grid,
   Pagination,
   Stack,
@@ -10,6 +9,7 @@ import {
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { useSearchParams } from 'react-router-dom';
+import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { CourseCatalogCard } from '../components/CourseCatalogCard';
 import { CourseCatalogFiltersBar } from '../components/CourseCatalogFilters';
 import { useCourseCatalog } from '../hooks/useCourseCatalog';
@@ -175,19 +175,22 @@ export const CourseCatalogPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#FBF9F5', pb: 8 }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 }, flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
-        <Box sx={{ mb: 3 }}>
-          <Typography component="h1" variant="h4" sx={{ fontWeight: 800 }}>
-            Khóa học tiếng Nhật
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.75 }}>
-            Tìm khóa học đã xuất bản theo mục tiêu, trình độ và ngân sách của bạn.
-          </Typography>
-        </Box>
+    <Box component="main" sx={{ minHeight: '100vh', flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#FAF9F6', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', position: 'relative', flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
+        {/* Background Watermark */}
+        <Typography variant="h1" sx={{ position: 'absolute', top: -40, right: -20, fontSize: '15rem', fontWeight: 900, color: 'rgba(0,0,0,0.025)', userSelect: 'none', pointerEvents: 'none', zIndex: 0, writingMode: 'vertical-rl' }}>
+          探求
+        </Typography>
+        <PageHeader
+          title="Khám phá khóa học"
+          subtitle="コースを探す"
+          watermark="探求"
+          breadcrumbs={[{ label: 'Học viên' }, { label: 'Khám phá khóa học' }]}
+        />
 
-        <Box sx={{ position: 'sticky', top: { xs: 56, sm: 64 }, zIndex: 20, bgcolor: 'rgba(251, 249, 245, 0.9)', backdropFilter: 'blur(12px)', py: 2, mx: -2, px: 2, borderRadius: 2, transition: 'all 0.3s' }}>
-          <CourseCatalogFiltersBar
+        <Box sx={{ position: 'relative', zIndex: 1, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ position: 'sticky', top: { xs: 56, sm: 64 }, zIndex: 20, bgcolor: 'rgba(250, 249, 246, 0.92)', backdropFilter: 'blur(12px)', py: 2, mx: -2, px: 2, borderRadius: 2, transition: 'all 0.3s' }}>
+            <CourseCatalogFiltersBar
             filters={query.filters}
             onFiltersChange={handleFiltersChange}
             categories={categories}
@@ -208,16 +211,16 @@ export const CourseCatalogPage: React.FC = () => {
             {/* Active Filter Badges */}
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
               {query.filters.category && (
-                <Chip size="small" label={`Danh mục: ${categories.find(c => c.code === query.filters.category)?.name || query.filters.category}`} onDelete={() => handleFiltersChange({ ...query.filters, category: undefined })} sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }} />
+                <Chip size="small" label={`Danh mục: ${categories.find(c => c.code === query.filters.category)?.name || query.filters.category}`} onDelete={() => handleFiltersChange({ ...query.filters, category: undefined })} sx={{ bgcolor: '#fee2e2', color: '#C41E3A', fontWeight: 700, '& .MuiChip-deleteIcon': { color: '#C41E3A', '&:hover': { color: '#9f1239' } } }} />
               )}
               {query.filters.jlptLevel && (
-                <Chip size="small" label={`Trình độ: ${query.filters.jlptLevel}`} onDelete={() => handleFiltersChange({ ...query.filters, jlptLevel: undefined })} sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }} />
+                <Chip size="small" label={`Trình độ: ${query.filters.jlptLevel}`} onDelete={() => handleFiltersChange({ ...query.filters, jlptLevel: undefined })} sx={{ bgcolor: '#fee2e2', color: '#C41E3A', fontWeight: 700, '& .MuiChip-deleteIcon': { color: '#C41E3A', '&:hover': { color: '#9f1239' } } }} />
               )}
               {query.filters.minPrice !== undefined && (
-                <Chip size="small" label={`Giá từ: ${query.filters.minPrice.toLocaleString()}đ`} onDelete={() => handleFiltersChange({ ...query.filters, minPrice: undefined })} sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }} />
+                <Chip size="small" label={`Giá từ: ${query.filters.minPrice.toLocaleString()}đ`} onDelete={() => handleFiltersChange({ ...query.filters, minPrice: undefined })} sx={{ bgcolor: '#fee2e2', color: '#C41E3A', fontWeight: 700, '& .MuiChip-deleteIcon': { color: '#C41E3A', '&:hover': { color: '#9f1239' } } }} />
               )}
               {query.filters.maxPrice !== undefined && (
-                <Chip size="small" label={`Giá đến: ${query.filters.maxPrice.toLocaleString()}đ`} onDelete={() => handleFiltersChange({ ...query.filters, maxPrice: undefined })} sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }} />
+                <Chip size="small" label={`Giá đến: ${query.filters.maxPrice.toLocaleString()}đ`} onDelete={() => handleFiltersChange({ ...query.filters, maxPrice: undefined })} sx={{ bgcolor: '#fee2e2', color: '#C41E3A', fontWeight: 700, '& .MuiChip-deleteIcon': { color: '#C41E3A', '&:hover': { color: '#9f1239' } } }} />
               )}
             </Stack>
           </Box>
@@ -298,7 +301,8 @@ export const CourseCatalogPage: React.FC = () => {
             />
           </Box>
         )}
-      </Container>
+        </Box>
+      </Box>
     </Box>
   );
 };

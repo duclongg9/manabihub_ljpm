@@ -84,7 +84,7 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
     HAS_BACKGROUND_IMAGE: true,
     HAS_RESULT_SCREEN: true,
     SHOW_STEP: true,
-    MAX_SIZE_IMAGE: 5,
+    MAX_SIZE_IMAGE: 1, // Reduced from 5 to 1 to ensure the total base64 payload stays well under AWS API Gateway's 10MB limit.
     DEFAULT_LANGUAGE: 'vi',
     LIST_TYPE_DOCUMENT: [9],
     HAS_QR_SCAN: false,

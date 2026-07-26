@@ -53,6 +53,9 @@ public class StudentProfileMapper {
 
         user.setFullName(request.getFullName());
         user.setPhoneNumber(request.getPhoneNumber());
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
     }
 
 }

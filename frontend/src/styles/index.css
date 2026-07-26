@@ -15,3 +15,18 @@
 body {
   margin: 0;
 }
+
+/* Fix: Tailwind Typography plugin forces list-style on ol/li.
+   MUI Breadcrumbs uses <ol>, so numbers bleed through. */
+nav[aria-label="breadcrumb"] ol,
+nav[aria-label="breadcrumb"] li {
+  list-style: none !important;
+  list-style-type: none !important;
+  padding-left: 0 !important;
+  margin: 0;
+}
+nav[aria-label="breadcrumb"] li::before,
+nav[aria-label="breadcrumb"] li::marker {
+  content: none !important;
+  display: none !important;
+}
