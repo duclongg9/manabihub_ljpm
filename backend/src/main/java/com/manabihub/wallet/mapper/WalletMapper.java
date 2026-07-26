@@ -11,7 +11,7 @@ import java.time.LocalDate;
 @Mapper(componentModel = "spring")
 public interface WalletMapper {
 
-    @Mapping(target = "walletFrozen", constant = "false")
+    @Mapping(target = "walletFrozen", source = "wallet.frozen")
     @Mapping(target = "pendingBalance", constant = "0")
     @Mapping(target = "reservedBalance", source = "wallet.frozenBalance")
     @Mapping(target = "availableBalance", expression = "java(wallet.getAvailableBalance())")

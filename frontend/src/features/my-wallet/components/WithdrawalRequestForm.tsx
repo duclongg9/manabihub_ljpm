@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
@@ -33,7 +33,10 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
     queryFn: () => walletService.getSavedBankAccounts(),
   });
   
-  const savedAccounts = savedAccountsResponse?.data || [];
+  const savedAccounts = useMemo(
+    () => savedAccountsResponse?.data ?? [],
+    [savedAccountsResponse?.data],
+  );
 
   const {
     register,
@@ -57,15 +60,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [useNewAccount, setUseNewAccount] = useState<boolean>(true);
 
-  // When saved accounts load, default to first one if exists
-  useEffect(() => {
-    if (savedAccounts.length > 0) {
-      setUseNewAccount(false);
-      handleSelectAccount(savedAccounts[0].id);
-    }
-  }, [savedAccounts.length]);
-
-  const handleSelectAccount = (id: string) => {
+  const handleSelectAccount = useCallback((id: string) => {
     setSelectedAccountId(id);
     const acc = savedAccounts.find(a => a.id === id);
     if (acc) {
@@ -74,7 +69,15 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
       setValue('accountNumber', acc.accountNumber);
       setValue('accountHolderName', acc.accountHolderName);
     }
-  };
+  }, [savedAccounts, setValue]);
+
+  // When saved accounts load, default to first one if exists.
+  useEffect(() => {
+    if (savedAccounts.length > 0) {
+      setUseNewAccount(false);
+      handleSelectAccount(savedAccounts[0].id);
+    }
+  }, [handleSelectAccount, savedAccounts]);
 
   const amount = watch('amount');
   const bankCode = watch('bankCode');
@@ -158,7 +161,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
           <input
             type="number"
             {...register('amount', { valueAsNumber: true, required: 'Vui lòng nhập số tiền', min: { value: 1, message: 'Số tiền phải lớn hơn 0' } })}
-            className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.amount ? 'border-red-500' : 'border-slate-300'}`}
+            className={`w-full rounded-lg border px-3 py-2.5 shadow-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 ${errors.amount ? 'border-red-500' : 'border-slate-300'}`}
             placeholder="Nhập số tiền..."
           />
           {errors.amount && (
@@ -199,7 +202,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
                   setValue('accountHolderName', '');
                 }
               }}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm font-semibold text-[#C41E3A] hover:underline"
             >
               {useNewAccount ? 'Chọn tài khoản đã lưu' : 'Dùng tài khoản mới'}
             </button>
@@ -212,7 +215,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
             <select
               value={selectedAccountId}
               onChange={(e) => handleSelectAccount(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 shadow-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
             >
               {savedAccounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
@@ -237,7 +240,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
                       const bank = BANK_LIST.find(b => b.code === e.target.value);
                       if (bank) setValue('bankName', bank.name);
                     }}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.bankCode ? 'border-red-500' : 'border-slate-300'}`}
+                    className={`w-full rounded-lg border px-3 py-2.5 shadow-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 ${errors.bankCode ? 'border-red-500' : 'border-slate-300'}`}
                   >
                     <option value="">-- Chọn ngân hàng --</option>
                     {BANK_LIST.map(bank => (
@@ -259,14 +262,14 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
                 <input
                   type="text"
                   {...register('accountNumber', { required: 'Vui lòng nhập số tài khoản' })}
-                  className={`flex-1 px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.accountNumber ? 'border-red-500' : 'border-slate-300'}`}
+                  className={`min-w-0 flex-1 rounded-lg border px-3 py-2.5 shadow-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 ${errors.accountNumber ? 'border-red-500' : 'border-slate-300'}`}
                   placeholder="Nhập số tài khoản"
                 />
                 <button
                   type="button"
                   onClick={handleCheckBank}
                   disabled={isCheckingBank || !bankCode || !accountNumber}
-                  className="px-4 py-2 border border-slate-300 shadow-sm text-sm font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
                 >
                   {isCheckingBank ? 'Đang tra cứu...' : 'Kiểm tra'}
                 </button>
@@ -281,7 +284,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
               <input
                 type="text"
                 {...register('accountHolderName', { required: 'Vui lòng nhập tên chủ tài khoản' })}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.accountHolderName ? 'border-red-500' : 'border-slate-300'}`}
+                className={`w-full rounded-lg border px-3 py-2.5 shadow-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 ${errors.accountHolderName ? 'border-red-500' : 'border-slate-300'}`}
                 placeholder="VD: NGUYEN VAN A"
               />
               {errors.accountHolderName && (
@@ -295,7 +298,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
                 type="checkbox"
                 checked={saveAccount}
                 onChange={(e) => setSaveAccount(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 rounded border-gray-300 text-[#C41E3A] focus:ring-[#C41E3A]"
               />
               <label htmlFor="save-account" className="ml-2 block text-sm text-gray-900">
                 Lưu thông tin tài khoản cho lần rút sau
@@ -308,7 +311,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
       <button
         type="submit"
         disabled={isDisabled}
-        className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`flex w-full justify-center rounded-lg border border-transparent bg-[#C41E3A] px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[#9d182e] focus:outline-none focus:ring-2 focus:ring-[#C41E3A] focus:ring-offset-2 ${isDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
       >
         {isSubmitting ? 'Đang xử lý...' : 'Gửi yêu cầu rút tiền'}
       </button>
@@ -323,7 +326,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
           </p>
           <input
             type="text"
-            className="w-48 px-4 py-3 text-center text-2xl tracking-[0.75em] font-mono border-2 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-48 rounded-lg border-2 px-4 py-3 text-center font-mono text-2xl tracking-[0.75em] shadow-inner outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
             placeholder="------"
             maxLength={6}
             value={otpCode}
@@ -332,13 +335,13 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
           />
           <div className="mt-6 text-sm">
             {countdown > 0 ? (
-              <span className="text-slate-500">Gửi lại mã sau <span className="font-semibold text-blue-600">{countdown}s</span></span>
+              <span className="text-slate-500">Gửi lại mã sau <span className="font-semibold text-[#C41E3A]">{countdown}s</span></span>
             ) : (
               <button 
                 type="button" 
                 onClick={() => sendOtp()}
                 disabled={isSendingOtp}
-                className="text-blue-600 font-medium hover:underline focus:outline-none disabled:opacity-50"
+                className="font-semibold text-[#C41E3A] hover:underline focus:outline-none disabled:opacity-50"
               >
                 {isSendingOtp ? 'Đang gửi...' : 'Gửi lại mã OTP'}
               </button>

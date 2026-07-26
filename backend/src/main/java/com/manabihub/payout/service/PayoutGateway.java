@@ -7,6 +7,8 @@ import java.util.UUID;
 
 public interface PayoutGateway {
 
+    String providerName();
+
     PayoutGatewayResult transfer(PayoutGatewayCommand command);
 
     PayoutGatewayResult getTransferStatus(String providerReference);

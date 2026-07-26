@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/teacher/wallet")
 @RequiredArgsConstructor
@@ -25,8 +27,8 @@ public class TeacherWalletController {
     @PreAuthorize("hasRole('TEACHER')")
     @Operation(summary = "Get teacher wallet details")
     public ApiResponse<TeacherWalletResponse> getWallet(Authentication authentication) {
-        String teacherId = authentication.getName();
-        TeacherWalletResponse response = walletService.getTeacherWallet(teacherId);
+        UUID userId = UUID.fromString(authentication.getName());
+        TeacherWalletResponse response = walletService.getTeacherWalletByUserId(userId);
         return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "Success", response);
     }
 }

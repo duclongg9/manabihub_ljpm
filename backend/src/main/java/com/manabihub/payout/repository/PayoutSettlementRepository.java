@@ -14,9 +14,15 @@ public interface PayoutSettlementRepository extends JpaRepository<PayoutSettleme
 
     Optional<PayoutSettlement> findByWithdrawalRequestId(UUID withdrawalRequestId);
 
+    boolean existsByProviderAndProviderReferenceId(String provider, String providerReferenceId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT ps FROM PayoutSettlement ps WHERE ps.id = :id")
     Optional<PayoutSettlement> findByIdWithLock(@Param("id") UUID id);
 
-    boolean existsByIdempotencyKey(String idempotencyKey);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT ps FROM PayoutSettlement ps WHERE ps.withdrawalRequestId = :withdrawalRequestId")
+    Optional<PayoutSettlement> findByWithdrawalRequestIdWithLock(
+            @Param("withdrawalRequestId") UUID withdrawalRequestId
+    );
 }

@@ -41,6 +41,10 @@ public class TeacherWallet {
     @Builder.Default
     private BigDecimal frozenBalance = BigDecimal.ZERO;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean frozen = false;
+
     @Column(name = "currency", nullable = false, length = 10)
     @Builder.Default
     private String currency = "VND";

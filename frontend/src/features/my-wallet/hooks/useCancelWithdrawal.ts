@@ -7,9 +7,9 @@ export function useCancelWithdrawal() {
   return useMutation({
     mutationFn: (id: string) => walletService.cancelWithdrawal(id),
     onSuccess: () => {
-      // Invalidate both wallet balance and withdrawals list
-      queryClient.invalidateQueries({ queryKey: ['teacherWallet'] });
-      queryClient.invalidateQueries({ queryKey: ['teacherWithdrawals'] });
+      // Keep the wallet metrics and history in sync immediately after cancellation.
+      queryClient.invalidateQueries({ queryKey: ['teacher-wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-withdrawals'] });
     },
   });
 }

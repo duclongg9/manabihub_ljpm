@@ -1,53 +1,52 @@
 package com.manabihub.payout.service.impl;
 
 import com.manabihub.payout.service.PayoutGateway;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
-@Slf4j
 @Service
+@Profile({"local", "test"})
 public class MockPayoutGateway implements PayoutGateway {
+
+    private final ConcurrentMap<String, PayoutGatewayResult> resultsByIdempotencyKey =
+            new ConcurrentHashMap<>();
+
+    @Override
+    public String providerName() {
+        return "MOCK_PAYOUT";
+    }
 
     @Override
     public PayoutGatewayResult transfer(PayoutGatewayCommand command) {
-        log.info("Mocking payout transfer for settlementId: {}", command.getSettlementId());
-        
-        try {
-            // Simulate network delay
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        // Simulate 80% success rate
-        boolean isSuccess = ThreadLocalRandom.current().nextInt(100) < 80;
-
-        if (isSuccess) {
-            String mockRef = "GW-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-            log.info("Mock payout success. Ref: {}", mockRef);
-            return PayoutGatewayResult.builder()
-                    .success(true)
-                    .providerReference(mockRef)
-                    .build();
-        } else {
-            log.warn("Mock payout failed");
-            return PayoutGatewayResult.builder()
-                    .success(false)
-                    .errorCode("ERR_BANK_TIMEOUT")
-                    .errorMessage("Connection to destination bank timed out")
-                    .isRetryable(true)
-                    .build();
-        }
+        return resultsByIdempotencyKey.computeIfAbsent(
+                command.getIdempotencyKey(),
+                key -> PayoutGatewayResult.builder()
+                        .success(true)
+                        .providerReference(referenceFor(key))
+                        .build()
+        );
     }
 
     @Override
     public PayoutGatewayResult getTransferStatus(String providerReference) {
-        return PayoutGatewayResult.builder()
-                .success(true)
-                .providerReference(providerReference)
-                .build();
+        return resultsByIdempotencyKey.values().stream()
+                .filter(result -> providerReference.equals(result.getProviderReference()))
+                .findFirst()
+                .orElseGet(() -> PayoutGatewayResult.builder()
+                        .success(false)
+                        .errorCode("PAYOUT_REFERENCE_NOT_FOUND")
+                        .errorMessage("The payout provider reference was not found.")
+                        .isRetryable(false)
+                        .build());
+    }
+
+    private String referenceFor(String idempotencyKey) {
+        UUID stableId = UUID.nameUUIDFromBytes(idempotencyKey.getBytes(StandardCharsets.UTF_8));
+        return "MOCK-" + stableId.toString().substring(0, 12).toUpperCase();
     }
 }

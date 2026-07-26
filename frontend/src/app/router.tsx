@@ -34,14 +34,11 @@ import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages
 import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistPage';
 import { TeacherWalletPage } from '../features/my-wallet/pages/TeacherWalletPage';
-<<<<<<< HEAD
 import { PayoutQueuePage } from '../features/admin-payout/pages/PayoutQueuePage';
 import { PayoutSettlementPage } from '../features/admin-payout/pages/PayoutSettlementPage';
-=======
 import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
->>>>>>> d1a31f27a16b7f6560c3c3c177aa5ac124f3ffe8
 
 export const router = createBrowserRouter([
   {

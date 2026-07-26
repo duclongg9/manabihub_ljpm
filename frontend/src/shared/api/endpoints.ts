@@ -15,6 +15,18 @@ export const ENDPOINTS = {
     DETAIL: (id: string) => `/v1/admin/course-approvals/${id}`,
     REVIEW: (id: string) => `/v1/admin/course-approvals/${id}/review`,
   },
+  ADMIN_PAYOUT: {
+    QUEUE: '/admin/payouts',
+    DETAIL: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}`,
+    RECONCILE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/reconcile`,
+    APPROVE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/approve`,
+    RETRY: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/retry`,
+    REJECT: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/reject`,
+    MANUAL_TRANSFER: (withdrawalRequestId: string) =>
+      `/admin/payouts/${withdrawalRequestId}/manual-transfer`,
+    MANUAL_PROOF: (withdrawalRequestId: string) =>
+      `/admin/payouts/${withdrawalRequestId}/manual-transfer/proof`,
+  },
   teacherKyc: {
     status: '/v1/teacher/kyc/status',
     identityVerifications: '/v1/teacher/kyc/identity-verifications',
