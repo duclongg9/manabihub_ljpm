@@ -25,6 +25,7 @@ import com.manabihub.payout.enums.WithdrawalStatus;
 import com.manabihub.payout.repository.PayoutSettlementRepository;
 import com.manabihub.payout.repository.PayoutReconciliationLogRepository;
 import com.manabihub.payout.repository.WithdrawalRequestRepository;
+import com.manabihub.payout.security.PayoutSecurityService;
 import com.manabihub.payout.service.PayoutGateway;
 import com.manabihub.payout.service.PayoutProofStorageService;
 import com.manabihub.payout.service.PayoutReconciliationService;
@@ -83,6 +84,7 @@ class PayoutSettlementServiceImplTest {
     @Mock private PayoutGateway payoutGateway;
     @Mock private PayoutProofStorageService proofStorageService;
     @Mock private TransactionTemplate transactionTemplate;
+    @Mock private PayoutSecurityService payoutSecurityService;
 
     private PayoutSettlementServiceImpl service;
     private UUID adminId;
@@ -177,6 +179,12 @@ class PayoutSettlementServiceImplTest {
         when(reconciliationService.reconcile(request, wallet, teacher))
                 .thenReturn(matchedReconciliation());
         when(payoutGateway.providerName()).thenReturn("TEST_GATEWAY");
+        when(payoutSecurityService.decryptAccountNumber(any())).thenAnswer(
+                invocation -> invocation.getArgument(0)
+        );
+        when(payoutSecurityService.maskAccountNumber(any())).thenAnswer(
+                invocation -> "****" + invocation.<String>getArgument(0).substring(6)
+        );
 
         service = new PayoutSettlementServiceImpl(
                 withdrawalRequestRepository,
@@ -192,7 +200,8 @@ class PayoutSettlementServiceImplTest {
                 notificationService,
                 payoutGateway,
                 proofStorageService,
-                transactionTemplate
+                transactionTemplate,
+                payoutSecurityService
         );
     }
 

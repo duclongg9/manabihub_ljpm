@@ -64,6 +64,15 @@ class PaymentControllerSecurityTest {
     }
 
     @Test
+    void anonymousBrowserReturn_CannotConfirmPayment() throws Exception {
+        mockMvc.perform(get("/api/v1/payments/vnpay/confirm-return")
+                        .param("vnp_TxnRef", "OD-TEST"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(paymentService, paymentGateway, orderRepository);
+    }
+
+    @Test
     @WithMockUser(roles = "STUDENT")
     void authenticatedUser_CannotInvokeDisabledDevSimulator() throws Exception {
         when(vnPayProperties.isDevSimulatorEnabled()).thenReturn(false);

@@ -5,6 +5,8 @@ manabihub:
     identity-secret: ${KYC_IDENTITY_SECRET:local-dev-only-identity-secret-key-32chars}
   wallet:
     minimum-payout-amount: 500000
+  payout:
+    security-secret: ${PAYOUT_SECURITY_SECRET:local-dev-only-payout-secret-key-32chars}
   payment:
     vnpay:
       dev-simulator-enabled: true

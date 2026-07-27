@@ -118,6 +118,14 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    void validateQuizBlock_WhenOptionsAreMissing_ShouldReturnValidationError() {
+        List<ValidationError> errors = validateQuizOptions(null, "answer");
+
+        assertEquals(1, errors.size());
+        assertEquals("MSG-COURSE-013", errors.getFirst().code());
+    }
+
+    @Test
     void validateHierarchy_WhenCourseHasNoModules_ShouldRejectCourse() {
         Course course = Course.builder()
                 .id(courseId)

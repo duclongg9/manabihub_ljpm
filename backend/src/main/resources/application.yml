@@ -35,6 +35,8 @@ management:
 manabihub:
   kyc:
     identity-secret: ${KYC_IDENTITY_SECRET:}
+  payout:
+    security-secret: ${PAYOUT_SECURITY_SECRET:}
   ai:
     chat:
       base-url: ${AI_CHAT_PROVIDER_BASE_URL:}

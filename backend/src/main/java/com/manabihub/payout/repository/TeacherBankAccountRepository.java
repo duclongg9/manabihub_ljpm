@@ -13,5 +13,10 @@ public interface TeacherBankAccountRepository extends JpaRepository<TeacherBankA
     
     List<TeacherBankAccount> findByTeacherIdOrderByCreatedAtDesc(UUID teacherId);
     
-    Optional<TeacherBankAccount> findByTeacherIdAndAccountNumber(UUID teacherId, String accountNumber);
+    Optional<TeacherBankAccount> findByTeacherIdAndAccountFingerprint(
+            UUID teacherId,
+            String accountFingerprint
+    );
+
+    Optional<TeacherBankAccount> findByIdAndTeacherId(UUID id, UUID teacherId);
 }

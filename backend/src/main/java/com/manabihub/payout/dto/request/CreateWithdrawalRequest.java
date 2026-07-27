@@ -1,6 +1,7 @@
 package com.manabihub.payout.dto.request;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -23,7 +24,6 @@ public class CreateWithdrawalRequest {
 
     private String bankAccountId;
 
-    @NotNull(message = "Bank account object is required")
     @Valid
     private BankAccountDto bankAccount;
 
@@ -32,4 +32,11 @@ public class CreateWithdrawalRequest {
 
     @Builder.Default
     private boolean saveAccount = false;
+
+    @AssertTrue(message = "Provide exactly one of bankAccountId or bankAccount")
+    public boolean isBankAccountSelectionValid() {
+        boolean hasSavedAccount = bankAccountId != null && !bankAccountId.isBlank();
+        boolean hasNewAccount = bankAccount != null;
+        return hasSavedAccount != hasNewAccount;
+    }
 }

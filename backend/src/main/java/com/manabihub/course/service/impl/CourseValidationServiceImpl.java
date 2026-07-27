@@ -255,6 +255,11 @@ public class CourseValidationServiceImpl implements CourseValidationService {
         }
 
         if (!StringUtils.hasText(block.getQuizOptionsJson())) {
+            errors.add(new ValidationError(
+                    "MSG-COURSE-013",
+                    "Câu hỏi quiz cần có danh sách lựa chọn trước khi lưu.",
+                    "error"
+            ));
             return;
         }
 

@@ -241,7 +241,11 @@ class CourseServiceImplTest {
 
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
-        when(courseRepository.findByIdAndTeacher_IdAndStatus(draftId, approvedTeacher.getId(), CourseStatus.DRAFT))
+        when(courseRepository.findByIdAndTeacher_IdAndStatusIn(
+                draftId,
+                approvedTeacher.getId(),
+                List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
+        ))
                 .thenReturn(Optional.of(draft));
         when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
         when(courseRepository.existsBySlugAndIdNot("jlpt-n5-foundation", draftId)).thenReturn(false);
@@ -266,7 +270,11 @@ class CourseServiceImplTest {
 
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
-        when(courseRepository.findByIdAndTeacher_IdAndStatus(draftId, approvedTeacher.getId(), CourseStatus.DRAFT))
+        when(courseRepository.findByIdAndTeacher_IdAndStatusIn(
+                draftId,
+                approvedTeacher.getId(),
+                List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
+        ))
                 .thenReturn(Optional.of(draft));
 
         courseService.deleteDraft(draftId);
@@ -287,10 +295,10 @@ class CourseServiceImplTest {
 
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
-        when(courseRepository.findByIdAndTeacher_IdAndStatus(
+        when(courseRepository.findByIdAndTeacher_IdAndStatusIn(
                 draftId,
                 approvedTeacher.getId(),
-                CourseStatus.DRAFT
+                List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
         )).thenReturn(Optional.of(draft));
         when(courseValidationService.validateCourse(draftId))
                 .thenReturn(new ValidationResultResponse(true, List.of()));
@@ -305,6 +313,42 @@ class CourseServiceImplTest {
                 "Teacher submitted course \"JLPT N5 Foundation\" for review.",
                 "COURSE_REVIEW",
                 "/admin/courses/approvals/" + draftId
+        );
+    }
+
+    @Test
+    void submitForReview_WhenCourseWasRejected_ShouldResubmitAndAuditPreviousStatus() {
+        UUID draftId = UUID.randomUUID();
+        Course rejected = Course.builder()
+                .id(draftId)
+                .teacher(approvedTeacher)
+                .title("JLPT N5 Foundation")
+                .slug("jlpt-n5-foundation")
+                .status(CourseStatus.REJECTED)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_IdAndStatusIn(
+                draftId,
+                approvedTeacher.getId(),
+                List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
+        )).thenReturn(Optional.of(rejected));
+        when(courseValidationService.validateCourse(draftId))
+                .thenReturn(new ValidationResultResponse(true, List.of()));
+
+        courseService.submitForReview(draftId);
+
+        assertEquals(CourseStatus.PENDING, rejected.getStatus());
+        verify(auditLogService).logUserAction(
+                userId,
+                "TEACHER",
+                "SUBMIT_COURSE",
+                "COURSE",
+                draftId,
+                Map.of("status", CourseStatus.REJECTED.name()),
+                Map.of("status", CourseStatus.PENDING.name()),
+                Map.of("courseTitle", rejected.getTitle())
         );
     }
 

@@ -98,7 +98,6 @@ export const ENDPOINTS = {
     // Local dev simulator for the VNPay IPN callback (no tunnel needed).
     devIpn: '/v1/payments/dev/ipn',
     // Confirms an order from the browser return redirect (checksum-verified backend-side).
-    confirmReturn: '/v1/payments/vnpay/confirm-return',
   },
   LEARNING: {
     COURSE_LEARN: (courseId: string) => `/v1/student/courses/${courseId}/learn`,

@@ -45,21 +45,6 @@ public class PaymentController {
     }
 
     /**
-     * Confirms an order from the browser return redirect. VNPay redirects the browser to the
-     * frontend return page carrying the (signed) {@code vnp_*} result params; the frontend
-     * forwards them here so the order can be confirmed immediately without waiting for the
-     * server-to-server IPN — useful on localhost where VNPay cannot reach the backend.
-     * <p>
-     * Security is unchanged: this runs the exact same checksum-verified, idempotent
-     * {@link PaymentService#handleIpn} logic, so a tampered redirect fails verification and the
-     * authoritative IPN remains the source of truth in production.
-     */
-    @GetMapping("/vnpay/confirm-return")
-    public IpnAckResponse confirmFromReturn(@RequestParam Map<String, String> params) {
-        return paymentService.handleIpn(params);
-    }
-
-    /**
      * Local dev simulator: builds a correctly-signed IPN payload for an order and runs it
      * through the exact same {@link PaymentService#handleIpn} path VNPay would trigger, so
      * the flow can be tested end-to-end without exposing localhost to VNPay via a tunnel.

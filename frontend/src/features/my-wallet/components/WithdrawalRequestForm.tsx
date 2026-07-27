@@ -49,6 +49,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
     defaultValues: {
       amount: undefined,
       useNewAccount: true,
+      bankAccountId: undefined,
       bankCode: '',
       bankName: '',
       accountNumber: '',
@@ -62,6 +63,8 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
 
   const handleSelectAccount = useCallback((id: string) => {
     setSelectedAccountId(id);
+    setValue('bankAccountId', id, { shouldValidate: true });
+    setValue('useNewAccount', false);
     const acc = savedAccounts.find(a => a.id === id);
     if (acc) {
       setValue('bankCode', acc.bankCode);
@@ -80,11 +83,8 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
   }, [handleSelectAccount, savedAccounts]);
 
   const amount = watch('amount');
-  const bankCode = watch('bankCode');
-  const accountNumber = watch('accountNumber');
   const amountNum = Number(amount) || 0;
   
-  const [isCheckingBank, setIsCheckingBank] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [pendingValues, setPendingValues] = useState<WithdrawalFormValues | null>(null);
@@ -114,19 +114,6 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
   const isExceedBalance = amountNum > wallet.availableBalance;
   const isBelowMinimum = amountNum > 0 && amountNum < wallet.minimumPayoutAmount;
   const isDisabled = isSubmitting || isExceedBalance || isBelowMinimum || amountNum <= 0;
-
-  const handleCheckBank = () => {
-    if (!bankCode || !accountNumber) {
-      toast.error('Vui lòng chọn Ngân hàng và Số tài khoản trước khi kiểm tra.');
-      return;
-    }
-    setIsCheckingBank(true);
-    setTimeout(() => {
-      setValue('accountHolderName', 'NGUYEN VAN A (Đã xác thực)', { shouldValidate: true });
-      setIsCheckingBank(false);
-      toast.success('Xác thực tài khoản thành công!');
-    }, 1000);
-  };
 
   const onPreSubmit = (values: WithdrawalFormValues) => {
     setPendingValues(values);
@@ -217,10 +204,14 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
             <button
               type="button"
               onClick={() => {
-                setUseNewAccount(!useNewAccount);
+                const nextUseNewAccount = !useNewAccount;
+                setUseNewAccount(nextUseNewAccount);
+                setValue('useNewAccount', nextUseNewAccount);
                 if (useNewAccount && savedAccounts.length > 0) {
                   handleSelectAccount(savedAccounts[0].id);
                 } else {
+                  setSelectedAccountId('');
+                  setValue('bankAccountId', undefined);
                   setValue('bankCode', '');
                   setValue('bankName', '');
                   setValue('accountNumber', '');
@@ -283,25 +274,20 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
             
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Số tài khoản</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  {...register('accountNumber', { required: 'Vui lòng nhập số tài khoản' })}
-                  className={`min-w-0 flex-1 rounded-lg border px-3 py-2.5 shadow-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 ${errors.accountNumber ? 'border-red-500' : 'border-slate-300'}`}
-                  placeholder="Nhập số tài khoản"
-                />
-                <button
-                  type="button"
-                  onClick={handleCheckBank}
-                  disabled={isCheckingBank || !bankCode || !accountNumber}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {isCheckingBank ? 'Đang tra cứu...' : 'Kiểm tra'}
-                </button>
-              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                {...register('accountNumber', { required: 'Vui lòng nhập số tài khoản' })}
+                className={`w-full rounded-lg border px-3 py-2.5 shadow-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 ${errors.accountNumber ? 'border-red-500' : 'border-slate-300'}`}
+                placeholder="Nhập số tài khoản"
+              />
               {errors.accountNumber && (
                 <p className="mt-1 text-sm text-red-600">{errors.accountNumber.message as string}</p>
               )}
+              <p className="mt-1 text-xs text-slate-500">
+                ManabiHub chưa hỗ trợ tra cứu tên tài khoản tự động. Vui lòng tự kiểm tra thông tin trước khi gửi.
+              </p>
             </div>
 
             <div>

@@ -206,14 +206,7 @@ public class CourseServiceImpl implements CourseService {
         UUID currentUserId = currentUserService.getCurrentUserId();
         TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
-
-        if (course.getStatus() != CourseStatus.DRAFT && course.getStatus() != CourseStatus.REJECTED && course.getStatus() != CourseStatus.FORCED_DRAFT) {
-            throw new BusinessException(
-                    com.manabihub.common.constants.MessageCodes.COMMON_BAD_REQUEST,
-                    "Không thể gửi duyệt khóa học ở trạng thái hiện tại.",
-                    org.springframework.http.HttpStatus.BAD_REQUEST
-            );
-        }
+        CourseStatus previousStatus = course.getStatus();
 
         ValidationResultResponse validationResult = courseValidationService.validateCourse(draftId);
         if (!validationResult.isValid()) {
@@ -241,7 +234,7 @@ public class CourseServiceImpl implements CourseService {
                 "SUBMIT_COURSE",
                 "COURSE",
                 course.getId(),
-                Map.of("status", CourseStatus.DRAFT.name()),
+                Map.of("status", previousStatus.name()),
                 Map.of("status", CourseStatus.PENDING.name()),
                 Map.of("courseTitle", course.getTitle())
         );
@@ -466,7 +459,11 @@ public class CourseServiceImpl implements CourseService {
     }
 
     private Course resolveDraftForTeacher(UUID draftId, UUID teacherId) {
-        return courseRepository.findByIdAndTeacher_IdAndStatus(draftId, teacherId, CourseStatus.DRAFT)
+        return courseRepository.findByIdAndTeacher_IdAndStatusIn(
+                        draftId,
+                        teacherId,
+                        List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
+                )
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COMMON_NOT_FOUND,
                         "Course draft was not found",

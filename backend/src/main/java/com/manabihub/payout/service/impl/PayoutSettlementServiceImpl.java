@@ -31,6 +31,7 @@ import com.manabihub.payout.enums.WithdrawalStatus;
 import com.manabihub.payout.repository.PayoutReconciliationLogRepository;
 import com.manabihub.payout.repository.PayoutSettlementRepository;
 import com.manabihub.payout.repository.WithdrawalRequestRepository;
+import com.manabihub.payout.security.PayoutSecurityService;
 import com.manabihub.payout.service.PayoutGateway;
 import com.manabihub.payout.service.PayoutProofStorageService;
 import com.manabihub.payout.service.PayoutReconciliationService;
@@ -86,6 +87,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
     private final PayoutGateway payoutGateway;
     private final PayoutProofStorageService proofStorageService;
     private final TransactionTemplate transactionTemplate;
+    private final PayoutSecurityService payoutSecurityService;
 
     @Override
     @Transactional(readOnly = true)
@@ -560,7 +562,9 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                     .bankName(bank.getBankName())
                     .bankBranch(bank.getBranch())
                     .accountHolderName(bank.getAccountHolderName())
-                    .accountNumber(bank.getAccountNumber())
+                    .accountNumber(
+                            payoutSecurityService.decryptAccountNumber(bank.getAccountNumber())
+                    )
                     .idempotencyKey(prepared.settlement().getIdempotencyKey())
                     .description("ManabiHub teacher payout")
                     .build());
@@ -1131,7 +1135,11 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 .bankName(bank == null ? null : bank.getBankName())
                 .bankBranch(bank == null ? null : bank.getBranch())
                 .accountHolderName(bank == null ? null : bank.getAccountHolderName())
-                .accountNumberMasked(bank == null ? null : maskAccount(bank.getAccountNumber()))
+                .accountNumberMasked(
+                        bank == null
+                                ? null
+                                : payoutSecurityService.maskAccountNumber(bank.getAccountNumber())
+                )
                 .requestedAt(request.getRequestedAt())
                 .processingStartedAt(settlement == null ? null : settlement.getProcessingStartedAt())
                 .settledAt(settlement == null ? null : settlement.getExecutedAt())
@@ -1322,7 +1330,9 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                     "Thanh toán doanh thu thành công",
                     "Yêu cầu rút " + request.getRequestedAmount()
                             + " VND đã được thanh toán tới tài khoản "
-                            + maskAccount(request.getBankAccountSnapshot().getAccountNumber())
+                            + payoutSecurityService.maskAccountNumber(
+                                    request.getBankAccountSnapshot().getAccountNumber()
+                            )
                             + ". Mã đối soát: " + settlement.getProviderReferenceId(),
                     "PAYOUT_SUCCESS"
             );
@@ -1490,15 +1500,6 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                         .orElse("MATCHED"),
                 500
         );
-    }
-
-    private String maskAccount(String accountNumber) {
-        if (isBlank(accountNumber)) {
-            return "****";
-        }
-        String normalized = accountNumber.trim();
-        int visible = Math.min(4, normalized.length());
-        return "****" + normalized.substring(normalized.length() - visible);
     }
 
     private boolean isStale(Instant processingStartedAt) {

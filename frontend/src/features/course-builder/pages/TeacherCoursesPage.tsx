@@ -752,6 +752,23 @@ function CourseDraftRow({
               >
                 Xây nội dung
               </Button>
+              <Tooltip
+                title="Khóa học phải đạt toàn bộ checklist: tối thiểu 5 bài học, 30 phút nội dung và Final Test hợp lệ."
+                placement="top"
+              >
+                <span>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={submitting ? <CircularProgress color="inherit" size={16} /> : <SendOutlinedIcon />}
+                    disabled={deleting || submitting}
+                    onClick={onSubmit}
+                    sx={{ textTransform: 'none', fontWeight: 700 }}
+                  >
+                    {submitting ? 'Đang gửi...' : 'Gửi duyệt'}
+                  </Button>
+                </span>
+              </Tooltip>
               <Tooltip title="Tác vụ khác">
                 <IconButton
                   aria-controls={menuOpen ? `course-draft-${course.id}-menu` : undefined}
@@ -804,20 +821,6 @@ function CourseDraftRow({
                 <Typography variant="body2">{deleting ? 'Đang xóa...' : 'Xóa bản nháp'}</Typography>
               </Stack>
             </MenuItem>
-            <Tooltip title="Vui lòng vào phần Xây nội dung để thêm ít nhất 1 bài học trước khi gửi duyệt." placement="left">
-              <span>
-                <MenuItem disabled={deleting || submitting}
-                          onClick={() => {
-                            closeMenu();
-                            onSubmit();
-                          }}>
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <SendOutlinedIcon fontSize="small" />
-                    <Typography variant="body2">Gửi duyệt</Typography>
-                  </Stack>
-                </MenuItem>
-              </span>
-            </Tooltip>
           </Menu>
         </Stack>
       </Stack>
