@@ -1,6 +1,8 @@
 manabihub:
   security:
     mock-jwt: false
+  demo:
+    admin-password: ${DEMO_ADMIN_PASSWORD:Admin@123}
   kyc:
     identity-secret: ${KYC_IDENTITY_SECRET:local-dev-only-identity-secret-key-32chars}
   wallet:

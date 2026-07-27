@@ -91,7 +91,7 @@ INSERT INTO system_settings (id, setting_key, setting_value, value_type, descrip
     (gen_random_uuid(), 'AI_SUPPORT_PRICE_FLOOR',       '100000', 'NUMBER',  'Minimum course price (VND) to enable AI writing support',        TRUE),
     (gen_random_uuid(), 'REFUND_WINDOW_DAYS',           '7',      'NUMBER',  'Number of days after enrollment during which refund is allowed', TRUE),
     (gen_random_uuid(), 'REFUND_PROGRESS_LIMIT_PERCENT','30',     'NUMBER',  'Maximum course progress (%) allowed for refund eligibility',     TRUE),
-    (gen_random_uuid(), 'ESCROW_HOLDING_DAYS',          '14',     'NUMBER',  'Number of days to hold funds in escrow before release',          TRUE),
+    (gen_random_uuid(), 'ESCROW_HOLDING_DAYS',          '7',      'NUMBER',  'Number of days to hold funds in escrow before release',          TRUE),
     (gen_random_uuid(), 'PAYOUT_THRESHOLD',             '100000', 'NUMBER',  'Minimum balance (VND) required for teacher withdrawal request',  TRUE),
     (gen_random_uuid(), 'AI_ENABLED',                   'true',   'BOOLEAN', 'Global toggle for all AI features',                              TRUE),
     (gen_random_uuid(), 'AI_WRITING_ENABLED',           'true',   'BOOLEAN', 'Toggle for AI writing suggestion feature (suggestion-only, not grading)', TRUE),

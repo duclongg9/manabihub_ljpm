@@ -202,6 +202,24 @@ class WithdrawalServiceImplTest {
     }
 
     @Test
+    void createWithdrawalRequest_UsesRuntimePayoutThresholdBeforeOtp() {
+        CreateWithdrawalRequest request = newRequest();
+        request.setAmount(new BigDecimal("600000"));
+        when(settingValueService.getDecimal("PAYOUT_THRESHOLD", minimumPayout))
+                .thenReturn(new BigDecimal("700000"));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> withdrawalService.createWithdrawalRequest(userIdString, request)
+        );
+
+        assertEquals(MessageCodes.PAYOUT_AMOUNT_BELOW_MINIMUM, exception.getMessageCode());
+        verify(settingValueService).getDecimal("PAYOUT_THRESHOLD", minimumPayout);
+        verifyNoInteractions(otpService, walletService);
+        verify(teacherWalletRepository, never()).findByTeacherIdForUpdate(any());
+    }
+
+    @Test
     void createWithdrawalRequest_WalletNotFound_DoesNotConsumeOtp() {
         CreateWithdrawalRequest request = newRequest();
         when(teacherWalletRepository.findByTeacherIdForUpdate(teacherProfileId))

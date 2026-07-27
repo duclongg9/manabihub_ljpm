@@ -48,6 +48,31 @@ class SystemAdministrationPostgresIntegrationTest {
 
     @Test
     void versionedMigrationUpdatesSettingsAndMaintainsExactlyOneRoleWithAudit() {
+        Integer disabledDemoAccounts = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM internal_admin_accounts
+                WHERE email IN (
+                    'sysadmin@manabihub.local',
+                    'course.manager@manabihub.local',
+                    'finance.manager@manabihub.local'
+                )
+                  AND account_status = 'DISABLED'
+                """,
+                Integer.class
+        );
+        assertEquals(3, disabledDemoAccounts);
+
+        jdbcTemplate.update(
+                """
+                UPDATE internal_admin_accounts
+                SET account_status = 'ACTIVE'
+                WHERE id IN (?, ?)
+                """,
+                SYSTEM_ADMIN_ID,
+                COURSE_MANAGER_ID
+        );
+
         Integer auditCountBefore = countConfigurationAudits();
         var settings = administrationService.listSettings(SYSTEM_ADMIN_ID);
         assertEquals(14, settings.size());
