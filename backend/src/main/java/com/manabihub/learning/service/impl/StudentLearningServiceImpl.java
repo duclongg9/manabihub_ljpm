@@ -4,13 +4,16 @@ import com.manabihub.common.response.PageResponse;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
+import com.manabihub.course.repository.LessonBlockRepository;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.learning.dto.response.StudentCourseSummaryResponse;
 import com.manabihub.learning.dto.response.StudentDashboardStatsResponse;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.enums.EnrollmentStatus;
+import com.manabihub.learning.enums.LessonProgressStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.StudentLearningService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +38,8 @@ public class StudentLearningServiceImpl implements StudentLearningService {
 
     private final EnrollmentRepository enrollmentRepository;
     private final StudentProfileRepository studentProfileRepository;
+    private final LessonBlockProgressRepository lessonBlockProgressRepository;
+    private final LessonBlockRepository lessonBlockRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -69,11 +76,50 @@ public class StudentLearningServiceImpl implements StudentLearningService {
                 LEARNING_STATUSES,
                 pageable);
 
-        Page<StudentCourseSummaryResponse> responsePage = enrollmentsPage.map(this::mapToSummaryResponse);
+        Map<UUID, Long> completedByEnrollment = loadCompletedCounts(enrollmentsPage);
+        Map<UUID, Long> totalByCourse = loadTotalBlockCounts(enrollmentsPage);
+
+        Page<StudentCourseSummaryResponse> responsePage = enrollmentsPage.map(enrollment -> {
+            long completed = completedByEnrollment.getOrDefault(enrollment.getId(), 0L);
+            long total = totalByCourse.getOrDefault(enrollment.getCourse().getId(), 0L);
+            return mapToSummaryResponse(enrollment, progressPercentage(completed, total));
+        });
         return PageResponse.from(responsePage);
     }
 
-    private StudentCourseSummaryResponse mapToSummaryResponse(Enrollment enrollment) {
+    private Map<UUID, Long> loadCompletedCounts(Page<Enrollment> enrollmentsPage) {
+        List<UUID> enrollmentIds = enrollmentsPage.getContent().stream()
+                .map(Enrollment::getId)
+                .toList();
+        if (enrollmentIds.isEmpty()) {
+            return Map.of();
+        }
+        return lessonBlockProgressRepository
+                .countByEnrollmentIdsAndStatus(enrollmentIds, LessonProgressStatus.COMPLETED)
+                .stream()
+                .collect(Collectors.toMap(
+                        LessonBlockProgressRepository.CompletedProgressCount::getEnrollmentId,
+                        LessonBlockProgressRepository.CompletedProgressCount::getCompletedCount));
+    }
+
+    private Map<UUID, Long> loadTotalBlockCounts(Page<Enrollment> enrollmentsPage) {
+        List<UUID> courseIds = enrollmentsPage.getContent().stream()
+                .map(Enrollment::getCourse)
+                .map(Course::getId)
+                .distinct()
+                .toList();
+        if (courseIds.isEmpty()) {
+            return Map.of();
+        }
+        return lessonBlockRepository.countByCourseIds(courseIds).stream()
+                .collect(Collectors.toMap(
+                        LessonBlockRepository.CourseBlockCount::getCourseId,
+                        LessonBlockRepository.CourseBlockCount::getTotalCount));
+    }
+
+    private StudentCourseSummaryResponse mapToSummaryResponse(
+            Enrollment enrollment,
+            double progressPercentage) {
         Course course = enrollment.getCourse();
         String teacherName = course.getTeacher() != null && course.getTeacher().getUser() != null
                 ? course.getTeacher().getUser().getFullName()
@@ -87,6 +133,14 @@ public class StudentLearningServiceImpl implements StudentLearningService {
                 .teacherName(teacherName)
                 .enrollmentStatus(enrollment.getStatus())
                 .enrolledAt(enrollment.getEnrolledAt())
+                .progressPercentage(progressPercentage)
                 .build();
+    }
+
+    private double progressPercentage(long completed, long total) {
+        if (total <= 0) {
+            return 0;
+        }
+        return Math.min(100.0, Math.round((completed * 10_000.0) / total) / 100.0);
     }
 }

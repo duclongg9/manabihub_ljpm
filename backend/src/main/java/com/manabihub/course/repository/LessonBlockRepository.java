@@ -3,6 +3,7 @@ package com.manabihub.course.repository;
 import com.manabihub.course.entity.LessonBlock;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,4 +25,18 @@ public interface LessonBlockRepository extends JpaRepository<LessonBlock, UUID> 
             @org.springframework.data.repository.query.Param("lessonBlockId") UUID lessonBlockId,
             @org.springframework.data.repository.query.Param("courseId") UUID courseId
     );
+
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT block.module.course.id AS courseId, COUNT(block) AS totalCount
+            FROM LessonBlock block
+            WHERE block.module.course.id IN :courseIds
+            GROUP BY block.module.course.id
+            """)
+    List<CourseBlockCount> countByCourseIds(
+            @org.springframework.data.repository.query.Param("courseIds") Collection<UUID> courseIds);
+
+    interface CourseBlockCount {
+        UUID getCourseId();
+        long getTotalCount();
+    }
 }

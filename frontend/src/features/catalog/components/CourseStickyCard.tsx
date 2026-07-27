@@ -118,15 +118,7 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
             >
               {buying ? 'Đang xử lý…' : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
             </button>
-            {course.price > 0 && (
-              <button className="border border-red-600 text-red-600 hover:bg-red-50 w-full py-3 rounded-xl font-semibold mb-2 transition-colors">
-                Thêm vào giỏ hàng
-              </button>
-            )}
             {buyError && <p className="text-center text-xs text-red-600 font-medium mb-3">{buyError}</p>}
-            <p className="text-center text-xs text-slate-500 font-medium mb-6">
-              Đảm bảo hoàn tiền trong 30 ngày
-            </p>
           </>
         )}
 

@@ -16,7 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/teacher/withdrawals")
+@RequestMapping("/api/v1/teacher/withdrawals")
 @RequiredArgsConstructor
 @Tag(name = "Teacher Payout", description = "Teacher Revenue Withdrawal Operations")
 public class TeacherWithdrawalController {

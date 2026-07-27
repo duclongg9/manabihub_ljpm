@@ -6,6 +6,7 @@ import CreateIcon from '@mui/icons-material/Create';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import AddIcon from '@mui/icons-material/Add';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
 import type { TeacherDashboardResponse } from '../services/teacherDashboardService';
 import { fetchTeacherDashboardStats } from '../services/teacherDashboardService';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -85,15 +86,27 @@ export const TeacherDashboardPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 2 }}>
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 2, mb: 4 }}
+      >
         <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Tổng quan Giảng viên</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate(ROUTES.TEACHER.COURSE_CREATE)}
-        >
-          Tạo khóa học
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="outlined"
+            startIcon={<AccountBalanceWalletOutlinedIcon />}
+            onClick={() => navigate(ROUTES.TEACHER.WALLET)}
+          >
+            Ví của tôi
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate(ROUTES.TEACHER.COURSE_CREATE)}
+          >
+            Tạo khóa học
+          </Button>
+        </Stack>
       </Stack>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
