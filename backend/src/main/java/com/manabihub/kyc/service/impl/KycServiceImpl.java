@@ -2,6 +2,9 @@ package com.manabihub.kyc.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.course.entity.Course;
+import com.manabihub.course.enums.CourseStatus;
+import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.kyc.domain.*;
 import com.manabihub.kyc.dto.request.KycReviewRequest;
 import com.manabihub.kyc.dto.response.KycRequestResponse;
@@ -15,7 +18,8 @@ import com.manabihub.audit.entity.AuditLog;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
-// removed UserRepository
+import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.repository.TeacherWalletRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.persistence.EntityManager;
@@ -43,6 +47,8 @@ public class KycServiceImpl implements KycService {
     private final KycDocumentRepository kycDocumentRepository;
     private final AuditLogRepository auditLogRepository;
     private final NotificationRepository notificationRepository;
+    private final CourseRepository courseRepository;
+    private final TeacherWalletRepository teacherWalletRepository;
     private final ObjectMapper objectMapper;
     private final EntityManager entityManager;
 
@@ -61,9 +67,10 @@ public class KycServiceImpl implements KycService {
     @Transactional(readOnly = true)
     public List<KycRequestResponse> getPendingKycQueue(UUID adminId) {
         checkCourseManagerAccess(adminId);
-        // UC-28: chỉ hiển thị hồ sơ đã được auto-approve (APPROVED) để Course Manager
-        // tra soát lại khi có tố cáo và thu hồi vai trò nếu phát hiện sai sót.
-        List<KycRequest> requests = kycRequestRepository.findByStatusOrderByCreatedAtDesc(KycRequestStatus.APPROVED);
+        // Successful automated verification is history, not Course Manager work.
+        // Only an unresolved exception may enter the actionable review queue.
+        List<KycRequest> requests =
+                kycRequestRepository.findByStatusOrderByCreatedAtDesc(KycRequestStatus.PENDING);
         return requests.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -96,6 +103,7 @@ public class KycServiceImpl implements KycService {
 
         KycRequestStatus currentStatus = kycRequest.getStatus();
         KycRequestStatus targetStatus = request.getStatus();
+        SuspensionImpact suspensionImpact = SuspensionImpact.none();
 
         // UC-28: an already-APPROVED request can be revoked after a complaint;
         // otherwise only PENDING requests are reviewable.
@@ -155,16 +163,20 @@ public class KycServiceImpl implements KycService {
             teacherProfileRepository.save(teacher);
         } else if (targetStatus == KycRequestStatus.REVOKED) {
             TeacherProfile teacher = kycRequest.getTeacherProfile();
-            teacher.setKycStatus(TeacherKycStatus.REVOKED);
-            teacher.setCanPublishCourse(false);
-            teacherProfileRepository.save(teacher);
-            // Gỡ vai trò TEACHER khỏi tài khoản người dùng khi thu hồi
-            revokeTeacherRole(teacher.getUser().getId());
+            suspensionImpact = suspendTeacherOperations(teacher);
         }
 
         KycRequest savedRequest = kycRequestRepository.save(kycRequest);
 
         // Create Audit Log
+        Map<String, Object> afterValue = new java.util.LinkedHashMap<>();
+        afterValue.put("status", targetStatus.name());
+        if (targetStatus == KycRequestStatus.REVOKED) {
+            afterValue.put("coursesRemovedFromMarketplace", suspensionImpact.coursesRemovedFromMarketplace());
+            afterValue.put("walletFrozen", suspensionImpact.walletFrozen());
+            afterValue.put("existingLearnerAccessPreserved", true);
+        }
+
         AuditLog log = AuditLog.builder()
                 .actorType("INTERNAL_ADMIN")
                 .actorAdminId(adminId)
@@ -173,7 +185,7 @@ public class KycServiceImpl implements KycService {
                 .targetType("KYC_REQUEST")
                 .targetId(kycRequest.getId())
                 .beforeValue(Map.of("status", currentStatus.name()))
-                .afterValue(Map.of("status", targetStatus.name()))
+                .afterValue(afterValue)
                 .metadata(Map.of("decisionNote", request.getDecisionNote() != null ? request.getDecisionNote() : ""))
                 .build();
         auditLogRepository.save(log);
@@ -188,8 +200,10 @@ public class KycServiceImpl implements KycService {
         } else if (targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
             message = "Hồ sơ KYC của bạn cần được chỉnh sửa. Lý do: " + request.getDecisionNote();
         } else if (targetStatus == KycRequestStatus.REVOKED) {
-            title = "Vai trò giảng viên đã bị thu hồi";
-            message = "Vai trò giảng viên của bạn đã bị thu hồi và quyền xuất bản khóa học đã bị gỡ bỏ. Lý do: " + request.getDecisionNote();
+            title = "Quyền vận hành giảng viên đã bị đình chỉ";
+            message = "Quyền tạo, xuất bản, bán khóa học và rút doanh thu đã bị đình chỉ. "
+                    + "Học viên đã mua vẫn được giữ quyền truy cập trong thời gian xử lý. Lý do: "
+                    + request.getDecisionNote();
         }
 
         Notification notification = Notification.builder()
@@ -277,5 +291,42 @@ public class KycServiceImpl implements KycService {
         ).setParameter("userId", userId)
          .setParameter("roleId", TEACHER_ROLE_ID)
          .executeUpdate();
+    }
+
+    private SuspensionImpact suspendTeacherOperations(TeacherProfile teacher) {
+        teacher.setKycStatus(TeacherKycStatus.REVOKED);
+        teacher.setCanPublishCourse(false);
+        teacherProfileRepository.save(teacher);
+        revokeTeacherRole(teacher.getUser().getId());
+
+        List<Course> coursesToRemove = courseRepository
+                .findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(teacher.getId(), CourseStatus.ARCHIVED)
+                .stream()
+                .filter(course -> course.getStatus() == CourseStatus.PUBLISHED
+                        || course.getStatus() == CourseStatus.APPROVED
+                        || course.getStatus() == CourseStatus.PENDING)
+                .toList();
+        coursesToRemove.forEach(course -> course.setStatus(CourseStatus.FORCED_DRAFT));
+        if (!coursesToRemove.isEmpty()) {
+            courseRepository.saveAll(coursesToRemove);
+        }
+
+        boolean walletFrozen = teacherWalletRepository.findByTeacherIdForUpdate(teacher.getId())
+                .map(this::freezeWallet)
+                .orElse(false);
+
+        return new SuspensionImpact(coursesToRemove.size(), walletFrozen);
+    }
+
+    private boolean freezeWallet(TeacherWallet wallet) {
+        wallet.setFrozen(true);
+        teacherWalletRepository.save(wallet);
+        return true;
+    }
+
+    private record SuspensionImpact(int coursesRemovedFromMarketplace, boolean walletFrozen) {
+        private static SuspensionImpact none() {
+            return new SuspensionImpact(0, false);
+        }
     }
 }

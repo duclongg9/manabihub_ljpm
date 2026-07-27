@@ -152,6 +152,10 @@ public class CourseValidationServiceImpl implements CourseValidationService {
     private void validateHierarchy(Course course, List<ValidationError> errors) {
         List<CourseModule> modules = course.getModules();
         if (modules == null || modules.isEmpty()) {
+            errors.add(new ValidationError("MSG-COURSE-015",
+                    "Video Course cần có tối thiểu 5 bài học trước khi gửi duyệt.", "error"));
+            errors.add(new ValidationError("MSG-COURSE-016",
+                    "Video Course cần có tổng thời lượng video tối thiểu 30 phút trước khi gửi duyệt.", "error"));
             return;
         }
 
@@ -289,7 +293,12 @@ public class CourseValidationServiceImpl implements CourseValidationService {
     }
 
     private void validateFlashcardBlock(LessonBlock block, List<ValidationError> errors) {
-        if (block.getType() != LessonBlockType.FLASHCARD || !StringUtils.hasText(block.getFlashcardsJson())) {
+        if (block.getType() != LessonBlockType.FLASHCARD) {
+            return;
+        }
+        if (!StringUtils.hasText(block.getFlashcardsJson())) {
+            errors.add(new ValidationError("MSG-COURSE-011",
+                    "Bộ Flashcard cần có ít nhất một thẻ hợp lệ.", "error"));
             return;
         }
 
@@ -297,17 +306,30 @@ public class CourseValidationServiceImpl implements CourseValidationService {
             List<Map<String, String>> flashcards = objectMapper.readValue(block.getFlashcardsJson(),
                     new TypeReference<>() {
                     });
+            if (flashcards.isEmpty()) {
+                errors.add(new ValidationError("MSG-COURSE-011",
+                        "Bộ Flashcard cần có ít nhất một thẻ hợp lệ.", "error"));
+                return;
+            }
             Set<String> fronts = new HashSet<>();
             for (Map<String, String> card : flashcards) {
                 String front = card.get("front");
-                if (front != null && !fronts.add(front.trim().toLowerCase())) {
+                String back = card.get("back");
+                if (!StringUtils.hasText(front) || !StringUtils.hasText(back)) {
+                    errors.add(new ValidationError("MSG-COURSE-011",
+                            "Mỗi Flashcard cần có đầy đủ mặt trước và mặt sau.", "error"));
+                    break;
+                }
+                if (!fronts.add(front.trim().toLowerCase())) {
                     errors.add(new ValidationError("MSG-COURSE-010",
                             "Phát hiện thẻ từ vựng bị trùng lặp. Vui lòng kiểm tra lại bộ Flashcard.", "error"));
                     break;
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to parse flashcards JSON for block {}", block.getId(), e);
+            log.warn("Failed to parse flashcards JSON for block {}", block.getId());
+            errors.add(new ValidationError("MSG-COURSE-011",
+                    "Dữ liệu Flashcard không hợp lệ.", "error"));
         }
     }
 

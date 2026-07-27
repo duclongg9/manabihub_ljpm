@@ -66,9 +66,9 @@ export function KycQueuePage() {
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Tra soát hồ sơ KYC đã duyệt tự động</h2>
+          <h2 className="text-xl font-bold text-gray-900">Ngoại lệ KYC cần xử lý</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Hiển thị các hồ sơ giáo viên đã được duyệt tự động để tra soát khi có tố cáo và thu hồi vai trò nếu phát hiện sai sót.
+            Chỉ hiển thị hồ sơ không thể tự động xác minh. Hồ sơ xác minh thành công không tạo công việc thủ công.
           </p>
         </div>
         <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1.5 rounded-full border border-amber-200">
@@ -83,8 +83,10 @@ export function KycQueuePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <p className="text-gray-600 font-medium">Chưa có hồ sơ nào được duyệt tự động.</p>
-          <p className="text-sm text-gray-400 mt-1">Khi có giáo viên được duyệt tự động, hồ sơ sẽ xuất hiện tại đây để tra soát.</p>
+          <p className="text-gray-600 font-medium">Không có hồ sơ cần xử lý.</p>
+          <p className="text-sm text-gray-400 mt-1">
+            Hậu kiểm hồ sơ đã duyệt phải bắt đầu từ báo cáo vi phạm hoặc tín hiệu rủi ro có căn cứ.
+          </p>
         </div>
       ) : (
         <div className="overflow-x-auto">

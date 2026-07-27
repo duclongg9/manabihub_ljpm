@@ -108,8 +108,12 @@ public class WalletServiceImpl implements WalletService {
         TeacherWallet wallet = teacherWalletRepository.findByTeacherIdForUpdate(UUID.fromString(teacherId))
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
-        // V002 schema does not have a explicit frozen flag on the wallet itself.
-        // We just check if available balance is sufficient.
+        if (wallet.isFrozen()) {
+            throw new BusinessException(
+                    MessageCodes.PAYOUT_BALANCE_FROZEN,
+                    "Teacher wallet is frozen and cannot create a withdrawal"
+            );
+        }
 
         if (wallet.getAvailableBalance().compareTo(amount) < 0) {
             throw new BusinessException(MessageCodes.WALLET_INSUFFICIENT_BALANCE, "Insufficient available balance");
