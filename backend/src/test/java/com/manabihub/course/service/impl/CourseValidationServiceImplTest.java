@@ -117,6 +117,45 @@ class CourseValidationServiceImplTest {
         assertEquals("MSG-COURSE-013", errors.getFirst().code());
     }
 
+    @Test
+    void validateHierarchy_WhenCourseHasNoModules_ShouldRejectCourse() {
+        Course course = Course.builder()
+                .id(courseId)
+                .modules(List.of())
+                .build();
+        List<ValidationError> errors = new ArrayList<>();
+
+        ReflectionTestUtils.invokeMethod(
+                courseValidationService,
+                "validateHierarchy",
+                course,
+                errors
+        );
+
+        assertTrue(errors.stream().anyMatch(error -> "MSG-COURSE-015".equals(error.code())));
+        assertTrue(errors.stream().anyMatch(error -> "MSG-COURSE-016".equals(error.code())));
+    }
+
+    @Test
+    void validateFlashcardBlock_WhenJsonIsInvalid_ShouldReturnValidationError() {
+        LessonBlock block = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .type(LessonBlockType.FLASHCARD)
+                .flashcardsJson("[invalid-json")
+                .build();
+        List<ValidationError> errors = new ArrayList<>();
+
+        ReflectionTestUtils.invokeMethod(
+                courseValidationService,
+                "validateFlashcardBlock",
+                block,
+                errors
+        );
+
+        assertEquals(1, errors.size());
+        assertEquals("MSG-COURSE-011", errors.getFirst().code());
+    }
+
     private ValidationResultResponse validate(String thumbnailUrl) {
         AppUser user = new AppUser();
         user.setId(userId);

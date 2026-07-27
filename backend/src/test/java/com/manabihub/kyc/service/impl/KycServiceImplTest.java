@@ -1,14 +1,17 @@
 package com.manabihub.kyc.service.impl;
 
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.course.entity.Course;
+import com.manabihub.course.enums.CourseStatus;
+import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.kyc.domain.*;
 import com.manabihub.kyc.dto.request.KycReviewRequest;
 import com.manabihub.kyc.dto.response.KycRequestResponse;
 import com.manabihub.kyc.repository.*;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.notification.repository.NotificationRepository;
-import com.manabihub.identity.repository.UserRepository;
-import com.manabihub.identity.entity.User;
+import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.repository.TeacherWalletRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +53,10 @@ class KycServiceImplTest {
     private NotificationRepository notificationRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private CourseRepository courseRepository;
+
+    @Mock
+    private TeacherWalletRepository teacherWalletRepository;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -94,6 +100,22 @@ class KycServiceImplTest {
         pendingKycRequest.setStatus(KycRequestStatus.PENDING);
         pendingKycRequest.setCreatedAt(Instant.now());
         pendingKycRequest.setUpdatedAt(Instant.now());
+    }
+
+    @Test
+    void getPendingKycQueue_ShouldReturnOnlyActionablePendingRecords() {
+        when(adminAccountRepository.existsByAdminIdAndRoleCodes(eq(courseManager.getId()), anyList()))
+                .thenReturn(true);
+        when(kycRequestRepository.findByStatusOrderByCreatedAtDesc(KycRequestStatus.PENDING))
+                .thenReturn(List.of(pendingKycRequest));
+        when(kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(kycId))
+                .thenReturn(List.of());
+
+        List<KycRequestResponse> response = kycService.getPendingKycQueue(courseManager.getId());
+
+        assertEquals(1, response.size());
+        assertEquals(KycRequestStatus.PENDING, response.getFirst().getStatus());
+        verify(kycRequestRepository).findByStatusOrderByCreatedAtDesc(KycRequestStatus.PENDING);
     }
 
     @Test
@@ -188,6 +210,27 @@ class KycServiceImplTest {
         when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
         when(nativeQuery.setParameter(anyString(), any())).thenReturn(nativeQuery);
         when(nativeQuery.executeUpdate()).thenReturn(1);
+        Course publishedCourse = Course.builder()
+                .id(UUID.randomUUID())
+                .teacher(teacherProfile)
+                .status(CourseStatus.PUBLISHED)
+                .build();
+        Course draftCourse = Course.builder()
+                .id(UUID.randomUUID())
+                .teacher(teacherProfile)
+                .status(CourseStatus.DRAFT)
+                .build();
+        when(courseRepository.findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(
+                teacherProfile.getId(),
+                CourseStatus.ARCHIVED
+        )).thenReturn(List.of(publishedCourse, draftCourse));
+        TeacherWallet wallet = TeacherWallet.builder()
+                .id(UUID.randomUUID())
+                .teacherId(teacherProfile.getId())
+                .frozen(false)
+                .build();
+        when(teacherWalletRepository.findByTeacherIdForUpdate(teacherProfile.getId()))
+                .thenReturn(Optional.of(wallet));
 
         KycReviewRequest request = new KycReviewRequest(KycRequestStatus.REVOKED, "Phát hiện gian lận sau tố cáo");
 
@@ -200,6 +243,11 @@ class KycServiceImplTest {
         verify(teacherProfileRepository).save(teacherProfile);
         verify(entityManager).createNativeQuery(contains("DELETE FROM user_roles"));
         verify(nativeQuery).executeUpdate();
+        assertEquals(CourseStatus.FORCED_DRAFT, publishedCourse.getStatus());
+        assertEquals(CourseStatus.DRAFT, draftCourse.getStatus());
+        verify(courseRepository).saveAll(List.of(publishedCourse));
+        assertTrue(wallet.isFrozen());
+        verify(teacherWalletRepository).save(wallet);
     }
 
     @Test

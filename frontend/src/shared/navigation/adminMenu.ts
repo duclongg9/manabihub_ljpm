@@ -3,7 +3,7 @@ import { ROUTES } from '../constants/routes';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import RuleIcon from '@mui/icons-material/Rule';
-import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 
 export const ADMIN_MENU = [
   {
@@ -19,12 +19,6 @@ export const ADMIN_MENU = [
     roles: [ROLES.COURSE_MANAGER],
   },
   {
-    title: 'Task Queue',
-    path: ROUTES.ADMIN.TASK_QUEUE,
-    icon: FormatListBulletedIcon,
-    roles: [ROLES.COURSE_MANAGER],
-  },
-  {
     title: 'Course Approval',
     path: ROUTES.ADMIN.COURSE_APPROVAL,
     icon: RuleIcon,
@@ -33,7 +27,7 @@ export const ADMIN_MENU = [
   {
     title: 'Payout Settlement',
     path: ROUTES.ADMIN.PAYOUTS,
-    icon: FactCheckIcon, // using a generic icon for now
+    icon: AccountBalanceOutlinedIcon,
     roles: [ROLES.FINANCE_MANAGER],
   },
 ];

@@ -38,7 +38,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     private final ObjectMapper objectMapper;
 
     private void checkCourseManagerAccess(UUID adminId) {
-        boolean hasAccess = courseRepository.hasAdminRole(adminId, List.of("SUPER_ADMIN", "COURSE_MANAGER"));
+        boolean hasAccess = courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN", "COURSE_MANAGER"));
         if (!hasAccess) {
             throw new BusinessException(MessageCodes.ADMIN_PERMISSION_DENIED,
                     "Access denied: Course Manager or Super Admin privileges required");
@@ -49,9 +49,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     @Transactional(readOnly = true)
     public List<CourseApprovalQueueResponse> getQueue(UUID adminId) {
         checkCourseManagerAccess(adminId);
-        // Fetch courses that are currently in review queue or have been reviewed recently
-        List<Course> courses = courseRepository.findAllByStatusInOrderBySubmittedAtDesc(
-                List.of(CourseStatus.PENDING, CourseStatus.APPROVED, CourseStatus.REJECTED, CourseStatus.DRAFT, CourseStatus.PUBLISHED));
+        List<Course> courses = courseRepository.findAllByStatusOrderBySubmittedAtAsc(CourseStatus.PENDING);
         return courses.stream().map(this::mapToQueueResponse).collect(Collectors.toList());
     }
 

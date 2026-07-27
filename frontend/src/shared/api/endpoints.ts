@@ -40,6 +40,14 @@ export const ENDPOINTS = {
   teacherDashboard: {
     stats: '/v1/teacher/dashboard',
   },
+  teacherWallet: {
+    detail: '/v1/teacher/wallet',
+    withdrawals: '/v1/teacher/withdrawals',
+    withdrawalDetail: (id: string) => `/v1/teacher/withdrawals/${id}`,
+    cancelWithdrawal: (id: string) => `/v1/teacher/withdrawals/${id}/cancel`,
+    sendWithdrawalOtp: '/v1/teacher/withdrawals/send-otp',
+    bankAccounts: '/v1/teacher/withdrawals/bank-accounts',
+  },
   teacherWriting: {
     submissions: '/v1/teacher/writing-submissions',
     detail: (submissionId: string) => `/v1/teacher/writing-submissions/${submissionId}`,
@@ -83,6 +91,7 @@ export const ENDPOINTS = {
   },
   orders: {
     create: '/v1/orders',
+    list: '/v1/orders',
     detail: (orderId: string) => `/v1/orders/${orderId}`,
   },
   payments: {

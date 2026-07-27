@@ -227,12 +227,12 @@ public class CourseServiceImpl implements CourseService {
         course.setStatus(CourseStatus.PENDING);
         course.setSubmittedAt(Instant.now());
 
-        notificationService.createNotificationForRole(
-                "ADMIN",
+        notificationService.createNotificationForAdminRole(
+                "COURSE_MANAGER",
                 "Course submitted for review",
                 "Teacher submitted course \"" + course.getTitle() + "\" for review.",
                 "COURSE_REVIEW",
-                "/admin/courses/" + course.getId()
+                "/admin/courses/approvals/" + course.getId()
         );
 
         auditLogService.logUserAction(
