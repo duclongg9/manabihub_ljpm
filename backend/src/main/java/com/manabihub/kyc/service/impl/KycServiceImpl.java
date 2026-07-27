@@ -61,9 +61,11 @@ public class KycServiceImpl implements KycService {
     @Transactional(readOnly = true)
     public List<KycRequestResponse> getPendingKycQueue(UUID adminId) {
         checkCourseManagerAccess(adminId);
-        // UC-28: chỉ hiển thị hồ sơ đã được auto-approve (APPROVED) để Course Manager
-        // tra soát lại khi có tố cáo và thu hồi vai trò nếu phát hiện sai sót.
-        List<KycRequest> requests = kycRequestRepository.findByStatusOrderByCreatedAtDesc(KycRequestStatus.APPROVED);
+        // UC-28 keeps pending submissions reviewable while approved records remain
+        // available for post-approval investigation and revocation.
+        List<KycRequest> requests = kycRequestRepository.findByStatusInOrderByCreatedAtDesc(
+                List.of(KycRequestStatus.PENDING, KycRequestStatus.APPROVED)
+        );
         return requests.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());

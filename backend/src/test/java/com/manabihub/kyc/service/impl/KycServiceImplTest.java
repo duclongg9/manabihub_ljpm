@@ -97,6 +97,26 @@ class KycServiceImplTest {
     }
 
     @Test
+    void getPendingKycQueue_ShouldIncludePendingAndApprovedRecords() {
+        when(adminAccountRepository.existsByAdminIdAndRoleCodes(eq(courseManager.getId()), anyList()))
+                .thenReturn(true);
+        when(kycRequestRepository.findByStatusInOrderByCreatedAtDesc(anyList()))
+                .thenReturn(List.of(pendingKycRequest));
+        when(kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(kycId))
+                .thenReturn(List.of());
+
+        List<KycRequestResponse> response = kycService.getPendingKycQueue(courseManager.getId());
+
+        assertEquals(1, response.size());
+        assertEquals(KycRequestStatus.PENDING, response.getFirst().getStatus());
+        verify(kycRequestRepository).findByStatusInOrderByCreatedAtDesc(argThat(statuses ->
+                statuses.size() == 2
+                        && statuses.contains(KycRequestStatus.PENDING)
+                        && statuses.contains(KycRequestStatus.APPROVED)
+        ));
+    }
+
+    @Test
     void testReviewKyc_WhenNotAuthorized_ShouldThrowException() {
         UUID randomAdminId = UUID.randomUUID();
         when(adminAccountRepository.existsByAdminIdAndRoleCodes(any(UUID.class), anyList())).thenReturn(false);

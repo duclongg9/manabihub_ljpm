@@ -58,4 +58,4 @@ manabihub:
       order-type: ${VNPAY_ORDER_TYPE:other}
       locale: ${VNPAY_LOCALE:vn}
       currency: ${VNPAY_CURRENCY:VND}
-      dev-simulator-enabled: ${VNPAY_DEV_SIMULATOR_ENABLED:true}
+      dev-simulator-enabled: ${VNPAY_DEV_SIMULATOR_ENABLED:false}
