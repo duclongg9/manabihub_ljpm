@@ -155,6 +155,32 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public void createNotificationForAdminRole(
+            String roleCode,
+            String title,
+            String message,
+            String type,
+            String actionUrl
+    ) {
+        List<UUID> adminIds = notificationRepository.findActiveAdminIdsByRoleCode(roleCode);
+        List<Notification> notifications = adminIds.stream()
+                .map(adminId -> Notification.builder()
+                        .recipientAdminId(adminId)
+                        .title(title)
+                        .message(message)
+                        .notificationType(type)
+                        .actionUrl(actionUrl)
+                        .isRead(false)
+                        .createdAt(Instant.now())
+                        .build())
+                .toList();
+
+        notificationRepository.saveAll(notifications);
+        log.info("Broadcasted notification to {} internal admins with role {}", adminIds.size(), roleCode);
+    }
+
+    @Override
+    @Transactional
     public void createNotification(UUID recipientUserId, String recipientEmail,
                                    String title, String message, String type) {
         Notification notification = Notification.builder()

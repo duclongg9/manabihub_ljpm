@@ -267,12 +267,12 @@ class CourseServiceImplTest {
 
         assertEquals(CourseStatus.PENDING, draft.getStatus());
         assertNotNull(draft.getSubmittedAt());
-        verify(notificationService).createNotificationForRole(
-                "ADMIN",
+        verify(notificationService).createNotificationForAdminRole(
+                "COURSE_MANAGER",
                 "Course submitted for review",
                 "Teacher submitted course \"JLPT N5 Foundation\" for review.",
                 "COURSE_REVIEW",
-                "/admin/courses/" + draftId
+                "/admin/courses/approvals/" + draftId
         );
     }
 

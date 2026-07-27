@@ -190,7 +190,7 @@ export const AdminDashboardPage: React.FC = () => {
                     variant="outlined"
                     color="secondary"
                     endIcon={<ArrowForwardIcon />}
-                    onClick={() => navigate(ROUTES.ADMIN.TASK_QUEUE)}
+                    onClick={() => navigate(ROUTES.ADMIN.COURSE_APPROVAL)}
                   >
                     Đến hàng đợi Khóa học
                   </Button>

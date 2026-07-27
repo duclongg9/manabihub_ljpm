@@ -107,7 +107,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f8fafc', minHeight: '100vh' }}>
       <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 4 }}>
-        Task Queue
+        Course Approval Queue
       </Typography>
 
       <Paper elevation={0} sx={{ p: 2, mb: 4, borderRadius: 3, border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', justifyContent: 'space-between', bgcolor: 'white', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
@@ -176,7 +176,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
         <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <HistoryIcon sx={{ color: 'text.secondary' }} />
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Operation Queue</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Submitted Courses</Typography>
           </Box>
         </Box>
 
@@ -199,7 +199,9 @@ export const CourseApprovalQueuePage: React.FC = () => {
                 </TableRow>
               ) : paginatedQueue.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>Không có dữ liệu phù hợp.</TableCell>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    Không có khóa học nào đang chờ duyệt.
+                  </TableCell>
                 </TableRow>
               ) : (
                 paginatedQueue.map((row) => {
