@@ -165,6 +165,21 @@ public final class MessageCodes {
     public static final String LEARNING_WISHLIST_REMOVED = "LEARNING_WISHLIST_REMOVED";
     public static final String LEARNING_WISHLIST_DUPLICATE = "LEARNING_WISHLIST_DUPLICATE";
     public static final String LEARNING_WISHLIST_ITEM_NOT_FOUND = "LEARNING_WISHLIST_ITEM_NOT_FOUND";
+    public static final String COURSE_REVIEW_SAVED = "COURSE_REVIEW_SAVED";
+    public static final String COURSE_REVIEW_NOT_ELIGIBLE = "COURSE_REVIEW_NOT_ELIGIBLE";
+    public static final String COURSE_REVIEW_INVALID = "COURSE_REVIEW_INVALID";
+
+    // SYSTEM CONFIGURATION / INTERNAL ADMIN RBAC — UC-31
+    public static final String SYSTEM_SETTING_UPDATED = "SYSTEM_SETTING_UPDATED";
+    public static final String SYSTEM_SETTING_INVALID = "SYSTEM_SETTING_INVALID";
+    public static final String SYSTEM_SETTING_NOT_EDITABLE = "SYSTEM_SETTING_NOT_EDITABLE";
+    public static final String SYSTEM_ADMIN_REQUIRED = "SYSTEM_ADMIN_REQUIRED";
+    public static final String INTERNAL_ROLE_UPDATED = "INTERNAL_ROLE_UPDATED";
+    public static final String INTERNAL_ROLE_INVALID = "INTERNAL_ROLE_INVALID";
+    public static final String INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN =
+            "INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN";
+    public static final String LAST_SYSTEM_ADMIN_REQUIRED = "LAST_SYSTEM_ADMIN_REQUIRED";
+    public static final String ADMIN_SESSION_STALE = "ADMIN_SESSION_STALE";
     public static final String LEARNING_STUDENT_PROFILE_NOT_FOUND = "LEARNING_STUDENT_PROFILE_NOT_FOUND";
 
     // ──────────────────────────────────────────────

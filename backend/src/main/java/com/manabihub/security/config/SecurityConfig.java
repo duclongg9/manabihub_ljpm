@@ -49,9 +49,14 @@ public class SecurityConfig {
     private List<String> allowedOrigins;
 
     private final TeacherEligibilityFilter teacherEligibilityFilter;
+    private final InternalAdminRoleFilter internalAdminRoleFilter;
 
-    public SecurityConfig(TeacherEligibilityFilter teacherEligibilityFilter) {
+    public SecurityConfig(
+            TeacherEligibilityFilter teacherEligibilityFilter,
+            InternalAdminRoleFilter internalAdminRoleFilter
+    ) {
         this.teacherEligibilityFilter = teacherEligibilityFilter;
+        this.internalAdminRoleFilter = internalAdminRoleFilter;
     }
 
     @Bean
@@ -85,6 +90,7 @@ public class SecurityConfig {
                                 "/api/v1/mock/**",
                                 "/api/v1/course-categories",
                                 "/api/v1/public/courses/**",
+                                "/api/v1/public/teachers/**",
                                 "/api/v1/payments/vnpay/ipn",
                                 "/uploads/course-thumbnails/**",
                                 "/uploads/user-avatars/**",
@@ -95,6 +101,7 @@ public class SecurityConfig {
                         jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
         http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
+        http.addFilterAfter(internalAdminRoleFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }
@@ -217,6 +224,16 @@ public class SecurityConfig {
             TeacherEligibilityFilter filter
     ) {
         FilterRegistrationBean<TeacherEligibilityFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<InternalAdminRoleFilter> internalAdminRoleFilterRegistration(
+            InternalAdminRoleFilter filter
+    ) {
+        FilterRegistrationBean<InternalAdminRoleFilter> registration =
+                new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

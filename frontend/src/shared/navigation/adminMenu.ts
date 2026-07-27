@@ -4,6 +4,8 @@ import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import RuleIcon from '@mui/icons-material/Rule';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
+import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 
 export const ADMIN_MENU = [
   {
@@ -11,6 +13,18 @@ export const ADMIN_MENU = [
     path: ROUTES.ADMIN.DASHBOARD,
     icon: SpaceDashboardIcon,
     roles: [ROLES.SYSTEM_ADMIN, ROLES.COURSE_MANAGER, ROLES.FINANCE_MANAGER],
+  },
+  {
+    title: 'Cấu hình hệ thống',
+    path: ROUTES.ADMIN.SYSTEM_SETTINGS,
+    icon: SettingsApplicationsOutlinedIcon,
+    roles: [ROLES.SYSTEM_ADMIN],
+  },
+  {
+    title: 'Phân quyền nội bộ',
+    path: ROUTES.ADMIN.USERS,
+    icon: ManageAccountsOutlinedIcon,
+    roles: [ROLES.SYSTEM_ADMIN],
   },
   {
     title: 'Teacher KYC Review',

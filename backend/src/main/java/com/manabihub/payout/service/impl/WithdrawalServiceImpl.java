@@ -21,6 +21,7 @@ import com.manabihub.payout.service.WithdrawalOtpService;
 import com.manabihub.payout.service.WithdrawalNotificationService;
 import com.manabihub.wallet.repository.TeacherWalletRepository;
 import com.manabihub.wallet.service.WalletService;
+import com.manabihub.systemconfig.service.SystemSettingValueService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,6 +51,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private final WithdrawalNotificationService notificationService;
     private final WithdrawalOtpService otpService;
     private final PayoutSecurityService securityService;
+    private final SystemSettingValueService settingValueService;
 
     @Value("${manabihub.wallet.minimum-payout-amount:500000}")
     private BigDecimal minimumPayoutAmount;
@@ -57,7 +59,11 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     @Override
     @Transactional
     public WithdrawalRequestResponse createWithdrawalRequest(String userId, CreateWithdrawalRequest request) {
-        if (request.getAmount().compareTo(minimumPayoutAmount) < 0) {
+        BigDecimal configuredPayoutThreshold = settingValueService.getDecimal(
+                "PAYOUT_THRESHOLD",
+                minimumPayoutAmount
+        );
+        if (request.getAmount().compareTo(configuredPayoutThreshold) < 0) {
             throw new BusinessException(MessageCodes.PAYOUT_AMOUNT_BELOW_MINIMUM, "Amount below minimum threshold");
         }
 

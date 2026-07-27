@@ -5,6 +5,7 @@ export const ROUTES = {
     REGISTER: '/register',
     COURSE_BROWSE: '/courses',
     COURSE_DETAIL: '/courses/:id',
+    TEACHER_PROFILE: (teacherId: string) => `/teachers/${teacherId}`,
     ABOUT: '/about',
   },
   STUDENT: {

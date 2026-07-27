@@ -22,6 +22,7 @@ import com.manabihub.course.dto.response.ValidationResultResponse;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,6 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.review.dto.response.CourseReviewAggregateResponse;
+import com.manabihub.review.service.CourseReviewService;
+import com.manabihub.systemconfig.service.SystemSettingValueService;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -49,8 +53,8 @@ import java.util.UUID;
 @Transactional
 public class CourseServiceImpl implements CourseService {
 
-    private static final int MIN_LEARNING_GOALS = 4;
-    private static final int MAX_LEARNING_GOAL_LENGTH = 160;
+    private static final int DEFAULT_MIN_LEARNING_GOALS = 4;
+    private static final int DEFAULT_MAX_LEARNING_GOAL_LENGTH = 160;
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DRAFT_TITLE_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(VIETNAM_ZONE);
@@ -62,6 +66,8 @@ public class CourseServiceImpl implements CourseService {
     private final CourseValidationService courseValidationService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final CourseReviewService courseReviewService;
+    private final SystemSettingValueService settingValueService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -330,6 +336,8 @@ public class CourseServiceImpl implements CourseService {
         if (currentUserIdOpt.isPresent()) {
             isEnrolled = courseRepository.checkEnrollmentExists(course.getId(), currentUserIdOpt.get());
         }
+        CourseReviewAggregateResponse reviewAggregate =
+                courseReviewService.getAggregate(course.getId());
 
         // Aggregate stats
         int totalDurationMinutes = 0;
@@ -368,10 +376,16 @@ public class CourseServiceImpl implements CourseService {
                         .name(course.getTeacher().getDisplayName())
                         .avatarUrl(course.getTeacher().getUser() != null ? course.getTeacher().getUser().getAvatarUrl() : null)
                         .bio(course.getTeacher().getBio())
+                        .verified(course.getTeacher().getKycStatus() == TeacherKycStatus.APPROVED
+                                && course.getTeacher().isCanPublishCourse()
+                                && course.getTeacher().getUser() != null
+                                && course.getTeacher().getUser().getUserStatus() == UserStatus.ACTIVE)
                         .build())
                 .isEnrolled(isEnrolled)
                 .totalDurationMinutes(totalDurationMinutes)
                 .totalLessons(totalLessons)
+                .averageRating(reviewAggregate.averageRating())
+                .reviewCount(reviewAggregate.reviewCount())
                 .modules(moduleResponses)
                 .build();
     }
@@ -415,13 +429,29 @@ public class CourseServiceImpl implements CourseService {
     }
 
     private void validateDraftRequest(CreateCourseDraftRequest request, List<String> learningGoals) {
+        int minimumLearningGoals = settingValueService.getInteger(
+                "COURSE_MIN_LEARNING_GOALS",
+                DEFAULT_MIN_LEARNING_GOALS
+        );
+        int maximumLearningGoalLength = settingValueService.getInteger(
+                "COURSE_MAX_LEARNING_GOAL_LENGTH",
+                DEFAULT_MAX_LEARNING_GOAL_LENGTH
+        );
+        BigDecimal coursePriceFloor = settingValueService.getDecimal(
+                "COURSE_PRICE_FLOOR",
+                BigDecimal.ZERO
+        );
+
         if (!StringUtils.hasText(request.category())
                 || !courseCategoryRepository.existsByCodeAndActiveTrue(request.category().trim())) {
             throw new BusinessException(MessageCodes.MSG_COURSE_004, "Course category is invalid");
         }
 
-        if (request.price() == null || request.price().compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException(MessageCodes.MSG_COURSE_003, "Course price must be zero or greater");
+        if (request.price() == null || request.price().compareTo(coursePriceFloor) < 0) {
+            throw new BusinessException(
+                    MessageCodes.MSG_COURSE_003,
+                    "Course price must be at least " + coursePriceFloor.toPlainString()
+            );
         }
 
         if (!StringUtils.hasText(request.prerequisites())) {
@@ -432,13 +462,22 @@ public class CourseServiceImpl implements CourseService {
             throw new BusinessException(MessageCodes.MSG_GOAL_004, "Target students are required");
         }
 
-        if (learningGoals.size() < MIN_LEARNING_GOALS) {
-            throw new BusinessException(MessageCodes.MSG_GOAL_001, "At least 4 learning goals are required");
+        if (learningGoals.size() < minimumLearningGoals) {
+            throw new BusinessException(
+                    MessageCodes.MSG_GOAL_001,
+                    "At least " + minimumLearningGoals + " learning goals are required"
+            );
         }
 
-        boolean hasTooLongGoal = learningGoals.stream().anyMatch(goal -> goal.length() > MAX_LEARNING_GOAL_LENGTH);
+        boolean hasTooLongGoal = learningGoals.stream()
+                .anyMatch(goal -> goal.length() > maximumLearningGoalLength);
         if (hasTooLongGoal) {
-            throw new BusinessException(MessageCodes.MSG_GOAL_002, "Each learning goal must be at most 160 characters");
+            throw new BusinessException(
+                    MessageCodes.MSG_GOAL_002,
+                    "Each learning goal must be at most "
+                            + maximumLearningGoalLength
+                            + " characters"
+            );
         }
     }
 
@@ -590,11 +629,26 @@ public class CourseServiceImpl implements CourseService {
     ) {
         var spec = PublicCourseSpecification.buildSearch(keyword, category, jlptLevel, minPrice, maxPrice);
         Page<Course> coursePage = courseRepository.findAll(spec, pageable);
+        Map<UUID, CourseReviewAggregateResponse> reviewAggregates =
+                courseReviewService.getAggregates(
+                        coursePage.getContent().stream()
+                                .map(Course::getId)
+                                .toList()
+                );
 
-        return coursePage.map(this::toSummaryResponse);
+        return coursePage.map(course -> toSummaryResponse(
+                course,
+                reviewAggregates.getOrDefault(
+                        course.getId(),
+                        CourseReviewAggregateResponse.empty()
+                )
+        ));
     }
 
-    private PublicCourseSummaryResponse toSummaryResponse(Course course) {
+    private PublicCourseSummaryResponse toSummaryResponse(
+            Course course,
+            CourseReviewAggregateResponse reviewAggregate
+    ) {
         int totalLessons = 0;
         for (CourseModule module : course.getModules()) {
             totalLessons += module.getBlocks().size();
@@ -618,10 +672,13 @@ public class CourseServiceImpl implements CourseService {
                 .category(course.getCategory())
                 .price(course.getPrice())
                 .currency(course.getCurrency())
+                .teacherId(course.getTeacher() != null ? course.getTeacher().getId() : null)
                 .teacherName(teacherName)
                 .teacherAvatarUrl(teacherAvatarUrl)
                 .totalLessons(totalLessons)
                 .publishedAt(course.getPublishedAt())
+                .averageRating(reviewAggregate.averageRating())
+                .reviewCount(reviewAggregate.reviewCount())
                 .build();
     }
 

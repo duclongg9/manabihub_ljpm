@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, Paper, CircularProgress, Alert, Button, Stack, Card, CardContent, Divider } from '@mui/material';
+import { Box, Typography, Grid, CircularProgress, Alert, Button, Stack, Card, CardContent, Divider } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import RuleIcon from '@mui/icons-material/Rule';
-import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import { adminKycService } from '../../admin-kyc/services/adminKycService';
 import type { KycRequestResponse } from '../../admin-kyc/services/adminKycService';
 import { courseApprovalService } from '../../admin-course-approval/services/courseApprovalService';
@@ -29,6 +30,7 @@ export const AdminDashboardPage: React.FC = () => {
 
   const isCourseManager = session ? hasAnyRole(session, [ROLES.COURSE_MANAGER]) : false;
   const isFinanceManager = session ? hasAnyRole(session, [ROLES.FINANCE_MANAGER]) : false;
+  const isSystemAdmin = session ? hasAnyRole(session, [ROLES.SYSTEM_ADMIN]) : false;
 
   const loadData = React.useCallback(async () => {
     if (!isCourseManager && !isFinanceManager) return;
@@ -88,16 +90,27 @@ export const AdminDashboardPage: React.FC = () => {
         </Alert>
       )}
 
-      {!isCourseManager && !isFinanceManager ? (
-        <Paper sx={{ p: 6, textAlign: 'center' }}>
-          <SpaceDashboardIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            Trang tổng quan hệ thống
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Chào mừng bạn đến với trung tâm quản trị. Chọn một chức năng từ menu bên trái để bắt đầu.
-          </Typography>
-        </Paper>
+      {isSystemAdmin ? (
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AdminActionCard
+              title="Cấu hình hệ thống"
+              subtitle="Giá, hoàn tiền, escrow, AI, kiểm tra khóa học và bảo mật đăng nhập"
+              icon={<SettingsApplicationsOutlinedIcon />}
+              actionLabel="Mở cấu hình"
+              onAction={() => navigate(ROUTES.ADMIN.SYSTEM_SETTINGS)}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AdminActionCard
+              title="Phân quyền nội bộ"
+              subtitle="Kiểm tra tài khoản và gán đúng một vai trò quản trị"
+              icon={<ManageAccountsOutlinedIcon />}
+              actionLabel="Quản lý vai trò"
+              onAction={() => navigate(ROUTES.ADMIN.USERS)}
+            />
+          </Grid>
+        </Grid>
       ) : isFinanceManager ? (
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 6 }}>
@@ -240,6 +253,36 @@ function OperationalQueueCard({
             <Typography variant="h2" sx={{ fontWeight: 800 }}>{value}</Typography>
           )}
         </Box>
+      </CardContent>
+      <Divider />
+      <Box sx={{ p: 2 }}>
+        <Button fullWidth variant="outlined" endIcon={<ArrowForwardIcon />} onClick={onAction}>
+          {actionLabel}
+        </Button>
+      </Box>
+    </Card>
+  );
+}
+
+function AdminActionCard({
+  title,
+  subtitle,
+  icon,
+  actionLabel,
+  onAction,
+}: Omit<OperationalQueueCardProps, 'loading' | 'value'>) {
+  return (
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <CardContent sx={{ flexGrow: 1 }}>
+        <Stack direction="row" sx={{ alignItems: 'flex-start', gap: 2 }}>
+          <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover', display: 'flex' }}>
+            {icon}
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{title}</Typography>
+            <Typography variant="body2" color="text.secondary">{subtitle}</Typography>
+          </Box>
+        </Stack>
       </CardContent>
       <Divider />
       <Box sx={{ p: 2 }}>
