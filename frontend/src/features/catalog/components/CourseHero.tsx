@@ -2,7 +2,7 @@ import type { PublicCourseDetail } from '../types/courseDetailTypes';
 import LanguageIcon from '@mui/icons-material/Language';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 
-import DOMPurify from 'dompurify';
+import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
 
 interface CourseHeroProps {
   course: PublicCourseDetail;
@@ -53,7 +53,7 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
           {/* Description */}
           <div
             className="text-base sm:text-lg text-slate-300 my-6 max-w-3xl leading-relaxed prose prose-invert"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.description || course.introduction || '') }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichText(course.description || course.introduction) }}
           />
 
           {/* Meta Info */}

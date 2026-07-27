@@ -7,7 +7,7 @@ import { TeacherProfile } from '../components/TeacherProfile';
 import { CourseStickyHeader } from '../components/CourseStickyHeader';
 import { Helmet } from 'react-helmet-async';
 import { Target, CheckCircle2 } from 'lucide-react';
-import DOMPurify from 'dompurify';
+import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
 
 export const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -137,7 +137,7 @@ export const CourseDetailPage = () => {
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">Đối tượng phù hợp</h2>
                 <div
                   className="prose prose-slate text-sm max-w-none text-slate-700 whitespace-pre-line"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.targetStudents) }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeRichText(course.targetStudents) }}
                 />
               </div>
             )}
