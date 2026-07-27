@@ -6,7 +6,7 @@ export interface KycRequestResponse {
   teacherId: string;
   teacherEmail: string;
   teacherFullName: string;
-  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED';
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED' | 'REVOKED';
   displayName: string;
   idCardFrontUrl: string;
   idCardBackUrl: string;
@@ -32,7 +32,7 @@ export interface ApiResponse<T> {
 }
 
 export interface KycReviewRequest {
-  status: 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED';
+  status: 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED' | 'REVOKED';
   decisionNote?: string;
 }
 
@@ -43,6 +43,7 @@ export const KYC_STATUS_LABELS: Record<string, string> = {
   REJECTED: 'Từ chối',
   CORRECTION_REQUIRED: 'Yêu cầu sửa đổi',
   DRAFT: 'Bản nháp',
+  REVOKED: 'Đã thu hồi',
 };
 
 export const adminKycService = {

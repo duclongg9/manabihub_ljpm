@@ -9,9 +9,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import StarIcon from '@mui/icons-material/Star';
-import PersonIcon from '@mui/icons-material/Person';
-import { getAsset } from '../../../shared/utils/assets';
+import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 import type { PublicCourseSummary } from '../types/catalogTypes';
@@ -37,8 +35,6 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
     [course.thumbnailUrl],
   );
 
-  const idNum = parseInt(String(course.id).replace(/\D/g, '') || '0', 10);
-
   return (
     <Card
       elevation={0}
@@ -47,7 +43,7 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
         position: 'relative',
         border: '1px solid',
         borderColor: 'divider',
-        borderRadius: '16px',
+        borderRadius: 1,
         overflow: 'hidden',
         transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
         cursor: 'pointer',
@@ -83,11 +79,18 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
             />
           ) : (
             <Box
-              component="img"
-              src={getAsset('hero.png')}
-              alt="Mặc định"
-              sx={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.95)' }}
-            />
+              role="img"
+              aria-label={`Khóa học ${course.title} chưa có ảnh bìa`}
+              sx={{
+                width: '100%',
+                height: '100%',
+                display: 'grid',
+                placeItems: 'center',
+                color: 'text.disabled',
+              }}
+            >
+              <ImageNotSupportedOutlinedIcon sx={{ fontSize: 44 }} />
+            </Box>
           )}
           {course.jlptLevel && (
             <Chip
@@ -130,28 +133,8 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
             {course.title}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, display: 'flex', alignItems: 'center', gap: 1 }}>
-            {course.teacherName || 'Sensai Manabi'}
+            {course.teacherName || 'Giảng viên chưa cập nhật'}
           </Typography>
-
-          {/* Mock Trust Factors */}
-          <Stack direction="row" sx={{ alignItems: 'center', mt: 1.5, gap: 1.5 }}>
-            <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5 }}>
-              <StarIcon sx={{ fontSize: 16, color: '#F59E0B' }} />
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#475569' }}>
-                {(4 + (idNum % 10) / 10).toFixed(1)}
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                ({(idNum % 200) + 15})
-              </Typography>
-            </Stack>
-            <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#cbd5e1' }} />
-            <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5 }}>
-              <PersonIcon sx={{ fontSize: 16, color: '#94a3b8' }} />
-              <Typography variant="caption" sx={{ color: '#64748b' }}>
-                {(idNum % 500) + 50} học viên
-              </Typography>
-            </Stack>
-          </Stack>
 
           <Stack
             direction="row"

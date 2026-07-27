@@ -4,6 +4,7 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.dto.request.CreateCourseDraftRequest;
 import com.manabihub.course.dto.response.CourseDraftResponse;
+import com.manabihub.course.dto.response.ValidationResultResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.enums.JlptLevel;
@@ -239,6 +240,40 @@ class CourseServiceImplTest {
         courseService.deleteDraft(draftId);
 
         verify(courseRepository).delete(draft);
+    }
+
+    @Test
+    void submitForReview_WhenDraftIsValid_ShouldMoveCourseToPending() {
+        UUID draftId = UUID.randomUUID();
+        Course draft = Course.builder()
+                .id(draftId)
+                .teacher(approvedTeacher)
+                .title("JLPT N5 Foundation")
+                .slug("jlpt-n5-foundation")
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_IdAndStatus(
+                draftId,
+                approvedTeacher.getId(),
+                CourseStatus.DRAFT
+        )).thenReturn(Optional.of(draft));
+        when(courseValidationService.validateCourse(draftId))
+                .thenReturn(new ValidationResultResponse(true, List.of()));
+
+        courseService.submitForReview(draftId);
+
+        assertEquals(CourseStatus.PENDING, draft.getStatus());
+        assertNotNull(draft.getSubmittedAt());
+        verify(notificationService).createNotificationForAdminRole(
+                "COURSE_MANAGER",
+                "Course submitted for review",
+                "Teacher submitted course \"JLPT N5 Foundation\" for review.",
+                "COURSE_REVIEW",
+                "/admin/courses/approvals/" + draftId
+        );
     }
 
     @Test

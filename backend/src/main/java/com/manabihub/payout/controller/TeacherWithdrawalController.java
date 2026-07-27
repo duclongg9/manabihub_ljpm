@@ -16,7 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/teacher/withdrawals")
+@RequestMapping("/api/v1/teacher/withdrawals")
 @RequiredArgsConstructor
 @Tag(name = "Teacher Payout", description = "Teacher Revenue Withdrawal Operations")
 public class TeacherWithdrawalController {
@@ -25,7 +25,7 @@ public class TeacherWithdrawalController {
 
     @PostMapping
     @PreAuthorize("hasRole('TEACHER')")
-    @Operation(summary = "Create a withdrawal request", description = "Creates a withdrawal request with PENDING_REVIEW status. No bank transfer is executed by this endpoint.")
+    @Operation(summary = "Create a withdrawal request", description = "Creates a withdrawal request with PENDING status. No bank transfer is executed by this endpoint.")
     public ApiResponse<WithdrawalRequestResponse> createWithdrawal(
             @Valid @RequestBody CreateWithdrawalRequest request,
             Authentication authentication) {

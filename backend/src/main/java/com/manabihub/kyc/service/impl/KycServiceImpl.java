@@ -2,6 +2,9 @@ package com.manabihub.kyc.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.course.entity.Course;
+import com.manabihub.course.enums.CourseStatus;
+import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.kyc.domain.*;
 import com.manabihub.kyc.dto.request.KycReviewRequest;
 import com.manabihub.kyc.dto.response.KycRequestResponse;
@@ -15,9 +18,11 @@ import com.manabihub.audit.entity.AuditLog;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
-// removed UserRepository
+import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.repository.TeacherWalletRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,13 +39,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class KycServiceImpl implements KycService {
 
+    private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
+
     private final KycRequestRepository kycRequestRepository;
     private final InternalAdminAccountRepository adminAccountRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final KycDocumentRepository kycDocumentRepository;
     private final AuditLogRepository auditLogRepository;
     private final NotificationRepository notificationRepository;
+    private final CourseRepository courseRepository;
+    private final TeacherWalletRepository teacherWalletRepository;
     private final ObjectMapper objectMapper;
+    private final EntityManager entityManager;
 
     private void checkCourseManagerAccess(UUID adminId) {
         boolean hasAccess = adminAccountRepository.existsByAdminIdAndRoleCodes(adminId, List.of("COURSE_MANAGER", "SYSTEM_ADMIN"));
@@ -57,7 +67,10 @@ public class KycServiceImpl implements KycService {
     @Transactional(readOnly = true)
     public List<KycRequestResponse> getPendingKycQueue(UUID adminId) {
         checkCourseManagerAccess(adminId);
-        List<KycRequest> requests = kycRequestRepository.findByStatusOrderByCreatedAtDesc(KycRequestStatus.PENDING);
+        // Successful automated verification is history, not Course Manager work.
+        // Only an unresolved exception may enter the actionable review queue.
+        List<KycRequest> requests =
+                kycRequestRepository.findByStatusOrderByCreatedAtDesc(KycRequestStatus.PENDING);
         return requests.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -88,10 +101,18 @@ public class KycServiceImpl implements KycService {
                         HttpStatus.NOT_FOUND
                 ));
 
-        if (kycRequest.getStatus() != KycRequestStatus.PENDING) {
+        KycRequestStatus currentStatus = kycRequest.getStatus();
+        KycRequestStatus targetStatus = request.getStatus();
+        SuspensionImpact suspensionImpact = SuspensionImpact.none();
+
+        // UC-28: an already-APPROVED request can be revoked after a complaint;
+        // otherwise only PENDING requests are reviewable.
+        boolean isRevoke = currentStatus == KycRequestStatus.APPROVED
+                && targetStatus == KycRequestStatus.REVOKED;
+        if (currentStatus != KycRequestStatus.PENDING && !isRevoke) {
             throw new BusinessException(
                     MessageCodes.COMMON_CONFLICT,
-                    "KYC request has already been processed or is not pending review",
+                    "KYC request has already been processed or cannot transition to " + targetStatus,
                     HttpStatus.CONFLICT
             );
         }
@@ -99,8 +120,7 @@ public class KycServiceImpl implements KycService {
         InternalAdminAccount admin = adminAccountRepository.findById(adminId)
                 .orElseThrow(() -> new BusinessException(MessageCodes.AUTH_UNAUTHORIZED, "Admin not found", HttpStatus.UNAUTHORIZED));
 
-        // Validate decision note for Reject or Request Correction
-        KycRequestStatus targetStatus = request.getStatus();
+        // DRAFT / PENDING are never valid review outcomes
         if (targetStatus == KycRequestStatus.DRAFT || targetStatus == KycRequestStatus.PENDING) {
             throw new BusinessException(
                     MessageCodes.VALIDATION_FAILED,
@@ -109,11 +129,14 @@ public class KycServiceImpl implements KycService {
             );
         }
 
-        if (targetStatus == KycRequestStatus.REJECTED || targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
+        // Decision reason is required for Reject, Request Correction, and Revoke
+        if (targetStatus == KycRequestStatus.REJECTED
+                || targetStatus == KycRequestStatus.CORRECTION_REQUIRED
+                || targetStatus == KycRequestStatus.REVOKED) {
             if (request.getDecisionNote() == null || request.getDecisionNote().trim().isEmpty()) {
                 throw new BusinessException(
                         MessageCodes.VALIDATION_FAILED,
-                        "Decision reason is required for rejection or correction request",
+                        "Decision reason is required for rejection, correction, or revocation",
                         HttpStatus.BAD_REQUEST
                 );
             }
@@ -138,11 +161,22 @@ public class KycServiceImpl implements KycService {
             TeacherProfile teacher = kycRequest.getTeacherProfile();
             teacher.setKycStatus(TeacherKycStatus.CORRECTION_REQUIRED);
             teacherProfileRepository.save(teacher);
+        } else if (targetStatus == KycRequestStatus.REVOKED) {
+            TeacherProfile teacher = kycRequest.getTeacherProfile();
+            suspensionImpact = suspendTeacherOperations(teacher);
         }
 
         KycRequest savedRequest = kycRequestRepository.save(kycRequest);
 
         // Create Audit Log
+        Map<String, Object> afterValue = new java.util.LinkedHashMap<>();
+        afterValue.put("status", targetStatus.name());
+        if (targetStatus == KycRequestStatus.REVOKED) {
+            afterValue.put("coursesRemovedFromMarketplace", suspensionImpact.coursesRemovedFromMarketplace());
+            afterValue.put("walletFrozen", suspensionImpact.walletFrozen());
+            afterValue.put("existingLearnerAccessPreserved", true);
+        }
+
         AuditLog log = AuditLog.builder()
                 .actorType("INTERNAL_ADMIN")
                 .actorAdminId(adminId)
@@ -150,8 +184,8 @@ public class KycServiceImpl implements KycService {
                 .action("KYC_REVIEW")
                 .targetType("KYC_REQUEST")
                 .targetId(kycRequest.getId())
-                .beforeValue(Map.of("status", KycRequestStatus.PENDING.name()))
-                .afterValue(Map.of("status", targetStatus.name()))
+                .beforeValue(Map.of("status", currentStatus.name()))
+                .afterValue(afterValue)
                 .metadata(Map.of("decisionNote", request.getDecisionNote() != null ? request.getDecisionNote() : ""))
                 .build();
         auditLogRepository.save(log);
@@ -165,6 +199,11 @@ public class KycServiceImpl implements KycService {
             message = "Rất tiếc, hồ sơ KYC của bạn đã bị từ chối. Lý do: " + request.getDecisionNote();
         } else if (targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
             message = "Hồ sơ KYC của bạn cần được chỉnh sửa. Lý do: " + request.getDecisionNote();
+        } else if (targetStatus == KycRequestStatus.REVOKED) {
+            title = "Quyền vận hành giảng viên đã bị đình chỉ";
+            message = "Quyền tạo, xuất bản, bán khóa học và rút doanh thu đã bị đình chỉ. "
+                    + "Học viên đã mua vẫn được giữ quyền truy cập trong thời gian xử lý. Lý do: "
+                    + request.getDecisionNote();
         }
 
         Notification notification = Notification.builder()
@@ -244,5 +283,50 @@ public class KycServiceImpl implements KycService {
                 .map(KycDocument::getFileUrl)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private void revokeTeacherRole(UUID userId) {
+        entityManager.createNativeQuery(
+                "DELETE FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
+        ).setParameter("userId", userId)
+         .setParameter("roleId", TEACHER_ROLE_ID)
+         .executeUpdate();
+    }
+
+    private SuspensionImpact suspendTeacherOperations(TeacherProfile teacher) {
+        teacher.setKycStatus(TeacherKycStatus.REVOKED);
+        teacher.setCanPublishCourse(false);
+        teacherProfileRepository.save(teacher);
+        revokeTeacherRole(teacher.getUser().getId());
+
+        List<Course> coursesToRemove = courseRepository
+                .findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(teacher.getId(), CourseStatus.ARCHIVED)
+                .stream()
+                .filter(course -> course.getStatus() == CourseStatus.PUBLISHED
+                        || course.getStatus() == CourseStatus.APPROVED
+                        || course.getStatus() == CourseStatus.PENDING)
+                .toList();
+        coursesToRemove.forEach(course -> course.setStatus(CourseStatus.FORCED_DRAFT));
+        if (!coursesToRemove.isEmpty()) {
+            courseRepository.saveAll(coursesToRemove);
+        }
+
+        boolean walletFrozen = teacherWalletRepository.findByTeacherIdForUpdate(teacher.getId())
+                .map(this::freezeWallet)
+                .orElse(false);
+
+        return new SuspensionImpact(coursesToRemove.size(), walletFrozen);
+    }
+
+    private boolean freezeWallet(TeacherWallet wallet) {
+        wallet.setFrozen(true);
+        teacherWalletRepository.save(wallet);
+        return true;
+    }
+
+    private record SuspensionImpact(int coursesRemovedFromMarketplace, boolean walletFrozen) {
+        private static SuspensionImpact none() {
+            return new SuspensionImpact(0, false);
+        }
     }
 }

@@ -2,6 +2,8 @@ package com.manabihub.order.repository;
 
 import com.manabihub.order.entity.Order;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -17,6 +19,12 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findByOrderCode(String orderCode);
 
     boolean existsByOrderCode(String orderCode);
+
+    Page<Order> findByStudent_Id(UUID studentId, Pageable pageable);
+
+    Page<Order> findByStudent_IdAndStatus(UUID studentId,
+                                          com.manabihub.order.enums.OrderStatus status,
+                                          Pageable pageable);
 
     /**
      * Loads an order by its code holding a pessimistic write lock.

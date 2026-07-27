@@ -1,7 +1,6 @@
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
 import LanguageIcon from '@mui/icons-material/Language';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
-import { Flame, Star } from 'lucide-react';
 
 import DOMPurify from 'dompurify';
 
@@ -28,7 +27,7 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
           <div className="flex items-center text-xs font-medium text-white/50 mb-3 tracking-wide">
             <span className="hover:text-white/80 cursor-pointer transition-colors">Khám phá khóa học</span>
             <span className="mx-2">/</span>
-            <span className="hover:text-white/80 cursor-pointer transition-colors">{course.jlptLevel || 'JLPT N3'}</span>
+            <span className="hover:text-white/80 transition-colors">{course.jlptLevel || 'Khóa học'}</span>
             <span className="mx-2">/</span>
             <span className="text-white/80 truncate max-w-[200px] sm:max-w-xs">{course.title.replace('--', '|')}</span>
           </div>
@@ -51,26 +50,23 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-2 leading-tight drop-shadow-md">
             {course.title.replace('--', '|')}
           </h1>
-          <div className="flex items-center gap-4 text-sm text-rose-100/90 mt-3 mb-6">
-            <span className="inline-flex items-center gap-1.5"><Flame className="w-4 h-4 text-amber-500 fill-amber-500" /> 51 học viên đã đăng ký</span>
-            <span className="inline-flex items-center gap-1.5"><Star className="w-4 h-4 text-amber-400 fill-amber-400" /> 4.8 (16 đánh giá)</span>
-          </div>
-
           {/* Description */}
           <div
-            className="text-base sm:text-lg text-slate-300 mb-6 max-w-3xl leading-relaxed prose prose-invert"
+            className="text-base sm:text-lg text-slate-300 my-6 max-w-3xl leading-relaxed prose prose-invert"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.description || course.introduction || '') }}
           />
 
           {/* Meta Info */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-400">
             <span className="flex items-center">
-              Tạo bởi&nbsp;<span className="text-white font-medium hover:text-rose-200 transition-colors cursor-pointer border-b border-rose-200/50">{course.teacher.name}</span>
+              Tạo bởi&nbsp;<span className="text-white font-medium">{course.teacher.name}</span>
             </span>
-            <span className="flex items-center">
-              <NewReleasesIcon fontSize="small" className="mr-1.5 opacity-70" />
-              Cập nhật {course.publishedAt ? new Date(course.publishedAt).toLocaleDateString('vi-VN') : 'Gần đây'}
-            </span>
+            {course.publishedAt && (
+              <span className="flex items-center">
+                <NewReleasesIcon fontSize="small" className="mr-1.5 opacity-70" />
+                Xuất bản {new Date(course.publishedAt).toLocaleDateString('vi-VN')}
+              </span>
+            )}
             <span className="flex items-center">
               <LanguageIcon fontSize="small" className="mr-1.5 opacity-70" />
               Tiếng Việt

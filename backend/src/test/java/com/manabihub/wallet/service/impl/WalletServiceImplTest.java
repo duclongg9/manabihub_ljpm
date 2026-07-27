@@ -1,11 +1,18 @@
 package com.manabihub.wallet.service.impl;
 
+import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.common.exception.BusinessException;
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.wallet.dto.response.TeacherWalletResponse;
+import com.manabihub.wallet.entity.TeacherWallet;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.enums.WalletTransactionType;
+import com.manabihub.wallet.mapper.WalletMapper;
+import com.manabihub.wallet.repository.TeacherWalletRepository;
 import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,21 +22,31 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WalletServiceImplTest {
 
+    @Mock private TeacherWalletRepository teacherWalletRepository;
+    @Mock private TeacherProfileRepository teacherProfileRepository;
     @Mock private WalletRepository walletRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
+    @Mock private WalletMapper walletMapper;
 
     @InjectMocks
     private WalletServiceImpl service;
@@ -39,6 +56,7 @@ class WalletServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(service, "minimumPayoutAmount", new BigDecimal("500000.00"));
         teacher = new TeacherProfile();
         teacher.setId(UUID.randomUUID());
         wallet = Wallet.builder()
@@ -48,6 +66,33 @@ class WalletServiceImplTest {
                 .balance(BigDecimal.ZERO)
                 .frozenBalance(BigDecimal.ZERO)
                 .build();
+    }
+
+    @Test
+    void getTeacherWalletByUserId_resolvesTeacherProfileBeforeWalletLookup() {
+        UUID userId = UUID.randomUUID();
+        TeacherWallet teacherWallet = TeacherWallet.builder()
+                .id(UUID.randomUUID())
+                .teacherId(teacher.getId())
+                .balance(new BigDecimal("5000000.00"))
+                .frozenBalance(BigDecimal.ZERO)
+                .build();
+        TeacherWalletResponse expected = new TeacherWalletResponse();
+
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(teacher));
+        when(teacherWalletRepository.findByTeacherId(teacher.getId())).thenReturn(Optional.of(teacherWallet));
+        when(walletMapper.toResponse(
+                eq(teacherWallet),
+                any(BigDecimal.class),
+                anyInt(),
+                any(LocalDate.class)))
+                .thenReturn(expected);
+
+        TeacherWalletResponse actual = service.getTeacherWalletByUserId(userId);
+
+        assertSame(expected, actual);
+        verify(teacherProfileRepository).findByUserId(userId);
+        verify(teacherWalletRepository).findByTeacherId(teacher.getId());
     }
 
     @Test
@@ -85,5 +130,33 @@ class WalletServiceImplTest {
 
         assertEquals(WalletOwnerType.TEACHER, created.getOwnerType());
         assertEquals(teacher, created.getTeacher());
+    }
+
+    @Test
+    void reserveBalance_whenWalletIsFrozen_rejectsWithdrawalBeforeMutation() {
+        UUID withdrawalId = UUID.randomUUID();
+        TeacherWallet teacherWallet = TeacherWallet.builder()
+                .id(UUID.randomUUID())
+                .teacherId(teacher.getId())
+                .balance(new BigDecimal("2000000.00"))
+                .frozenBalance(BigDecimal.ZERO)
+                .frozen(true)
+                .build();
+        when(teacherWalletRepository.findByTeacherIdForUpdate(teacher.getId()))
+                .thenReturn(Optional.of(teacherWallet));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.reserveBalance(
+                        teacher.getId().toString(),
+                        new BigDecimal("500000.00"),
+                        withdrawalId.toString()
+                )
+        );
+
+        assertEquals(MessageCodes.PAYOUT_BALANCE_FROZEN, exception.getMessageCode());
+        assertEquals(new BigDecimal("2000000.00"), teacherWallet.getBalance());
+        assertEquals(BigDecimal.ZERO, teacherWallet.getFrozenBalance());
+        verifyNoInteractions(walletTransactionRepository);
     }
 }

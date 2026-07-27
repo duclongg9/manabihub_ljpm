@@ -6,6 +6,8 @@ import com.manabihub.common.util.EncryptionUtil;
 import com.manabihub.common.mail.EmailService;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.payout.dto.request.BankAccountDto;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
@@ -42,6 +44,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private final TeacherWalletRepository teacherWalletRepository;
     private final TeacherBankAccountRepository bankAccountRepository;
     private final AppUserRepository appUserRepository;
+    private final TeacherProfileRepository teacherProfileRepository;
     private final EmailService emailService;
     private final WalletService walletService;
     private final WithdrawalMapper withdrawalMapper;
@@ -62,29 +65,35 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
     @Override
     @Transactional
-    public WithdrawalRequestResponse createWithdrawalRequest(String teacherId, CreateWithdrawalRequest request) {
+    public WithdrawalRequestResponse createWithdrawalRequest(String userId, CreateWithdrawalRequest request) {
         if (request.getAmount().compareTo(minimumPayoutAmount) < 0) {
             throw new BusinessException(MessageCodes.PAYOUT_AMOUNT_BELOW_MINIMUM, "Amount below minimum threshold");
         }
 
         // Validate OTP
-        OtpEntry entry = otpCache.get(teacherId);
+        OtpEntry entry = otpCache.get(userId);
         if (entry == null || !entry.code.equals(request.getOtpCode()) || System.currentTimeMillis() > entry.expiresAt) {
             throw new BusinessException("PAYOUT_INVALID_OTP", "Invalid or expired OTP");
         }
-        otpCache.remove(teacherId);
+        otpCache.remove(userId);
 
-        java.util.UUID teacherUuid = java.util.UUID.fromString(teacherId);
+        UUID teacherProfileId = resolveTeacherProfileId(userId);
 
         // Business Rule: Check for existing PENDING request
-        long pendingCount = withdrawalRepository.countByTeacherIdAndStatus(teacherUuid, WithdrawalStatus.PENDING);
+        long pendingCount = withdrawalRepository.countByTeacherIdAndStatus(
+                teacherProfileId,
+                WithdrawalStatus.PENDING
+        );
         if (pendingCount > 0) {
             throw new BusinessException(MessageCodes.PAYOUT_PENDING_REQUEST_EXISTS, "You already have a pending withdrawal request.");
         }
 
         // Business Rule: Limit to 2 per month
         // In a real app, query by month, but here we simplify by counting this month's requests
-        long monthlyCount = withdrawalRepository.countByTeacherIdAndCreatedAtAfter(teacherUuid, java.time.LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0));
+        long monthlyCount = withdrawalRepository.countByTeacherIdAndCreatedAtAfter(
+                teacherProfileId,
+                java.time.LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0)
+        );
         if (monthlyCount >= 2) {
             throw new BusinessException(MessageCodes.PAYOUT_MONTHLY_LIMIT_EXCEEDED, "You can only make 2 withdrawal requests per month.");
         }
@@ -92,12 +101,12 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         BankAccountSnapshot snapshot = buildSnapshot(request);
 
         // Fetch wallet ID to link the request
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherId(teacherUuid)
+        TeacherWallet wallet = teacherWalletRepository.findByTeacherId(teacherProfileId)
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Wallet not found"));
 
         // Create the withdrawal request first to get an ID for the ledger
         WithdrawalRequest withdrawalRequest = WithdrawalRequest.builder()
-                .teacherId(teacherUuid)
+                .teacherId(teacherProfileId)
                 .requestedAmount(request.getAmount())
                 .status(WithdrawalStatus.PENDING)
                 .bankAccountSnapshot(snapshot)
@@ -107,7 +116,11 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         withdrawalRequest = withdrawalRepository.save(withdrawalRequest);
 
         // Reserve balance (This uses pessimistic locking and validates funds)
-        walletService.reserveBalance(teacherId, request.getAmount(), withdrawalRequest.getId().toString());
+        walletService.reserveBalance(
+                teacherProfileId.toString(),
+                request.getAmount(),
+                withdrawalRequest.getId().toString()
+        );
 
         // Send notification
         try {
@@ -125,7 +138,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
         // Save bank account if requested
         if (request.isSaveAccount()) {
-            saveTeacherBankAccount(teacherUuid, request.getBankAccount());
+            saveTeacherBankAccount(teacherProfileId, request.getBankAccount());
         }
 
         return withdrawalMapper.toResponse(withdrawalRequest);
@@ -164,23 +177,32 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<WithdrawalRequestResponse> getTeacherWithdrawals(String teacherId, Pageable pageable) {
-        return withdrawalRepository.findByTeacherId(java.util.UUID.fromString(teacherId), pageable)
+    public Page<WithdrawalRequestResponse> getTeacherWithdrawals(String userId, Pageable pageable) {
+        UUID teacherProfileId = resolveTeacherProfileId(userId);
+        return withdrawalRepository.findByTeacherId(teacherProfileId, pageable)
                 .map(withdrawalMapper::toResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public WithdrawalRequestResponse getWithdrawalDetail(String teacherId, String withdrawalId) {
-        WithdrawalRequest request = withdrawalRepository.findByIdAndTeacherId(java.util.UUID.fromString(withdrawalId), java.util.UUID.fromString(teacherId))
+    public WithdrawalRequestResponse getWithdrawalDetail(String userId, String withdrawalId) {
+        UUID teacherProfileId = resolveTeacherProfileId(userId);
+        WithdrawalRequest request = withdrawalRepository.findByIdAndTeacherId(
+                        UUID.fromString(withdrawalId),
+                        teacherProfileId
+                )
                 .orElseThrow(() -> new BusinessException(MessageCodes.PAYOUT_WITHDRAWAL_NOT_FOUND, "Withdrawal request not found"));
         return withdrawalMapper.toResponse(request);
     }
 
     @Override
     @Transactional
-    public void cancelWithdrawal(String teacherId, String withdrawalId) {
-        WithdrawalRequest request = withdrawalRepository.findByIdAndTeacherId(java.util.UUID.fromString(withdrawalId), java.util.UUID.fromString(teacherId))
+    public void cancelWithdrawal(String userId, String withdrawalId) {
+        UUID teacherProfileId = resolveTeacherProfileId(userId);
+        WithdrawalRequest request = withdrawalRepository.findByIdAndTeacherId(
+                        UUID.fromString(withdrawalId),
+                        teacherProfileId
+                )
                 .orElseThrow(() -> new BusinessException(MessageCodes.PAYOUT_WITHDRAWAL_NOT_FOUND, "Withdrawal request not found"));
 
         if (request.getStatus() != WithdrawalStatus.PENDING) {
@@ -191,7 +213,11 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         withdrawalRepository.save(request);
 
         // Refund the reserved balance
-        walletService.releaseBalance(teacherId, request.getRequestedAmount(), withdrawalId);
+        walletService.releaseBalance(
+                teacherProfileId.toString(),
+                request.getRequestedAmount(),
+                withdrawalId
+        );
 
         // Send notification
         try {
@@ -208,10 +234,10 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     }
 
     @Override
-    public void sendWithdrawalOtp(String teacherId) {
-        java.util.UUID teacherUuid = java.util.UUID.fromString(teacherId);
+    public void sendWithdrawalOtp(String userId) {
+        UUID userUuid = UUID.fromString(userId);
         
-        AppUser teacher = appUserRepository.findById(teacherUuid)
+        AppUser teacher = appUserRepository.findById(userUuid)
                 .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Teacher not found"));
                 
         if (teacher.getEmail() == null || teacher.getEmail().isEmpty()) {
@@ -220,7 +246,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
         // Generate 6 digit OTP
         String code = String.format("%06d", new java.util.Random().nextInt(1000000));
-        otpCache.put(teacherId, new OtpEntry(code));
+        otpCache.put(userId, new OtpEntry(code));
         
         // Send email
         String subject = "[ManabiHub] Mã xác thực rút tiền doanh thu";
@@ -231,13 +257,13 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                       "<br><p>Trân trọng,<br>Đội ngũ ManabiHub</p>";
                       
         emailService.sendEmail(teacher.getEmail(), subject, body);
-        log.info("OTP sent to teacher {} at email {}", teacherId, teacher.getEmail());
+        log.info("OTP sent to teacher user {} at email {}", userId, teacher.getEmail());
     }
 
     @Override
-    public java.util.List<TeacherBankAccountResponse> getSavedBankAccounts(String teacherId) {
-        java.util.UUID teacherUuid = java.util.UUID.fromString(teacherId);
-        return bankAccountRepository.findByTeacherIdOrderByCreatedAtDesc(teacherUuid).stream()
+    public java.util.List<TeacherBankAccountResponse> getSavedBankAccounts(String userId) {
+        UUID teacherProfileId = resolveTeacherProfileId(userId);
+        return bankAccountRepository.findByTeacherIdOrderByCreatedAtDesc(teacherProfileId).stream()
                 .map(account -> TeacherBankAccountResponse.builder()
                         .id(account.getId().toString())
                         .bankCode(account.getBankCode())
@@ -248,5 +274,15 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                         .isDefault(account.isDefault())
                         .build())
                 .toList();
+    }
+
+    private UUID resolveTeacherProfileId(String userId) {
+        UUID userUuid = UUID.fromString(userId);
+        TeacherProfile teacherProfile = teacherProfileRepository.findByUserId(userUuid)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.KYC_TEACHER_NOT_FOUND,
+                        "Teacher profile not found"
+                ));
+        return teacherProfile.getId();
     }
 }
