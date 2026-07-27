@@ -307,8 +307,7 @@ export function TeacherCoursesPage() {
           )}
           sx={{ mb: 2 }}
         >
-          Đã lưu bản nháp “{draftState?.draftTitle || 'khóa học mới'}”. Hãy xây nội dung, kiểm tra
-          điều kiện rồi bấm Gửi duyệt để chuyển khóa học sang Course Manager.
+          Đã lưu bản nháp “{draftState?.draftTitle || 'khóa học mới'}”. Bạn có thể xem lại khóa học trong danh sách bản nháp bên dưới.
         </Alert>
       )}
 
@@ -805,6 +804,20 @@ function CourseDraftRow({
                 <Typography variant="body2">{deleting ? 'Đang xóa...' : 'Xóa bản nháp'}</Typography>
               </Stack>
             </MenuItem>
+            <Tooltip title="Vui lòng vào phần Xây nội dung để thêm ít nhất 1 bài học trước khi gửi duyệt." placement="left">
+              <span>
+                <MenuItem disabled={deleting || submitting}
+                          onClick={() => {
+                            closeMenu();
+                            onSubmit();
+                          }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <SendOutlinedIcon fontSize="small" />
+                    <Typography variant="body2">Gửi duyệt</Typography>
+                  </Stack>
+                </MenuItem>
+              </span>
+            </Tooltip>
           </Menu>
         </Stack>
       </Stack>
