@@ -46,6 +46,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
+import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
 import {
   courseDraftApiError,
   createCourseModule,
@@ -1407,9 +1408,13 @@ function RichTextEditor({ error, helperText, label, onChange, placeholder, requi
       theme: 'snow',
     });
 
-    quill.root.innerHTML = value || '';
+    const sanitizedInitialValue = sanitizeRichText(value);
+    quill.clipboard.dangerouslyPasteHTML(sanitizedInitialValue);
+    valueRef.current = sanitizedInitialValue;
     quill.on('text-change', () => {
-      const html = quill.root.innerHTML === '<p><br></p>' ? '' : quill.root.innerHTML;
+      const html = quill.root.innerHTML === '<p><br></p>'
+        ? ''
+        : sanitizeRichText(quill.root.innerHTML);
       valueRef.current = html;
       onChangeRef.current(html);
     });
@@ -1424,8 +1429,9 @@ function RichTextEditor({ error, helperText, label, onChange, placeholder, requi
     }
 
     const selection = quill.getSelection();
-    quill.root.innerHTML = value || '';
-    valueRef.current = value;
+    const sanitizedValue = sanitizeRichText(value);
+    quill.clipboard.dangerouslyPasteHTML(sanitizedValue);
+    valueRef.current = sanitizedValue;
     if (selection) {
       quill.setSelection(selection);
     }
@@ -1497,7 +1503,7 @@ function createBlockFormFromResponse(block: LessonBlockResponse): BlockForm {
   return {
     type: block.type,
     title: block.title || '',
-    content: block.content || '',
+    content: sanitizeRichText(block.content),
     videoUrl: block.videoUrl || '',
     durationMinutes: block.durationMinutes ? String(block.durationMinutes) : '',
     quizQuestion: block.quizQuestion || '',
@@ -1663,7 +1669,7 @@ function buildBlockPayload(form: BlockForm): LessonBlockPayload {
   if (form.type === 'VIDEO') {
     return {
       ...base,
-      content: form.content.trim() || null,
+      content: sanitizeRichText(form.content).trim() || null,
       videoUrl: form.videoUrl.trim(),
       durationMinutes: Number(form.durationMinutes),
     };
@@ -1672,7 +1678,7 @@ function buildBlockPayload(form: BlockForm): LessonBlockPayload {
   if (form.type === 'TEXT') {
     return {
       ...base,
-      content: form.content.trim(),
+      content: sanitizeRichText(form.content).trim(),
     };
   }
 
