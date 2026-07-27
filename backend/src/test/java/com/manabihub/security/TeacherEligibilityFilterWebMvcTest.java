@@ -10,6 +10,7 @@ import com.manabihub.kyc.service.TeacherKycService;
 import com.manabihub.payout.controller.TeacherWithdrawalController;
 import com.manabihub.payout.service.WithdrawalService;
 import com.manabihub.security.config.SecurityConfig;
+import com.manabihub.security.config.InternalAdminRoleFilter;
 import com.manabihub.security.config.TeacherEligibilityFilter;
 import com.manabihub.security.oauth2.CustomOAuth2UserService;
 import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
@@ -93,6 +94,9 @@ class TeacherEligibilityFilterWebMvcTest {
 
     @MockBean
     private JdbcTemplate jdbcTemplate;
+
+    @MockBean
+    private InternalAdminRoleFilter internalAdminRoleFilter;
 
     @Test
     void activeTeacher_dashboardReturns200() throws Exception {

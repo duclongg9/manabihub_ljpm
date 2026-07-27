@@ -1,0 +1,34 @@
+export type SystemSettingValueType = 'NUMBER' | 'BOOLEAN' | 'STRING' | 'JSON';
+export type InternalAdminRole = 'SYSTEM_ADMIN' | 'COURSE_MANAGER' | 'FINANCE_MANAGER';
+export type InternalAdminStatus = 'ACTIVE' | 'LOCKED' | 'DISABLED';
+
+export interface SystemSetting {
+  id: string;
+  key: string;
+  value: string;
+  valueType: SystemSettingValueType;
+  description: string | null;
+  editable: boolean;
+  updatedBy: string | null;
+  updatedAt: string | null;
+}
+
+export interface InternalAdminAccount {
+  id: string;
+  email: string;
+  fullName: string;
+  status: InternalAdminStatus;
+  role: InternalAdminRole;
+  lastLoginAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface UpdateSystemSettingPayload {
+  value: string;
+  reason: string;
+}
+
+export interface UpdateInternalAdminRolePayload {
+  roleCode: InternalAdminRole;
+  reason: string;
+}

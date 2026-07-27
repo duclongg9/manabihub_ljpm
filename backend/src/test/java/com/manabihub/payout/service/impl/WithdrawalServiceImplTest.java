@@ -21,6 +21,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import com.manabihub.systemconfig.service.SystemSettingValueService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -51,6 +52,8 @@ class WithdrawalServiceImplTest {
     private WithdrawalMapper withdrawalMapper;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private SystemSettingValueService settingValueService;
 
     @InjectMocks
     private WithdrawalServiceImpl withdrawalService;
@@ -64,6 +67,9 @@ class WithdrawalServiceImplTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(withdrawalService, "minimumPayoutAmount", minimumPayout);
+        lenient()
+                .when(settingValueService.getDecimal(any(String.class), any(BigDecimal.class)))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         
         com.manabihub.identity.entity.AppUser mockUser = new com.manabihub.identity.entity.AppUser();
         mockUser.setId(userId);

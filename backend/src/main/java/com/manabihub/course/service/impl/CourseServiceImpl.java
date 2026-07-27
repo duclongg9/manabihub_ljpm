@@ -35,6 +35,7 @@ import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.review.dto.response.CourseReviewAggregateResponse;
 import com.manabihub.review.service.CourseReviewService;
+import com.manabihub.systemconfig.service.SystemSettingValueService;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -52,8 +53,8 @@ import java.util.UUID;
 @Transactional
 public class CourseServiceImpl implements CourseService {
 
-    private static final int MIN_LEARNING_GOALS = 4;
-    private static final int MAX_LEARNING_GOAL_LENGTH = 160;
+    private static final int DEFAULT_MIN_LEARNING_GOALS = 4;
+    private static final int DEFAULT_MAX_LEARNING_GOAL_LENGTH = 160;
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DRAFT_TITLE_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(VIETNAM_ZONE);
@@ -66,6 +67,7 @@ public class CourseServiceImpl implements CourseService {
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
     private final CourseReviewService courseReviewService;
+    private final SystemSettingValueService settingValueService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -434,13 +436,29 @@ public class CourseServiceImpl implements CourseService {
     }
 
     private void validateDraftRequest(CreateCourseDraftRequest request, List<String> learningGoals) {
+        int minimumLearningGoals = settingValueService.getInteger(
+                "COURSE_MIN_LEARNING_GOALS",
+                DEFAULT_MIN_LEARNING_GOALS
+        );
+        int maximumLearningGoalLength = settingValueService.getInteger(
+                "COURSE_MAX_LEARNING_GOAL_LENGTH",
+                DEFAULT_MAX_LEARNING_GOAL_LENGTH
+        );
+        BigDecimal coursePriceFloor = settingValueService.getDecimal(
+                "COURSE_PRICE_FLOOR",
+                BigDecimal.ZERO
+        );
+
         if (!StringUtils.hasText(request.category())
                 || !courseCategoryRepository.existsByCodeAndActiveTrue(request.category().trim())) {
             throw new BusinessException(MessageCodes.MSG_COURSE_004, "Course category is invalid");
         }
 
-        if (request.price() == null || request.price().compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException(MessageCodes.MSG_COURSE_003, "Course price must be zero or greater");
+        if (request.price() == null || request.price().compareTo(coursePriceFloor) < 0) {
+            throw new BusinessException(
+                    MessageCodes.MSG_COURSE_003,
+                    "Course price must be at least " + coursePriceFloor.toPlainString()
+            );
         }
 
         if (!StringUtils.hasText(request.prerequisites())) {
@@ -451,13 +469,22 @@ public class CourseServiceImpl implements CourseService {
             throw new BusinessException(MessageCodes.MSG_GOAL_004, "Target students are required");
         }
 
-        if (learningGoals.size() < MIN_LEARNING_GOALS) {
-            throw new BusinessException(MessageCodes.MSG_GOAL_001, "At least 4 learning goals are required");
+        if (learningGoals.size() < minimumLearningGoals) {
+            throw new BusinessException(
+                    MessageCodes.MSG_GOAL_001,
+                    "At least " + minimumLearningGoals + " learning goals are required"
+            );
         }
 
-        boolean hasTooLongGoal = learningGoals.stream().anyMatch(goal -> goal.length() > MAX_LEARNING_GOAL_LENGTH);
+        boolean hasTooLongGoal = learningGoals.stream()
+                .anyMatch(goal -> goal.length() > maximumLearningGoalLength);
         if (hasTooLongGoal) {
-            throw new BusinessException(MessageCodes.MSG_GOAL_002, "Each learning goal must be at most 160 characters");
+            throw new BusinessException(
+                    MessageCodes.MSG_GOAL_002,
+                    "Each learning goal must be at most "
+                            + maximumLearningGoalLength
+                            + " characters"
+            );
         }
     }
 

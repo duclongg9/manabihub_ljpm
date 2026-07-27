@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.review.service.CourseReviewService;
+import com.manabihub.systemconfig.service.SystemSettingValueService;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -69,6 +70,9 @@ class CourseServiceImplTest {
     @Mock
     private CourseReviewService courseReviewService;
 
+    @Mock
+    private SystemSettingValueService settingValueService;
+
     @InjectMocks
     private CourseServiceImpl courseService;
     private UUID userId;
@@ -84,8 +88,15 @@ class CourseServiceImplTest {
                 courseValidationService,
                 auditLogService,
                 notificationService,
-                courseReviewService
+                courseReviewService,
+                settingValueService
         );
+        org.mockito.Mockito.lenient()
+                .when(settingValueService.getInteger(any(String.class), any(Integer.class)))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        org.mockito.Mockito.lenient()
+                .when(settingValueService.getDecimal(any(String.class), any(BigDecimal.class)))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         userId = UUID.randomUUID();
         approvedTeacher = new TeacherProfile();
         approvedTeacher.setId(UUID.randomUUID());

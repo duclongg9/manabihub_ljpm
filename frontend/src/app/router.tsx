@@ -39,6 +39,8 @@ import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
 import { PublicTeacherProfilePage } from '../features/teacher-discovery/pages/PublicTeacherProfilePage';
+import { SystemSettingsPage } from '../features/system-administration/pages/SystemSettingsPage';
+import { InternalAdminAccountsPage } from '../features/system-administration/pages/InternalAdminAccountsPage';
 
 export const router = createBrowserRouter([
   {
@@ -214,11 +216,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'settings',
-        element: <Navigate to="/admin/dashboard" replace />,
+        element: <SystemSettingsPage />,
       },
       {
         path: 'users',
-        element: <Navigate to="/admin/dashboard" replace />,
+        element: <InternalAdminAccountsPage />,
       },
       {
         path: 'kyc/review',

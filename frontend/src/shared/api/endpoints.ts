@@ -27,6 +27,13 @@ export const ENDPOINTS = {
     MANUAL_PROOF: (withdrawalRequestId: string) =>
       `/admin/payouts/${withdrawalRequestId}/manual-transfer/proof`,
   },
+  SYSTEM_ADMIN: {
+    SETTINGS: '/v1/admin/system-settings',
+    SETTING: (key: string) => `/v1/admin/system-settings/${encodeURIComponent(key)}`,
+    INTERNAL_ACCOUNTS: '/v1/admin/internal-accounts',
+    INTERNAL_ACCOUNT_ROLE: (adminId: string) =>
+      `/v1/admin/internal-accounts/${adminId}/role`,
+  },
   teacherKyc: {
     status: '/v1/teacher/kyc/status',
     identityVerifications: '/v1/teacher/kyc/identity-verifications',

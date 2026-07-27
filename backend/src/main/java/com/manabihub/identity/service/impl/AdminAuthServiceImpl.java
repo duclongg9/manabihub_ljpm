@@ -11,6 +11,7 @@ import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.service.AdminAuthService;
+import com.manabihub.systemconfig.service.SystemSettingValueService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,6 +42,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     private final AuditLogRepository auditLogRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
+    private final SystemSettingValueService settingValueService;
 
     @Value("${app.security.jwt.expiration-minutes:1440}") // Default 24 hours
     private long jwtExpirationMinutes;
@@ -132,9 +134,25 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     private void handleFailedAttempt(String email) {
         int attempts = failedAttempts.getOrDefault(email, 0) + 1;
         failedAttempts.put(email, attempts);
-        if (attempts >= maxFailedAttempts) {
-            lockedAccounts.put(email, Instant.now().plus(lockoutDurationMinutes, ChronoUnit.MINUTES));
-            log.warn("Account {} locked temporarily in memory for {} minutes due to {} failed attempts.", email, lockoutDurationMinutes, attempts);
+        int configuredMaxAttempts = settingValueService.getInteger(
+                "ADMIN_LOCKOUT_MAX_ATTEMPTS",
+                maxFailedAttempts
+        );
+        int configuredDurationMinutes = settingValueService.getInteger(
+                "ADMIN_LOCKOUT_DURATION_MINUTES",
+                Math.toIntExact(lockoutDurationMinutes)
+        );
+        if (attempts >= configuredMaxAttempts) {
+            lockedAccounts.put(
+                    email,
+                    Instant.now().plus(configuredDurationMinutes, ChronoUnit.MINUTES)
+            );
+            log.warn(
+                    "Account {} locked temporarily in memory for {} minutes due to {} failed attempts.",
+                    email,
+                    configuredDurationMinutes,
+                    attempts
+            );
         }
     }
 
