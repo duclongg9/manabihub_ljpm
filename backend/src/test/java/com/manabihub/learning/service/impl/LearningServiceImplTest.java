@@ -6,6 +6,7 @@ import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseModule;
 import com.manabihub.course.entity.LessonBlock;
+import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.enums.LessonBlockType;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.repository.LessonBlockRepository;
@@ -291,6 +292,23 @@ class LearningServiceImplTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () -> learningService.openOrResumeCourse(courseId));
         assertEquals(MessageCodes.LEARNING_NOT_ENROLLED, ex.getMessageCode());
+    }
+
+    @Test
+    @Order(112)
+    @DisplayName("UTC12: Existing learner keeps access after course is removed from marketplace")
+    void testOpenOrResumeCourse_UTC12_ForcedDraftPreservesExistingLearnerAccess() {
+        course.setStatus(CourseStatus.FORCED_DRAFT);
+        enrollment.setStatus(EnrollmentStatus.ACTIVE);
+        courseModule.addBlock(videoBlock);
+        mockActiveEnrollment();
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId)).thenReturn(List.of());
+
+        CourseLearningResponse response = learningService.openOrResumeCourse(courseId);
+
+        assertEquals(courseId, response.courseId());
+        assertEquals(1, response.totalLessons());
+        assertEquals(blockVideoId, response.currentLessonBlockId());
     }
 
     // ==========================================

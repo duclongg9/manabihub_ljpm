@@ -1,5 +1,4 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { Box, Typography } from '@mui/material';
 import { PublicLayout } from '../shared/layouts/PublicLayout';
 import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
@@ -33,9 +32,11 @@ import { TeacherWritingReviewsPage } from '../features/writing-review/pages/Teac
 import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages/TeacherWritingReviewDetailPage';
 import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistPage';
+import { TeacherWalletPage } from '../features/my-wallet/pages/TeacherWalletPage';
+import { PayoutQueuePage } from '../features/admin-payout/pages/PayoutQueuePage';
+import { PayoutSettlementPage } from '../features/admin-payout/pages/PayoutSettlementPage';
 import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
-
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
 
 export const router = createBrowserRouter([
@@ -186,7 +187,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'wallet',
-        element: <Navigate to="/teacher/dashboard" replace />,
+        element: <TeacherWalletPage />,
       },
     ],
   },
@@ -228,11 +229,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'tasks/queue',
-        element: <CourseApprovalQueuePage />,
+        element: <Navigate to="/admin/courses/approvals" replace />,
       },
       {
         path: 'courses/approvals',
-        element: <Box sx={{ p: 4, mt: 4, textAlign: 'center', color: 'text.secondary' }}><Typography variant="h5">Vui lòng chọn một khóa học từ Task Queue để tiến hành phê duyệt.</Typography></Box>,
+        element: <CourseApprovalQueuePage />,
       },
       {
         path: 'courses/approvals/:id',
@@ -241,6 +242,14 @@ export const router = createBrowserRouter([
       {
         path: 'finance',
         element: <Navigate to="/admin/dashboard" replace />,
+      },
+      {
+        path: 'payouts',
+        element: <PayoutQueuePage />,
+      },
+      {
+        path: 'payouts/:id',
+        element: <PayoutSettlementPage />,
       },
     ],
   },

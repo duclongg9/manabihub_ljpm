@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Badge, Avatar, Menu, MenuItem } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Avatar, Menu, MenuItem } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SearchIcon from '@mui/icons-material/Search';
-import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -172,12 +171,6 @@ export const LandingHeader: React.FC = () => {
               Trở thành giảng viên
             </Typography>
           )}
-
-          <IconButton color="inherit" sx={{ display: { xs: 'none', sm: 'flex' } }}>
-            <Badge badgeContent={0} color="error">
-              <ShoppingCartOutlinedIcon />
-            </Badge>
-          </IconButton>
 
           {session ? (
             <>

@@ -21,7 +21,11 @@ public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecif
 
     Optional<Course> findByIdAndTeacher_IdAndStatus(UUID id, UUID teacherId, CourseStatus status);
 
+    Optional<Course> findByIdAndTeacher_Id(UUID id, UUID teacherId);
+
     List<Course> findAllByStatusInOrderBySubmittedAtDesc(java.util.Collection<CourseStatus> statuses);
+
+    List<Course> findAllByStatusOrderBySubmittedAtAsc(CourseStatus status);
 
     @org.springframework.data.jpa.repository.Query(value = "SELECT CASE WHEN COUNT(e.id) > 0 THEN true ELSE false END FROM enrollments e JOIN student_profiles sp ON e.student_id = sp.id WHERE e.course_id = :courseId AND sp.user_id = :userId AND e.enrollment_status = 'ACTIVE'", nativeQuery = true)
     boolean checkEnrollmentExists(@org.springframework.data.repository.query.Param("courseId") UUID courseId, @org.springframework.data.repository.query.Param("userId") UUID userId);

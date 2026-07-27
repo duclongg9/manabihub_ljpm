@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -68,6 +68,13 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
     setKeyword(filters.keyword || '');
   }, [filters.keyword]);
 
+  const updateFilter = useCallback((field: keyof CourseCatalogFilters, value?: string) => {
+    onFiltersChange({
+      ...filters,
+      [field]: value || undefined,
+    });
+  }, [filters, onFiltersChange]);
+
   useEffect(() => {
     const handler = setTimeout(() => {
       if (keyword !== (filters.keyword || '')) {
@@ -75,18 +82,11 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
       }
     }, 500);
     return () => clearTimeout(handler);
-  }, [keyword]);
+  }, [filters.keyword, keyword, updateFilter]);
 
   const handlePriceChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const numericStr = e.target.value.replace(/\D/g, '');
     setter(numericStr ? Number(numericStr).toLocaleString('en-US') : '');
-  };
-
-  const updateFilter = (field: keyof CourseCatalogFilters, value?: string) => {
-    onFiltersChange({
-      ...filters,
-      [field]: value || undefined,
-    });
   };
 
   const applyPrice = () => {

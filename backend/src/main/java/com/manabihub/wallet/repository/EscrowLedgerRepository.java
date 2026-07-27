@@ -1,7 +1,10 @@
 package com.manabihub.wallet.repository;
 
 import com.manabihub.wallet.entity.EscrowLedger;
+import com.manabihub.wallet.enums.EscrowStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import org.springframework.data.domain.Page;
@@ -38,4 +41,15 @@ public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID
             @Param("lastCreatedAt") Instant lastCreatedAt, 
             @Param("lastId") UUID lastId, 
             Pageable pageable);
+
+    @Query("""
+            select coalesce(sum(escrow.amount), 0)
+            from EscrowLedger escrow
+            where escrow.teacher.id = :teacherId
+              and escrow.status = :status
+            """)
+    java.math.BigDecimal sumAmountByTeacherIdAndStatus(
+            @Param("teacherId") UUID teacherId,
+            @Param("status") EscrowStatus status
+    );
 }

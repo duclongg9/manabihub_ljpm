@@ -193,6 +193,21 @@ class ManabiHubApplicationTests {
     @MockBean
     private TransactionTemplate transactionTemplate;
 
+    @MockBean
+    private com.manabihub.wallet.repository.TeacherWalletRepository teacherWalletRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.WithdrawalRequestRepository withdrawalRequestRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.PayoutSettlementRepository payoutSettlementRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.PayoutReconciliationLogRepository payoutReconciliationLogRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.TeacherBankAccountRepository teacherBankAccountRepository;
+
     @Test
     void contextLoads() {
         // Basic integration test to verify the Spring Application Context loads correctly.

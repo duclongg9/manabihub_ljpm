@@ -1,6 +1,7 @@
 package com.manabihub.course.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.course.dto.response.ValidationError;
 import com.manabihub.course.dto.response.ValidationResultResponse;
@@ -151,6 +152,10 @@ public class CourseValidationServiceImpl implements CourseValidationService {
     private void validateHierarchy(Course course, List<ValidationError> errors) {
         List<CourseModule> modules = course.getModules();
         if (modules == null || modules.isEmpty()) {
+            errors.add(new ValidationError("MSG-COURSE-015",
+                    "Video Course cần có tối thiểu 5 bài học trước khi gửi duyệt.", "error"));
+            errors.add(new ValidationError("MSG-COURSE-016",
+                    "Video Course cần có tổng thời lượng video tối thiểu 30 phút trước khi gửi duyệt.", "error"));
             return;
         }
 
@@ -254,24 +259,46 @@ public class CourseValidationServiceImpl implements CourseValidationService {
         }
 
         try {
-            List<Map<String, Object>> options = objectMapper.readValue(block.getQuizOptionsJson(),
-                    new TypeReference<>() {
-                    });
-            boolean answerMatches = options.stream()
-                    .anyMatch(opt -> block.getQuizAnswer().equals(opt.get("id"))
-                            || block.getQuizAnswer().equals(opt.get("value"))
-                            || block.getQuizAnswer().equals(opt.get("text")));
+            JsonNode options = objectMapper.readTree(block.getQuizOptionsJson());
+            boolean answerMatches = options != null
+                    && options.isArray()
+                    && matchesQuizAnswer(options, block.getQuizAnswer());
             if (!answerMatches) {
-                errors.add(new ValidationError("MSG-COURSE-014",
+                errors.add(new ValidationError("MSG-COURSE-013",
                         "Đáp án đúng không khớp với bất kỳ lựa chọn nào trong danh sách.", "error"));
             }
         } catch (Exception e) {
-            log.error("Failed to parse quiz options JSON for block {}", block.getId(), e);
+            log.warn("Failed to parse quiz options JSON for block {}", block.getId(), e);
+            errors.add(new ValidationError(
+                    "MSG-COURSE-013",
+                    "Danh sách lựa chọn quiz không hợp lệ.",
+                    "error"
+            ));
         }
     }
 
+    private boolean matchesQuizAnswer(JsonNode options, String answer) {
+        for (JsonNode option : options) {
+            if (option.isTextual() && answer.equals(option.asText())) {
+                return true;
+            }
+            if (option.isObject()
+                    && (answer.equals(option.path("id").asText())
+                    || answer.equals(option.path("value").asText())
+                    || answer.equals(option.path("text").asText()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void validateFlashcardBlock(LessonBlock block, List<ValidationError> errors) {
-        if (block.getType() != LessonBlockType.FLASHCARD || !StringUtils.hasText(block.getFlashcardsJson())) {
+        if (block.getType() != LessonBlockType.FLASHCARD) {
+            return;
+        }
+        if (!StringUtils.hasText(block.getFlashcardsJson())) {
+            errors.add(new ValidationError("MSG-COURSE-011",
+                    "Bộ Flashcard cần có ít nhất một thẻ hợp lệ.", "error"));
             return;
         }
 
@@ -279,17 +306,30 @@ public class CourseValidationServiceImpl implements CourseValidationService {
             List<Map<String, String>> flashcards = objectMapper.readValue(block.getFlashcardsJson(),
                     new TypeReference<>() {
                     });
+            if (flashcards.isEmpty()) {
+                errors.add(new ValidationError("MSG-COURSE-011",
+                        "Bộ Flashcard cần có ít nhất một thẻ hợp lệ.", "error"));
+                return;
+            }
             Set<String> fronts = new HashSet<>();
             for (Map<String, String> card : flashcards) {
                 String front = card.get("front");
-                if (front != null && !fronts.add(front.trim().toLowerCase())) {
+                String back = card.get("back");
+                if (!StringUtils.hasText(front) || !StringUtils.hasText(back)) {
+                    errors.add(new ValidationError("MSG-COURSE-011",
+                            "Mỗi Flashcard cần có đầy đủ mặt trước và mặt sau.", "error"));
+                    break;
+                }
+                if (!fronts.add(front.trim().toLowerCase())) {
                     errors.add(new ValidationError("MSG-COURSE-010",
                             "Phát hiện thẻ từ vựng bị trùng lặp. Vui lòng kiểm tra lại bộ Flashcard.", "error"));
                     break;
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to parse flashcards JSON for block {}", block.getId(), e);
+            log.warn("Failed to parse flashcards JSON for block {}", block.getId());
+            errors.add(new ValidationError("MSG-COURSE-011",
+                    "Dữ liệu Flashcard không hợp lệ.", "error"));
         }
     }
 

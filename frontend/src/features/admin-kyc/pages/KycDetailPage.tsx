@@ -27,12 +27,12 @@ export function KycDetailPage() {
       });
   }, [id]);
 
-  const handleReview = async (status: 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED') => {
+  const handleReview = async (status: 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED' | 'REVOKED') => {
     if (!id || !detail) return;
     setNoteError(null);
 
-    // Validate that decision note is required for Reject and Request Correction
-    if (status === 'REJECTED' || status === 'CORRECTION_REQUIRED') {
+    // Validate that decision note is required for Reject, Request Correction, and Revoke
+    if (status === 'REJECTED' || status === 'CORRECTION_REQUIRED' || status === 'REVOKED') {
       if (!decisionNote.trim()) {
         setNoteError('Vui lòng nhập lý do (thông tin bắt buộc).');
         return;
@@ -274,13 +274,63 @@ export function KycDetailPage() {
 
           {/* Decision Panel */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-            <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">Bảng phê duyệt</h3>
+            <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">Quyết định KYC</h3>
 
-            {detail.status !== 'PENDING' ? (
+            {detail.status === 'APPROVED' ? (
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+                  <p className="font-semibold">Hồ sơ đã được duyệt — giáo viên đang hoạt động</p>
+                  <p className="text-xs text-green-700 mt-1">
+                    Duyệt bởi: {detail.processedByEmail || 'Hệ thống (tự động)'}
+                  </p>
+                </div>
+
+                <div className="border-t border-gray-100 pt-4 space-y-1">
+                  <label htmlFor="revokeNote" className="block text-sm font-semibold text-gray-700">
+                    Lý do thu hồi / nội dung tố cáo
+                  </label>
+                  <p className="text-[11px] text-gray-400">Bắt buộc. Sẽ được lưu vào nhật ký và gửi thông báo cho giáo viên.</p>
+                  <textarea
+                    id="revokeNote"
+                    rows={4}
+                    value={decisionNote}
+                    onChange={(e) => {
+                      setDecisionNote(e.target.value);
+                      if (e.target.value.trim()) setNoteError(null);
+                    }}
+                    placeholder="Nhập lý do thu hồi vai trò giáo viên (theo kết quả tra soát tố cáo)..."
+                    className={`w-full p-2.5 border rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-1 focus:ring-red-500 outline-none transition ${
+                      noteError ? 'border-red-500 focus:ring-red-500' : 'border-gray-200'
+                    }`}
+                  />
+                  {noteError && (
+                    <p className="text-xs text-red-600 font-medium mt-1">{noteError}</p>
+                  )}
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900">
+                  Chỉ thu hồi khi có hồ sơ điều tra hoặc báo cáo vi phạm đã được xác minh. Thao tác sẽ dừng bán khóa học,
+                  đóng băng rút tiền và giữ quyền học của học viên đã mua.
+                </div>
+
+                <button
+                  onClick={() => handleReview('REVOKED')}
+                  disabled={submitting}
+                  className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm shadow-sm transition hover:shadow-md disabled:opacity-50"
+                >
+                  {submitting ? 'Đang thực hiện...' : 'Thu hồi vai trò giáo viên'}
+                </button>
+                <p className="text-[11px] text-gray-400 text-center">
+                  Quyết định và phạm vi ảnh hưởng được lưu trong audit log.
+                </p>
+              </div>
+            ) : detail.status !== 'PENDING' ? (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-sm text-gray-500">
-                <p className="font-medium text-gray-700">Yêu cầu đã được xử lý</p>
+                <p className="font-medium text-gray-700">
+                  {detail.status === 'REVOKED' ? 'Vai trò giáo viên đã bị thu hồi' : 'Yêu cầu đã được xử lý'}
+                </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Đã duyệt bởi: {detail.processedByEmail || 'Hệ thống'}
+                  Xử lý bởi: {detail.processedByEmail || 'Hệ thống'}
                 </p>
                 {detail.decisionNote && (
                   <div className="mt-3 text-left p-2.5 bg-white rounded border border-gray-100 text-xs">

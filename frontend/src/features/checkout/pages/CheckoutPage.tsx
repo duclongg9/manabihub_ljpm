@@ -12,6 +12,7 @@ export const CheckoutPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const paymentUrl = (location.state as CheckoutLocationState | null)?.paymentUrl;
+  const devSimulatorEnabled = import.meta.env.VITE_PAYMENT_DEV_SIMULATOR_ENABLED === 'true';
 
   const [order, setOrder] = useState<OrderResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,25 +115,29 @@ export const CheckoutPage = () => {
           </p>
         )}
 
-        <div className="relative py-2">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
-          <div className="relative flex justify-center"><span className="bg-white px-3 text-xs text-slate-400">Chế độ Sandbox / Dev</span></div>
-        </div>
+        {devSimulatorEnabled && (
+          <>
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+              <div className="relative flex justify-center"><span className="bg-white px-3 text-xs text-slate-400">Chế độ Sandbox / Dev</span></div>
+            </div>
 
-        <button
-          onClick={() => handleSimulate(true)}
-          disabled={processing}
-          className="w-full bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 font-bold py-3 px-4 rounded-xl transition-all border border-emerald-200"
-        >
-          {processing ? 'Đang xử lý…' : 'Giả lập thanh toán thành công (IPN)'}
-        </button>
-        <button
-          onClick={() => handleSimulate(false)}
-          disabled={processing}
-          className="w-full bg-slate-50 hover:bg-slate-100 disabled:opacity-50 text-slate-600 font-medium py-2.5 px-4 rounded-xl transition-all border border-slate-200 text-sm"
-        >
-          Giả lập thanh toán thất bại
-        </button>
+            <button
+              onClick={() => handleSimulate(true)}
+              disabled={processing}
+              className="w-full bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 font-bold py-3 px-4 rounded-xl transition-all border border-emerald-200"
+            >
+              {processing ? 'Đang xử lý…' : 'Giả lập thanh toán thành công (IPN)'}
+            </button>
+            <button
+              onClick={() => handleSimulate(false)}
+              disabled={processing}
+              className="w-full bg-slate-50 hover:bg-slate-100 disabled:opacity-50 text-slate-600 font-medium py-2.5 px-4 rounded-xl transition-all border border-slate-200 text-sm"
+            >
+              Giả lập thanh toán thất bại
+            </button>
+          </>
+        )}
       </div>
 
       <p className="text-center text-xs text-slate-400 mt-6">
