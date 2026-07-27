@@ -10,6 +10,5 @@ import java.util.UUID;
 
 public interface KycRequestRepository extends JpaRepository<KycRequest, UUID> {
     List<KycRequest> findByStatusOrderByCreatedAtDesc(KycRequestStatus status);
-    List<KycRequest> findByStatusInOrderByCreatedAtDesc(List<KycRequestStatus> statuses);
     Optional<KycRequest> findTopByTeacherProfileIdOrderBySubmittedAtDesc(UUID teacherId);
 }

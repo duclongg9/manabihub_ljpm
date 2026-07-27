@@ -274,7 +274,7 @@ export function KycDetailPage() {
 
           {/* Decision Panel */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-            <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">Bảng phê duyệt</h3>
+            <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">Quyết định KYC</h3>
 
             {detail.status === 'APPROVED' ? (
               <div className="space-y-4">
@@ -308,6 +308,11 @@ export function KycDetailPage() {
                   )}
                 </div>
 
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900">
+                  Chỉ thu hồi khi có hồ sơ điều tra hoặc báo cáo vi phạm đã được xác minh. Thao tác sẽ dừng bán khóa học,
+                  đóng băng rút tiền và giữ quyền học của học viên đã mua.
+                </div>
+
                 <button
                   onClick={() => handleReview('REVOKED')}
                   disabled={submitting}
@@ -316,7 +321,7 @@ export function KycDetailPage() {
                   {submitting ? 'Đang thực hiện...' : 'Thu hồi vai trò giáo viên'}
                 </button>
                 <p className="text-[11px] text-gray-400 text-center">
-                  Thao tác này gỡ vai trò giảng viên và chặn xuất bản khóa học của người dùng.
+                  Quyết định và phạm vi ảnh hưởng được lưu trong audit log.
                 </p>
               </div>
             ) : detail.status !== 'PENDING' ? (
