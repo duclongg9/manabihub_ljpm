@@ -9,6 +9,7 @@ import com.manabihub.audit.entity.AuditLog;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import com.manabihub.wallet.entity.EscrowLedger;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
@@ -31,13 +32,17 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EscrowServiceImpl implements EscrowService {
 
-    /** How long funds stay held before becoming eligible for teacher payout. */
-    private static final Duration HOLD_PERIOD = Duration.ofDays(7);
-
     private final EscrowLedgerRepository escrowLedgerRepository;
     private final OrderItemRepository orderItemRepository;
     private final WalletService walletService;
     private final AuditLogRepository auditLogRepository;
+    private final SystemSettingRepository systemSettingRepository;
+
+    private int getEscrowHoldingDays() {
+        return systemSettingRepository.findBySettingKey("ESCROW_HOLDING_DAYS")
+                .map(setting -> Integer.parseInt(setting.getSettingValue()))
+                .orElse(14);
+    }
 
     @Override
     @Transactional
@@ -47,7 +52,8 @@ public class EscrowServiceImpl implements EscrowService {
             return escrowLedgerRepository.findByOrder_Id(order.getId());
         }
 
-        Instant releaseAt = Instant.now().plus(HOLD_PERIOD);
+        int holdingDays = getEscrowHoldingDays();
+        Instant releaseAt = Instant.now().plus(Duration.ofDays(holdingDays));
         List<EscrowLedger> created = new ArrayList<>();
 
         for (OrderItem item : orderItemRepository.findByOrder_Id(order.getId())) {
