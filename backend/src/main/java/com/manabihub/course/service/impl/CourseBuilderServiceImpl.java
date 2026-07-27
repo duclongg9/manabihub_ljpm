@@ -220,7 +220,11 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
             );
         }
 
-        return courseRepository.findByIdAndTeacher_IdAndStatus(draftId, teacherProfile.getId(), CourseStatus.DRAFT)
+        return courseRepository.findByIdAndTeacher_IdAndStatusIn(
+                        draftId,
+                        teacherProfile.getId(),
+                        List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
+                )
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COURSE_NOT_FOUND,
                         "Course draft was not found",

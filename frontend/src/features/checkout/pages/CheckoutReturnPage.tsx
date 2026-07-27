@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { confirmVnPayReturn, getOrder } from '../services/checkoutService';
+import { getOrder } from '../services/checkoutService';
 import type { OrderResponse } from '../types';
 import { ROUTES } from '../../../shared/constants/routes';
 
@@ -27,13 +27,6 @@ export const CheckoutReturnPage = () => {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
 
-    // Collect the params VNPay appended to the return URL.
-    const returnParams: Record<string, string> = {};
-    searchParams.forEach((value, key) => {
-      returnParams[key] = value;
-    });
-    const cameFromVnPay = 'vnp_ResponseCode' in returnParams;
-
     const poll = async () => {
       try {
         const data = await getOrder(orderId);
@@ -59,20 +52,7 @@ export const CheckoutReturnPage = () => {
       timer = setTimeout(poll, POLL_INTERVAL_MS);
     };
 
-    const start = async () => {
-      // On a real VNPay redirect, confirm the (checksum-signed) result server-side first so
-      // the order is marked paid immediately, then reflect the authoritative status by polling.
-      if (cameFromVnPay) {
-        try {
-          await confirmVnPayReturn(returnParams);
-        } catch {
-          // fall through to polling — the IPN may still confirm it
-        }
-      }
-      if (active) poll();
-    };
-
-    start();
+    poll();
     return () => {
       active = false;
       clearTimeout(timer);

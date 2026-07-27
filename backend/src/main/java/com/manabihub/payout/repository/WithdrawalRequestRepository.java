@@ -25,6 +25,17 @@ public interface WithdrawalRequestRepository extends JpaRepository<WithdrawalReq
     Optional<WithdrawalRequest> findByIdAndTeacherId(UUID id, UUID teacherId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select request
+            from WithdrawalRequest request
+            where request.id = :id and request.teacherId = :teacherId
+            """)
+    Optional<WithdrawalRequest> findByIdAndTeacherIdWithLock(
+            @Param("id") UUID id,
+            @Param("teacherId") UUID teacherId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select request from WithdrawalRequest request where request.id = :id")
     Optional<WithdrawalRequest> findByIdWithLock(@Param("id") UUID id);
 

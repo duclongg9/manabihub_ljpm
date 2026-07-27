@@ -32,8 +32,11 @@ public class TeacherBankAccount {
     @Column(name = "bank_name", nullable = false)
     private String bankName;
 
-    @Column(name = "account_number", nullable = false, length = 100)
+    @Column(name = "account_number", nullable = false, length = 512)
     private String accountNumber;
+
+    @Column(name = "account_fingerprint", length = 64)
+    private String accountFingerprint;
 
     @Column(name = "account_holder_name", nullable = false)
     private String accountHolderName;
