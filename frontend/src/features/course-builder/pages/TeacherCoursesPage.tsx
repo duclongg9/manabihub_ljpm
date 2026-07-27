@@ -15,6 +15,10 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   InputAdornment,
@@ -90,6 +94,7 @@ export function TeacherCoursesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [publishCandidate, setPublishCandidate] = useState<CourseDraftResponse | null>(null);
 
   const categoryNames = useMemo(
     () => new Map(categories.map((category) => [category.code, category.name])),
@@ -240,15 +245,12 @@ export function TeacherCoursesPage() {
     }
   }
 
-  async function publishApprovedCourse(course: CourseDraftResponse) {
-    const title = displayDraftTitle(course);
-    const confirmed = window.confirm(
-      `Xuất bản khóa học "${title}" lên danh mục công khai?`,
-    );
-    if (!confirmed) {
+  async function publishApprovedCourse() {
+    if (!publishCandidate) {
       return;
     }
 
+    const course = publishCandidate;
     setPublishingId(course.id);
     setFeedback(null);
 
@@ -266,6 +268,7 @@ export function TeacherCoursesPage() {
       });
     } finally {
       setPublishingId(null);
+      setPublishCandidate(null);
     }
   }
 
@@ -448,7 +451,7 @@ export function TeacherCoursesPage() {
                     onConfigureFinalTest={() => navigate(`/teacher/courses/${course.id}/final-test`)}
                     onDelete={() => void deleteDraft(course)}
                     onEdit={() => editDraft(course)}
-                    onPublish={() => void publishApprovedCourse(course)}
+                    onPublish={() => setPublishCandidate(course)}
                     onSubmit={() => void submitDraft(course)}
                     onView={() => navigate(ROUTES.PUBLIC.COURSE_DETAIL.replace(':id', course.slug || course.id))}
                   />
@@ -473,6 +476,102 @@ export function TeacherCoursesPage() {
           )}
         </Stack>
       </Paper>
+
+      <Dialog
+        open={Boolean(publishCandidate)}
+        onClose={() => {
+          if (!publishingId) {
+            setPublishCandidate(null);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+        aria-labelledby="publish-course-dialog-title"
+      >
+        <DialogTitle
+          id="publish-course-dialog-title"
+          component="div"
+          sx={{ borderBottom: '1px solid', borderColor: 'divider', px: 3, py: 2.5 }}
+        >
+          <Stack direction="row" spacing={1.75} sx={{ alignItems: 'center' }}>
+            <Box
+              sx={{
+                alignItems: 'center',
+                bgcolor: 'success.light',
+                borderRadius: 2,
+                color: 'success.dark',
+                display: 'flex',
+                height: 44,
+                justifyContent: 'center',
+                width: 44,
+              }}
+            >
+              <PublishIcon />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Xuất bản khóa học?
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Khóa học sẽ được hiển thị công khai trên ManabiHub.
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogTitle>
+
+        <DialogContent sx={{ px: 3, py: '24px !important' }}>
+          <Stack spacing={2}>
+            <Box
+              sx={{
+                bgcolor: 'action.hover',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+                px: 2,
+                py: 1.75,
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Khóa học được xuất bản
+              </Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mt: 0.25 }}>
+                {publishCandidate ? displayDraftTitle(publishCandidate) : ''}
+              </Typography>
+            </Box>
+
+            <Typography variant="body2" color="text.secondary">
+              Trạng thái khóa học sẽ chuyển từ <strong>Đã duyệt</strong> sang{' '}
+              <strong>Đã xuất bản</strong>. Học viên có thể tìm kiếm và xem thông tin
+              khóa học ngay sau khi xuất bản.
+            </Typography>
+
+            <Alert severity="info">
+              Vui lòng kiểm tra lần cuối ảnh bìa, học phí và nội dung khóa học trước khi tiếp tục.
+            </Alert>
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ borderTop: '1px solid', borderColor: 'divider', gap: 1, px: 3, py: 2 }}>
+          <Button
+            color="inherit"
+            disabled={Boolean(publishingId)}
+            onClick={() => setPublishCandidate(null)}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            Để sau
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            disabled={Boolean(publishingId)}
+            onClick={() => void publishApprovedCourse()}
+            startIcon={publishingId ? <CircularProgress color="inherit" size={16} /> : <PublishIcon />}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            {publishingId ? 'Đang xuất bản...' : 'Xuất bản ngay'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
