@@ -114,6 +114,21 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<CourseDraftResponse> listMyCourses() {
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+
+        return courseRepository.findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(
+                        teacherProfile.getId(),
+                        CourseStatus.ARCHIVED
+                )
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public com.manabihub.course.dto.response.TeacherDashboardResponse getTeacherDashboardStats() {
         UUID currentUserId = currentUserService.getCurrentUserId();
         TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
@@ -228,6 +243,54 @@ public class CourseServiceImpl implements CourseService {
                 course.getId(),
                 Map.of("status", CourseStatus.DRAFT.name()),
                 Map.of("status", CourseStatus.PENDING.name()),
+                Map.of("courseTitle", course.getTitle())
+        );
+    }
+
+    @Override
+    public void publishCourse(UUID courseId) {
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        Course course = courseRepository.findByIdAndTeacher_Id(courseId, teacherProfile.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COURSE_NOT_FOUND,
+                        "Course was not found",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        if (course.getStatus() != CourseStatus.APPROVED) {
+            throw new BusinessException(
+                    MessageCodes.MSG_COURSE_007,
+                    "Only an approved course can be published.",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        ValidationResultResponse validationResult = courseValidationService.validateCourse(courseId);
+        if (!validationResult.isValid()) {
+            throw new com.manabihub.common.exception.ValidationBusinessException(
+                    MessageCodes.MSG_COURSE_004,
+                    "Course validation is no longer current. Please resolve the validation errors before publishing.",
+                    validationResult.errors()
+            );
+        }
+
+        Instant publishedAt = Instant.now();
+        course.setStatus(CourseStatus.PUBLISHED);
+        course.setPublishedAt(publishedAt);
+        courseRepository.saveAndFlush(course);
+
+        auditLogService.logUserAction(
+                currentUserId,
+                "TEACHER",
+                "PUBLISH_COURSE",
+                "COURSE",
+                course.getId(),
+                Map.of("status", CourseStatus.APPROVED.name()),
+                Map.of(
+                        "status", CourseStatus.PUBLISHED.name(),
+                        "publishedAt", publishedAt.toString()
+                ),
                 Map.of("courseTitle", course.getTitle())
         );
     }
