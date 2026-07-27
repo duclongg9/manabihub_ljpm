@@ -7,6 +7,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import { ROUTES } from '../../../shared/constants/routes';
 
 function SlideTransition(props: any) {
   return <Slide {...props} direction="left" />;
@@ -44,7 +45,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
     try {
       await courseApprovalService.reviewCourse(id!, { action, reason });
       setFeedback({ message: "Xử lý thành công!", severity: 'success' });
-      setTimeout(() => navigate('/admin/courses/approvals'), 1000);
+      setTimeout(() => navigate(ROUTES.ADMIN.COURSE_APPROVAL), 1000);
     } catch (e: any) {
       const errorMessage = e.response?.data?.message || e.message || "Có lỗi xảy ra khi xử lý.";
       setFeedback({ message: `Lỗi: ${errorMessage}`, severity: 'error' });

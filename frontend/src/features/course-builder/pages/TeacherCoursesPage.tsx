@@ -272,7 +272,8 @@ export function TeacherCoursesPage() {
           )}
           sx={{ mb: 2 }}
         >
-          Đã lưu bản nháp “{draftState?.draftTitle || 'khóa học mới'}”. Bạn có thể xem lại khóa học trong danh sách bản nháp bên dưới.
+          Đã lưu bản nháp “{draftState?.draftTitle || 'khóa học mới'}”. Hãy xây nội dung, kiểm tra
+          điều kiện rồi bấm Gửi duyệt để chuyển khóa học sang Course Manager.
         </Alert>
       )}
 
@@ -587,7 +588,11 @@ function CourseDraftRow({
           </Typography>
         </Stack>
 
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'flex-end', pt: 0.5 }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1}
+          sx={{ flexWrap: 'wrap', justifyContent: 'flex-end', pt: 0.5, rowGap: 1 }}
+        >
           <Button
             variant="outlined"
             size="small"
@@ -616,6 +621,16 @@ function CourseDraftRow({
           >
             Xây nội dung
           </Button>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<SendOutlinedIcon />}
+            disabled={deleting || submitting}
+            onClick={onSubmit}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            {submitting ? 'Đang gửi...' : 'Gửi duyệt'}
+          </Button>
           <Tooltip title="Tác vụ khác">
             <IconButton
               aria-controls={menuOpen ? `course-draft-${course.id}-menu` : undefined}
@@ -642,20 +657,6 @@ function CourseDraftRow({
                 <Typography variant="body2">{deleting ? 'Đang xóa...' : 'Xóa bản nháp'}</Typography>
               </Stack>
             </MenuItem>
-            <Tooltip title="Vui lòng vào phần Xây nội dung để thêm ít nhất 1 bài học trước khi gửi duyệt." placement="left">
-              <span>
-                <MenuItem disabled={deleting || submitting}
-                          onClick={() => {
-                            closeMenu();
-                            onSubmit();
-                          }}>
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <SendOutlinedIcon fontSize="small" />
-                    <Typography variant="body2">Gửi duyệt</Typography>
-                  </Stack>
-                </MenuItem>
-              </span>
-            </Tooltip>
           </Menu>
         </Stack>
       </Stack>
