@@ -13,6 +13,8 @@ import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.review.dto.response.CourseReviewAggregateResponse;
+import com.manabihub.review.service.CourseReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -32,15 +35,29 @@ public class PublicTeacherProfileServiceImpl implements PublicTeacherProfileServ
 
     private final TeacherProfileRepository teacherProfileRepository;
     private final CourseRepository courseRepository;
+    private final CourseReviewService courseReviewService;
 
     @Override
     @Transactional(readOnly = true)
     public PublicTeacherProfileResponse getProfile(UUID teacherId) {
         TeacherProfile profile = findDiscoverableProfile(teacherId);
-        List<PublicTeacherCourseResponse> courses = courseRepository
-                .findByTeacher_IdAndStatusOrderByPublishedAtDesc(teacherId, CourseStatus.PUBLISHED)
-                .stream()
-                .map(this::toCourseResponse)
+        List<Course> publishedCourses = courseRepository
+                .findByTeacher_IdAndStatusOrderByPublishedAtDesc(
+                        teacherId,
+                        CourseStatus.PUBLISHED
+                );
+        Map<UUID, CourseReviewAggregateResponse> aggregates =
+                courseReviewService.getAggregates(
+                        publishedCourses.stream().map(Course::getId).toList()
+                );
+        List<PublicTeacherCourseResponse> courses = publishedCourses.stream()
+                .map(course -> toCourseResponse(
+                        course,
+                        aggregates.getOrDefault(
+                                course.getId(),
+                                CourseReviewAggregateResponse.empty()
+                        )
+                ))
                 .toList();
 
         return new PublicTeacherProfileResponse(
@@ -94,7 +111,10 @@ public class PublicTeacherProfileServiceImpl implements PublicTeacherProfileServ
                 : FALLBACK_DISPLAY_NAME;
     }
 
-    private PublicTeacherCourseResponse toCourseResponse(Course course) {
+    private PublicTeacherCourseResponse toCourseResponse(
+            Course course,
+            CourseReviewAggregateResponse reviewAggregate
+    ) {
         int totalLessons = course.getModules().stream()
                 .mapToInt(module -> module.getBlocks().size())
                 .sum();
@@ -109,7 +129,9 @@ public class PublicTeacherProfileServiceImpl implements PublicTeacherProfileServ
                 course.getPrice(),
                 course.getCurrency(),
                 totalLessons,
-                course.getPublishedAt()
+                course.getPublishedAt(),
+                reviewAggregate.averageRating(),
+                reviewAggregate.reviewCount()
         );
     }
 }

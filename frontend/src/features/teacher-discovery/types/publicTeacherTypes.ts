@@ -9,6 +9,8 @@ export interface PublicTeacherCourse {
   currency: string;
   totalLessons: number;
   publishedAt?: string;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 export interface PublicTeacherSummary {

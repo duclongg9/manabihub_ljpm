@@ -58,6 +58,7 @@ export const ENDPOINTS = {
     courses: '/v1/student/courses',
     wishlist: '/v1/student/wishlist',
     wishlistCourse: (courseId: string) => `/v1/student/wishlist/${courseId}`,
+    courseReview: (courseId: string) => `/v1/student/courses/${courseId}/review`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>
@@ -88,6 +89,8 @@ export const ENDPOINTS = {
   },
   publicCourses: {
     list: '/v1/public/courses',
+    reviews: (courseIdentifier: string) =>
+      `/v1/public/courses/${courseIdentifier}/reviews`,
   },
   publicTeachers: {
     list: '/v1/public/teachers',

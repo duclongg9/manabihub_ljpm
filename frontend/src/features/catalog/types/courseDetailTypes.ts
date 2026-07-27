@@ -41,5 +41,7 @@ export interface PublicCourseDetail {
   isEnrolled: boolean;
   totalDurationMinutes: number;
   totalLessons: number;
+  averageRating?: number;
+  reviewCount?: number;
   modules: PublicModule[];
 }

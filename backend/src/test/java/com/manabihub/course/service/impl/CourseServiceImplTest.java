@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.review.service.CourseReviewService;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -65,6 +66,9 @@ class CourseServiceImplTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private CourseReviewService courseReviewService;
+
     @InjectMocks
     private CourseServiceImpl courseService;
     private UUID userId;
@@ -79,7 +83,8 @@ class CourseServiceImplTest {
                 currentUserService,
                 courseValidationService,
                 auditLogService,
-                notificationService
+                notificationService,
+                courseReviewService
         );
         userId = UUID.randomUUID();
         approvedTeacher = new TeacherProfile();

@@ -37,6 +37,8 @@ public class PublicCourseDetailResponse {
     // Aggregation
     private Integer totalDurationMinutes;
     private Integer totalLessons;
+    private BigDecimal averageRating;
+    private Long reviewCount;
 
     private List<PublicModuleResponse> modules;
 

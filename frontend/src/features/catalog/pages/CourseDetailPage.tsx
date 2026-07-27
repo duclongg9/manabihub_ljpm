@@ -8,6 +8,7 @@ import { CourseStickyHeader } from '../components/CourseStickyHeader';
 import { Helmet } from 'react-helmet-async';
 import { Target, CheckCircle2 } from 'lucide-react';
 import DOMPurify from 'dompurify';
+import { CourseReviewsSection } from '../../course-reviews/components/CourseReviewsSection';
 
 export const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -144,6 +145,14 @@ export const CourseDetailPage = () => {
 
             {/* Teacher Profile */}
             <TeacherProfile teacher={course.teacher} />
+
+            <CourseReviewsSection
+              courseId={course.id}
+              courseIdentifier={course.slug || course.id}
+              isEnrolled={course.isEnrolled}
+              averageRating={course.averageRating}
+              reviewCount={course.reviewCount}
+            />
           </div>
 
           {/* Right Column: Sticky Card */}

@@ -13,6 +13,8 @@ export interface PublicCourseSummary {
   teacherName?: string;
   teacherAvatarUrl?: string;
   totalLessons: number;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 // ─── Catalog Filter Params ───────────────────────────────────────

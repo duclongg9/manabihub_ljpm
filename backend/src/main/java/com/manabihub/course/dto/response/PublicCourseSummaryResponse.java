@@ -29,4 +29,6 @@ public class PublicCourseSummaryResponse {
     private String teacherAvatarUrl;
     private Integer totalLessons;
     private Instant publishedAt;
+    private BigDecimal averageRating;
+    private Long reviewCount;
 }

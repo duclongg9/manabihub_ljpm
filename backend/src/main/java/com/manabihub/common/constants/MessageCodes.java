@@ -165,6 +165,9 @@ public final class MessageCodes {
     public static final String LEARNING_WISHLIST_REMOVED = "LEARNING_WISHLIST_REMOVED";
     public static final String LEARNING_WISHLIST_DUPLICATE = "LEARNING_WISHLIST_DUPLICATE";
     public static final String LEARNING_WISHLIST_ITEM_NOT_FOUND = "LEARNING_WISHLIST_ITEM_NOT_FOUND";
+    public static final String COURSE_REVIEW_SAVED = "COURSE_REVIEW_SAVED";
+    public static final String COURSE_REVIEW_NOT_ELIGIBLE = "COURSE_REVIEW_NOT_ELIGIBLE";
+    public static final String COURSE_REVIEW_INVALID = "COURSE_REVIEW_INVALID";
     public static final String LEARNING_STUDENT_PROFILE_NOT_FOUND = "LEARNING_STUDENT_PROFILE_NOT_FOUND";
 
     // ──────────────────────────────────────────────

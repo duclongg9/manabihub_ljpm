@@ -16,6 +16,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import { Helmet } from 'react-helmet-async';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -83,6 +84,17 @@ function TeacherCourseCard({ course }: { course: PublicTeacherCourse }) {
         <Typography variant="h6" component="h3" sx={{ fontWeight: 800, lineHeight: 1.35 }}>
           {course.title}
         </Typography>
+        {(course.reviewCount ?? 0) > 0 && course.averageRating != null && (
+          <Stack direction="row" spacing={0.4} sx={{ alignItems: 'center' }}>
+            <StarRoundedIcon sx={{ color: '#F59E0B', fontSize: 19 }} />
+            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+              {course.averageRating.toFixed(1)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              ({course.reviewCount} đánh giá)
+            </Typography>
+          </Stack>
+        )}
         <Stack
           direction="row"
           sx={{ justifyContent: 'space-between', alignItems: 'center' }}

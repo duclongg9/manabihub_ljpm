@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
+import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 import { ROUTES } from '../../../shared/constants/routes';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
@@ -162,6 +163,23 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
           <Typography variant="body2" color="text.secondary">
             {course.teacherName || 'Giảng viên ManabiHub'}
           </Typography>
+        )}
+
+        {(course.reviewCount ?? 0) > 0 && course.averageRating != null && (
+          <Stack
+            direction="row"
+            spacing={0.4}
+            sx={{ mt: 1, alignItems: 'center' }}
+            aria-label={`${course.averageRating.toFixed(1)} trên 5 sao từ ${course.reviewCount} đánh giá`}
+          >
+            <StarRoundedIcon sx={{ color: '#F59E0B', fontSize: 19 }} />
+            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+              {course.averageRating.toFixed(1)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              ({course.reviewCount})
+            </Typography>
+          </Stack>
         )}
 
         <Stack

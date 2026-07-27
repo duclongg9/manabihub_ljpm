@@ -16,6 +16,8 @@ public record PublicTeacherCourseResponse(
         BigDecimal price,
         String currency,
         int totalLessons,
-        Instant publishedAt
+        Instant publishedAt,
+        BigDecimal averageRating,
+        long reviewCount
 ) {
 }

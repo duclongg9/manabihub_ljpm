@@ -13,6 +13,7 @@ import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.review.service.CourseReviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,12 +43,19 @@ class PublicTeacherProfileServiceImplTest {
     @Mock
     private CourseRepository courseRepository;
 
+    @Mock
+    private CourseReviewService courseReviewService;
+
     private PublicTeacherProfileServiceImpl service;
     private TeacherProfile profile;
 
     @BeforeEach
     void setUp() {
-        service = new PublicTeacherProfileServiceImpl(teacherProfileRepository, courseRepository);
+        service = new PublicTeacherProfileServiceImpl(
+                teacherProfileRepository,
+                courseRepository,
+                courseReviewService
+        );
 
         AppUser user = new AppUser();
         user.setId(UUID.randomUUID());
@@ -91,6 +99,8 @@ class PublicTeacherProfileServiceImplTest {
                 profile.getId(),
                 CourseStatus.PUBLISHED
         )).thenReturn(List.of(publishedCourse));
+        when(courseReviewService.getAggregates(List.of(publishedCourse.getId())))
+                .thenReturn(java.util.Map.of());
 
         PublicTeacherProfileResponse response = service.getProfile(profile.getId());
 

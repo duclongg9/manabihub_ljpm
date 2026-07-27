@@ -62,7 +62,9 @@ class PublicTeacherProfileControllerTest {
                 new BigDecimal("299000"),
                 "VND",
                 12,
-                Instant.parse("2026-07-01T00:00:00Z")
+                Instant.parse("2026-07-01T00:00:00Z"),
+                new BigDecimal("4.8"),
+                16
         );
         when(publicTeacherProfileService.getProfile(teacherId))
                 .thenReturn(new PublicTeacherProfileResponse(

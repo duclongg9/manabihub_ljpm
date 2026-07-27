@@ -33,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.review.dto.response.CourseReviewAggregateResponse;
+import com.manabihub.review.service.CourseReviewService;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -63,6 +65,7 @@ public class CourseServiceImpl implements CourseService {
     private final CourseValidationService courseValidationService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final CourseReviewService courseReviewService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -338,6 +341,8 @@ public class CourseServiceImpl implements CourseService {
         if (currentUserIdOpt.isPresent()) {
             isEnrolled = courseRepository.checkEnrollmentExists(course.getId(), currentUserIdOpt.get());
         }
+        CourseReviewAggregateResponse reviewAggregate =
+                courseReviewService.getAggregate(course.getId());
 
         // Aggregate stats
         int totalDurationMinutes = 0;
@@ -384,6 +389,8 @@ public class CourseServiceImpl implements CourseService {
                 .isEnrolled(isEnrolled)
                 .totalDurationMinutes(totalDurationMinutes)
                 .totalLessons(totalLessons)
+                .averageRating(reviewAggregate.averageRating())
+                .reviewCount(reviewAggregate.reviewCount())
                 .modules(moduleResponses)
                 .build();
     }
@@ -598,11 +605,26 @@ public class CourseServiceImpl implements CourseService {
     ) {
         var spec = PublicCourseSpecification.buildSearch(keyword, category, jlptLevel, minPrice, maxPrice);
         Page<Course> coursePage = courseRepository.findAll(spec, pageable);
+        Map<UUID, CourseReviewAggregateResponse> reviewAggregates =
+                courseReviewService.getAggregates(
+                        coursePage.getContent().stream()
+                                .map(Course::getId)
+                                .toList()
+                );
 
-        return coursePage.map(this::toSummaryResponse);
+        return coursePage.map(course -> toSummaryResponse(
+                course,
+                reviewAggregates.getOrDefault(
+                        course.getId(),
+                        CourseReviewAggregateResponse.empty()
+                )
+        ));
     }
 
-    private PublicCourseSummaryResponse toSummaryResponse(Course course) {
+    private PublicCourseSummaryResponse toSummaryResponse(
+            Course course,
+            CourseReviewAggregateResponse reviewAggregate
+    ) {
         int totalLessons = 0;
         for (CourseModule module : course.getModules()) {
             totalLessons += module.getBlocks().size();
@@ -631,6 +653,8 @@ public class CourseServiceImpl implements CourseService {
                 .teacherAvatarUrl(teacherAvatarUrl)
                 .totalLessons(totalLessons)
                 .publishedAt(course.getPublishedAt())
+                .averageRating(reviewAggregate.averageRating())
+                .reviewCount(reviewAggregate.reviewCount())
                 .build();
     }
 
