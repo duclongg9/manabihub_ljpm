@@ -5,6 +5,9 @@ import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.repository.OrderItemRepository;
+import com.manabihub.audit.repository.AuditLogRepository;
+import com.manabihub.systemconfig.entity.SystemSetting;
+import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import com.manabihub.wallet.entity.EscrowLedger;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
@@ -19,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,6 +38,8 @@ class EscrowServiceImplTest {
     @Mock private EscrowLedgerRepository escrowLedgerRepository;
     @Mock private OrderItemRepository orderItemRepository;
     @Mock private WalletService walletService;
+    @Mock private AuditLogRepository auditLogRepository;
+    @Mock private SystemSettingRepository systemSettingRepository;
 
     @InjectMocks
     private EscrowServiceImpl service;
@@ -55,6 +61,11 @@ class EscrowServiceImplTest {
         when(escrowLedgerRepository.existsByOrder_Id(order.getId())).thenReturn(false);
         when(orderItemRepository.findByOrder_Id(order.getId())).thenReturn(List.of(
                 OrderItem.builder().order(order).course(course).price(new BigDecimal("150000.00")).build()));
+        
+        SystemSetting setting = new SystemSetting();
+        setting.setSettingValue("14");
+        when(systemSettingRepository.findBySettingKey("ESCROW_HOLDING_DAYS")).thenReturn(Optional.of(setting));
+        
         when(escrowLedgerRepository.save(any(EscrowLedger.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.holdForOrder(order);
