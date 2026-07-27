@@ -260,13 +260,13 @@ public class CourseValidationServiceImpl implements CourseValidationService {
                     && options.isArray()
                     && matchesQuizAnswer(options, block.getQuizAnswer());
             if (!answerMatches) {
-                errors.add(new ValidationError("MSG-COURSE-014",
+                errors.add(new ValidationError("MSG-COURSE-013",
                         "Đáp án đúng không khớp với bất kỳ lựa chọn nào trong danh sách.", "error"));
             }
         } catch (Exception e) {
             log.warn("Failed to parse quiz options JSON for block {}", block.getId(), e);
             errors.add(new ValidationError(
-                    "MSG-COURSE-014",
+                    "MSG-COURSE-013",
                     "Danh sách lựa chọn quiz không hợp lệ.",
                     "error"
             ));

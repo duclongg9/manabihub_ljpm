@@ -58,6 +58,7 @@ export const ENDPOINTS = {
       `/v1/student/courses/${courseId}/lesson-blocks/${lessonBlockId}/ai-chat/messages`,
   },
   teacherCourses: {
+    list: '/v1/teacher/courses',
     drafts: '/v1/teacher/courses/drafts',
     draftDetail: (id: string) => `/v1/teacher/courses/drafts/${id}`,
     builder: (id: string) => `/v1/teacher/courses/drafts/${id}/builder`,
@@ -68,7 +69,8 @@ export const ENDPOINTS = {
     builderBlockDetail: (id: string, moduleId: string, blockId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/${blockId}`,
     builderBlockOrder: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/order`,
     validate: (id: string) => `/v1/teacher/courses/drafts/${id}/validate`,
-    submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`
+    submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`,
+    publish: (id: string) => `/v1/teacher/courses/${id}/publish`,
   },
   teacherCourseAssets: {
     thumbnails: '/v1/teacher/courses/assets/thumbnails',

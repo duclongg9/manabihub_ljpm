@@ -114,7 +114,7 @@ class CourseValidationServiceImplTest {
         List<ValidationError> errors = validateQuizOptions("[invalid-json", "answer");
 
         assertEquals(1, errors.size());
-        assertEquals("MSG-COURSE-014", errors.getFirst().code());
+        assertEquals("MSG-COURSE-013", errors.getFirst().code());
     }
 
     private ValidationResultResponse validate(String thumbnailUrl) {

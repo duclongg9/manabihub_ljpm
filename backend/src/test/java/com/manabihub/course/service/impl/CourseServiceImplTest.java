@@ -28,6 +28,7 @@ import com.manabihub.notification.service.NotificationService;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -188,6 +189,37 @@ class CourseServiceImplTest {
     }
 
     @Test
+    void listMyCourses_WhenTeacherApproved_ShouldIncludeApprovedAndPublishedCourses() {
+        Course approvedCourse = Course.builder()
+                .id(UUID.randomUUID())
+                .teacher(approvedTeacher)
+                .title("Approved course")
+                .slug("approved-course")
+                .status(CourseStatus.APPROVED)
+                .build();
+        Course publishedCourse = Course.builder()
+                .id(UUID.randomUUID())
+                .teacher(approvedTeacher)
+                .title("Published course")
+                .slug("published-course")
+                .status(CourseStatus.PUBLISHED)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(
+                approvedTeacher.getId(),
+                CourseStatus.ARCHIVED
+        )).thenReturn(List.of(approvedCourse, publishedCourse));
+
+        List<CourseDraftResponse> responses = courseService.listMyCourses();
+
+        assertEquals(2, responses.size());
+        assertEquals(CourseStatus.APPROVED, responses.get(0).status());
+        assertEquals(CourseStatus.PUBLISHED, responses.get(1).status());
+    }
+
+    @Test
     void updateDraft_WhenDraftExists_ShouldUpdateFieldsAndGoals() {
         UUID draftId = UUID.randomUUID();
         Course draft = Course.builder()
@@ -273,6 +305,73 @@ class CourseServiceImplTest {
                 "Teacher submitted course \"JLPT N5 Foundation\" for review.",
                 "COURSE_REVIEW",
                 "/admin/courses/" + draftId
+        );
+    }
+
+    @Test
+    void publishCourse_WhenApprovedAndValid_ShouldPublishAndWriteAudit() {
+        UUID courseId = UUID.randomUUID();
+        Course approvedCourse = Course.builder()
+                .id(courseId)
+                .teacher(approvedTeacher)
+                .title("JLPT N5 Foundation")
+                .slug("jlpt-n5-foundation")
+                .status(CourseStatus.APPROVED)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_Id(courseId, approvedTeacher.getId()))
+                .thenReturn(Optional.of(approvedCourse));
+        when(courseValidationService.validateCourse(courseId))
+                .thenReturn(new ValidationResultResponse(true, List.of()));
+
+        courseService.publishCourse(courseId);
+
+        assertEquals(CourseStatus.PUBLISHED, approvedCourse.getStatus());
+        assertNotNull(approvedCourse.getPublishedAt());
+        verify(courseRepository).saveAndFlush(approvedCourse);
+        verify(auditLogService).logUserAction(
+                userId,
+                "TEACHER",
+                "PUBLISH_COURSE",
+                "COURSE",
+                courseId,
+                Map.of("status", CourseStatus.APPROVED.name()),
+                Map.of(
+                        "status", CourseStatus.PUBLISHED.name(),
+                        "publishedAt", approvedCourse.getPublishedAt().toString()
+                ),
+                Map.of("courseTitle", approvedCourse.getTitle())
+        );
+    }
+
+    @Test
+    void publishCourse_WhenCourseIsNotApproved_ShouldRejectTransition() {
+        UUID courseId = UUID.randomUUID();
+        Course pendingCourse = Course.builder()
+                .id(courseId)
+                .teacher(approvedTeacher)
+                .title("Pending course")
+                .status(CourseStatus.PENDING)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_Id(courseId, approvedTeacher.getId()))
+                .thenReturn(Optional.of(pendingCourse));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> courseService.publishCourse(courseId)
+        );
+
+        assertEquals(MessageCodes.MSG_COURSE_007, exception.getMessageCode());
+        assertEquals(HttpStatus.CONFLICT, exception.getHttpStatus());
+        verify(courseValidationService, never()).validateCourse(courseId);
+        verify(courseRepository, never()).saveAndFlush(any());
+        verify(auditLogService, never()).logUserAction(
+                any(), any(), any(), any(), any(), any(), any(), any()
         );
     }
 

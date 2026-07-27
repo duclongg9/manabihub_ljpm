@@ -148,7 +148,7 @@ export async function updateCourseDraft(id: string, payload: CreateCourseDraftPa
 }
 
 export async function fetchCourseDrafts() {
-  const response = await axiosClient.get<ApiResponse<CourseDraftResponse[]>>(ENDPOINTS.teacherCourses.drafts);
+  const response = await axiosClient.get<ApiResponse<CourseDraftResponse[]>>(ENDPOINTS.teacherCourses.list);
 
   return response.data.data;
 }
@@ -161,6 +161,14 @@ export async function submitCourseForReview(draftId: string) {
   await axiosClient.post<ApiResponse<void>>(
       ENDPOINTS.teacherCourses.submitReview(draftId),
   );
+}
+
+export async function publishCourse(courseId: string) {
+  const response = await axiosClient.post<ApiResponse<void>>(
+    ENDPOINTS.teacherCourses.publish(courseId),
+  );
+
+  return response.data;
 }
 
 export async function fetchCourseBuilder(draftId: string) {
