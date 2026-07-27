@@ -1,7 +1,10 @@
 package com.manabihub.order.service;
 
+import com.manabihub.common.response.PageResponse;
 import com.manabihub.order.dto.response.OrderResponse;
 import com.manabihub.order.entity.Order;
+import com.manabihub.order.enums.OrderStatus;
+import org.springframework.data.domain.Pageable;
 
 import java.util.UUID;
 
@@ -27,4 +30,10 @@ public interface OrderService {
      * payment status after redirecting back from the payment provider.
      */
     OrderResponse getOrderForCurrentStudent(UUID orderId);
+
+    /**
+     * Returns the current student's purchase history. An optional status filter is
+     * applied server-side so pagination remains correct.
+     */
+    PageResponse<OrderResponse> getOrdersForCurrentStudent(OrderStatus status, Pageable pageable);
 }

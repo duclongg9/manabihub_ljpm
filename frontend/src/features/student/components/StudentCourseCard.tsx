@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Card, CardContent, Typography, Box, Chip, Button } from '@mui/material';
+import { Card, CardContent, Typography, Box, Chip, Button, LinearProgress } from '@mui/material';
 import type { ChipProps } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import type { StudentCourseSummary } from '../types/studentTypes';
 import PersonIcon from '@mui/icons-material/Person';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
+import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
+import { ROUTES } from '../../../shared/constants/routes';
 
 interface StudentCourseCardProps {
   course: StudentCourseSummary;
@@ -30,12 +32,15 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
   };
 
   const handleViewCourse = () => {
-    navigate(`/courses/${course.courseId}`);
+    navigate(ROUTES.PUBLIC.COURSE_DETAIL.replace(':id', course.courseId));
   };
 
   const handleStudyCourse = () => {
-    navigate(`/student/courses/${course.courseId}/learn`);
+    navigate(ROUTES.STUDENT.COURSE_LEARN(course.courseId));
   };
+
+  const progress = Math.min(100, Math.max(0, course.progressPercentage || 0));
+  const statusLabel = course.enrollmentStatus === 'COMPLETED' ? 'Đã hoàn thành' : 'Đang học';
 
   return (
     <Card
@@ -53,7 +58,7 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
       {course.thumbnailUrl && !imageFailed ? (
         <Box
           component="img"
-          src={course.thumbnailUrl}
+          src={resolvePublicAssetUrl(course.thumbnailUrl)}
           alt={course.courseTitle}
           onError={() => setImageFailed(true)}
           sx={{ width: '100%', height: 180, objectFit: 'cover', bgcolor: 'grey.100' }}
@@ -93,21 +98,34 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, color: 'text.secondary' }}>
           <PersonIcon sx={{ fontSize: 16, mr: 0.5 }} />
           <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
-            {course.teacherName || 'Unknown Instructor'}
+            {course.teacherName || 'Chưa cập nhật giảng viên'}
           </Typography>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, color: 'text.secondary' }}>
           <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5 }} />
           <Typography variant="body2">
-            Enrolled: {new Date(course.enrolledAt).toLocaleDateString()}
+            Ghi danh: {new Date(course.enrolledAt).toLocaleDateString('vi-VN')}
           </Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+            <Typography variant="caption" color="text.secondary">Tiến độ</Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700 }}>{Math.round(progress)}%</Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={progress}
+            aria-label={`Tiến độ ${Math.round(progress)}%`}
+            sx={{ height: 7, borderRadius: 1 }}
+          />
         </Box>
 
         <Box sx={{ mt: 'auto', pt: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Chip
-              label={course.enrollmentStatus}
+              label={statusLabel}
               size="small"
               color={getStatusColor(course.enrollmentStatus)}
               variant="outlined"
@@ -120,7 +138,7 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
                 onClick={handleViewCourse}
                 sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
               >
-                View Course
+                Chi tiết
               </Button>
               <Button
                 variant="contained"
@@ -129,7 +147,7 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
                 onClick={handleStudyCourse}
                 sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
               >
-                Study
+                {course.enrollmentStatus === 'COMPLETED' ? 'Xem lại' : 'Học tiếp'}
               </Button>
             </Box>
           </Box>

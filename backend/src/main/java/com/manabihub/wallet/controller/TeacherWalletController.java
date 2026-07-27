@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/teacher/wallet")
+@RequestMapping("/api/v1/teacher/wallet")
 @RequiredArgsConstructor
 @Tag(name = "Teacher Wallet", description = "Teacher Revenue Wallet Operations")
 public class TeacherWalletController {

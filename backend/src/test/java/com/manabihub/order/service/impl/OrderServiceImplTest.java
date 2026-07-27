@@ -1,6 +1,7 @@
 package com.manabihub.order.service.impl;
 
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.common.response.PageResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseRepository;
@@ -12,6 +13,7 @@ import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
+import com.manabihub.order.dto.response.OrderResponse;
 import com.manabihub.order.enums.OrderStatus;
 import com.manabihub.order.mapper.OrderMapper;
 import com.manabihub.order.repository.OrderItemRepository;
@@ -23,8 +25,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -139,5 +145,46 @@ class OrderServiceImplTest {
         assertEquals(OrderStatus.PAID, order.getStatus());
         verify(enrollmentRepository).save(any(Enrollment.class));
         verify(orderRepository).save(order);
+    }
+
+    @Test
+    void getOrdersForCurrentStudent_filtersServerSideAndBatchesItems() {
+        UUID orderId = UUID.randomUUID();
+        Order order = Order.builder()
+                .id(orderId)
+                .student(student)
+                .orderCode("OD202607270001")
+                .totalAmount(course.getPrice())
+                .currency("VND")
+                .status(OrderStatus.PAID)
+                .createdAt(Instant.parse("2026-07-27T00:00:00Z"))
+                .build();
+        OrderItem item = OrderItem.builder()
+                .order(order)
+                .course(course)
+                .price(course.getPrice())
+                .build();
+        OrderResponse response = new OrderResponse(
+                orderId,
+                order.getOrderCode(),
+                order.getTotalAmount(),
+                order.getCurrency(),
+                order.getStatus().name(),
+                order.getCreatedAt(),
+                List.of());
+        PageRequest pageable = PageRequest.of(0, 10);
+
+        when(orderRepository.findByStudent_IdAndStatus(student.getId(), OrderStatus.PAID, pageable))
+                .thenReturn(new PageImpl<>(List.of(order), pageable, 1));
+        when(orderItemRepository.findByOrder_IdIn(List.of(orderId))).thenReturn(List.of(item));
+        when(orderMapper.toResponse(order, List.of(item))).thenReturn(response);
+
+        PageResponse<OrderResponse> result =
+                service.getOrdersForCurrentStudent(OrderStatus.PAID, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(orderId, result.getContent().getFirst().id());
+        verify(orderRepository).findByStudent_IdAndStatus(student.getId(), OrderStatus.PAID, pageable);
+        verify(orderItemRepository).findByOrder_IdIn(List.of(orderId));
     }
 }

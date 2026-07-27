@@ -26,14 +26,6 @@ export const TeacherProfile = ({ teacher }: TeacherProfileProps) => {
               <VerifiedIcon sx={{ fontSize: 14 }} />
               Sensei 先生
             </span>
-            <span className="text-slate-300">|</span>
-            <span className="flex items-center text-sm font-semibold text-slate-700">
-              ⭐ 4.8 <span className="text-slate-500 font-normal ml-1">(16 đánh giá)</span>
-            </span>
-            <span className="text-slate-300">|</span>
-            <span className="flex items-center text-sm font-semibold text-slate-700">
-              👥 12,345 <span className="text-slate-500 font-normal ml-1">Học viên</span>
-            </span>
           </div>
           <div className="text-slate-600 text-sm leading-relaxed whitespace-pre-line mb-4">
             {teacher.bio || 'Giảng viên chưa cập nhật thông tin giới thiệu.'}

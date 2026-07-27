@@ -2,6 +2,7 @@ package com.manabihub.order.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.common.response.PageResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseRepository;
@@ -14,12 +15,15 @@ import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.order.dto.response.OrderResponse;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
+import com.manabihub.order.enums.OrderStatus;
 import com.manabihub.order.mapper.OrderMapper;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,8 +31,11 @@ import java.security.SecureRandom;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -129,6 +136,29 @@ public class OrderServiceImpl implements OrderService {
                         HttpStatus.NOT_FOUND));
 
         return orderMapper.toResponse(order, orderItemRepository.findByOrder_Id(order.getId()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<OrderResponse> getOrdersForCurrentStudent(OrderStatus status, Pageable pageable) {
+        StudentProfile student = resolveCurrentStudent();
+        Page<Order> orders = status == null
+                ? orderRepository.findByStudent_Id(student.getId(), pageable)
+                : orderRepository.findByStudent_IdAndStatus(student.getId(), status, pageable);
+
+        if (orders.isEmpty()) {
+            return PageResponse.from(orders.map(order -> orderMapper.toResponse(order, List.of())));
+        }
+
+        List<UUID> orderIds = orders.getContent().stream()
+                .map(Order::getId)
+                .toList();
+        Map<UUID, List<OrderItem>> itemsByOrderId = orderItemRepository.findByOrder_IdIn(orderIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getOrder().getId()));
+
+        Page<OrderResponse> responsePage = orders.map(order ->
+                orderMapper.toResponse(order, itemsByOrderId.getOrDefault(order.getId(), List.of())));
+        return PageResponse.from(responsePage);
     }
 
     private StudentProfile resolveCurrentStudent() {

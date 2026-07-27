@@ -3,6 +3,7 @@ package com.manabihub.learning.service.impl;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.common.response.PageResponse;
 import com.manabihub.course.entity.Course;
+import com.manabihub.course.repository.LessonBlockRepository;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.learning.dto.response.StudentCourseSummaryResponse;
@@ -10,6 +11,8 @@ import com.manabihub.learning.dto.response.StudentDashboardStatsResponse;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.repository.LessonBlockProgressRepository;
+import com.manabihub.learning.enums.LessonProgressStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,6 +30,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +41,12 @@ class StudentLearningServiceImplTest {
 
     @Mock
     private StudentProfileRepository studentProfileRepository;
+
+    @Mock
+    private LessonBlockProgressRepository lessonBlockProgressRepository;
+
+    @Mock
+    private LessonBlockRepository lessonBlockRepository;
 
     @InjectMocks
     private StudentLearningServiceImpl studentLearningService;
@@ -86,6 +96,19 @@ class StudentLearningServiceImplTest {
         when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(profile));
         when(enrollmentRepository.findByStudentIdAndStatusIn(studentId, statuses, pageable))
                 .thenReturn(new PageImpl<>(List.of(enrollment), pageable, 1));
+        LessonBlockProgressRepository.CompletedProgressCount completedCount =
+                mock(LessonBlockProgressRepository.CompletedProgressCount.class);
+        LessonBlockRepository.CourseBlockCount totalCount =
+                mock(LessonBlockRepository.CourseBlockCount.class);
+        when(completedCount.getEnrollmentId()).thenReturn(enrollment.getId());
+        when(completedCount.getCompletedCount()).thenReturn(3L);
+        when(totalCount.getCourseId()).thenReturn(courseId);
+        when(totalCount.getTotalCount()).thenReturn(4L);
+        when(lessonBlockProgressRepository.countByEnrollmentIdsAndStatus(
+                List.of(enrollment.getId()), LessonProgressStatus.COMPLETED))
+                .thenReturn(List.of(completedCount));
+        when(lessonBlockRepository.countByCourseIds(List.of(courseId)))
+                .thenReturn(List.of(totalCount));
 
         PageResponse<StudentCourseSummaryResponse> result =
                 studentLearningService.getEnrolledCourses(userId, pageable);
@@ -93,6 +116,7 @@ class StudentLearningServiceImplTest {
         assertEquals(1, result.getTotalElements());
         assertEquals(courseId, result.getContent().getFirst().getCourseId());
         assertEquals(EnrollmentStatus.ACTIVE, result.getContent().getFirst().getEnrollmentStatus());
+        assertEquals(75.0, result.getContent().getFirst().getProgressPercentage());
         verify(enrollmentRepository).findByStudentIdAndStatusIn(studentId, statuses, pageable);
     }
 
