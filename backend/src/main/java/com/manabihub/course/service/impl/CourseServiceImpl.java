@@ -22,6 +22,7 @@ import com.manabihub.course.dto.response.ValidationResultResponse;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -375,6 +376,10 @@ public class CourseServiceImpl implements CourseService {
                         .name(course.getTeacher().getDisplayName())
                         .avatarUrl(course.getTeacher().getUser() != null ? course.getTeacher().getUser().getAvatarUrl() : null)
                         .bio(course.getTeacher().getBio())
+                        .verified(course.getTeacher().getKycStatus() == TeacherKycStatus.APPROVED
+                                && course.getTeacher().isCanPublishCourse()
+                                && course.getTeacher().getUser() != null
+                                && course.getTeacher().getUser().getUserStatus() == UserStatus.ACTIVE)
                         .build())
                 .isEnrolled(isEnrolled)
                 .totalDurationMinutes(totalDurationMinutes)
@@ -621,6 +626,7 @@ public class CourseServiceImpl implements CourseService {
                 .category(course.getCategory())
                 .price(course.getPrice())
                 .currency(course.getCurrency())
+                .teacherId(course.getTeacher() != null ? course.getTeacher().getId() : null)
                 .teacherName(teacherName)
                 .teacherAvatarUrl(teacherAvatarUrl)
                 .totalLessons(totalLessons)

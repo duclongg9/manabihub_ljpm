@@ -17,6 +17,10 @@ public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecif
 
     List<Course> findByTeacher_IdAndStatusOrderByCreatedAtDesc(UUID teacherId, CourseStatus status);
 
+    List<Course> findByTeacher_IdAndStatusOrderByPublishedAtDesc(UUID teacherId, CourseStatus status);
+
+    long countByTeacher_IdAndStatus(UUID teacherId, CourseStatus status);
+
     List<Course> findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(UUID teacherId, CourseStatus status);
 
     Optional<Course> findByIdAndTeacher_IdAndStatus(UUID id, UUID teacherId, CourseStatus status);

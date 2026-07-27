@@ -9,6 +9,7 @@ export interface PublicCourseSummary {
   category?: string;
   price: number;
   currency: string;
+  teacherId?: string;
   teacherName?: string;
   teacherAvatarUrl?: string;
   totalLessons: number;

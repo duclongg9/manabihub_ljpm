@@ -47,5 +47,6 @@ public class PublicCourseDetailResponse {
         private String name;
         private String avatarUrl;
         private String bio;
+        private boolean verified;
     }
 }

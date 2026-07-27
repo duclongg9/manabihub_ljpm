@@ -3,6 +3,7 @@ export interface PublicTeacherProfile {
   name: string;
   avatarUrl?: string;
   bio?: string;
+  verified: boolean;
 }
 
 export interface PublicLessonBlock {

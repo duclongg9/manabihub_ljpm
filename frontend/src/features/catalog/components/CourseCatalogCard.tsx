@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
+import { ROUTES } from '../../../shared/constants/routes';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 import type { PublicCourseSummary } from '../types/catalogTypes';
 
@@ -28,7 +29,6 @@ function formatPrice(price: number, currency: string): string {
 }
 
 export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) => {
-  const navigate = useNavigate();
   const [imageFailed, setImageFailed] = useState(false);
   const thumbnailUrl = useMemo(
     () => resolvePublicAssetUrl(course.thumbnailUrl),
@@ -41,12 +41,13 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
       sx={{
         height: '100%',
         position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
         border: '1px solid',
         borderColor: 'divider',
         borderRadius: 1,
         overflow: 'hidden',
         transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-        cursor: 'pointer',
         '&:hover': {
           transform: 'translateY(-4px)',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
@@ -56,9 +57,9 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
     >
       <WishlistToggleButton courseId={course.id} variant="icon" />
       <CardActionArea
+        component={Link}
+        to={`/courses/${course.slug || course.id}`}
         aria-label={`Xem khóa học ${course.title}`}
-        onClick={() => navigate(`/courses/${course.slug || course.id}`)}
-        sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
       >
         <Box
           sx={{
@@ -96,21 +97,19 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
             <Chip
               label={course.jlptLevel}
               size="small"
-              sx={{ position: 'absolute', top: 12, left: 12, fontWeight: 700, bgcolor: '#C41E3A', color: 'white' }}
+              sx={{
+                position: 'absolute',
+                top: 12,
+                left: 12,
+                fontWeight: 700,
+                bgcolor: '#C41E3A',
+                color: 'white',
+              }}
             />
           )}
         </Box>
 
-        <CardContent
-          sx={{
-            width: '100%',
-            flexGrow: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            p: 2,
-            '&:last-child': { pb: 2 },
-          }}
-        >
+        <CardContent sx={{ pb: 1 }}>
           {course.category && (
             <Typography variant="caption" color="primary.main" sx={{ mb: 0.5, fontWeight: 700 }}>
               {course.category}
@@ -132,43 +131,55 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
           >
             {course.title}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, display: 'flex', alignItems: 'center', gap: 1 }}>
-            {course.teacherName || 'Giảng viên chưa cập nhật'}
-          </Typography>
-
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{ mt: 'auto', pt: 2, justifyContent: 'space-between', alignItems: 'center' }}
-          >
-            <Typography
-              className="card-price"
-              variant="subtitle1"
-              sx={{ fontWeight: 800, color: course.price === 0 ? 'success.main' : '#C41E3A' }}
-            >
-              {formatPrice(course.price, course.currency)}
-            </Typography>
-            <Box
-              sx={{
-                bgcolor: '#C41E3A',
-                color: 'white',
-                px: 1.5,
-                py: 0.5,
-                borderRadius: 2,
-                fontSize: '0.875rem',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                transition: 'all 0.2s',
-                '&:hover': { bgcolor: '#a01830' }
-              }}
-            >
-              Thêm vào giỏ 🛒
-            </Box>
-          </Stack>
         </CardContent>
       </CardActionArea>
+
+      <CardContent
+        sx={{
+          pt: 0,
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          '&:last-child': { pb: 2 },
+        }}
+      >
+        {course.teacherId ? (
+          <Typography
+            component={Link}
+            to={ROUTES.PUBLIC.TEACHER_PROFILE(course.teacherId)}
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              alignSelf: 'flex-start',
+              textDecoration: 'none',
+              fontWeight: 600,
+              '&:hover': { color: '#C41E3A', textDecoration: 'underline' },
+            }}
+          >
+            {course.teacherName || 'Giảng viên ManabiHub'}
+          </Typography>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            {course.teacherName || 'Giảng viên ManabiHub'}
+          </Typography>
+        )}
+
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ mt: 'auto', pt: 2, justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <Typography
+            variant="subtitle1"
+            sx={{ fontWeight: 800, color: course.price === 0 ? 'success.main' : '#C41E3A' }}
+          >
+            {formatPrice(course.price, course.currency)}
+          </Typography>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+            {course.totalLessons} bài học
+          </Typography>
+        </Stack>
+      </CardContent>
     </Card>
   );
 };

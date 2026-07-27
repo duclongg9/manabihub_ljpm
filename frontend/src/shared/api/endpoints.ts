@@ -89,6 +89,10 @@ export const ENDPOINTS = {
   publicCourses: {
     list: '/v1/public/courses',
   },
+  publicTeachers: {
+    list: '/v1/public/teachers',
+    detail: (teacherId: string) => `/v1/public/teachers/${teacherId}`,
+  },
   orders: {
     create: '/v1/orders',
     list: '/v1/orders',
