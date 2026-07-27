@@ -154,7 +154,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
 
         // Create Audit Log
         AuditLog auditLog = AuditLog.builder()
-                .actorType("ADMIN")
+                .actorType("INTERNAL_ADMIN")
                 .actorAdminId(adminId)
                 .actorRoleCode("COURSE_MANAGER")
                 .action(actionLog)
