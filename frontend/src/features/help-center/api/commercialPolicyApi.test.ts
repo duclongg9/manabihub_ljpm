@@ -15,7 +15,7 @@ describe('provisional commercial policy', () => {
       payoutThreshold: 100_000,
       withdrawalFee: 0,
       policyVersion: 'provisional-2026-07-28',
-      effectiveAt: '2026-07-28T00:00:00+07:00',
+      effectiveAt: '2026-07-28T00:00:00Z',
     });
   });
 

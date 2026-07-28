@@ -1,24 +1,25 @@
 package com.manabihub.wallet.service.impl;
 
-import com.manabihub.course.entity.Course;
-import com.manabihub.kyc.domain.TeacherProfile;
-import com.manabihub.order.entity.Order;
-import com.manabihub.order.entity.OrderItem;
-import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.audit.entity.AuditLog;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.course.entity.Course;
+import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.domain.UserStatus;
-import com.manabihub.order.enums.OrderStatus;
-import com.manabihub.systemconfig.repository.SystemSettingRepository;
-import com.manabihub.wallet.entity.EscrowLedger;
+import com.manabihub.order.entity.Order;
+import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.entity.OrderItemSnapshot;
+import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderItemSnapshotRepository;
+import com.manabihub.systemconfig.model.CommercialPolicy;
+import com.manabihub.systemconfig.service.CommercialPolicyService;
+import com.manabihub.wallet.entity.EscrowLedger;
 import com.manabihub.wallet.entity.PlatformCommissionLedger;
-import com.manabihub.wallet.repository.PlatformCommissionLedgerRepository;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
+import com.manabihub.wallet.repository.PlatformCommissionLedgerRepository;
 import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
@@ -32,15 +33,10 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -48,79 +44,57 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EscrowServiceImpl implements EscrowService {
 
-    private static final String ESCROW_HOLDING_DAYS = "ESCROW_HOLDING_DAYS";
-    private static final String COMMISSION_RATE = "COMMISSION_RATE";
-    private static final String POLICY_VERSION = "POLICY_VERSION";
-    private static final int DEFAULT_HOLDING_DAYS = 14;
-    private static final BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("0.20");
-    private static final String DEFAULT_POLICY_VERSION = "1.0.0-provisional";
-
     private final EscrowLedgerRepository escrowLedgerRepository;
     private final OrderItemRepository orderItemRepository;
     private final WalletService walletService;
     private final AuditLogRepository auditLogRepository;
-    private final SystemSettingRepository systemSettingRepository;
     private final OrderItemSnapshotRepository orderItemSnapshotRepository;
     private final PlatformCommissionLedgerRepository platformCommissionLedgerRepository;
-
-    private int getEscrowHoldingDays() {
-        String configuredValue = systemSettingRepository.findBySettingKey(ESCROW_HOLDING_DAYS)
-                .map(setting -> setting.getSettingValue())
-                .orElse(Integer.toString(DEFAULT_HOLDING_DAYS));
-        try {
-            int holdingDays = Integer.parseInt(configuredValue);
-            if (holdingDays < 1 || holdingDays > 365) {
-                throw new NumberFormatException("outside supported range");
-            }
-            return holdingDays;
-        } catch (NumberFormatException exception) {
-            log.warn("Invalid {} value; using the safe {}-day default",
-                    ESCROW_HOLDING_DAYS, DEFAULT_HOLDING_DAYS);
-            return DEFAULT_HOLDING_DAYS;
-        }
-    }
+    private final CommercialPolicyService commercialPolicyService;
 
     @Override
     @Transactional
     public List<EscrowLedger> holdForOrder(Order order) {
-        // Idempotency guard — an order must never produce more than one set of holds.
-        if (escrowLedgerRepository.existsByOrder_Id(order.getId())) {
-            return escrowLedgerRepository.findByOrder_Id(order.getId());
+        requirePaidOrder(order);
+
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
+        validateOrderItems(order, items);
+
+        List<EscrowLedger> existing = escrowLedgerRepository.findByOrder_Id(order.getId());
+        if (!existing.isEmpty()) {
+            validateExistingAllocation(items, existing);
+            return existing;
         }
 
-        int holdingDays = getEscrowHoldingDays();
-        Instant releaseAt = Instant.now().plus(Duration.ofDays(holdingDays));
+        CommercialPolicy policy = commercialPolicyService.getCurrentPolicy();
+        validateSettlementPolicy(order, items, policy);
+        Instant releaseAt = Instant.now().plus(Duration.ofDays(policy.escrowHoldingDays()));
         List<EscrowLedger> created = new ArrayList<>();
 
-        BigDecimal commissionRate = systemSettingRepository.findBySettingKey(COMMISSION_RATE)
-                .map(setting -> new BigDecimal(setting.getSettingValue()))
-                .orElse(DEFAULT_COMMISSION_RATE);
-
-        String policyVersion = systemSettingRepository.findBySettingKey(POLICY_VERSION)
-                .map(setting -> setting.getSettingValue())
-                .orElse(DEFAULT_POLICY_VERSION);
-
-        for (OrderItem item : orderItemRepository.findByOrder_Id(order.getId())) {
+        for (OrderItem item : items) {
             Course course = item.getCourse();
             TeacherProfile teacher = course.getTeacher();
-
-            BigDecimal grossAmount = item.getPrice();
-            BigDecimal platformCommission = grossAmount.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal grossAmount = settlementMoney(item.getPrice(), policy.currency());
+            BigDecimal platformCommission = grossAmount
+                    .multiply(policy.commissionRate())
+                    .setScale(0, RoundingMode.HALF_UP)
+                    .setScale(2);
             BigDecimal teacherNet = grossAmount.subtract(platformCommission);
 
             orderItemSnapshotRepository.save(OrderItemSnapshot.builder()
                     .orderItem(item)
-                    .currency("VND")
+                    .currency(order.getCurrency())
                     .grossAmount(grossAmount)
-                    .commissionRate(commissionRate)
+                    .commissionRate(policy.commissionRate())
                     .commissionAmount(platformCommission)
                     .teacherNetAmount(teacherNet)
-                    .commercialPolicyVersion(policyVersion)
-                    .escrowDays(holdingDays)
+                    .commercialPolicyVersion(policy.policyVersion())
+                    .escrowDays(policy.escrowHoldingDays())
                     .build());
 
-            EscrowLedger ledger = escrowLedgerRepository.save(EscrowLedger.builder()
+            EscrowLedger escrow = escrowLedgerRepository.save(EscrowLedger.builder()
                     .order(order)
+                    .orderItem(item)
                     .course(course)
                     .teacher(teacher)
                     .amount(teacherNet)
@@ -128,21 +102,22 @@ public class EscrowServiceImpl implements EscrowService {
                     .releaseAt(releaseAt)
                     .build());
 
-            platformCommissionLedgerRepository.save(PlatformCommissionLedger.builder()
-                    .order(order)
-                    .orderItem(item)
-                    .amount(platformCommission)
-                    .status(PlatformCommissionLedger.CommissionStatus.HELD)
-                    .build());
+            appendCommissionEvent(
+                    order,
+                    item,
+                    platformCommission,
+                    PlatformCommissionLedger.CommissionEventType.COMMISSION_HELD);
 
-            walletService.holdEscrow(
-                    teacher,
-                    teacherNet,
-                    "ORDER",
-                    order.getId(),
-                    "Escrow hold for order " + order.getOrderCode());
+            if (teacherNet.signum() > 0) {
+                walletService.holdEscrow(
+                        teacher,
+                        teacherNet,
+                        "ESCROW",
+                        escrow.getId(),
+                        "Teacher net held for paid order " + order.getOrderCode());
+            }
 
-            created.add(ledger);
+            created.add(escrow);
         }
 
         return created;
@@ -189,39 +164,240 @@ public class EscrowServiceImpl implements EscrowService {
             return false;
         }
 
+        OrderItem item = requireOrderItem(escrow);
+        OrderItemSnapshot snapshot = requireSnapshot(item);
+        ensureCommissionEventAbsent(
+                item,
+                PlatformCommissionLedger.CommissionEventType.COMMISSION_RECOGNIZED);
+
+        if (escrow.getAmount().signum() > 0) {
+            walletService.releaseEscrow(
+                    escrow.getTeacher(),
+                    escrow.getAmount(),
+                    "ESCROW",
+                    escrow.getId(),
+                    "Escrow released to teacher available balance");
+        }
+
+        appendCommissionEvent(
+                escrow.getOrder(),
+                item,
+                snapshot.getCommissionAmount(),
+                PlatformCommissionLedger.CommissionEventType.COMMISSION_RECOGNIZED);
+
         escrow.setStatus(EscrowStatus.RELEASED);
         escrowLedgerRepository.save(escrow);
+        auditLogRepository.save(audit(
+                "ESCROW_RELEASE",
+                escrow,
+                "release_at reached with no refund, trust case, or account block"));
 
-        walletService.releaseEscrow(
-                escrow.getTeacher(),
-                escrow.getAmount(),
-                "ESCROW",
-                escrow.getId(),
-                "Escrow released to available balance");
+        return true;
+    }
 
-        // Recognize platform commission
-        for (OrderItem item : orderItemRepository.findByOrder_Id(escrow.getOrder().getId())) {
-            if (item.getCourse().getId().equals(escrow.getCourse().getId())) {
-                platformCommissionLedgerRepository.findByOrderItem_IdAndStatus(item.getId(), PlatformCommissionLedger.CommissionStatus.HELD)
-                        .ifPresent(ledger -> {
-                            ledger.setStatus(PlatformCommissionLedger.CommissionStatus.RECOGNIZED);
-                            platformCommissionLedgerRepository.save(ledger);
-                        });
+    @Override
+    @Transactional
+    public boolean reverseHeldAllocationsForRefund(UUID orderId) {
+        List<EscrowLedger> escrows = escrowLedgerRepository.findByOrderIdForUpdate(orderId);
+        if (escrows.isEmpty()) {
+            throw integrityViolation("Paid order has no escrow allocations");
+        }
+
+        boolean releasedAllocationExists = escrows.stream()
+                .anyMatch(escrow -> escrow.getStatus() == EscrowStatus.RELEASED);
+        if (releasedAllocationExists) {
+            throw new BusinessException(
+                    MessageCodes.REFUND_RECONCILIATION_REQUIRED,
+                    "Refund cannot be auto-posted after teacher funds were released",
+                    HttpStatus.CONFLICT);
+        }
+
+        boolean reversed = false;
+        for (EscrowLedger escrow : escrows) {
+            if (escrow.getStatus() == EscrowStatus.REFUNDED) {
+                continue;
+            }
+            if (escrow.getStatus() != EscrowStatus.HELD
+                    && escrow.getStatus() != EscrowStatus.FROZEN) {
+                throw integrityViolation("Unsupported escrow state during refund reversal");
+            }
+
+            OrderItem item = requireOrderItem(escrow);
+            OrderItemSnapshot snapshot = requireSnapshot(item);
+            ensureCommissionEventAbsent(
+                    item,
+                    PlatformCommissionLedger.CommissionEventType.COMMISSION_REVERSED);
+
+            if (escrow.getAmount().signum() > 0) {
+                walletService.refundHeldEscrow(
+                        escrow.getTeacher(),
+                        escrow.getAmount(),
+                        "ESCROW",
+                        escrow.getId(),
+                        "Held teacher allocation reversed after confirmed refund");
+            }
+
+            appendCommissionEvent(
+                    escrow.getOrder(),
+                    item,
+                    snapshot.getCommissionAmount(),
+                    PlatformCommissionLedger.CommissionEventType.COMMISSION_REVERSED);
+
+            escrow.setStatus(EscrowStatus.REFUNDED);
+            escrowLedgerRepository.save(escrow);
+            auditLogRepository.save(audit(
+                    "ESCROW_REFUND_REVERSE",
+                    escrow,
+                    "confirmed refund reversed allocations before release"));
+            reversed = true;
+        }
+
+        return reversed;
+    }
+
+    private void requirePaidOrder(Order order) {
+        if (order == null || order.getId() == null || order.getStatus() != OrderStatus.PAID) {
+            throw integrityViolation("Escrow allocation requires a persisted PAID order");
+        }
+        if (order.getCurrency() == null || order.getCurrency().isBlank()) {
+            throw integrityViolation("Paid order currency is missing");
+        }
+    }
+
+    private void validateOrderItems(Order order, List<OrderItem> items) {
+        if (items.isEmpty()) {
+            throw integrityViolation("Paid order has no order items");
+        }
+        BigDecimal itemTotal = items.stream()
+                .map(OrderItem::getPrice)
+                .map(this::money)
+                .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+        if (order.getTotalAmount() == null
+                || itemTotal.compareTo(money(order.getTotalAmount())) != 0) {
+            throw integrityViolation("Paid order total does not equal its item total");
+        }
+    }
+
+    private void validateExistingAllocation(List<OrderItem> items, List<EscrowLedger> existing) {
+        if (existing.size() != items.size()) {
+            throw integrityViolation("Existing escrow allocation is incomplete");
+        }
+
+        Set<UUID> expectedItemIds = new HashSet<>();
+        for (OrderItem item : items) {
+            expectedItemIds.add(item.getId());
+            if (!orderItemSnapshotRepository.existsByOrderItem_Id(item.getId())
+                    || !platformCommissionLedgerRepository.existsByOrderItem_IdAndEventType(
+                    item.getId(),
+                    PlatformCommissionLedger.CommissionEventType.COMMISSION_HELD)) {
+                throw integrityViolation("Existing escrow is missing immutable financial history");
             }
         }
 
-        AuditLog auditLog = AuditLog.builder()
+        Set<UUID> allocatedItemIds = new HashSet<>();
+        for (EscrowLedger escrow : existing) {
+            if (escrow.getOrderItem() == null) {
+                throw integrityViolation("Existing escrow is not linked to an order item");
+            }
+            allocatedItemIds.add(escrow.getOrderItem().getId());
+        }
+        if (!expectedItemIds.equals(allocatedItemIds)) {
+            throw integrityViolation("Existing escrow does not match the paid order items");
+        }
+    }
+
+    private void validateSettlementPolicy(
+            Order order,
+            List<OrderItem> items,
+            CommercialPolicy policy
+    ) {
+        if (!order.getCurrency().equals(policy.currency())) {
+            throw integrityViolation(
+                    "Paid order currency does not match the active commercial policy");
+        }
+
+        settlementMoney(order.getTotalAmount(), policy.currency());
+        items.forEach(item -> settlementMoney(item.getPrice(), policy.currency()));
+    }
+
+    private OrderItem requireOrderItem(EscrowLedger escrow) {
+        if (escrow.getOrderItem() == null) {
+            throw integrityViolation("Escrow is not linked to an order item");
+        }
+        return escrow.getOrderItem();
+    }
+
+    private OrderItemSnapshot requireSnapshot(OrderItem item) {
+        return orderItemSnapshotRepository.findByOrderItem_Id(item.getId())
+                .orElseThrow(() -> integrityViolation(
+                        "Order item is missing its immutable commercial snapshot"));
+    }
+
+    private void ensureCommissionEventAbsent(
+            OrderItem item,
+            PlatformCommissionLedger.CommissionEventType eventType
+    ) {
+        if (platformCommissionLedgerRepository.existsByOrderItem_IdAndEventType(
+                item.getId(),
+                eventType)) {
+            throw integrityViolation("Commission event already exists before escrow state transition");
+        }
+    }
+
+    private void appendCommissionEvent(
+            Order order,
+            OrderItem item,
+            BigDecimal amount,
+            PlatformCommissionLedger.CommissionEventType eventType
+    ) {
+        platformCommissionLedgerRepository.save(PlatformCommissionLedger.builder()
+                .order(order)
+                .orderItem(item)
+                .amount(money(amount))
+                .eventType(eventType)
+                .build());
+    }
+
+    private BigDecimal money(BigDecimal amount) {
+        if (amount == null || amount.signum() < 0) {
+            throw integrityViolation("Financial amount must not be negative");
+        }
+        try {
+            return amount.setScale(2, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException exception) {
+            throw integrityViolation("Financial amount has more than two decimal places");
+        }
+    }
+
+    private BigDecimal settlementMoney(BigDecimal amount, String currency) {
+        BigDecimal normalized = money(amount);
+        if (!"VND".equals(currency)) {
+            return normalized;
+        }
+        try {
+            return normalized.setScale(0, RoundingMode.UNNECESSARY).setScale(2);
+        } catch (ArithmeticException exception) {
+            throw integrityViolation("VND settlement amount must be a whole number");
+        }
+    }
+
+    private AuditLog audit(String action, EscrowLedger escrow, String reason) {
+        return AuditLog.builder()
                 .actorType("SYSTEM")
-                .action("ESCROW_RELEASE")
+                .action(action)
                 .targetType("ESCROW_LEDGER")
                 .targetId(escrow.getId())
                 .metadata(Map.of(
+                        "orderId", escrow.getOrder().getId().toString(),
                         "decision", "APPROVED",
-                        "reason", "release_at reached with no refund, dispute, freeze, or account block",
-                        "releaseAt", escrow.getReleaseAt().toString()))
+                        "reason", reason))
                 .build();
-        auditLogRepository.save(auditLog);
+    }
 
-        return true;
+    private BusinessException integrityViolation(String message) {
+        return new BusinessException(
+                MessageCodes.FINANCIAL_INTEGRITY_VIOLATION,
+                message,
+                HttpStatus.CONFLICT);
     }
 }

@@ -19,6 +19,8 @@ public interface WalletService {
                                  String referenceType, UUID referenceId, String note);
     WalletTransaction releaseEscrow(TeacherProfile teacher, BigDecimal amount,
                                     String referenceType, UUID referenceId, String note);
+    WalletTransaction refundHeldEscrow(TeacherProfile teacher, BigDecimal amount,
+                                       String referenceType, UUID referenceId, String note);
     
     /**
      * Reserves balance for withdrawal.

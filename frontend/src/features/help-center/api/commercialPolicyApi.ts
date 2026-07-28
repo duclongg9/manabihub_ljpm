@@ -14,7 +14,7 @@ export const PROVISIONAL_COMMERCIAL_POLICY: Readonly<CommercialPolicy> = {
   kycTargetDaysMin: 1,
   kycTargetDaysMax: 2,
   policyVersion: 'provisional-2026-07-28',
-  effectiveAt: '2026-07-28T00:00:00+07:00',
+  effectiveAt: '2026-07-28T00:00:00Z',
 };
 
 const isFiniteNumber = (value: unknown): value is number => (
@@ -66,10 +66,6 @@ export const parseCommercialPolicy = (value: unknown): CommercialPolicy => {
 };
 
 export const getCommercialPolicy = async (): Promise<CommercialPolicy> => {
-  if (import.meta.env.DEV) {
-    return parseCommercialPolicy({ ...PROVISIONAL_COMMERCIAL_POLICY });
-  }
-
   const response = await axiosClient.get<ApiResponse<unknown>>(
     ENDPOINTS.publicCommercialPolicy.current,
   );

@@ -13,29 +13,36 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.Immutable;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "platform_commission_ledgers")
+@Immutable
+@Table(
+        name = "platform_commission_ledgers",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_platform_commission_event",
+                columnNames = {"order_item_id", "event_type"}))
 @Getter
-@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class PlatformCommissionLedger {
 
-    public enum CommissionStatus {
-        HELD, RECOGNIZED, REVERSED
+    public enum CommissionEventType {
+        COMMISSION_HELD,
+        COMMISSION_RECOGNIZED,
+        COMMISSION_REVERSED
     }
 
     @Id
@@ -54,14 +61,10 @@ public class PlatformCommissionLedger {
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private CommissionStatus status;
+    @Column(name = "event_type", nullable = false, length = 40)
+    private CommissionEventType eventType;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
 }

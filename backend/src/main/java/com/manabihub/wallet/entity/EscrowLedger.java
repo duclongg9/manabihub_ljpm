@@ -3,6 +3,7 @@ package com.manabihub.wallet.entity;
 import com.manabihub.course.entity.Course;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.order.entity.Order;
+import com.manabihub.order.entity.OrderItem;
 import com.manabihub.wallet.enums.EscrowStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -50,6 +51,10 @@ public class EscrowLedger {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_item_id")
+    private OrderItem orderItem;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", nullable = false)

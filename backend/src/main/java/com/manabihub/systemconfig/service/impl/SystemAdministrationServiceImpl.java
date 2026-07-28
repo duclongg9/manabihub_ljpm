@@ -13,6 +13,7 @@ import com.manabihub.systemconfig.dto.response.InternalAdminAccountResponse;
 import com.manabihub.systemconfig.dto.response.SystemSettingResponse;
 import com.manabihub.systemconfig.entity.SystemSetting;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
+import com.manabihub.systemconfig.service.CommercialPolicyService;
 import com.manabihub.systemconfig.service.SystemAdministrationService;
 import com.manabihub.systemconfig.service.SystemSettingValidator;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
     private final RoleRepository roleRepository;
     private final AuditLogService auditLogService;
     private final SystemSettingValidator validator;
+    private final CommercialPolicyService commercialPolicyService;
 
     @Override
     @Transactional(readOnly = true)
@@ -61,12 +63,19 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
     ) {
         InternalAdminAccount actor = requireLiveSystemAdmin(actorId);
         String key = settingKey == null ? "" : settingKey.trim().toUpperCase();
-        SystemSetting setting = settingRepository.findBySettingKeyForUpdate(key)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.COMMON_NOT_FOUND,
-                        "System setting not found",
-                        HttpStatus.NOT_FOUND
-                ));
+        List<SystemSetting> lockedPolicySettings = List.of();
+        SystemSetting setting;
+        if (commercialPolicyService.isPolicyKey(key)) {
+            lockedPolicySettings = settingRepository.findAllBySettingKeyInForUpdate(
+                    commercialPolicyService.policyKeys());
+            setting = lockedPolicySettings.stream()
+                    .filter(candidate -> candidate.getSettingKey().equals(key))
+                    .findFirst()
+                    .orElseThrow(this::settingNotFound);
+        } else {
+            setting = settingRepository.findBySettingKeyForUpdate(key)
+                    .orElseThrow(this::settingNotFound);
+        }
 
         if (!setting.isEditable()) {
             throw new BusinessException(
@@ -77,6 +86,10 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
         }
 
         String normalizedValue = validator.normalize(key, value);
+        commercialPolicyService.validateCandidate(
+                lockedPolicySettings,
+                key,
+                normalizedValue);
         String previousValue = setting.getSettingValue();
         if (previousValue.equals(normalizedValue)) {
             return toSettingResponse(setting);
@@ -97,6 +110,14 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
                 Map.of("reason", reason.trim())
         );
         return toSettingResponse(saved);
+    }
+
+    private BusinessException settingNotFound() {
+        return new BusinessException(
+                MessageCodes.COMMON_NOT_FOUND,
+                "System setting not found",
+                HttpStatus.NOT_FOUND
+        );
     }
 
     @Override

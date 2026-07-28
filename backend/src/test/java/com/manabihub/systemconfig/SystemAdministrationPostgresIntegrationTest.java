@@ -12,7 +12,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -75,10 +77,19 @@ class SystemAdministrationPostgresIntegrationTest {
 
         Integer auditCountBefore = countConfigurationAudits();
         var settings = administrationService.listSettings(SYSTEM_ADMIN_ID);
-        assertEquals(14, settings.size());
-        assertTrue(settings.stream().anyMatch(
-                setting -> setting.key().equals("ADMIN_LOCKOUT_MAX_ATTEMPTS")
-        ));
+        assertEquals(20, settings.size());
+        Set<String> settingKeys = settings.stream()
+                .map(setting -> setting.key())
+                .collect(Collectors.toSet());
+        assertTrue(settingKeys.containsAll(Set.of(
+                "ADMIN_LOCKOUT_MAX_ATTEMPTS",
+                "CURRENCY",
+                "WITHDRAWAL_FEE",
+                "KYC_TARGET_DAYS_MIN",
+                "KYC_TARGET_DAYS_MAX",
+                "POLICY_VERSION",
+                "POLICY_EFFECTIVE_AT"
+        )));
 
         var updatedSetting = administrationService.updateSetting(
                 SYSTEM_ADMIN_ID,

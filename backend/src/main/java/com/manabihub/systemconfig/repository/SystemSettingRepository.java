@@ -19,6 +19,16 @@ public interface SystemSettingRepository extends JpaRepository<SystemSetting, UU
     List<SystemSetting> findAllBySettingKeyInOrderBySettingKeyAsc(Collection<String> settingKeys);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select setting
+            from SystemSetting setting
+            where setting.settingKey in :settingKeys
+            order by setting.settingKey
+            """)
+    List<SystemSetting> findAllBySettingKeyInForUpdate(
+            @Param("settingKeys") Collection<String> settingKeys);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select setting from SystemSetting setting where setting.settingKey = :settingKey")
     Optional<SystemSetting> findBySettingKeyForUpdate(@Param("settingKey") String settingKey);
 }

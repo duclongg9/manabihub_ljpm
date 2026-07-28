@@ -9,24 +9,25 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Immutable;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
+@Immutable
 @Table(name = "order_item_snapshots")
 @Getter
-@Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class OrderItemSnapshot {
 
     @Id
@@ -55,7 +56,7 @@ public class OrderItemSnapshot {
     @Column(name = "gateway_fee_amount", precision = 12, scale = 2)
     private BigDecimal gatewayFeeAmount;
 
-    @Column(name = "commercial_policy_version", nullable = false, length = 50)
+    @Column(name = "commercial_policy_version", nullable = false, length = 100)
     private String commercialPolicyVersion;
 
     @Column(name = "escrow_days", nullable = false)
