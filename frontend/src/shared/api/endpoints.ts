@@ -27,6 +27,11 @@ export const ENDPOINTS = {
     MANUAL_PROOF: (withdrawalRequestId: string) =>
       `/admin/payouts/${withdrawalRequestId}/manual-transfer/proof`,
   },
+  ADMIN_VIOLATIONS: {
+    QUEUE: '/v1/admin/violations',
+    DETAIL: (reportId: string) => `/v1/admin/violations/${reportId}`,
+    RESOLVE: (reportId: string) => `/v1/admin/violations/${reportId}/resolve`,
+  },
   SYSTEM_ADMIN: {
     SETTINGS: '/v1/admin/system-settings',
     SETTING: (key: string) => `/v1/admin/system-settings/${encodeURIComponent(key)}`,

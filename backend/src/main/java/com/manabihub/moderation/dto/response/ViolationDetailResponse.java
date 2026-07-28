@@ -20,12 +20,13 @@ public class ViolationDetailResponse {
     
     private ReporterSummary reporter;
     private ViolationTarget target;
-    private List<Object> evidence; // No evidence table in DB yet, use empty list
+    private List<ViolationEvidenceResponse> evidence;
     private List<ModerationHistoryItem> moderationHistory;
     
     private int previousWarnings;
     private int paidEnrollmentCount;
     private List<ModerationActionType> availableActions;
+    private boolean severeActionAllowed;
     
     @Data
     @Builder
@@ -44,6 +45,10 @@ public class ViolationDetailResponse {
         private UUID courseId;
         private String courseTitle;
         private String currentStatus;
+        private UUID teacherProfileId;
+        private UUID teacherUserId;
+        private String teacherName;
+        private String contentTitle;
     }
     
     @Data
@@ -54,6 +59,7 @@ public class ViolationDetailResponse {
         private String decisionNote;
         private Instant decidedAt;
         private String decidedBy;
+        private String evidenceRequestedFrom;
         private List<String> actions;
     }
 }

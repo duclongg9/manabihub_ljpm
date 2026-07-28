@@ -39,6 +39,9 @@ public class ViolationReport {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String reason;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

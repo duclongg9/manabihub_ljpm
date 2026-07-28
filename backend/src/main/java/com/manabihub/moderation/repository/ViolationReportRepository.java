@@ -20,4 +20,10 @@ public interface ViolationReportRepository extends JpaRepository<ViolationReport
     Optional<ViolationReport> findByIdLocked(@Param("id") UUID id);
     
     Page<ViolationReport> findByStatus(ViolationReportStatus status, Pageable pageable);
+
+    long countByTargetTypeIgnoreCaseAndTargetIdAndStatus(
+            String targetType,
+            UUID targetId,
+            ViolationReportStatus status
+    );
 }

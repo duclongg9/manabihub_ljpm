@@ -76,6 +76,7 @@ public class StudentAssessmentServiceImpl implements StudentAssessmentService {
     @Transactional
     public QuizSubmissionResponse submitQuiz(UUID lessonBlockId, QuizSubmissionRequest request) {
         LessonBlock block = lessonBlockRepository.findById(lessonBlockId)
+                .filter(value -> !value.isModerationHidden())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.CONTENT_NOT_FOUND,
                         "Quiz lesson block was not found.",

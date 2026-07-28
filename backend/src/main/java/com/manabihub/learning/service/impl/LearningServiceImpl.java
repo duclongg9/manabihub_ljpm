@@ -340,6 +340,7 @@ public class LearningServiceImpl implements LearningService {
 
     private LessonBlock resolveLessonBlock(UUID lessonBlockId) {
         return lessonBlockRepository.findById(lessonBlockId)
+                .filter(block -> !block.isModerationHidden())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.CONTENT_NOT_FOUND,
                         "Lesson block was not found",
@@ -460,6 +461,7 @@ public class LearningServiceImpl implements LearningService {
 
     private List<LessonBlock> sortedBlocks(CourseModule module) {
         return module.getBlocks().stream()
+                .filter(block -> !block.isModerationHidden())
                 .sorted(Comparator.comparingInt(LessonBlock::getOrderIndex))
                 .toList();
     }

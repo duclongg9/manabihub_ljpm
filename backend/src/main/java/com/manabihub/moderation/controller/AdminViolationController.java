@@ -5,6 +5,9 @@ import com.manabihub.moderation.dto.request.ResolveViolationRequest;
 import com.manabihub.moderation.dto.response.ViolationDetailResponse;
 import com.manabihub.moderation.dto.response.ViolationQueueItemResponse;
 import com.manabihub.moderation.service.ViolationModerationService;
+import com.manabihub.moderation.enums.ViolationReportStatus;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,26 +24,40 @@ import java.util.UUID;
 @RequestMapping("/api/v1/admin/violations")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'SYSTEM_ADMIN')")
+@Tag(name = "Admin Violation Moderation", description = "Permission-controlled UC-30 violation review and resolution")
 public class AdminViolationController {
 
     private final ViolationModerationService violationModerationService;
 
     @GetMapping
+    @Operation(summary = "List violation reports visible to moderation administrators")
     public ApiResponse<Page<ViolationQueueItemResponse>> getViolationQueue(
-            @RequestParam(required = false) String status,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @RequestParam(required = false) ViolationReportStatus status,
+            @PageableDefault(size = 20) Pageable pageable,
+            @AuthenticationPrincipal Jwt jwt) {
         
-        Page<ViolationQueueItemResponse> queue = violationModerationService.getViolationQueue(status, pageable);
+        Page<ViolationQueueItemResponse> queue = violationModerationService.getViolationQueue(
+                status,
+                pageable,
+                UUID.fromString(jwt.getSubject())
+        );
         return ApiResponse.success(queue);
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<ViolationDetailResponse> getViolationDetail(@PathVariable UUID id) {
-        ViolationDetailResponse detail = violationModerationService.getViolationDetail(id);
+    @Operation(summary = "Get violation detail, evidence, history, warnings and allowed actions")
+    public ApiResponse<ViolationDetailResponse> getViolationDetail(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        ViolationDetailResponse detail = violationModerationService.getViolationDetail(
+                id,
+                UUID.fromString(jwt.getSubject())
+        );
         return ApiResponse.success(detail);
     }
 
     @PostMapping("/{id}/resolve")
+    @Operation(summary = "Apply an atomic violation decision and its authorized enforcement actions")
     public ApiResponse<ViolationDetailResponse> resolveViolation(
             @PathVariable UUID id,
             @RequestBody @Valid ResolveViolationRequest request,

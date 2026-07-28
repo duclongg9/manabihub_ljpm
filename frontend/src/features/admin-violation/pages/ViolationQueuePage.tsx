@@ -1,14 +1,12 @@
-import FilterListIcon from '@mui/icons-material/FilterList';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import SearchIcon from '@mui/icons-material/Search';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
+  Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
-  InputAdornment,
   MenuItem,
   Pagination,
   Paper,
@@ -27,6 +25,8 @@ import { useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { useViolationQueue } from '../hooks/useViolationQueue';
+import { ViolationStatusBadge } from '../components/ViolationStatusBadge';
+import type { ViolationReportStatus } from '../types/violation.types';
 
 const PAGE_SIZE = 10;
 
@@ -45,32 +45,16 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-const statusColorMap: Record<string, { label: string; color: string; bgcolor: string }> = {
-  PENDING_REVIEW: { label: 'Chờ duyệt', color: '#d97706', bgcolor: '#fef3c7' },
-  IN_REVIEW: { label: 'Đang xem xét', color: '#2563eb', bgcolor: '#dbeafe' },
-  PENDING_EVIDENCE: { label: 'Chờ bằng chứng', color: '#7c3aed', bgcolor: '#ede9fe' },
-  CORRECTION_REQUIRED: { label: 'Yêu cầu sửa đổi', color: '#059669', bgcolor: '#d1fae5' },
-  RESOLVED_UPHELD: { label: 'Vi phạm', color: '#dc2626', bgcolor: '#fee2e2' },
-  RESOLVED_NO_VIOLATION: { label: 'Không vi phạm', color: '#16a34a', bgcolor: '#dcfce3' },
-  INVALID: { label: 'Báo cáo sai', color: '#6b7280', bgcolor: '#f3f4f6' },
-  CANCELLED: { label: 'Đã hủy', color: '#4b5563', bgcolor: '#e5e7eb' },
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const config = statusColorMap[status] || { label: status, color: '#6b7280', bgcolor: '#f3f4f6' };
-  return (
-    <Chip
-      size="small"
-      label={config.label}
-      sx={{
-        bgcolor: config.bgcolor,
-        color: config.color,
-        fontWeight: 700,
-        borderRadius: 1,
-      }}
-    />
-  );
-}
+const statusOptions: Array<{ value: ViolationReportStatus; label: string }> = [
+  { value: 'PENDING_REVIEW', label: 'Chờ duyệt' },
+  { value: 'IN_REVIEW', label: 'Đang xem xét' },
+  { value: 'PENDING_EVIDENCE', label: 'Chờ bằng chứng' },
+  { value: 'CORRECTION_REQUIRED', label: 'Yêu cầu chỉnh sửa' },
+  { value: 'RESOLVED_UPHELD', label: 'Đã xác nhận vi phạm' },
+  { value: 'RESOLVED_NO_VIOLATION', label: 'Không vi phạm' },
+  { value: 'INVALID', label: 'Không hợp lệ' },
+  { value: 'CANCELLED', label: 'Đã hủy' },
+];
 
 export function ViolationQueuePage() {
   const [page, setPage] = useState(0);
@@ -94,6 +78,20 @@ export function ViolationQueuePage() {
           { label: 'Vi phạm' },
         ]}
       />
+
+      {queue.isError && (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => void queue.refetch()}>
+              Thử lại
+            </Button>
+          }
+          sx={{ mb: 2 }}
+        >
+          Không thể tải hàng đợi báo cáo vi phạm.
+        </Alert>
+      )}
 
       <Paper
         elevation={0}
@@ -158,8 +156,8 @@ export function ViolationQueuePage() {
               sx={{ minWidth: 200 }}
             >
               <MenuItem value="">Tất cả trạng thái</MenuItem>
-              {Object.entries(statusColorMap).map(([key, config]) => (
-                <MenuItem key={key} value={key}>{config.label}</MenuItem>
+              {statusOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
               ))}
             </TextField>
           </Stack>
@@ -219,7 +217,7 @@ export function ViolationQueuePage() {
                             {item.reason}
                           </Typography>
                         </TableCell>
-                        <TableCell><StatusBadge status={item.status} /></TableCell>
+                        <TableCell><ViolationStatusBadge status={item.status} /></TableCell>
                         <TableCell>
                           <Typography variant="body2">{formatDate(item.submittedAt)}</Typography>
                         </TableCell>

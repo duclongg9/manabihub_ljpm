@@ -5,8 +5,11 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -37,6 +40,14 @@ public class ModerationActionRecord {
     @Column(name = "target_id")
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.UUID)
     private UUID targetId;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "before_value", columnDefinition = "jsonb")
+    private Map<String, Object> beforeValue;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "after_value", columnDefinition = "jsonb")
+    private Map<String, Object> afterValue;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

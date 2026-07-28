@@ -2,6 +2,7 @@ package com.manabihub.moderation.entity;
 
 import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.moderation.enums.ModerationDecisionType;
+import com.manabihub.moderation.enums.EvidenceRequestedFrom;
 import com.manabihub.moderation.enums.ViolationReportStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -48,6 +49,13 @@ public class ModerationDecision {
     @Enumerated(EnumType.STRING)
     @Column(name = "status_after")
     private ViolationReportStatus statusAfter;
+
+    @Column(name = "correlation_id")
+    private UUID correlationId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "evidence_requested_from")
+    private EvidenceRequestedFrom evidenceRequestedFrom;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

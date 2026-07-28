@@ -11,6 +11,7 @@ export function useResolveViolation() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-violation-detail', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['admin-violations'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard', 'pending-violation-count'] });
     },
   });
 }

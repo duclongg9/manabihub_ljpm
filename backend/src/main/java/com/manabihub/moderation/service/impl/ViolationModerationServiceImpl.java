@@ -4,296 +4,1101 @@ import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
+import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.repository.LessonBlockRepository;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.identity.repository.IdentityTeacherProfileRepository;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.moderation.dto.request.ResolveViolationRequest;
 import com.manabihub.moderation.dto.response.ViolationDetailResponse;
+import com.manabihub.moderation.dto.response.ViolationEvidenceResponse;
 import com.manabihub.moderation.dto.response.ViolationQueueItemResponse;
 import com.manabihub.moderation.entity.ModerationActionRecord;
 import com.manabihub.moderation.entity.ModerationDecision;
+import com.manabihub.moderation.entity.ViolationEvidence;
 import com.manabihub.moderation.entity.ViolationReport;
 import com.manabihub.moderation.enums.ModerationActionType;
 import com.manabihub.moderation.enums.ModerationDecisionType;
+import com.manabihub.moderation.enums.EvidenceRequestedFrom;
 import com.manabihub.moderation.enums.ViolationReportStatus;
+import com.manabihub.moderation.event.ModerationNotificationEvent;
 import com.manabihub.moderation.repository.ModerationActionRecordRepository;
 import com.manabihub.moderation.repository.ModerationDecisionRepository;
+import com.manabihub.moderation.repository.ViolationEvidenceRepository;
 import com.manabihub.moderation.repository.ViolationReportRepository;
 import com.manabihub.moderation.service.ViolationModerationService;
-import com.manabihub.notification.service.NotificationService;
+import com.manabihub.order.repository.OrderItemRepository;
+import com.manabihub.review.entity.CourseReview;
+import com.manabihub.review.enums.CourseReviewStatus;
+import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.wallet.entity.TeacherWallet;
 import com.manabihub.wallet.repository.TeacherWalletRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class ViolationModerationServiceImpl implements ViolationModerationService {
 
+    private static final String PERMISSION_RESOLVE = "VIOLATION_RESOLVE";
+    private static final String PERMISSION_CONTENT = "VIOLATION_CONTENT_ENFORCE";
+    private static final String PERMISSION_SEVERE = "VIOLATION_SEVERE_ENFORCE";
+
+    private static final Set<ViolationReportStatus> TERMINAL_STATUSES = Set.of(
+            ViolationReportStatus.RESOLVED_NO_VIOLATION,
+            ViolationReportStatus.RESOLVED_UPHELD,
+            ViolationReportStatus.INVALID,
+            ViolationReportStatus.CANCELLED
+    );
+
     private final ViolationReportRepository reportRepository;
+    private final ViolationEvidenceRepository evidenceRepository;
     private final ModerationDecisionRepository decisionRepository;
     private final ModerationActionRecordRepository actionRecordRepository;
     private final InternalAdminAccountRepository adminRepository;
     private final CourseRepository courseRepository;
+    private final LessonBlockRepository lessonBlockRepository;
+    private final CourseReviewRepository courseReviewRepository;
     private final AppUserRepository appUserRepository;
+    private final IdentityTeacherProfileRepository teacherProfileRepository;
     private final TeacherWalletRepository teacherWalletRepository;
+    private final OrderItemRepository orderItemRepository;
     private final AuditLogService auditLogService;
-    private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ViolationQueueItemResponse> getViolationQueue(String statusStr, Pageable pageable) {
-        ViolationReportStatus status = null;
-        if (statusStr != null && !statusStr.isEmpty()) {
-            try {
-                status = ViolationReportStatus.valueOf(statusStr);
-            } catch (IllegalArgumentException e) {
-                // ignore
-            }
-        }
-        
-        Page<ViolationReport> reports;
-        if (status != null) {
-            reports = reportRepository.findByStatus(status, pageable);
-        } else {
-            reports = reportRepository.findAll(pageable);
-        }
-        
-        return reports.map(r -> ViolationQueueItemResponse.builder()
-                .reportId(r.getId())
-                .status(r.getStatus())
-                .targetType(r.getTargetType())
-                .targetId(r.getTargetId())
-                .reason(r.getReason())
-                .reporterName(r.getReporter() != null ? r.getReporter().getFullName() : "Unknown")
-                .submittedAt(r.getCreatedAt())
+    public Page<ViolationQueueItemResponse> getViolationQueue(
+            ViolationReportStatus status,
+            Pageable pageable,
+            UUID adminId
+    ) {
+        requirePermission(adminId, PERMISSION_RESOLVE, MessageCodes.ADMIN_PERMISSION_DENIED);
+
+        Page<ViolationReport> reports = status == null
+                ? reportRepository.findAll(pageable)
+                : reportRepository.findByStatus(status, pageable);
+
+        return reports.map(report -> ViolationQueueItemResponse.builder()
+                .reportId(report.getId())
+                .status(report.getStatus())
+                .targetType(report.getTargetType())
+                .targetId(report.getTargetId())
+                .reason(report.getReason())
+                .reporterName(report.getReporter() == null
+                        ? "Unknown"
+                        : report.getReporter().getFullName())
+                .submittedAt(report.getCreatedAt())
                 .build());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public ViolationDetailResponse getViolationDetail(UUID reportId) {
-        ViolationReport report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new BusinessException(MessageCodes.MODERATION_REPORT_NOT_FOUND, "Report not found"));
-                
-        List<ModerationDecision> decisions = decisionRepository.findByViolationReportIdOrderByCreatedAtDesc(reportId);
-        List<ViolationDetailResponse.ModerationHistoryItem> history = decisions.stream().map(d -> {
-            List<String> actionStrs = new ArrayList<>();
-            if (d.getActions() != null) {
-                actionStrs = d.getActions().stream().map(a -> a.getActionType().name()).collect(Collectors.toList());
-            }
-            return ViolationDetailResponse.ModerationHistoryItem.builder()
-                    .decisionId(d.getId())
-                    .decisionType(d.getDecisionType().name())
-                    .decisionNote(d.getReason())
-                    .decidedAt(d.getCreatedAt())
-                    .decidedBy(d.getDecidedBy() != null ? d.getDecidedBy().getFullName() : "System")
-                    .actions(actionStrs)
-                    .build();
-        }).collect(Collectors.toList());
-        
-        ViolationDetailResponse.ReporterSummary reporter = null;
-        if (report.getReporter() != null) {
-            reporter = ViolationDetailResponse.ReporterSummary.builder()
-                    .reporterId(report.getReporter().getId())
-                    .displayName(report.getReporter().getFullName())
-                    .build();
-        }
-        
-        ViolationDetailResponse.ViolationTarget target = ViolationDetailResponse.ViolationTarget.builder()
-                .targetType(report.getTargetType())
-                .targetId(report.getTargetId())
-                .build();
-                
-        if ("COURSE".equalsIgnoreCase(report.getTargetType())) {
-            courseRepository.findById(report.getTargetId()).ifPresent(course -> {
-                target.setCourseId(course.getId());
-                target.setCourseTitle(course.getTitle());
-                target.setCurrentStatus(course.getStatus().name());
-            });
-        }
-        
-        List<ModerationActionType> availableActions = List.of(
-                ModerationActionType.NONE,
-                ModerationActionType.FORCE_DRAFT,
-                ModerationActionType.HIDE_COURSE,
-                ModerationActionType.BAN_ACCOUNT,
-                ModerationActionType.FREEZE_BALANCE
+    public ViolationDetailResponse getViolationDetail(UUID reportId, UUID adminId) {
+        requirePermission(adminId, PERMISSION_RESOLVE, MessageCodes.ADMIN_PERMISSION_DENIED);
+        return buildViolationDetail(requireReport(reportId), adminId);
+    }
+
+    @Override
+    @Transactional
+    public ViolationDetailResponse resolveViolation(
+            UUID reportId,
+            ResolveViolationRequest request,
+            UUID adminId
+    ) {
+        InternalAdminAccount admin = requirePermission(
+                adminId,
+                PERMISSION_RESOLVE,
+                MessageCodes.ADMIN_PERMISSION_DENIED
         );
+        validateRequest(request);
+
+        ViolationReport report = reportRepository.findByIdLocked(reportId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.MODERATION_REPORT_NOT_FOUND,
+                        "Violation report was not found",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        if (TERMINAL_STATUSES.contains(report.getStatus())) {
+            throw new BusinessException(
+                    MessageCodes.MODERATION_ALREADY_RESOLVED,
+                    "This violation report has already been processed",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        UUID correlationId = UUID.randomUUID();
+        ViolationReportStatus statusBefore = report.getStatus();
+        ViolationReportStatus statusAfter = mapStatus(request.getDecision());
+        TargetContext targetContext = null;
+
+        if (request.getDecision() != ModerationDecisionType.DISMISSED) {
+            targetContext = loadTargetContextForUpdate(report);
+        }
+
+        ModerationDecision decision = decisionRepository.save(
+                ModerationDecision.builder()
+                        .violationReport(report)
+                        .decidedBy(admin)
+                        .decisionType(request.getDecision())
+                        .reason(request.getDecisionNote().trim())
+                        .statusBefore(statusBefore)
+                        .statusAfter(statusAfter)
+                        .correlationId(correlationId)
+                        .evidenceRequestedFrom(request.getEvidenceRequestedFrom())
+                        .build()
+        );
+
+        List<ModerationActionRecord> actionRecords = new ArrayList<>();
+        if (request.getDecision() == ModerationDecisionType.UPHELD) {
+            actionRecords.addAll(executeActions(
+                    report,
+                    decision,
+                    targetContext,
+                    request,
+                    adminId
+            ));
+        } else {
+            actionRecords.add(actionRecord(
+                    decision,
+                    ModerationActionType.NONE,
+                    report.getTargetType(),
+                    report.getTargetId(),
+                    Map.of("reportStatus", statusBefore.name()),
+                    Map.of("reportStatus", statusAfter.name())
+            ));
+        }
+
+        actionRecordRepository.saveAll(actionRecords);
+        decision.setActions(actionRecords);
+
+        report.setStatus(statusAfter);
+        reportRepository.save(report);
+
+        Map<String, Object> auditMetadata = new LinkedHashMap<>();
+        auditMetadata.put("correlationId", correlationId);
+        auditMetadata.put("reportId", report.getId());
+        auditMetadata.put("decision", request.getDecision().name());
+        auditMetadata.put("decisionNote", request.getDecisionNote().trim());
+        auditMetadata.put("statusBefore", statusBefore.name());
+        auditMetadata.put("statusAfter", statusAfter.name());
+        if (request.getEvidenceRequestedFrom() != null) {
+            auditMetadata.put(
+                    "evidenceRequestedFrom",
+                    request.getEvidenceRequestedFrom().name()
+            );
+        }
+        auditMetadata.put(
+                "actions",
+                actionRecords.stream().map(record -> record.getActionType().name()).toList()
+        );
+        auditMetadata.put(
+                "actionTargetIds",
+                actionRecords.stream().map(ModerationActionRecord::getTargetId).toList()
+        );
+        auditMetadata.put(
+                "evidenceIds",
+                evidenceRepository.findByViolationReport_IdOrderByCreatedAtAsc(reportId)
+                        .stream()
+                        .map(ViolationEvidence::getId)
+                        .toList()
+        );
+        if (targetContext != null && targetContext.teacherProfileId() != null) {
+            auditMetadata.put("teacherProfileId", targetContext.teacherProfileId());
+        }
+        if (targetContext != null && targetContext.teacherUser() != null) {
+            auditMetadata.put("teacherUserId", targetContext.teacherUser().getId());
+        }
+        auditMetadata.put("permission", PERMISSION_RESOLVE);
+
+        writeAuditLogs(
+                adminId,
+                admin.getRole().getCode().name(),
+                request.getDecision(),
+                report,
+                statusBefore,
+                statusAfter,
+                actionRecords,
+                auditMetadata
+        );
+
+        publishNotifications(report, request, targetContext, actionRecords);
+        return buildViolationDetail(report, adminId);
+    }
+
+    private void writeAuditLogs(
+            UUID adminId,
+            String roleCode,
+            ModerationDecisionType decisionType,
+            ViolationReport report,
+            ViolationReportStatus statusBefore,
+            ViolationReportStatus statusAfter,
+            List<ModerationActionRecord> actionRecords,
+            Map<String, Object> decisionMetadata
+    ) {
+        auditLogService.logAdminAction(
+                adminId,
+                roleCode,
+                decisionAuditAction(decisionType),
+                "VIOLATION_REPORT",
+                report.getId(),
+                Map.of("status", statusBefore.name()),
+                Map.of("status", statusAfter.name()),
+                decisionMetadata
+        );
+
+        actionRecords.stream()
+                .filter(record -> record.getActionType() != ModerationActionType.NONE)
+                .forEach(record -> {
+                    Map<String, Object> actionMetadata =
+                            new LinkedHashMap<>(decisionMetadata);
+                    actionMetadata.put("moderationAction", record.getActionType().name());
+                    actionMetadata.put("actionRecordId", record.getId());
+                    auditLogService.logAdminAction(
+                            adminId,
+                            roleCode,
+                            enforcementAuditAction(record.getActionType()),
+                            record.getTargetType(),
+                            record.getTargetId(),
+                            record.getBeforeValue(),
+                            record.getAfterValue(),
+                            actionMetadata
+                    );
+                });
+    }
+
+    private String decisionAuditAction(ModerationDecisionType decisionType) {
+        return switch (decisionType) {
+            case UPHELD -> "MODERATION_REPORT_UPHELD";
+            case DISMISSED -> "MODERATION_REPORT_DISMISSED";
+            case PENDING_EVIDENCE -> "MODERATION_EVIDENCE_REQUESTED";
+            case CORRECTION_REQUIRED -> "MODERATION_CORRECTION_REQUIRED";
+        };
+    }
+
+    private String enforcementAuditAction(ModerationActionType actionType) {
+        return switch (actionType) {
+            case FORCE_DRAFT -> "COURSE_FORCE_DRAFTED";
+            case HIDE_COURSE -> "COURSE_HIDDEN";
+            case REMOVE_CONTENT -> "CONTENT_REMOVED";
+            case BAN_ACCOUNT -> "TEACHER_ACCOUNT_BANNED";
+            case FREEZE_BALANCE -> "TEACHER_BALANCE_FROZEN";
+            case NONE -> throw invalidAction("NONE does not have an enforcement audit action");
+        };
+    }
+
+    private List<ModerationActionRecord> executeActions(
+            ViolationReport report,
+            ModerationDecision decision,
+            TargetContext targetContext,
+            ResolveViolationRequest request,
+            UUID adminId
+    ) {
+        List<ModerationActionRecord> records = new ArrayList<>();
+        for (ModerationActionType action : distinctActions(request.getActions())) {
+            requireActionPermission(adminId, action);
+            switch (action) {
+                case FORCE_DRAFT, HIDE_COURSE ->
+                        records.add(forceDraftCourse(decision, targetContext, action));
+                case REMOVE_CONTENT ->
+                        records.addAll(removeContent(
+                                report,
+                                decision,
+                                targetContext,
+                                request.getTargetIds()
+                        ));
+                case BAN_ACCOUNT -> records.add(banAccount(decision, targetContext));
+                case FREEZE_BALANCE -> records.add(freezeBalance(decision, targetContext));
+                case NONE -> throw invalidAction(
+                        "NONE cannot be used with an upheld violation decision"
+                );
+            }
+        }
+        return records;
+    }
+
+    private ModerationActionRecord forceDraftCourse(
+            ModerationDecision decision,
+            TargetContext context,
+            ModerationActionType action
+    ) {
+        Course course = requireCourse(context, action);
+        CourseStatus before = course.getStatus();
+        course.setStatus(CourseStatus.FORCED_DRAFT);
+        courseRepository.save(course);
+
+        return actionRecord(
+                decision,
+                action,
+                "COURSE",
+                course.getId(),
+                Map.of("status", before.name()),
+                Map.of("status", CourseStatus.FORCED_DRAFT.name())
+        );
+    }
+
+    private List<ModerationActionRecord> removeContent(
+            ViolationReport report,
+            ModerationDecision decision,
+            TargetContext context,
+            List<UUID> requestedTargetIds
+    ) {
+        List<UUID> targetIds = resolveRemovalTargets(report, requestedTargetIds);
+        List<ModerationActionRecord> records = new ArrayList<>();
+        Course affectedCourse = null;
+
+        for (UUID targetId : targetIds) {
+            if ("LESSON".equals(normalizedTargetType(report))
+                    && !report.getTargetId().equals(targetId)) {
+                throw invalidAction("Removal target does not match the reported lesson");
+            }
+            if ("REVIEW".equals(normalizedTargetType(report))
+                    && !report.getTargetId().equals(targetId)) {
+                throw invalidAction("Removal target does not match the reported review");
+            }
+
+            Optional<LessonBlock> lesson = lessonBlockRepository.findByIdForModeration(targetId);
+            if (lesson.isPresent()) {
+                Course course = lesson.get().getModule().getCourse();
+                assertSameCourse(context.course(), course);
+                boolean before = lesson.get().isModerationHidden();
+                lesson.get().setModerationHidden(true);
+                lesson.get().setModerationHiddenAt(Instant.now());
+                lessonBlockRepository.save(lesson.get());
+                affectedCourse = course;
+                records.add(actionRecord(
+                        decision,
+                        ModerationActionType.REMOVE_CONTENT,
+                        "LESSON",
+                        lesson.get().getId(),
+                        Map.of("moderationHidden", before),
+                        Map.of("moderationHidden", true)
+                ));
+                continue;
+            }
+
+            Optional<CourseReview> review = courseReviewRepository.findByIdForModeration(targetId);
+            if (review.isPresent()) {
+                Course course = review.get().getEnrollment().getCourse();
+                assertSameCourse(context.course(), course);
+                CourseReviewStatus before = review.get().getStatus();
+                review.get().setStatus(CourseReviewStatus.HIDDEN);
+                courseReviewRepository.save(review.get());
+                affectedCourse = course;
+                records.add(actionRecord(
+                        decision,
+                        ModerationActionType.REMOVE_CONTENT,
+                        "REVIEW",
+                        review.get().getId(),
+                        Map.of("status", before.name()),
+                        Map.of("status", CourseReviewStatus.HIDDEN.name())
+                ));
+                continue;
+            }
+
+            throw new BusinessException(
+                    MessageCodes.MODERATION_TARGET_NOT_FOUND,
+                    "The selected content target no longer exists",
+                    HttpStatus.NOT_FOUND
+            );
+        }
+
+        if (affectedCourse != null && requiresCourseRevalidation(affectedCourse.getStatus())) {
+            affectedCourse.setStatus(CourseStatus.FORCED_DRAFT);
+            courseRepository.save(affectedCourse);
+        }
+        return records;
+    }
+
+    private ModerationActionRecord banAccount(
+            ModerationDecision decision,
+            TargetContext context
+    ) {
+        AppUser affectedUser = context.teacherUser();
+        if (affectedUser == null) {
+            throw invalidAction("BAN_ACCOUNT requires an affected user account");
+        }
+
+        AppUser lockedUser = appUserRepository.findByIdForUpdate(affectedUser.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.MODERATION_TARGET_NOT_FOUND,
+                        "The affected user account no longer exists",
+                        HttpStatus.NOT_FOUND
+                ));
+        AccountStatus before = lockedUser.getUserStatus();
+        lockedUser.setUserStatus(AccountStatus.LOCKED);
+        appUserRepository.save(lockedUser);
+
+        return actionRecord(
+                decision,
+                ModerationActionType.BAN_ACCOUNT,
+                "USER",
+                lockedUser.getId(),
+                Map.of("status", before.name()),
+                Map.of("status", AccountStatus.LOCKED.name())
+        );
+    }
+
+    private ModerationActionRecord freezeBalance(
+            ModerationDecision decision,
+            TargetContext context
+    ) {
+        if (context.teacherProfileId() == null) {
+            throw invalidAction("FREEZE_BALANCE requires an affected teacher wallet");
+        }
+
+        TeacherWallet wallet = teacherWalletRepository
+                .findByTeacherIdForUpdate(context.teacherProfileId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.MODERATION_TARGET_NOT_FOUND,
+                        "The affected teacher wallet does not exist",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        boolean before = wallet.isFrozen();
+        wallet.setFrozen(true);
+        teacherWalletRepository.save(wallet);
+
+        Map<String, Object> beforeValue = walletSnapshot(wallet, before);
+        Map<String, Object> afterValue = walletSnapshot(wallet, true);
+        return actionRecord(
+                decision,
+                ModerationActionType.FREEZE_BALANCE,
+                "WALLET",
+                wallet.getId(),
+                beforeValue,
+                afterValue
+        );
+    }
+
+    private TargetContext loadTargetContextForUpdate(ViolationReport report) {
+        String targetType = normalizedTargetType(report);
+        return switch (targetType) {
+            case "COURSE" -> contextFromCourse(courseRepository
+                    .findByIdForModeration(report.getTargetId())
+                    .orElseThrow(this::targetNotFound));
+            case "LESSON" -> {
+                LessonBlock lesson = lessonBlockRepository
+                        .findByIdForModeration(report.getTargetId())
+                        .orElseThrow(this::targetNotFound);
+                yield contextFromLesson(lesson);
+            }
+            case "REVIEW" -> {
+                CourseReview review = courseReviewRepository
+                        .findByIdForModeration(report.getTargetId())
+                        .orElseThrow(this::targetNotFound);
+                yield contextFromReview(review);
+            }
+            case "USER" -> {
+                AppUser user = appUserRepository.findByIdForUpdate(report.getTargetId())
+                        .orElseThrow(this::targetNotFound);
+                TeacherProfile profile = teacherProfileRepository.findByUser_Id(user.getId())
+                        .orElse(null);
+                yield new TargetContext(null, null, null, profile, user, user.getFullName());
+            }
+            default -> throw invalidAction("Unsupported violation target type: " + targetType);
+        };
+    }
+
+    private TargetContext loadTargetContext(ViolationReport report) {
+        String targetType = normalizedTargetType(report);
+        return switch (targetType) {
+            case "COURSE" -> courseRepository.findById(report.getTargetId())
+                    .map(this::contextFromCourse)
+                    .orElse(TargetContext.empty());
+            case "LESSON" -> lessonBlockRepository.findById(report.getTargetId())
+                    .map(this::contextFromLesson)
+                    .orElse(TargetContext.empty());
+            case "REVIEW" -> courseReviewRepository.findById(report.getTargetId())
+                    .map(this::contextFromReview)
+                    .orElse(TargetContext.empty());
+            case "USER" -> appUserRepository.findById(report.getTargetId())
+                    .map(user -> new TargetContext(
+                            null,
+                            null,
+                            null,
+                            teacherProfileRepository.findByUser_Id(user.getId()).orElse(null),
+                            user,
+                            user.getFullName()
+                    ))
+                    .orElse(TargetContext.empty());
+            default -> TargetContext.empty();
+        };
+    }
+
+    private TargetContext contextFromCourse(Course course) {
+        TeacherProfile profile = course.getTeacher();
+        return new TargetContext(
+                course,
+                null,
+                null,
+                profile,
+                resolveIdentityUser(profile),
+                course.getTitle()
+        );
+    }
+
+    private TargetContext contextFromLesson(LessonBlock lesson) {
+        Course course = lesson.getModule().getCourse();
+        TeacherProfile profile = course.getTeacher();
+        return new TargetContext(
+                course,
+                lesson,
+                null,
+                profile,
+                resolveIdentityUser(profile),
+                lesson.getTitle()
+        );
+    }
+
+    private TargetContext contextFromReview(CourseReview review) {
+        Course course = review.getEnrollment().getCourse();
+        TeacherProfile profile = course.getTeacher();
+        return new TargetContext(
+                course,
+                null,
+                review,
+                profile,
+                resolveIdentityUser(profile),
+                "Course review"
+        );
+    }
+
+    private AppUser resolveIdentityUser(TeacherProfile profile) {
+        if (profile == null || profile.getUser() == null) {
+            return null;
+        }
+        return appUserRepository.findById(profile.getUser().getId()).orElse(null);
+    }
+
+    private ViolationDetailResponse buildViolationDetail(
+            ViolationReport report,
+            UUID adminId
+    ) {
+        TargetContext context = loadTargetContext(report);
+        List<ModerationDecision> decisions =
+                decisionRepository.findByViolationReportIdOrderByCreatedAtDesc(report.getId());
+
+        List<ViolationDetailResponse.ModerationHistoryItem> history = decisions.stream()
+                .map(decision -> ViolationDetailResponse.ModerationHistoryItem.builder()
+                        .decisionId(decision.getId())
+                        .decisionType(decision.getDecisionType().name())
+                        .decisionNote(decision.getReason())
+                        .decidedAt(decision.getCreatedAt())
+                        .decidedBy(decision.getDecidedBy() == null
+                                ? "System"
+                                : decision.getDecidedBy().getFullName())
+                        .evidenceRequestedFrom(decision.getEvidenceRequestedFrom() == null
+                                ? null
+                                : decision.getEvidenceRequestedFrom().name())
+                        .actions(decision.getActions() == null
+                                ? List.of()
+                                : decision.getActions().stream()
+                                        .map(action -> action.getActionType().name())
+                                        .toList())
+                        .build())
+                .toList();
+
+        ViolationDetailResponse.ReporterSummary reporter = buildReporter(report.getReporter());
+        ViolationDetailResponse.ViolationTarget target =
+                ViolationDetailResponse.ViolationTarget.builder()
+                        .targetType(report.getTargetType())
+                        .targetId(report.getTargetId())
+                        .courseId(context.course() == null ? null : context.course().getId())
+                        .courseTitle(context.course() == null ? null : context.course().getTitle())
+                        .currentStatus(resolveCurrentStatus(context))
+                        .teacherProfileId(context.teacherProfileId())
+                        .teacherUserId(context.teacherUser() == null
+                                ? null
+                                : context.teacherUser().getId())
+                        .teacherName(context.teacherUser() == null
+                                ? null
+                                : context.teacherUser().getFullName())
+                        .contentTitle(context.contentTitle())
+                        .build();
+
+        List<ViolationEvidenceResponse> evidence = evidenceRepository
+                .findByViolationReport_IdOrderByCreatedAtAsc(report.getId())
+                .stream()
+                .map(this::toEvidenceResponse)
+                .flatMap(Optional::stream)
+                .toList();
+
+        long paidPurchasers = context.course() == null
+                ? 0
+                : orderItemRepository.countPaidPurchasersByCourseId(context.course().getId());
+        long priorWarnings = reportRepository.countByTargetTypeIgnoreCaseAndTargetIdAndStatus(
+                report.getTargetType(),
+                report.getTargetId(),
+                ViolationReportStatus.RESOLVED_UPHELD
+        );
+
+        boolean canApplyContent = hasPermission(adminId, PERMISSION_CONTENT);
+        boolean canApplySevere = hasPermission(adminId, PERMISSION_SEVERE)
+                && context.teacherUser() != null;
 
         return ViolationDetailResponse.builder()
                 .reportId(report.getId())
                 .status(report.getStatus())
                 .reason(report.getReason())
+                .description(report.getDescription())
                 .submittedAt(report.getCreatedAt())
                 .reporter(reporter)
                 .target(target)
-                .evidence(new ArrayList<>())
+                .evidence(evidence)
                 .moderationHistory(history)
-                .availableActions(availableActions)
+                .previousWarnings(Math.toIntExact(Math.min(priorWarnings, Integer.MAX_VALUE)))
+                .paidEnrollmentCount(Math.toIntExact(Math.min(paidPurchasers, Integer.MAX_VALUE)))
+                .availableActions(availableActions(context, canApplyContent, canApplySevere))
+                .severeActionAllowed(canApplySevere)
                 .build();
     }
 
-    @Override
-    @Transactional
-    public ViolationDetailResponse resolveViolation(UUID reportId, ResolveViolationRequest request, UUID adminId) {
-        ViolationReport report = reportRepository.findByIdLocked(reportId)
-                .orElseThrow(() -> new BusinessException(MessageCodes.MODERATION_REPORT_NOT_FOUND, "Report not found"));
-                
-        if (report.getStatus() == ViolationReportStatus.RESOLVED_NO_VIOLATION || 
-            report.getStatus() == ViolationReportStatus.RESOLVED_UPHELD ||
-            report.getStatus() == ViolationReportStatus.CANCELLED) {
-            throw new BusinessException(MessageCodes.MODERATION_ALREADY_RESOLVED, "Report is already resolved");
+    private ViolationDetailResponse.ReporterSummary buildReporter(AppUser reporter) {
+        if (reporter == null) {
+            return null;
         }
-        
-        if ((request.getDecision() == ModerationDecisionType.DISMISSED || request.getDecision() == ModerationDecisionType.UPHELD) 
-                && (request.getDecisionNote() == null || request.getDecisionNote().trim().isEmpty())) {
-            throw new BusinessException(MessageCodes.MODERATION_DECISION_NOTE_REQUIRED, "Decision note is required");
-        }
-        
-        InternalAdminAccount admin = adminRepository.findById(adminId)
-                .orElseThrow(() -> new BusinessException(MessageCodes.ADMIN_PERMISSION_DENIED, "Admin not found"));
-                
-        ViolationReportStatus statusBefore = report.getStatus();
-        ViolationReportStatus statusAfter = statusBefore;
-        
-        ModerationDecision decision = ModerationDecision.builder()
-                .violationReport(report)
-                .decidedBy(admin)
-                .decisionType(request.getDecision())
-                .reason(request.getDecisionNote())
-                .statusBefore(statusBefore)
-                .build();
-                
-        decision = decisionRepository.save(decision);
-        
-        List<ModerationActionRecord> actionRecords = new ArrayList<>();
-        List<String> actionNames = new ArrayList<>();
-        UUID affectedTeacherId = null;
+        String role = reporter.getRoles().stream()
+                .map(value -> value.getCode().name())
+                .sorted()
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("USER");
+        String accountAge = reporter.getCreatedAt() == null
+                ? null
+                : ChronoUnit.DAYS.between(reporter.getCreatedAt(), Instant.now()) + " days";
 
-        if (request.getDecision() == ModerationDecisionType.DISMISSED) {
-            statusAfter = ViolationReportStatus.RESOLVED_NO_VIOLATION;
-            actionRecords.add(createActionRecord(decision, ModerationActionType.NONE, report.getTargetType(), report.getTargetId()));
-            actionNames.add("NONE");
-        } else if (request.getDecision() == ModerationDecisionType.UPHELD) {
-            statusAfter = ViolationReportStatus.RESOLVED_UPHELD;
-            
-            if (request.getActions() == null || request.getActions().isEmpty()) {
-                throw new BusinessException(MessageCodes.MODERATION_ACTION_REQUIRED, "Actions required for UPHELD decision");
-            }
-            
-            for (ModerationActionType actionType : request.getActions()) {
-                actionNames.add(actionType.name());
-                
-                if (actionType == ModerationActionType.FORCE_DRAFT) {
-                    if ("COURSE".equalsIgnoreCase(report.getTargetType())) {
-                        Course course = courseRepository.findById(report.getTargetId())
-                                .orElseThrow(() -> new BusinessException(MessageCodes.MODERATION_TARGET_NOT_FOUND, "Course not found"));
-                        course.setStatus(CourseStatus.FORCED_DRAFT);
-                        courseRepository.save(course);
-                        affectedTeacherId = course.getTeacher().getId();
-                        actionRecords.add(createActionRecord(decision, actionType, "COURSE", course.getId()));
-                    }
-                } else if (actionType == ModerationActionType.BAN_ACCOUNT) {
-                    UUID teacherIdToBan = getAffectedTeacherId(report);
-                    if (teacherIdToBan != null) {
-                        AppUser user = appUserRepository.findById(teacherIdToBan)
-                                .orElseThrow(() -> new BusinessException(MessageCodes.MODERATION_TARGET_NOT_FOUND, "User not found"));
-                        user.setUserStatus(AccountStatus.LOCKED);
-                        appUserRepository.save(user);
-                        affectedTeacherId = teacherIdToBan;
-                        actionRecords.add(createActionRecord(decision, actionType, "USER", user.getId()));
-                    }
-                } else if (actionType == ModerationActionType.FREEZE_BALANCE) {
-                    UUID teacherIdToFreeze = getAffectedTeacherId(report);
-                    if (teacherIdToFreeze != null) {
-                        TeacherWallet wallet = teacherWalletRepository.findByTeacherId(teacherIdToFreeze)
-                                .orElseThrow(() -> new BusinessException(MessageCodes.MODERATION_TARGET_NOT_FOUND, "Wallet not found"));
-                        wallet.setFrozen(true);
-                        teacherWalletRepository.save(wallet);
-                        affectedTeacherId = teacherIdToFreeze;
-                        actionRecords.add(createActionRecord(decision, actionType, "WALLET", wallet.getId()));
-                    }
-                }
-            }
-        } else if (request.getDecision() == ModerationDecisionType.PENDING_EVIDENCE) {
-            statusAfter = ViolationReportStatus.PENDING_EVIDENCE;
-            actionRecords.add(createActionRecord(decision, ModerationActionType.NONE, report.getTargetType(), report.getTargetId()));
-            actionNames.add("NONE");
-        } else if (request.getDecision() == ModerationDecisionType.CORRECTION_REQUIRED) {
-            statusAfter = ViolationReportStatus.CORRECTION_REQUIRED;
-            actionRecords.add(createActionRecord(decision, ModerationActionType.NONE, report.getTargetType(), report.getTargetId()));
-            actionNames.add("NONE");
+        return ViolationDetailResponse.ReporterSummary.builder()
+                .reporterId(reporter.getId())
+                .displayName(reporter.getFullName())
+                .role(role)
+                .accountAge(accountAge)
+                .build();
+    }
+
+    private Optional<ViolationEvidenceResponse> toEvidenceResponse(ViolationEvidence evidence) {
+        String safeUrl = safeExternalUrl(evidence.getExternalUrl());
+        if (safeUrl == null) {
+            return Optional.empty();
         }
-        
-        actionRecordRepository.saveAll(actionRecords);
-        decision.setActions(actionRecords);
-        decision.setStatusAfter(statusAfter);
-        decisionRepository.save(decision);
-        
-        report.setStatus(statusAfter);
-        reportRepository.save(report);
-        
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("decision", request.getDecision().name());
-        metadata.put("actions", actionNames);
-        metadata.put("decisionNote", request.getDecisionNote());
-        
-        auditLogService.logAdminAction(
-                adminId,
-                "COURSE_MANAGER", 
-                "RESOLVE_VIOLATION",
-                report.getTargetType(),
-                report.getTargetId(),
-                Map.of("status", statusBefore.name()),
-                Map.of("status", statusAfter.name()),
-                metadata
-        );
-        
-        if (affectedTeacherId != null && statusAfter == ViolationReportStatus.RESOLVED_UPHELD) {
-            final UUID teacherIdForNotification = affectedTeacherId;
-            appUserRepository.findById(teacherIdForNotification).ifPresent(user -> {
-                notificationService.createNotification(
-                        teacherIdForNotification,
-                        user.getEmail(),
-                        "Violation Report Upheld",
-                        "Your content has been moderated due to a violation report. Actions taken: " + String.join(", ", actionNames),
-                        "VIOLATION_UPHELD"
+        return Optional.of(ViolationEvidenceResponse.builder()
+                .evidenceId(evidence.getId())
+                .evidenceType(evidence.getEvidenceType())
+                .displayName(evidence.getDisplayName())
+                .accessUrl(safeUrl)
+                .contentType(evidence.getContentType())
+                .submittedAt(evidence.getCreatedAt())
+                .build());
+    }
+
+    private List<ModerationActionType> availableActions(
+            TargetContext context,
+            boolean canApplyContent,
+            boolean canApplySevere
+    ) {
+        List<ModerationActionType> actions = new ArrayList<>();
+        if (canApplyContent && context.course() != null) {
+            actions.add(ModerationActionType.FORCE_DRAFT);
+            actions.add(ModerationActionType.HIDE_COURSE);
+            actions.add(ModerationActionType.REMOVE_CONTENT);
+        } else if (canApplyContent
+                && (context.lesson() != null || context.review() != null)) {
+            actions.add(ModerationActionType.REMOVE_CONTENT);
+        }
+        if (canApplySevere) {
+            actions.add(ModerationActionType.BAN_ACCOUNT);
+            if (context.teacherProfileId() != null) {
+                actions.add(ModerationActionType.FREEZE_BALANCE);
+            }
+        }
+        return List.copyOf(actions);
+    }
+
+    private void validateRequest(ResolveViolationRequest request) {
+        if (request == null || request.getDecision() == null) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "A moderation decision is required"
+            );
+        }
+        if (!StringUtils.hasText(request.getDecisionNote())) {
+            throw new BusinessException(
+                    MessageCodes.MODERATION_DECISION_NOTE_REQUIRED,
+                    "A decision note is required"
+            );
+        }
+        if (request.getDecisionNote().trim().length() > 2000) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Decision note must not exceed 2000 characters"
+            );
+        }
+
+        List<ModerationActionType> actions = request.getActions() == null
+                ? List.of()
+                : request.getActions();
+        if (actions.stream().anyMatch(java.util.Objects::isNull)) {
+            throw invalidAction("Moderation actions cannot contain null values");
+        }
+        if (new LinkedHashSet<>(actions).size() != actions.size()) {
+            throw invalidAction("Duplicate moderation actions are not allowed");
+        }
+
+        if (request.getDecision() == ModerationDecisionType.UPHELD) {
+            if (actions.isEmpty()) {
+                throw new BusinessException(
+                        MessageCodes.MODERATION_ACTION_REQUIRED,
+                        "At least one enforcement action is required"
                 );
-            });
+            }
+            if (actions.contains(ModerationActionType.NONE)) {
+                throw invalidAction("NONE is not an enforcement action");
+            }
+        } else if (!actions.isEmpty()) {
+            throw invalidAction(
+                    "Enforcement actions are only allowed for an upheld decision"
+            );
         }
-        
-        return getViolationDetail(reportId);
+
+        if (request.getDecision() == ModerationDecisionType.PENDING_EVIDENCE
+                && request.getEvidenceRequestedFrom() == null) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "The evidence provider is required for an evidence request"
+            );
+        }
+        if (request.getDecision() != ModerationDecisionType.PENDING_EVIDENCE
+                && request.getEvidenceRequestedFrom() != null) {
+            throw invalidAction(
+                    "An evidence provider is only valid for a pending-evidence decision"
+            );
+        }
     }
-    
-    private ModerationActionRecord createActionRecord(ModerationDecision decision, ModerationActionType type, String targetType, UUID targetId) {
+
+    private void requireActionPermission(UUID adminId, ModerationActionType action) {
+        String permission = switch (action) {
+            case FORCE_DRAFT, HIDE_COURSE, REMOVE_CONTENT -> PERMISSION_CONTENT;
+            case BAN_ACCOUNT, FREEZE_BALANCE -> PERMISSION_SEVERE;
+            case NONE -> PERMISSION_RESOLVE;
+        };
+        String messageCode = permission.equals(PERMISSION_SEVERE)
+                ? MessageCodes.MODERATION_SEVERE_PERMISSION_REQUIRED
+                : MessageCodes.MODERATION_CONTENT_PERMISSION_REQUIRED;
+        requirePermission(adminId, permission, messageCode);
+    }
+
+    private InternalAdminAccount requirePermission(
+            UUID adminId,
+            String permission,
+            String messageCode
+    ) {
+        InternalAdminAccount admin = adminRepository.findById(adminId)
+                .filter(value -> value.getAccountStatus() == AccountStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.ADMIN_PERMISSION_DENIED,
+                        "The moderation administrator is not active",
+                        HttpStatus.FORBIDDEN
+                ));
+        if (!adminRepository.hasPermission(adminId, permission)) {
+            throw new BusinessException(
+                    messageCode,
+                    "The administrator does not have permission " + permission,
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        return admin;
+    }
+
+    private boolean hasPermission(UUID adminId, String permission) {
+        return adminRepository.hasPermission(adminId, permission);
+    }
+
+    private void publishNotifications(
+            ViolationReport report,
+            ResolveViolationRequest request,
+            TargetContext context,
+            List<ModerationActionRecord> actions
+    ) {
+        if (request.getDecision() == ModerationDecisionType.DISMISSED) {
+            AppUser reporter = report.getReporter();
+            if (reporter != null) {
+                eventPublisher.publishEvent(new ModerationNotificationEvent(
+                        reporter.getId(),
+                        reporter.getEmail(),
+                        "Violation report reviewed",
+                        "Your report was reviewed and the reported violation was not confirmed. "
+                                + request.getDecisionNote().trim(),
+                        request.getDecision().name()
+                ));
+            }
+            return;
+        }
+
+        AppUser teacher = context == null ? null : context.teacherUser();
+        if (request.getDecision() == ModerationDecisionType.PENDING_EVIDENCE) {
+            publishEvidenceRequestNotifications(
+                    report.getReporter(),
+                    teacher,
+                    request.getEvidenceRequestedFrom(),
+                    request.getDecisionNote().trim()
+            );
+            return;
+        }
+        if (teacher == null) {
+            return;
+        }
+        String title = request.getDecision() == ModerationDecisionType.CORRECTION_REQUIRED
+                ? "Course correction required"
+                : "Violation report upheld";
+        String actionNames = actions.stream()
+                .map(record -> record.getActionType().name())
+                .distinct()
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("NONE");
+        String message = request.getDecision() == ModerationDecisionType.CORRECTION_REQUIRED
+                ? "Changes are required before your content can proceed. "
+                        + request.getDecisionNote().trim()
+                : "A violation was confirmed. Applied actions: "
+                        + actionNames
+                        + ". Reason: "
+                        + request.getDecisionNote().trim();
+        eventPublisher.publishEvent(new ModerationNotificationEvent(
+                teacher.getId(),
+                teacher.getEmail(),
+                title,
+                message,
+                request.getDecision().name()
+        ));
+    }
+
+    private void publishEvidenceRequestNotifications(
+            AppUser reporter,
+            AppUser creator,
+            EvidenceRequestedFrom requestedFrom,
+            String decisionNote
+    ) {
+        if ((requestedFrom == EvidenceRequestedFrom.REPORTER
+                || requestedFrom == EvidenceRequestedFrom.BOTH)
+                && reporter != null) {
+            publishEvidenceRequest(reporter, decisionNote);
+        }
+        if ((requestedFrom == EvidenceRequestedFrom.CREATOR
+                || requestedFrom == EvidenceRequestedFrom.BOTH)
+                && creator != null
+                && (reporter == null
+                    || requestedFrom != EvidenceRequestedFrom.BOTH
+                    || !creator.getId().equals(reporter.getId()))) {
+            publishEvidenceRequest(creator, decisionNote);
+        }
+    }
+
+    private void publishEvidenceRequest(AppUser recipient, String decisionNote) {
+        eventPublisher.publishEvent(new ModerationNotificationEvent(
+                recipient.getId(),
+                recipient.getEmail(),
+                "Additional evidence required",
+                "Please provide additional evidence for this violation report. "
+                        + decisionNote,
+                ModerationDecisionType.PENDING_EVIDENCE.name()
+        ));
+    }
+
+    private ViolationReport requireReport(UUID reportId) {
+        return reportRepository.findById(reportId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.MODERATION_REPORT_NOT_FOUND,
+                        "Violation report was not found",
+                        HttpStatus.NOT_FOUND
+                ));
+    }
+
+    private List<ModerationActionType> distinctActions(
+            Collection<ModerationActionType> actions
+    ) {
+        return List.copyOf(new LinkedHashSet<>(actions));
+    }
+
+    private List<UUID> resolveRemovalTargets(
+            ViolationReport report,
+            List<UUID> requestedTargetIds
+    ) {
+        String targetType = normalizedTargetType(report);
+        if (!Set.of("COURSE", "LESSON", "REVIEW").contains(targetType)) {
+            throw invalidAction(
+                    "REMOVE_CONTENT requires a course, lesson, or review report"
+            );
+        }
+        if (requestedTargetIds != null && !requestedTargetIds.isEmpty()) {
+            return List.copyOf(new LinkedHashSet<>(requestedTargetIds));
+        }
+        if (Set.of("LESSON", "REVIEW").contains(targetType)) {
+            return List.of(report.getTargetId());
+        }
+        throw invalidAction(
+                "REMOVE_CONTENT requires one or more lesson or review target IDs"
+        );
+    }
+
+    private Course requireCourse(
+            TargetContext context,
+            ModerationActionType action
+    ) {
+        if (context == null || context.course() == null) {
+            throw invalidAction(action.name() + " requires a course-related report");
+        }
+        return context.course();
+    }
+
+    private void assertSameCourse(Course expected, Course actual) {
+        if (expected != null && !expected.getId().equals(actual.getId())) {
+            throw invalidAction(
+                    "The selected content does not belong to the reported course"
+            );
+        }
+    }
+
+    private boolean requiresCourseRevalidation(CourseStatus status) {
+        return status == CourseStatus.PUBLISHED
+                || status == CourseStatus.APPROVED
+                || status == CourseStatus.PENDING;
+    }
+
+    private String resolveCurrentStatus(TargetContext context) {
+        if (context.lesson() != null) {
+            return context.lesson().isModerationHidden() ? "HIDDEN" : "VISIBLE";
+        }
+        if (context.review() != null) {
+            return context.review().getStatus().name();
+        }
+        if (context.course() != null) {
+            return context.course().getStatus().name();
+        }
+        if (context.teacherUser() != null) {
+            return context.teacherUser().getUserStatus().name();
+        }
+        return "MISSING";
+    }
+
+    private String normalizedTargetType(ViolationReport report) {
+        return report.getTargetType() == null
+                ? ""
+                : report.getTargetType().trim().toUpperCase(Locale.ROOT);
+    }
+
+    private ViolationReportStatus mapStatus(ModerationDecisionType decision) {
+        return switch (decision) {
+            case DISMISSED -> ViolationReportStatus.RESOLVED_NO_VIOLATION;
+            case UPHELD -> ViolationReportStatus.RESOLVED_UPHELD;
+            case PENDING_EVIDENCE -> ViolationReportStatus.PENDING_EVIDENCE;
+            case CORRECTION_REQUIRED -> ViolationReportStatus.CORRECTION_REQUIRED;
+        };
+    }
+
+    private ModerationActionRecord actionRecord(
+            ModerationDecision decision,
+            ModerationActionType action,
+            String targetType,
+            UUID targetId,
+            Map<String, Object> beforeValue,
+            Map<String, Object> afterValue
+    ) {
         return ModerationActionRecord.builder()
                 .moderationDecision(decision)
-                .actionType(type)
+                .actionType(action)
                 .targetType(targetType)
                 .targetId(targetId)
+                .beforeValue(beforeValue)
+                .afterValue(afterValue)
                 .build();
     }
-    
-    private UUID getAffectedTeacherId(ViolationReport report) {
-        if ("COURSE".equalsIgnoreCase(report.getTargetType())) {
-            Optional<Course> course = courseRepository.findById(report.getTargetId());
-            if (course.isPresent()) {
-                return course.get().getTeacher().getId();
-            }
-        } else if ("USER".equalsIgnoreCase(report.getTargetType())) {
-            return report.getTargetId();
+
+    private Map<String, Object> walletSnapshot(TeacherWallet wallet, boolean frozen) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("frozen", frozen);
+        snapshot.put("balance", wallet.getBalance());
+        snapshot.put("reservedBalance", wallet.getFrozenBalance());
+        snapshot.put("availableBalance", wallet.getAvailableBalance());
+        snapshot.put("currency", wallet.getCurrency());
+        return snapshot;
+    }
+
+    private String safeExternalUrl(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
         }
-        return null;
+        try {
+            URI uri = new URI(value.trim());
+            String scheme = uri.getScheme();
+            if (scheme == null
+                    || uri.getHost() == null
+                    || uri.getUserInfo() != null
+                    || (!scheme.equalsIgnoreCase("https")
+                    && !scheme.equalsIgnoreCase("http"))) {
+                return null;
+            }
+            return uri.toASCIIString();
+        } catch (URISyntaxException exception) {
+            return null;
+        }
+    }
+
+    private BusinessException targetNotFound() {
+        return new BusinessException(
+                MessageCodes.MODERATION_TARGET_NOT_FOUND,
+                "The reported target no longer exists",
+                HttpStatus.NOT_FOUND
+        );
+    }
+
+    private BusinessException invalidAction(String message) {
+        return new BusinessException(
+                MessageCodes.MODERATION_INVALID_ACTION,
+                message,
+                HttpStatus.UNPROCESSABLE_ENTITY
+        );
+    }
+
+    private record TargetContext(
+            Course course,
+            LessonBlock lesson,
+            CourseReview review,
+            TeacherProfile teacherProfile,
+            AppUser teacherUser,
+            String contentTitle
+    ) {
+        private static TargetContext empty() {
+            return new TargetContext(null, null, null, null, null, null);
+        }
+
+        private UUID teacherProfileId() {
+            return teacherProfile == null ? null : teacherProfile.getId();
+        }
     }
 }

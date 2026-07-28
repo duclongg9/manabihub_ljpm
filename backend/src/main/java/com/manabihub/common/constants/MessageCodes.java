@@ -298,6 +298,10 @@ public final class MessageCodes {
     public static final String MODERATION_REPORT_DISMISSED = "MODERATION_REPORT_DISMISSED";
     public static final String MODERATION_CONCURRENT_UPDATE = "MODERATION_CONCURRENT_UPDATE";
     public static final String MODERATION_SEVERE_PERMISSION_REQUIRED = "MODERATION_SEVERE_PERMISSION_REQUIRED";
+    public static final String MODERATION_CONTENT_PERMISSION_REQUIRED = "MODERATION_CONTENT_PERMISSION_REQUIRED";
+    public static final String MODERATION_INVALID_ACTION = "MODERATION_INVALID_ACTION";
+    public static final String MODERATION_INVALID_TRANSITION = "MODERATION_INVALID_TRANSITION";
+    public static final String AUTH_ACCOUNT_RESTRICTED = "AUTH_ACCOUNT_RESTRICTED";
     public static final String MSG_ADM_003 = "MSG-ADM-003"; // Moderation action applied
 
     // ──────────────────────────────────────────────

@@ -14,6 +14,8 @@ export type ModerationDecisionType =
   | 'PENDING_EVIDENCE'
   | 'CORRECTION_REQUIRED';
 
+export type EvidenceRequestedFrom = 'REPORTER' | 'CREATOR' | 'BOTH';
+
 export type ModerationActionType =
   | 'NONE'
   | 'FORCE_DRAFT'
@@ -38,6 +40,7 @@ export interface ModerationHistoryItem {
   decisionNote: string;
   decidedAt: string;
   decidedBy: string;
+  evidenceRequestedFrom?: EvidenceRequestedFrom;
   actions: string[];
 }
 
@@ -48,32 +51,47 @@ export interface ReporterSummary {
   accountAge?: string;
 }
 
+export interface ViolationEvidence {
+  evidenceId: string;
+  evidenceType: 'LINK' | 'IMAGE' | 'DOCUMENT' | 'VIDEO';
+  displayName: string;
+  accessUrl: string;
+  contentType?: string;
+  submittedAt: string;
+}
+
 export interface ViolationTarget {
   targetType: string;
   targetId: string;
   courseId?: string;
   courseTitle?: string;
   currentStatus?: string;
+  teacherProfileId?: string;
+  teacherUserId?: string;
+  teacherName?: string;
+  contentTitle?: string;
 }
 
 export interface ViolationDetailResponse {
   reportId: string;
   status: ViolationReportStatus;
   reason: string;
-  description?: string;
+  description?: string | null;
   submittedAt: string;
   reporter?: ReporterSummary;
   target: ViolationTarget;
-  evidence?: any[];
+  evidence: ViolationEvidence[];
   moderationHistory: ModerationHistoryItem[];
-  previousWarnings?: number;
-  paidEnrollmentCount?: number;
+  previousWarnings: number;
+  paidEnrollmentCount: number;
   availableActions: ModerationActionType[];
+  severeActionAllowed: boolean;
 }
 
 export interface ResolveViolationRequest {
   decision: ModerationDecisionType;
   actions?: ModerationActionType[];
   decisionNote: string;
+  evidenceRequestedFrom?: EvidenceRequestedFrom;
   targetIds?: string[];
 }
