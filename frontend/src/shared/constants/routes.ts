@@ -5,6 +5,7 @@ export const ROUTES = {
     REGISTER: '/register',
     COURSE_BROWSE: '/courses',
     COURSE_DETAIL: '/courses/:id',
+    TEACHER_PROFILE: (teacherId: string) => `/teachers/${teacherId}`,
     ABOUT: '/about',
   },
   STUDENT: {
@@ -39,6 +40,7 @@ export const ROUTES = {
     COURSE_APPROVAL: '/admin/courses/approvals',
     KYC_REVIEW: '/admin/kyc',
     FINANCE: '/admin/finance',
+    PAYOUTS: '/admin/payouts',
     NOTIFICATIONS: '/admin/notifications',
     REFUND_REVIEW: '/admin/refunds',
   },

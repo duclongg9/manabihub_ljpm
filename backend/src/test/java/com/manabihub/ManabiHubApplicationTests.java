@@ -17,6 +17,7 @@ import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.repository.UserRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.repository.KycDocumentRepository;
+import com.manabihub.kyc.repository.TeacherCertificateClaimRepository;
 import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
@@ -33,6 +34,7 @@ import com.manabihub.learning.repository.LearningCertificateRepository;
 import com.manabihub.learning.repository.WishlistItemRepository;
 import com.manabihub.learning.repository.QuizAttemptRepository;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
+import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
 import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
@@ -71,6 +73,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private TeacherIdentityClaimRepository teacherIdentityClaimRepository;
+
+    @MockBean
+    private TeacherCertificateClaimRepository teacherCertificateClaimRepository;
 
     @MockBean
     private AuditLogRepository auditLogRepository;
@@ -171,6 +176,9 @@ class ManabiHubApplicationTests {
     @MockBean
     private SystemSettingRepository systemSettingRepository;
 
+    @MockBean
+    private CourseReviewRepository courseReviewRepository;
+
     // UC-08 purchase flow repositories.
     @MockBean
     private com.manabihub.order.repository.OrderRepository orderRepository;
@@ -191,7 +199,31 @@ class ManabiHubApplicationTests {
     private com.manabihub.wallet.repository.EscrowLedgerRepository escrowLedgerRepository;
 
     @MockBean
+    private com.manabihub.order.repository.OrderItemSnapshotRepository orderItemSnapshotRepository;
+
+    @MockBean
+    private com.manabihub.wallet.repository.PlatformCommissionLedgerRepository platformCommissionLedgerRepository;
+
+    @MockBean
     private TransactionTemplate transactionTemplate;
+
+    @MockBean
+    private com.manabihub.wallet.repository.TeacherWalletRepository teacherWalletRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.WithdrawalRequestRepository withdrawalRequestRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.PayoutSettlementRepository payoutSettlementRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.PayoutReconciliationLogRepository payoutReconciliationLogRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.TeacherBankAccountRepository teacherBankAccountRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.WithdrawalOtpChallengeRepository withdrawalOtpChallengeRepository;
 
     @Test
     void contextLoads() {

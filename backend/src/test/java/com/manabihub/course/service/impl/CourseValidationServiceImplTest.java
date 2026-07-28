@@ -1,9 +1,12 @@
 package com.manabihub.course.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manabihub.course.dto.response.ValidationError;
 import com.manabihub.course.dto.response.ValidationResultResponse;
 import com.manabihub.course.entity.Course;
+import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.JlptLevel;
+import com.manabihub.course.enums.LessonBlockType;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.finaltest.repository.FinalTestRepository;
 import com.manabihub.identity.service.CurrentUserService;
@@ -14,11 +17,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -31,7 +38,6 @@ class CourseValidationServiceImplTest {
     @Mock
     private CourseRepository courseRepository;
 
-    @Mock
     private ObjectMapper objectMapper;
 
     @Mock
@@ -46,6 +52,7 @@ class CourseValidationServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        objectMapper = new ObjectMapper();
         courseValidationService = new CourseValidationServiceImpl(
                 courseRepository,
                 objectMapper,
@@ -76,6 +83,85 @@ class CourseValidationServiceImplTest {
         ValidationResultResponse result = validate("/images/course-thumbnail.png");
 
         assertTrue(hasThumbnailUrlError(result));
+    }
+
+    @Test
+    void validateQuizBlock_WhenOptionsAreStringArray_ShouldAcceptMatchingAnswer() {
+        List<ValidationError> errors = validateQuizOptions(
+                """
+                ["こちらの会議室をご利用になる際は、受付で必要事項をご記入ください", "利用できません"]
+                """,
+                "こちらの会議室をご利用になる際は、受付で必要事項をご記入ください"
+        );
+
+        assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void validateQuizBlock_WhenOptionsUseLegacyObjects_ShouldAcceptMatchingAnswer() {
+        List<ValidationError> errors = validateQuizOptions(
+                """
+                [{"id":"answer-a","text":"Đáp án A"},{"id":"answer-b","text":"Đáp án B"}]
+                """,
+                "answer-b"
+        );
+
+        assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void validateQuizBlock_WhenOptionsJsonIsInvalid_ShouldReturnValidationError() {
+        List<ValidationError> errors = validateQuizOptions("[invalid-json", "answer");
+
+        assertEquals(1, errors.size());
+        assertEquals("MSG-COURSE-013", errors.getFirst().code());
+    }
+
+    @Test
+    void validateQuizBlock_WhenOptionsAreMissing_ShouldReturnValidationError() {
+        List<ValidationError> errors = validateQuizOptions(null, "answer");
+
+        assertEquals(1, errors.size());
+        assertEquals("MSG-COURSE-013", errors.getFirst().code());
+    }
+
+    @Test
+    void validateHierarchy_WhenCourseHasNoModules_ShouldRejectCourse() {
+        Course course = Course.builder()
+                .id(courseId)
+                .modules(List.of())
+                .build();
+        List<ValidationError> errors = new ArrayList<>();
+
+        ReflectionTestUtils.invokeMethod(
+                courseValidationService,
+                "validateHierarchy",
+                course,
+                errors
+        );
+
+        assertTrue(errors.stream().anyMatch(error -> "MSG-COURSE-015".equals(error.code())));
+        assertTrue(errors.stream().anyMatch(error -> "MSG-COURSE-016".equals(error.code())));
+    }
+
+    @Test
+    void validateFlashcardBlock_WhenJsonIsInvalid_ShouldReturnValidationError() {
+        LessonBlock block = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .type(LessonBlockType.FLASHCARD)
+                .flashcardsJson("[invalid-json")
+                .build();
+        List<ValidationError> errors = new ArrayList<>();
+
+        ReflectionTestUtils.invokeMethod(
+                courseValidationService,
+                "validateFlashcardBlock",
+                block,
+                errors
+        );
+
+        assertEquals(1, errors.size());
+        assertEquals("MSG-COURSE-011", errors.getFirst().code());
     }
 
     private ValidationResultResponse validate(String thumbnailUrl) {
@@ -110,5 +196,24 @@ class CourseValidationServiceImplTest {
     private boolean hasThumbnailUrlError(ValidationResultResponse result) {
         return result.errors().stream()
                 .anyMatch(error -> THUMBNAIL_URL_ERROR_CODE.equals(error.code()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ValidationError> validateQuizOptions(String optionsJson, String answer) {
+        LessonBlock block = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .type(LessonBlockType.QUIZ)
+                .quizOptionsJson(optionsJson)
+                .quizAnswer(answer)
+                .build();
+        List<ValidationError> errors = new ArrayList<>();
+
+        ReflectionTestUtils.invokeMethod(
+                courseValidationService,
+                "validateQuizBlock",
+                block,
+                errors
+        );
+        return errors;
     }
 }

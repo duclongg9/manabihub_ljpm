@@ -27,6 +27,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -49,9 +50,14 @@ public class SecurityConfig {
     private List<String> allowedOrigins;
 
     private final TeacherEligibilityFilter teacherEligibilityFilter;
+    private final InternalAdminRoleFilter internalAdminRoleFilter;
 
-    public SecurityConfig(TeacherEligibilityFilter teacherEligibilityFilter) {
+    public SecurityConfig(
+            TeacherEligibilityFilter teacherEligibilityFilter,
+            InternalAdminRoleFilter internalAdminRoleFilter
+    ) {
         this.teacherEligibilityFilter = teacherEligibilityFilter;
+        this.internalAdminRoleFilter = internalAdminRoleFilter;
     }
 
     @Bean
@@ -85,18 +91,22 @@ public class SecurityConfig {
                                 "/api/v1/mock/**",
                                 "/api/v1/course-categories",
                                 "/api/v1/public/courses/**",
+                                "/api/v1/public/teachers/**",
                                 "/api/v1/payments/vnpay/ipn",
-                                "/api/v1/payments/vnpay/confirm-return",
-                                "/api/v1/payments/dev/ipn",
                                 "/uploads/course-thumbnails/**",
                                 "/uploads/user-avatars/**",
                                 "/api/admin/auth/login")
+                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/public/commercial-policy/current")
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(
                         jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
         http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
+        http.addFilterAfter(internalAdminRoleFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }
@@ -219,6 +229,16 @@ public class SecurityConfig {
             TeacherEligibilityFilter filter
     ) {
         FilterRegistrationBean<TeacherEligibilityFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<InternalAdminRoleFilter> internalAdminRoleFilterRegistration(
+            InternalAdminRoleFilter filter
+    ) {
+        FilterRegistrationBean<InternalAdminRoleFilter> registration =
+                new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

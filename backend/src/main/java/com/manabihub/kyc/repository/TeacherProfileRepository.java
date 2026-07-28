@@ -1,17 +1,50 @@
 package com.manabihub.kyc.repository;
 
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.domain.TeacherKycStatus;
+import com.manabihub.kyc.domain.UserStatus;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface TeacherProfileRepository extends JpaRepository<TeacherProfile, UUID> {
 
     Optional<TeacherProfile> findByUserId(UUID userId);
+
+    @EntityGraph(attributePaths = "user")
+    Optional<TeacherProfile> findByIdAndKycStatusAndCanPublishCourseTrueAndUser_UserStatus(
+            UUID id,
+            TeacherKycStatus kycStatus,
+            UserStatus userStatus
+    );
+
+    @EntityGraph(attributePaths = "user")
+    @Query("""
+            SELECT profile
+            FROM TeacherProfile profile
+            WHERE profile.kycStatus = :kycStatus
+              AND profile.canPublishCourse = true
+              AND profile.user.userStatus = :userStatus
+              AND EXISTS (
+                  SELECT course.id
+                  FROM Course course
+                  WHERE course.teacher = profile
+                    AND course.status = com.manabihub.course.enums.CourseStatus.PUBLISHED
+              )
+            ORDER BY profile.updatedAt DESC, profile.id ASC
+            """)
+    List<TeacherProfile> findDiscoverableProfiles(
+            @Param("kycStatus") TeacherKycStatus kycStatus,
+            @Param("userStatus") UserStatus userStatus,
+            Pageable pageable
+    );
 
     @Modifying
     @Query(value = """

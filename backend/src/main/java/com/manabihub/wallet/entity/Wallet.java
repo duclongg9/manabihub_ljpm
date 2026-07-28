@@ -66,6 +66,10 @@ public class Wallet {
     private BigDecimal frozenBalance = BigDecimal.ZERO;
 
     @Builder.Default
+    @Column(nullable = false)
+    private boolean frozen = false;
+
+    @Builder.Default
     @Column(nullable = false, length = 10)
     private String currency = "VND";
 

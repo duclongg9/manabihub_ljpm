@@ -98,7 +98,7 @@ public class RefundServiceImpl implements RefundService {
                     });
         }
 
-        escrowService.reverseHold(order);
+        escrowService.reverseHeldAllocationsForRefund(order.getId());
 
         auditLogService.logAdminAction(
                 admin.getId(),

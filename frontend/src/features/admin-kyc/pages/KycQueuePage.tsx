@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
-import { adminKycService } from '../services/adminKycService';
+import { adminKycService, KYC_STATUS_LABELS } from '../services/adminKycService';
 import type { KycRequestResponse } from '../services/adminKycService';
+
+const STATUS_BADGE_CLASS: Record<string, string> = {
+  APPROVED: 'bg-green-50 text-green-700 border-green-200',
+  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
+  REJECTED: 'bg-red-50 text-red-700 border-red-200',
+  CORRECTION_REQUIRED: 'bg-orange-50 text-orange-700 border-orange-200',
+  REVOKED: 'bg-gray-200 text-gray-800 border-gray-300',
+  DRAFT: 'bg-slate-50 text-slate-600 border-slate-200',
+};
 
 export function KycQueuePage() {
   const [queue, setQueue] = useState<KycRequestResponse[]>([]);
@@ -57,13 +66,14 @@ export function KycQueuePage() {
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Danh sách yêu cầu KYC chờ duyệt</h2>
+          <h2 className="text-xl font-bold text-gray-900">Chứng chỉ JLPT chờ xác minh</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Hiển thị các hồ sơ đăng ký tài khoản Giáo viên đang chờ duyệt danh tính.
+            CCCD, OCR, đối chiếu danh tính và kiểm tra trùng đã đạt. Course Manager chỉ xác minh tính
+            xác thực của chứng chỉ theo hướng dẫn chính thức của Japan Foundation.
           </p>
         </div>
         <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1.5 rounded-full border border-amber-200">
-          Có {queue.length} hồ sơ chờ duyệt
+          Tổng {queue.length} hồ sơ
         </span>
       </div>
 
@@ -74,8 +84,10 @@ export function KycQueuePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <p className="text-gray-600 font-medium">Không có hồ sơ nào đang chờ xét duyệt.</p>
-          <p className="text-sm text-gray-400 mt-1">Tất cả hồ sơ đăng ký KYC đều đã được xử lý xong.</p>
+          <p className="text-gray-600 font-medium">Không có hồ sơ cần xử lý.</p>
+          <p className="text-sm text-gray-400 mt-1">
+            Hậu kiểm hồ sơ đã duyệt phải bắt đầu từ báo cáo vi phạm hoặc tín hiệu rủi ro có căn cứ.
+          </p>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -85,6 +97,7 @@ export function KycQueuePage() {
                 <th className="py-4 px-6">Họ và tên hiển thị</th>
                 <th className="py-4 px-6">Email giáo viên</th>
                 <th className="py-4 px-6">Ngày gửi</th>
+                <th className="py-4 px-6">Trạng thái</th>
                 <th className="py-4 px-6">Xác thực VNPT</th>
                 <th className="py-4 px-6">Mức độ rủi ro</th>
                 <th className="py-4 px-6 text-right">Thao tác</th>
@@ -106,22 +119,37 @@ export function KycQueuePage() {
                   </td>
                   <td className="py-4 px-6">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                      req.vnptVerificationStatus === 'SUCCESS'
-                        ? 'bg-green-50 text-green-700 border-green-200'
-                        : 'bg-red-50 text-red-700 border-red-200'
+                      STATUS_BADGE_CLASS[req.status] || 'bg-gray-50 text-gray-600 border-gray-200'
                     }`}>
-                      {req.vnptVerificationStatus === 'SUCCESS' ? 'Thành công' : 'Thất bại'}
+                      {KYC_STATUS_LABELS[req.status] || req.status}
                     </span>
                   </td>
                   <td className="py-4 px-6">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                      req.riskLevel === 'LOW'
+                      req.vnptVerificationStatus === 'SDK_VERIFIED'
+                        ? 'bg-green-50 text-green-700 border-green-200'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                    }`}>
+                      {req.vnptVerificationStatus === 'SDK_VERIFIED' ? 'Đã xác minh' : 'Cần kiểm tra'}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                      !req.riskLevel
+                        ? 'bg-gray-50 text-gray-600 border-gray-200'
+                        : req.riskLevel === 'LOW'
                         ? 'bg-green-50 text-green-700 border-green-200'
                         : req.riskLevel === 'MEDIUM'
                         ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
                         : 'bg-red-50 text-red-700 border-red-200'
                     }`}>
-                      {req.riskLevel === 'LOW' ? 'Thấp' : req.riskLevel === 'MEDIUM' ? 'Trung bình' : 'Cao'}
+                      {!req.riskLevel
+                        ? 'Chưa đánh giá'
+                        : req.riskLevel === 'LOW'
+                          ? 'Thấp'
+                          : req.riskLevel === 'MEDIUM'
+                            ? 'Trung bình'
+                            : 'Cao'}
                     </span>
                   </td>
                   <td className="py-4 px-6 text-right">

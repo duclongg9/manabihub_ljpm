@@ -25,6 +25,14 @@ public class KycRequestResponse {
     private String vnptVerificationStatus;
     private String vnptResponseDetails;
     private String riskLevel;
+    private String exceptionStage;
+    private String exceptionType;
+    private String exceptionReason;
+    private String certificateCode;
+    private String certificateHolderName;
+    private String certificateDateOfBirth;
+    private String certificateLevel;
+    private String certificateOcrText;
     private String decisionNote;
     private Instant createdAt;
     private Instant updatedAt;

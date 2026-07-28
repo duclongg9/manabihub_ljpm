@@ -74,6 +74,9 @@ public final class MessageCodes {
     public static final String KYC_ALREADY_PENDING = "KYC_ALREADY_PENDING";
     public static final String KYC_ALREADY_APPROVED = "KYC_ALREADY_APPROVED";
     public static final String KYC_SUBMISSION_NOT_ALLOWED = "KYC_SUBMISSION_NOT_ALLOWED";
+    public static final String KYC_CERTIFICATE_ALREADY_CLAIMED = "KYC_CERTIFICATE_ALREADY_CLAIMED";
+    public static final String KYC_CERTIFICATE_OCR_MISMATCH = "KYC_CERTIFICATE_OCR_MISMATCH";
+    public static final String KYC_TRUST_CASE_REQUIRED = "KYC_TRUST_CASE_REQUIRED";
     public static final String MSG_KYC_002 = "MSG-KYC-002";
     public static final String MSG_KYC_003 = "MSG-KYC-003";
     public static final String MSG_KYC_006 = "MSG-KYC-006";
@@ -165,6 +168,21 @@ public final class MessageCodes {
     public static final String LEARNING_WISHLIST_REMOVED = "LEARNING_WISHLIST_REMOVED";
     public static final String LEARNING_WISHLIST_DUPLICATE = "LEARNING_WISHLIST_DUPLICATE";
     public static final String LEARNING_WISHLIST_ITEM_NOT_FOUND = "LEARNING_WISHLIST_ITEM_NOT_FOUND";
+    public static final String COURSE_REVIEW_SAVED = "COURSE_REVIEW_SAVED";
+    public static final String COURSE_REVIEW_NOT_ELIGIBLE = "COURSE_REVIEW_NOT_ELIGIBLE";
+    public static final String COURSE_REVIEW_INVALID = "COURSE_REVIEW_INVALID";
+
+    // SYSTEM CONFIGURATION / INTERNAL ADMIN RBAC — UC-31
+    public static final String SYSTEM_SETTING_UPDATED = "SYSTEM_SETTING_UPDATED";
+    public static final String SYSTEM_SETTING_INVALID = "SYSTEM_SETTING_INVALID";
+    public static final String SYSTEM_SETTING_NOT_EDITABLE = "SYSTEM_SETTING_NOT_EDITABLE";
+    public static final String SYSTEM_ADMIN_REQUIRED = "SYSTEM_ADMIN_REQUIRED";
+    public static final String INTERNAL_ROLE_UPDATED = "INTERNAL_ROLE_UPDATED";
+    public static final String INTERNAL_ROLE_INVALID = "INTERNAL_ROLE_INVALID";
+    public static final String INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN =
+            "INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN";
+    public static final String LAST_SYSTEM_ADMIN_REQUIRED = "LAST_SYSTEM_ADMIN_REQUIRED";
+    public static final String ADMIN_SESSION_STALE = "ADMIN_SESSION_STALE";
     public static final String LEARNING_STUDENT_PROFILE_NOT_FOUND = "LEARNING_STUDENT_PROFILE_NOT_FOUND";
 
     // ──────────────────────────────────────────────
@@ -218,6 +236,8 @@ public final class MessageCodes {
     public static final String REFUND_NOT_ELIGIBLE = "REFUND_NOT_ELIGIBLE";
     public static final String REFUND_REQUESTED = "REFUND_REQUESTED";
     public static final String REFUND_PROCESSED = "REFUND_PROCESSED";
+    public static final String FINANCIAL_INTEGRITY_VIOLATION = "FINANCIAL_INTEGRITY_VIOLATION";
+    public static final String REFUND_RECONCILIATION_REQUIRED = "REFUND_RECONCILIATION_REQUIRED";
 
     // ──────────────────────────────────────────────
     // PAYOUT — teacher payout
@@ -225,6 +245,41 @@ public final class MessageCodes {
     public static final String PAYOUT_NOT_ELIGIBLE = "PAYOUT_NOT_ELIGIBLE";
     public static final String PAYOUT_REQUESTED = "PAYOUT_REQUESTED";
     public static final String PAYOUT_PROCESSED = "PAYOUT_PROCESSED";
+    public static final String PAYOUT_WITHDRAWAL_REQUEST_CREATED = "PAYOUT_WITHDRAWAL_REQUEST_CREATED";
+    public static final String PAYOUT_WITHDRAWAL_NOT_FOUND = "PAYOUT_WITHDRAWAL_NOT_FOUND";
+    public static final String PAYOUT_AMOUNT_BELOW_MINIMUM = "PAYOUT_AMOUNT_BELOW_MINIMUM";
+    public static final String PAYOUT_PENDING_REQUEST_EXISTS = "PAYOUT_PENDING_REQUEST_EXISTS";
+    public static final String PAYOUT_MONTHLY_LIMIT_EXCEEDED = "PAYOUT_MONTHLY_LIMIT_EXCEEDED";
+    public static final String PAYOUT_BANK_ACCOUNT_REQUIRED = "PAYOUT_BANK_ACCOUNT_REQUIRED";
+    public static final String PAYOUT_EMAIL_REQUIRED = "PAYOUT_EMAIL_REQUIRED";
+    public static final String PAYOUT_INVALID_OTP = "PAYOUT_INVALID_OTP";
+    public static final String PAYOUT_OTP_RATE_LIMITED = "PAYOUT_OTP_RATE_LIMITED";
+    public static final String PAYOUT_NOT_FOUND = "PAYOUT_NOT_FOUND";
+    public static final String PAYOUT_INVALID_STATUS = "PAYOUT_INVALID_STATUS";
+    public static final String PAYOUT_SETTLEMENT_PROCESSING = "PAYOUT_SETTLEMENT_PROCESSING";
+    public static final String PAYOUT_SETTLEMENT_COMPLETED = "PAYOUT_SETTLEMENT_COMPLETED";
+    public static final String PAYOUT_REJECTED = "PAYOUT_REJECTED";
+    public static final String PAYOUT_PERMISSION_DENIED = "PAYOUT_PERMISSION_DENIED";
+    public static final String PAYOUT_RECONCILIATION_MISMATCH = "PAYOUT_RECONCILIATION_MISMATCH";
+    public static final String PAYOUT_BALANCE_FROZEN = "PAYOUT_BALANCE_FROZEN";
+    public static final String PAYOUT_INSUFFICIENT_RESERVED_BALANCE = "PAYOUT_INSUFFICIENT_RESERVED_BALANCE";
+    public static final String PAYOUT_GATEWAY_FAILED = "PAYOUT_GATEWAY_FAILED";
+    public static final String PAYOUT_PENDING_RETRY = "PAYOUT_PENDING_RETRY";
+    public static final String PAYOUT_DUPLICATE_SETTLEMENT = "PAYOUT_DUPLICATE_SETTLEMENT";
+    public static final String PAYOUT_MANUAL_REFERENCE_DUPLICATE = "PAYOUT_MANUAL_REFERENCE_DUPLICATE";
+    public static final String PAYOUT_DECISION_REASON_REQUIRED = "PAYOUT_DECISION_REASON_REQUIRED";
+    public static final String PAYOUT_MANUAL_AMOUNT_MISMATCH = "PAYOUT_MANUAL_AMOUNT_MISMATCH";
+    public static final String PAYOUT_PROOF_INVALID = "PAYOUT_PROOF_INVALID";
+    public static final String PAYOUT_RETRY_NOT_ALLOWED = "PAYOUT_RETRY_NOT_ALLOWED";
+    public static final String PAYOUT_PROOF_NOT_FOUND = "PAYOUT_PROOF_NOT_FOUND";
+    public static final String MSG_ADM_004 = "MSG-ADM-004";
+    public static final String MSG_ADM_005 = "MSG-ADM-005";
+
+    // ──────────────────────────────────────────────
+    // WALLET — wallet operations
+    // ──────────────────────────────────────────────
+    public static final String WALLET_FROZEN = "WALLET_FROZEN";
+    public static final String WALLET_RESERVATION_FAILED = "WALLET_RESERVATION_FAILED";
 
     // ──────────────────────────────────────────────
     // ADMIN — admin operations

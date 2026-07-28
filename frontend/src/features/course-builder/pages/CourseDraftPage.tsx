@@ -36,6 +36,7 @@ import Cropper, { type Area } from 'react-easy-crop';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
+import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
 import {
   type CourseCategory,
   type CourseDraftResponse,
@@ -118,16 +119,16 @@ function buildInitialForm(draft?: CourseDraftResponse): CourseDraftForm {
 
   return {
     title: draft.title || '',
-    introduction: draft.introduction || '',
+    introduction: sanitizeRichText(draft.introduction),
     jlptLevel: draft.jlptLevel,
     category: draft.category || '',
     thumbnailUrl: draft.thumbnailUrl || '',
     thumbnailPreviewUrl: resolveCourseAssetUrl(draft.thumbnailUrl) || '',
     thumbnailFileName: draft.thumbnailUrl ? 'Ảnh bìa hiện tại' : '',
-    outcomes: draft.outcomes || '',
+    outcomes: sanitizeRichText(draft.outcomes),
     price: String(Number(draft.price || 0)),
-    prerequisites: draft.prerequisites || '',
-    targetStudents: draft.targetStudents || '',
+    prerequisites: sanitizeRichText(draft.prerequisites),
+    targetStudents: sanitizeRichText(draft.targetStudents),
     learningGoals: withMinimumGoals(draft.learningGoals),
   };
 }
@@ -320,14 +321,14 @@ export function CourseDraftPage() {
     try {
       const payload = {
         title: form.title.trim(),
-        introduction: form.introduction,
+        introduction: sanitizeRichText(form.introduction),
         jlptLevel: form.jlptLevel,
         category: form.category,
         thumbnailUrl: form.thumbnailUrl || null,
-        outcomes: form.outcomes,
+        outcomes: sanitizeRichText(form.outcomes),
         price: Number(form.price),
-        prerequisites: form.prerequisites,
-        targetStudents: form.targetStudents,
+        prerequisites: sanitizeRichText(form.prerequisites),
+        targetStudents: sanitizeRichText(form.targetStudents),
         learningGoals: form.learningGoals.map((goal) => goal.trim()).filter(Boolean),
       };
       const draft = editingDraft
@@ -749,9 +750,9 @@ function RichTextEditor({ label, value, onChange, placeholder, error }: RichText
       },
     });
 
-    quill.clipboard.dangerouslyPasteHTML(initialValueRef.current || '');
+    quill.clipboard.dangerouslyPasteHTML(sanitizeRichText(initialValueRef.current));
     const handleTextChange = () => {
-      const html = quill.root.innerHTML;
+      const html = sanitizeRichText(quill.root.innerHTML);
       onChangeRef.current(stripHtml(html).length === 0 ? '' : html);
     };
 
@@ -767,11 +768,16 @@ function RichTextEditor({ label, value, onChange, placeholder, error }: RichText
 
   useEffect(() => {
     const quill = quillRef.current;
-    if (!quill || document.activeElement === quill.root || quill.root.innerHTML === value) {
+    const sanitizedValue = sanitizeRichText(value);
+    if (
+      !quill
+      || document.activeElement === quill.root
+      || quill.root.innerHTML === sanitizedValue
+    ) {
       return;
     }
 
-    quill.clipboard.dangerouslyPasteHTML(value || '');
+    quill.clipboard.dangerouslyPasteHTML(sanitizedValue);
   }, [value]);
 
   return (

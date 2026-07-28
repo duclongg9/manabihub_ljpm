@@ -81,12 +81,20 @@ public class TeacherKycController {
             @RequestPart("certificate") MultipartFile certificate,
             @RequestParam("copyrightAgreementAccepted") boolean copyrightAgreementAccepted,
             @RequestParam("certificateCode") String certificateCode,
+            @RequestParam("certificateHolderName") String certificateHolderName,
+            @RequestParam("certificateDateOfBirth") String certificateDateOfBirth,
+            @RequestParam("certificateLevel") String certificateLevel,
+            @RequestParam("certificateOcrText") String certificateOcrText,
             HttpServletRequest request
     ) {
         KycCertificateSubmissionResponse response = teacherKycService.submitCertificate(
                 currentUserService.getCurrentUserId(),
                 certificate,
                 certificateCode,
+                certificateHolderName,
+                certificateDateOfBirth,
+                certificateLevel,
+                certificateOcrText,
                 copyrightAgreementAccepted,
                 request.getRemoteAddr(),
                 request.getHeader("User-Agent")
@@ -94,7 +102,9 @@ public class TeacherKycController {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
                 MessageCodes.MSG_KYC_003,
-                "Certificate submitted successfully. KYC is waiting for registry matching.",
+                "JLPT certificate received. OCR succeeded, identity data matched the VNPT-verified CCCD, "
+                        + "and duplicate checks passed. Authenticity review normally takes 1-2 business days, "
+                        + "excluding Saturdays, Sundays, and public holidays.",
                 response
         ));
     }

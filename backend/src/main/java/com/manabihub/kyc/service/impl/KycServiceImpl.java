@@ -1,38 +1,59 @@
 package com.manabihub.kyc.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manabihub.audit.entity.AuditLog;
+import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
-import com.manabihub.kyc.domain.*;
+import com.manabihub.course.entity.Course;
+import com.manabihub.course.enums.CourseStatus;
+import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.kyc.domain.AppUser;
+import com.manabihub.kyc.domain.CertificateVerificationStatus;
+import com.manabihub.kyc.domain.IdentityVerificationStatus;
+import com.manabihub.kyc.domain.InternalAdminAccount;
+import com.manabihub.kyc.domain.KycDocument;
+import com.manabihub.kyc.domain.KycDocumentType;
+import com.manabihub.kyc.domain.KycRequest;
+import com.manabihub.kyc.domain.KycRequestStatus;
+import com.manabihub.kyc.domain.TeacherKycStatus;
+import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.dto.request.KycReviewRequest;
+import com.manabihub.kyc.dto.response.KycDocumentDownload;
 import com.manabihub.kyc.dto.response.KycRequestResponse;
 import com.manabihub.kyc.repository.InternalAdminAccountRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.service.KycService;
-
-import com.manabihub.audit.entity.AuditLog;
-import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
-// removed UserRepository
-import com.fasterxml.jackson.databind.ObjectMapper;
-
+import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.repository.TeacherWalletRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class KycServiceImpl implements KycService {
+
+    private static final UUID TEACHER_ROLE_ID =
+            UUID.fromString("a0000000-0000-0000-0000-000000000002");
+    private static final List<String> REVIEW_ROLES = List.of("COURSE_MANAGER", "SYSTEM_ADMIN");
+    private static final String RESTRICTED_DOCUMENT_PREFIX = "restricted://kyc/";
 
     private final KycRequestRepository kycRequestRepository;
     private final InternalAdminAccountRepository adminAccountRepository;
@@ -40,196 +61,343 @@ public class KycServiceImpl implements KycService {
     private final KycDocumentRepository kycDocumentRepository;
     private final AuditLogRepository auditLogRepository;
     private final NotificationRepository notificationRepository;
+    private final CourseRepository courseRepository;
+    private final TeacherWalletRepository teacherWalletRepository;
     private final ObjectMapper objectMapper;
+    private final EntityManager entityManager;
 
-    private void checkCourseManagerAccess(UUID adminId) {
-        boolean hasAccess = adminAccountRepository.existsByAdminIdAndRoleCodes(adminId, List.of("COURSE_MANAGER", "SYSTEM_ADMIN"));
-        if (!hasAccess) {
+    @Value("${manabihub.kyc.storage-root:storage/kyc}")
+    private String storageRoot;
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<KycRequestResponse> getPendingKycQueue(UUID adminId) {
+        requireCourseManagerAccess(adminId);
+        return kycRequestRepository.findByStatusOrderByCreatedAtDesc(KycRequestStatus.PENDING)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public KycRequestResponse getKycDetail(UUID id, UUID adminId) {
+        requireCourseManagerAccess(adminId);
+        return mapToResponse(kycRequestRepository.findById(id)
+                .orElseThrow(() -> notFound("KYC request not found")));
+    }
+
+    @Override
+    @Transactional
+    public KycRequestResponse reviewKyc(UUID id, KycReviewRequest request, UUID adminId) {
+        AdminContext adminContext = requireCourseManagerAccess(adminId);
+        KycRequest kycRequest = kycRequestRepository.findByIdForReview(id)
+                .orElseThrow(() -> notFound("KYC request not found"));
+
+        KycRequestStatus currentStatus = kycRequest.getStatus();
+        KycRequestStatus targetStatus = request.getStatus();
+        boolean isRevoke = currentStatus == KycRequestStatus.APPROVED
+                && targetStatus == KycRequestStatus.REVOKED;
+        if (currentStatus != KycRequestStatus.PENDING && !isRevoke) {
+            throw transitionConflict(targetStatus);
+        }
+        if (targetStatus == KycRequestStatus.REVOKED && !isRevoke) {
+            throw transitionConflict(targetStatus);
+        }
+        if (targetStatus != KycRequestStatus.APPROVED
+                && targetStatus != KycRequestStatus.REJECTED
+                && targetStatus != KycRequestStatus.CORRECTION_REQUIRED
+                && targetStatus != KycRequestStatus.REVOKED) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Unsupported KYC review decision",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        requireDecisionReason(targetStatus, request.getDecisionNote());
+        if (targetStatus == KycRequestStatus.APPROVED) {
+            validateManualJlptApproval(kycRequest);
+        }
+        if (targetStatus == KycRequestStatus.REVOKED) {
+            requireConfirmedTrustCase(
+                    request.getTrustCaseId(),
+                    kycRequest.getTeacherProfile().getUser().getId()
+            );
+        }
+
+        SuspensionImpact suspensionImpact = applyDecision(kycRequest, targetStatus);
+        kycRequest.setStatus(targetStatus);
+        kycRequest.setDecisionReason(request.getDecisionNote());
+        kycRequest.setReviewedBy(adminId);
+        kycRequest.setReviewedAt(Instant.now());
+        KycRequest savedRequest = kycRequestRepository.save(kycRequest);
+
+        writeAudit(
+                savedRequest,
+                currentStatus,
+                targetStatus,
+                request,
+                adminId,
+                adminContext.roleCode(),
+                suspensionImpact
+        );
+        createResultNotification(savedRequest, targetStatus, request.getDecisionNote());
+        return mapToResponse(savedRequest);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public KycDocumentDownload getKycDocument(UUID requestId, UUID documentId, UUID adminId) {
+        requireCourseManagerAccess(adminId);
+        KycDocument document = kycDocumentRepository.findByIdAndKycRequestId(documentId, requestId)
+                .orElseThrow(() -> notFound("KYC document not found"));
+        String fileUrl = document.getFileUrl();
+        String expectedPrefix = RESTRICTED_DOCUMENT_PREFIX + requestId + "/";
+        if (fileUrl == null || !fileUrl.startsWith(expectedPrefix)) {
+            throw notFound("KYC document file is unavailable");
+        }
+
+        Path root = Path.of(storageRoot).toAbsolutePath().normalize();
+        Path file = root.resolve(fileUrl.substring(RESTRICTED_DOCUMENT_PREFIX.length())).normalize();
+        if (!file.startsWith(root) || !Files.isRegularFile(file)) {
+            throw notFound("KYC document file is unavailable");
+        }
+        try {
+            return new KycDocumentDownload(
+                    Files.readAllBytes(file),
+                    document.getFileName(),
+                    document.getMimeType()
+            );
+        } catch (IOException exception) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_INTERNAL_ERROR,
+                    "Could not read the secured KYC document",
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    exception
+            );
+        }
+    }
+
+    private AdminContext requireCourseManagerAccess(UUID adminId) {
+        adminAccountRepository.findById(adminId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.AUTH_UNAUTHORIZED,
+                        "Admin not found",
+                        HttpStatus.UNAUTHORIZED
+                ));
+        List<String> roleCodes = adminAccountRepository.findActiveRoleCodesByAdminId(
+                adminId,
+                REVIEW_ROLES
+        );
+        if (roleCodes.isEmpty()) {
             throw new BusinessException(
                     MessageCodes.ADMIN_PERMISSION_DENIED,
                     "Access denied: Course Manager privileges required",
                     HttpStatus.FORBIDDEN
             );
         }
+        return new AdminContext(roleCodes.contains("SYSTEM_ADMIN") ? "SYSTEM_ADMIN" : "COURSE_MANAGER");
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<KycRequestResponse> getPendingKycQueue(UUID adminId) {
-        checkCourseManagerAccess(adminId);
-        List<KycRequest> requests = kycRequestRepository.findByStatusOrderByCreatedAtDesc(KycRequestStatus.PENDING);
-        return requests.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public KycRequestResponse getKycDetail(UUID id, UUID adminId) {
-        checkCourseManagerAccess(adminId);
-        KycRequest request = kycRequestRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.COMMON_NOT_FOUND,
-                        "KYC request not found",
-                        HttpStatus.NOT_FOUND
-                ));
-        return mapToResponse(request);
-    }
-
-    @Override
-    @Transactional
-    public KycRequestResponse reviewKyc(UUID id, KycReviewRequest request, UUID adminId, String adminRole, String adminEmail) {
-        checkCourseManagerAccess(adminId);
-
-        KycRequest kycRequest = kycRequestRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.COMMON_NOT_FOUND,
-                        "KYC request not found",
-                        HttpStatus.NOT_FOUND
-                ));
-
-        if (kycRequest.getStatus() != KycRequestStatus.PENDING) {
-            throw new BusinessException(
-                    MessageCodes.COMMON_CONFLICT,
-                    "KYC request has already been processed or is not pending review",
-                    HttpStatus.CONFLICT
-            );
-        }
-
-        InternalAdminAccount admin = adminAccountRepository.findById(adminId)
-                .orElseThrow(() -> new BusinessException(MessageCodes.AUTH_UNAUTHORIZED, "Admin not found", HttpStatus.UNAUTHORIZED));
-
-        // Validate decision note for Reject or Request Correction
-        KycRequestStatus targetStatus = request.getStatus();
-        if (targetStatus == KycRequestStatus.DRAFT || targetStatus == KycRequestStatus.PENDING) {
+    private void requireDecisionReason(KycRequestStatus targetStatus, String decisionNote) {
+        if ((targetStatus == KycRequestStatus.REJECTED
+                || targetStatus == KycRequestStatus.CORRECTION_REQUIRED
+                || targetStatus == KycRequestStatus.REVOKED)
+                && (decisionNote == null || decisionNote.isBlank())) {
             throw new BusinessException(
                     MessageCodes.VALIDATION_FAILED,
-                    "Cannot review KYC with DRAFT or PENDING status",
+                    "Decision reason is required for rejection, correction, or revocation",
                     HttpStatus.BAD_REQUEST
             );
         }
+    }
 
-        if (targetStatus == KycRequestStatus.REJECTED || targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
-            if (request.getDecisionNote() == null || request.getDecisionNote().trim().isEmpty()) {
-                throw new BusinessException(
-                        MessageCodes.VALIDATION_FAILED,
-                        "Decision reason is required for rejection or correction request",
-                        HttpStatus.BAD_REQUEST
-                );
-            }
+    private void validateManualJlptApproval(KycRequest request) {
+        Map<String, Object> payload = request.getVerificationPayload();
+        boolean valid = request.getIdentityStatus() == IdentityVerificationStatus.VERIFIED
+                && request.getCertificateStatus() == CertificateVerificationStatus.PENDING_REVIEW
+                && "CERTIFICATE".equals(payloadValue(payload, "exceptionStage"))
+                && "JLPT_AUTHENTICITY_CHECK".equals(payloadValue(payload, "exceptionType"))
+                && "JLPT".equals(payloadValue(payload, "certificateType"))
+                && "MATCHED".equals(payloadValue(payload, "identityCrossMatch"))
+                && "PASSED".equals(payloadValue(payload, "duplicateCertificateCheck"));
+        if (!valid) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "Only a JLPT certificate with verified CCCD, successful OCR identity matching, "
+                            + "and passed duplicate checks can be approved",
+                    HttpStatus.CONFLICT
+            );
         }
+    }
 
-        // Apply changes
-        kycRequest.setStatus(targetStatus);
-        kycRequest.setDecisionReason(request.getDecisionNote());
-        kycRequest.setReviewedBy(adminId);
-        kycRequest.setReviewedAt(Instant.now());
+    private void requireConfirmedTrustCase(UUID trustCaseId, UUID teacherUserId) {
+        if (trustCaseId == null) {
+            throw trustCaseRequired(
+                    "A resolved trust case with a BAN decision is required before revoking teacher KYC"
+            );
+        }
+        Object result = entityManager.createNativeQuery("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM violation_reports report
+                    JOIN moderation_decisions decision
+                      ON decision.violation_report_id = report.id
+                    WHERE report.id = :trustCaseId
+                      AND report.target_type = 'USER'
+                      AND report.target_id = :teacherUserId
+                      AND report.status = 'RESOLVED'
+                      AND decision.decision = 'BAN'
+                )
+                """)
+                .setParameter("trustCaseId", trustCaseId)
+                .setParameter("teacherUserId", teacherUserId)
+                .getSingleResult();
+        boolean confirmed = result instanceof Boolean booleanResult
+                ? booleanResult
+                : result instanceof Number numberResult && numberResult.intValue() == 1;
+        if (!confirmed) {
+            throw trustCaseRequired(
+                    "The supplied trust case is not resolved with a BAN decision for this teacher"
+            );
+        }
+    }
 
+    private SuspensionImpact applyDecision(KycRequest request, KycRequestStatus targetStatus) {
+        TeacherProfile teacher = request.getTeacherProfile();
         if (targetStatus == KycRequestStatus.APPROVED) {
-            TeacherProfile teacher = kycRequest.getTeacherProfile();
+            request.setCertificateStatus(CertificateVerificationStatus.APPROVED);
             teacher.setKycStatus(TeacherKycStatus.APPROVED);
             teacher.setCanPublishCourse(true);
+            grantTeacherRoleIfAbsent(teacher.getUser().getId());
             teacherProfileRepository.save(teacher);
-        } else if (targetStatus == KycRequestStatus.REJECTED) {
-            TeacherProfile teacher = kycRequest.getTeacherProfile();
+            return SuspensionImpact.none();
+        }
+        if (targetStatus == KycRequestStatus.REJECTED) {
+            request.setCertificateStatus(CertificateVerificationStatus.REJECTED);
             teacher.setKycStatus(TeacherKycStatus.REJECTED);
+            teacher.setCanPublishCourse(false);
+            revokeTeacherRole(teacher.getUser().getId());
             teacherProfileRepository.save(teacher);
-        } else if (targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
-            TeacherProfile teacher = kycRequest.getTeacherProfile();
+            return SuspensionImpact.none();
+        }
+        if (targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
+            request.setCertificateStatus(CertificateVerificationStatus.REJECTED);
             teacher.setKycStatus(TeacherKycStatus.CORRECTION_REQUIRED);
+            teacher.setCanPublishCourse(false);
+            revokeTeacherRole(teacher.getUser().getId());
             teacherProfileRepository.save(teacher);
+            return SuspensionImpact.none();
+        }
+        return suspendTeacherOperations(teacher);
+    }
+
+    private void writeAudit(
+            KycRequest request,
+            KycRequestStatus currentStatus,
+            KycRequestStatus targetStatus,
+            KycReviewRequest review,
+            UUID adminId,
+            String adminRole,
+            SuspensionImpact suspensionImpact
+    ) {
+        Map<String, Object> afterValue = new LinkedHashMap<>();
+        afterValue.put("status", targetStatus.name());
+        if (targetStatus == KycRequestStatus.REVOKED) {
+            afterValue.put(
+                    "coursesRemovedFromMarketplace",
+                    suspensionImpact.coursesRemovedFromMarketplace()
+            );
+            afterValue.put("walletFrozen", suspensionImpact.walletFrozen());
+            afterValue.put("existingLearnerAccessPreserved", true);
         }
 
-        KycRequest savedRequest = kycRequestRepository.save(kycRequest);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("decisionNote", review.getDecisionNote() == null ? "" : review.getDecisionNote());
+        metadata.put("reviewMode", "MANUAL_JAPAN_FOUNDATION");
+        if (review.getTrustCaseId() != null) {
+            metadata.put("trustCaseId", review.getTrustCaseId().toString());
+        }
 
-        // Create Audit Log
-        AuditLog log = AuditLog.builder()
+        auditLogRepository.save(AuditLog.builder()
                 .actorType("INTERNAL_ADMIN")
                 .actorAdminId(adminId)
                 .actorRoleCode(adminRole)
                 .action("KYC_REVIEW")
                 .targetType("KYC_REQUEST")
-                .targetId(kycRequest.getId())
-                .beforeValue(Map.of("status", KycRequestStatus.PENDING.name()))
-                .afterValue(Map.of("status", targetStatus.name()))
-                .metadata(Map.of("decisionNote", request.getDecisionNote() != null ? request.getDecisionNote() : ""))
-                .build();
-        auditLogRepository.save(log);
+                .targetId(request.getId())
+                .beforeValue(Map.of("status", currentStatus.name()))
+                .afterValue(afterValue)
+                .metadata(metadata)
+                .build());
+    }
 
-        // Create Notification
-        String title = "Kết quả kiểm duyệt hồ sơ KYC";
-        String message = "";
-        if (targetStatus == KycRequestStatus.APPROVED) {
-            message = "Chúc mừng! Hồ sơ KYC của bạn đã được phê duyệt. Bạn đã có thể xuất bản khóa học.";
-        } else if (targetStatus == KycRequestStatus.REJECTED) {
-            message = "Rất tiếc, hồ sơ KYC của bạn đã bị từ chối. Lý do: " + request.getDecisionNote();
-        } else if (targetStatus == KycRequestStatus.CORRECTION_REQUIRED) {
-            message = "Hồ sơ KYC của bạn cần được chỉnh sửa. Lý do: " + request.getDecisionNote();
-        }
+    private void createResultNotification(
+            KycRequest request,
+            KycRequestStatus targetStatus,
+            String decisionNote
+    ) {
+        String title = "Teacher verification result";
+        String message = switch (targetStatus) {
+            case APPROVED ->
+                    "Your JLPT certificate has been verified. Your courses can now be submitted for publication.";
+            case REJECTED ->
+                    "Your JLPT certificate did not pass authenticity review. Reason: " + decisionNote;
+            case CORRECTION_REQUIRED ->
+                    "Your teacher application needs an updated JLPT certificate. Reason: " + decisionNote;
+            case REVOKED ->
+                    "Teacher operations and payouts have been suspended after a confirmed trust case. "
+                            + "Existing learners keep access while the case is handled. Reason: " + decisionNote;
+            default -> throw new IllegalStateException("Unsupported KYC review decision");
+        };
 
-        Notification notification = Notification.builder()
-                .recipientUserId(kycRequest.getTeacherProfile().getUser().getId())
+        notificationRepository.save(Notification.builder()
+                .recipientUserId(request.getTeacherProfile().getUser().getId())
                 .title(title)
                 .message(message)
                 .notificationType("KYC_RESULT")
+                .actionUrl("/teacher/kyc")
                 .isRead(false)
-                .build();
-        notificationRepository.save(notification);
-
-        return mapToResponse(savedRequest);
+                .build());
     }
 
     private KycRequestResponse mapToResponse(KycRequest request) {
-        if (request == null) {
-            return null;
-        }
-
         TeacherProfile teacher = request.getTeacherProfile();
         AppUser user = teacher.getUser();
+        List<KycDocument> documents =
+                kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(request.getId());
+        Map<String, Object> payload = request.getVerificationPayload();
 
-        List<KycDocument> documents = kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(request.getId());
-
-        String frontUrl = getDocUrl(documents, KycDocumentType.ID_CARD_FRONT);
-        String backUrl = getDocUrl(documents, KycDocumentType.ID_CARD_BACK);
-        String certUrl = getDocUrl(documents, KycDocumentType.CERTIFICATE);
-        String selfieUrl = getDocUrl(documents, KycDocumentType.SELFIE);
-
-        String vnptVerificationStatus = null;
-        String vnptResponseDetails = null;
-        if (request.getVerificationPayload() != null) {
-            vnptVerificationStatus = (String) request.getVerificationPayload().get("providerStatus");
-            try {
-                Object providerResult = request.getVerificationPayload().get("providerResult");
-                if (providerResult != null) {
-                    vnptResponseDetails = objectMapper.writeValueAsString(providerResult);
-                }
-            } catch (Exception e) {
-                vnptResponseDetails = "{}";
-            }
-        }
-
-        String processedByEmail = null;
-        if (request.getReviewedBy() != null) {
-            processedByEmail = adminAccountRepository.findById(request.getReviewedBy())
-                    .map(InternalAdminAccount::getEmail)
-                    .orElse(null);
-        }
+        String processedByEmail = request.getReviewedBy() == null
+                ? null
+                : adminAccountRepository.findById(request.getReviewedBy())
+                        .map(InternalAdminAccount::getEmail)
+                        .orElse(null);
 
         return KycRequestResponse.builder()
                 .id(request.getId())
                 .teacherId(teacher.getId())
-                .teacherEmail(user != null ? user.getEmail() : null)
-                .teacherFullName(user != null ? user.getFullName() : null)
+                .teacherEmail(user == null ? null : user.getEmail())
+                .teacherFullName(user == null ? null : user.getFullName())
                 .status(request.getStatus())
                 .displayName(teacher.getDisplayName())
-                .idCardFrontUrl(frontUrl)
-                .idCardBackUrl(backUrl)
-                .certificateUrl(certUrl)
-                .selfieUrl(selfieUrl)
+                .idCardFrontUrl(documentUrl(request.getId(), documents, KycDocumentType.ID_CARD_FRONT))
+                .idCardBackUrl(documentUrl(request.getId(), documents, KycDocumentType.ID_CARD_BACK))
+                .certificateUrl(documentUrl(request.getId(), documents, KycDocumentType.CERTIFICATE))
+                .selfieUrl(documentUrl(request.getId(), documents, KycDocumentType.SELFIE))
                 .copyrightAccepted(request.isCopyrightAgreed())
-                .vnptVerificationStatus(vnptVerificationStatus)
-                .vnptResponseDetails(vnptResponseDetails)
-                .riskLevel(request.getRiskLevel() != null ? request.getRiskLevel().name() : null)
+                .vnptVerificationStatus(payloadValue(payload, "providerStatus"))
+                .vnptResponseDetails(safeVnptDetails(request))
+                .riskLevel(request.getRiskLevel() == null ? null : request.getRiskLevel().name())
+                .exceptionStage(payloadValue(payload, "exceptionStage"))
+                .exceptionType(payloadValue(payload, "exceptionType"))
+                .exceptionReason(payloadValue(payload, "exceptionReason"))
+                .certificateCode(request.getCertificateCode())
+                .certificateHolderName(payloadValue(payload, "certificateHolderName"))
+                .certificateDateOfBirth(payloadValue(payload, "certificateDateOfBirth"))
+                .certificateLevel(payloadValue(payload, "certificateLevel"))
+                .certificateOcrText(payloadValue(payload, "certificateOcrText"))
                 .decisionNote(request.getDecisionReason())
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
@@ -238,11 +406,139 @@ public class KycServiceImpl implements KycService {
                 .build();
     }
 
-    private String getDocUrl(List<KycDocument> documents, KycDocumentType type) {
+    private String safeVnptDetails(KycRequest request) {
+        Map<String, Object> payload = request.getVerificationPayload();
+        Map<String, Object> safe = new LinkedHashMap<>();
+        safe.put("provider", request.getEkycProvider());
+        safe.put("providerStatus", payloadValue(payload, "providerStatus"));
+        Object ocrValue = payload == null ? null : payload.get("identityOcr");
+        if (ocrValue instanceof Map<?, ?> ocr) {
+            Map<String, Object> safeOcr = new LinkedHashMap<>();
+            safeOcr.put("fullName", nullableValue(ocr.get("fullName")));
+            safeOcr.put("dateOfBirth", nullableValue(ocr.get("dateOfBirth")));
+            safeOcr.put("idNumber", maskIdentityNumber(nullableValue(ocr.get("idNumber"))));
+            safe.put("identityOcr", safeOcr);
+        }
+        Object failureReasons = payload == null ? null : payload.get("failureReasons");
+        if (failureReasons != null) {
+            safe.put("failureReasons", failureReasons);
+        }
+        try {
+            return objectMapper.writeValueAsString(safe);
+        } catch (Exception exception) {
+            return "{}";
+        }
+    }
+
+    private String documentUrl(UUID requestId, List<KycDocument> documents, KycDocumentType type) {
         return documents.stream()
-                .filter(doc -> doc.getDocumentType() == type)
-                .map(KycDocument::getFileUrl)
+                .filter(document -> document.getDocumentType() == type)
+                .map(document -> "/v1/admin/kyc-requests/" + requestId
+                        + "/documents/" + document.getId())
                 .findFirst()
                 .orElse(null);
+    }
+
+    private String payloadValue(Map<String, Object> payload, String key) {
+        if (payload == null || payload.get(key) == null) {
+            return null;
+        }
+        return String.valueOf(payload.get(key));
+    }
+
+    private String nullableValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private String maskIdentityNumber(String value) {
+        if (value == null || value.length() < 6) {
+            return null;
+        }
+        return value.substring(0, 3) + "******" + value.substring(value.length() - 3);
+    }
+
+    private void grantTeacherRoleIfAbsent(UUID userId) {
+        Number count = (Number) entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
+        ).setParameter("userId", userId)
+         .setParameter("roleId", TEACHER_ROLE_ID)
+         .getSingleResult();
+        if (count.longValue() == 0) {
+            entityManager.createNativeQuery(
+                    "INSERT INTO user_roles (user_id, role_id) VALUES (:userId, :roleId)"
+            ).setParameter("userId", userId)
+             .setParameter("roleId", TEACHER_ROLE_ID)
+             .executeUpdate();
+        }
+    }
+
+    private void revokeTeacherRole(UUID userId) {
+        entityManager.createNativeQuery(
+                "DELETE FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
+        ).setParameter("userId", userId)
+         .setParameter("roleId", TEACHER_ROLE_ID)
+         .executeUpdate();
+    }
+
+    private SuspensionImpact suspendTeacherOperations(TeacherProfile teacher) {
+        teacher.setKycStatus(TeacherKycStatus.REVOKED);
+        teacher.setCanPublishCourse(false);
+        teacherProfileRepository.save(teacher);
+        revokeTeacherRole(teacher.getUser().getId());
+
+        List<Course> coursesToRemove = courseRepository
+                .findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(
+                        teacher.getId(),
+                        CourseStatus.ARCHIVED
+                )
+                .stream()
+                .filter(course -> course.getStatus() == CourseStatus.PUBLISHED
+                        || course.getStatus() == CourseStatus.APPROVED
+                        || course.getStatus() == CourseStatus.PENDING)
+                .toList();
+        coursesToRemove.forEach(course -> course.setStatus(CourseStatus.FORCED_DRAFT));
+        if (!coursesToRemove.isEmpty()) {
+            courseRepository.saveAll(coursesToRemove);
+        }
+
+        boolean walletFrozen = teacherWalletRepository.findByTeacherIdForUpdate(teacher.getId())
+                .map(this::freezeWallet)
+                .orElse(false);
+        return new SuspensionImpact(coursesToRemove.size(), walletFrozen);
+    }
+
+    private boolean freezeWallet(TeacherWallet wallet) {
+        wallet.setFrozen(true);
+        teacherWalletRepository.save(wallet);
+        return true;
+    }
+
+    private BusinessException notFound(String message) {
+        return new BusinessException(MessageCodes.COMMON_NOT_FOUND, message, HttpStatus.NOT_FOUND);
+    }
+
+    private BusinessException transitionConflict(KycRequestStatus targetStatus) {
+        return new BusinessException(
+                MessageCodes.COMMON_CONFLICT,
+                "KYC request cannot transition to " + targetStatus,
+                HttpStatus.CONFLICT
+        );
+    }
+
+    private BusinessException trustCaseRequired(String message) {
+        return new BusinessException(
+                MessageCodes.KYC_TRUST_CASE_REQUIRED,
+                message,
+                HttpStatus.CONFLICT
+        );
+    }
+
+    private record AdminContext(String roleCode) {
+    }
+
+    private record SuspensionImpact(int coursesRemovedFromMarketplace, boolean walletFrozen) {
+        private static SuspensionImpact none() {
+            return new SuspensionImpact(0, false);
+        }
     }
 }

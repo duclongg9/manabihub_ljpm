@@ -25,6 +25,11 @@ public interface NotificationService {
      */
     void createNotificationForRole(String roleCode, String title, String message, String type, String actionUrl);
 
+    /**
+     * Broadcasts a notification to active internal admin accounts holding the role.
+     */
+    void createNotificationForAdminRole(String roleCode, String title, String message, String type, String actionUrl);
+
     void createNotification(UUID recipientUserId, String recipientEmail,
                             String title, String message, String type);
 

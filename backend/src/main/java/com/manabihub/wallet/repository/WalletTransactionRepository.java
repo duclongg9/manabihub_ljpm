@@ -1,16 +1,23 @@
 package com.manabihub.wallet.repository;
 
 import com.manabihub.wallet.entity.WalletTransaction;
+import com.manabihub.wallet.enums.WalletTransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
-@Repository
-public interface WalletTransactionRepository extends JpaRepository<WalletTransaction, UUID> {
+public interface WalletTransactionRepository extends JpaRepository<WalletTransaction, java.util.UUID> {
 
-    List<WalletTransaction> findByWallet_IdOrderByCreatedAtDesc(UUID walletId);
+    Optional<WalletTransaction> findByReferenceTypeAndReferenceIdAndTransactionType(
+            String referenceType,
+            UUID referenceId,
+            WalletTransactionType transactionType
+    );
 
-    List<WalletTransaction> findByReferenceTypeAndReferenceId(String referenceType, UUID referenceId);
+    boolean existsByReferenceTypeAndReferenceIdAndTransactionType(
+            String referenceType,
+            UUID referenceId,
+            WalletTransactionType transactionType
+    );
 }

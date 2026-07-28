@@ -1,41 +1,46 @@
 package com.manabihub.wallet.service;
 
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.wallet.dto.response.TeacherWalletResponse;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/**
- * Manages wallets and their ledger entries.
- * <p>
- * Designed to be reused by both UC-08 (course purchase escrow) and the later
- * wallet top-up flow, hence the generic {@code referenceType}/{@code referenceId} linkage.
- */
 public interface WalletService {
+    TeacherWalletResponse getTeacherWalletByUserId(UUID userId);
 
     Wallet getOrCreatePlatformWallet();
 
     Wallet getOrCreateTeacherWallet(TeacherProfile teacher);
 
-    /**
-     * Moves {@code amount} into the teacher's frozen (held) balance and records an
-     * {@code ESCROW_HOLD} ledger line. The teacher's spendable balance is unchanged;
-     * releasing the hold is handled by a later payout use case.
-     */
     WalletTransaction holdEscrow(TeacherProfile teacher, BigDecimal amount,
                                  String referenceType, UUID referenceId, String note);
 
+    WalletTransaction releaseEscrow(TeacherProfile teacher, BigDecimal amount,
+                                    String referenceType, UUID referenceId, String note);
+    WalletTransaction refundHeldEscrow(TeacherProfile teacher, BigDecimal amount,
+                                       String referenceType, UUID referenceId, String note);
+    
     /**
-     * Deducts from the teacher's frozen (held) balance for an escrow hold that was reversed/refunded.
+     * Reserves balance for withdrawal.
+     * Must be called within a transactional context from the payout module.
+     *
+     * @param teacherId teacher ID
+     * @param amount amount to reserve
+     * @param withdrawalId reference ID for the ledger
      */
-    WalletTransaction reverseEscrowHold(TeacherProfile teacher, BigDecimal amount,
-                                        String referenceType, UUID referenceId, String note);
+    void reserveBalance(String teacherId, BigDecimal amount, String withdrawalId);
+    
+    /**
+     * Releases reserved balance back to available balance upon cancellation.
+     * Must be called within a transactional context.
+     *
+     * @param teacherId teacher ID
+     * @param amount amount to release
+     * @param withdrawalId reference ID for the ledger
+     */
+    void releaseBalance(String teacherId, BigDecimal amount, String withdrawalId);
 
-    /**
-     * Deducts from the teacher's available balance if the escrow was already released.
-     */
-    WalletTransaction refundWallet(TeacherProfile teacher, BigDecimal amount,
-                                   String referenceType, UUID referenceId, String note);
 }

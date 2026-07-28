@@ -15,6 +15,25 @@ export const ENDPOINTS = {
     DETAIL: (id: string) => `/v1/admin/course-approvals/${id}`,
     REVIEW: (id: string) => `/v1/admin/course-approvals/${id}/review`,
   },
+  ADMIN_PAYOUT: {
+    QUEUE: '/admin/payouts',
+    DETAIL: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}`,
+    RECONCILE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/reconcile`,
+    APPROVE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/approve`,
+    RETRY: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/retry`,
+    REJECT: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/reject`,
+    MANUAL_TRANSFER: (withdrawalRequestId: string) =>
+      `/admin/payouts/${withdrawalRequestId}/manual-transfer`,
+    MANUAL_PROOF: (withdrawalRequestId: string) =>
+      `/admin/payouts/${withdrawalRequestId}/manual-transfer/proof`,
+  },
+  SYSTEM_ADMIN: {
+    SETTINGS: '/v1/admin/system-settings',
+    SETTING: (key: string) => `/v1/admin/system-settings/${encodeURIComponent(key)}`,
+    INTERNAL_ACCOUNTS: '/v1/admin/internal-accounts',
+    INTERNAL_ACCOUNT_ROLE: (adminId: string) =>
+      `/v1/admin/internal-accounts/${adminId}/role`,
+  },
   teacherKyc: {
     status: '/v1/teacher/kyc/status',
     identityVerifications: '/v1/teacher/kyc/identity-verifications',
@@ -28,6 +47,14 @@ export const ENDPOINTS = {
   teacherDashboard: {
     stats: '/v1/teacher/dashboard',
   },
+  teacherWallet: {
+    detail: '/v1/teacher/wallet',
+    withdrawals: '/v1/teacher/withdrawals',
+    withdrawalDetail: (id: string) => `/v1/teacher/withdrawals/${id}`,
+    cancelWithdrawal: (id: string) => `/v1/teacher/withdrawals/${id}/cancel`,
+    sendWithdrawalOtp: '/v1/teacher/withdrawals/send-otp',
+    bankAccounts: '/v1/teacher/withdrawals/bank-accounts',
+  },
   teacherWriting: {
     submissions: '/v1/teacher/writing-submissions',
     detail: (submissionId: string) => `/v1/teacher/writing-submissions/${submissionId}`,
@@ -38,6 +65,7 @@ export const ENDPOINTS = {
     courses: '/v1/student/courses',
     wishlist: '/v1/student/wishlist',
     wishlistCourse: (courseId: string) => `/v1/student/wishlist/${courseId}`,
+    courseReview: (courseId: string) => `/v1/student/courses/${courseId}/review`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>
@@ -46,6 +74,7 @@ export const ENDPOINTS = {
       `/v1/student/courses/${courseId}/lesson-blocks/${lessonBlockId}/ai-chat/messages`,
   },
   teacherCourses: {
+    list: '/v1/teacher/courses',
     drafts: '/v1/teacher/courses/drafts',
     draftDetail: (id: string) => `/v1/teacher/courses/drafts/${id}`,
     builder: (id: string) => `/v1/teacher/courses/drafts/${id}/builder`,
@@ -56,7 +85,8 @@ export const ENDPOINTS = {
     builderBlockDetail: (id: string, moduleId: string, blockId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/${blockId}`,
     builderBlockOrder: (id: string, moduleId: string) => `/v1/teacher/courses/drafts/${id}/builder/modules/${moduleId}/blocks/order`,
     validate: (id: string) => `/v1/teacher/courses/drafts/${id}/validate`,
-    submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`
+    submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`,
+    publish: (id: string) => `/v1/teacher/courses/${id}/publish`,
   },
   teacherCourseAssets: {
     thumbnails: '/v1/teacher/courses/assets/thumbnails',
@@ -66,16 +96,25 @@ export const ENDPOINTS = {
   },
   publicCourses: {
     list: '/v1/public/courses',
+    reviews: (courseIdentifier: string) =>
+      `/v1/public/courses/${courseIdentifier}/reviews`,
+  },
+  publicTeachers: {
+    list: '/v1/public/teachers',
+    detail: (teacherId: string) => `/v1/public/teachers/${teacherId}`,
+  },
+  publicCommercialPolicy: {
+    current: '/v1/public/commercial-policy/current',
   },
   orders: {
     create: '/v1/orders',
+    list: '/v1/orders',
     detail: (orderId: string) => `/v1/orders/${orderId}`,
   },
   payments: {
     // Local dev simulator for the VNPay IPN callback (no tunnel needed).
     devIpn: '/v1/payments/dev/ipn',
     // Confirms an order from the browser return redirect (checksum-verified backend-side).
-    confirmReturn: '/v1/payments/vnpay/confirm-return',
   },
   LEARNING: {
     COURSE_LEARN: (courseId: string) => `/v1/student/courses/${courseId}/learn`,

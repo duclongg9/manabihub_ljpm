@@ -34,11 +34,56 @@ RDS_PASSWORD=<database password>
 GOOGLE_CLIENT_ID=<Google OAuth client id>
 GOOGLE_CLIENT_SECRET=<Google OAuth client secret>
 JWT_SECRET=<random value with at least 32 bytes>
+KYC_IDENTITY_SECRET=<stable random value with at least 32 bytes>
+PAYOUT_SECURITY_SECRET=<stable random value with at least 32 bytes>
+MAIL_USERNAME=<SMTP username used for withdrawal OTP>
+MAIL_PASSWORD=<SMTP app password>
+VNPAY_TMN_CODE=<VNPay merchant terminal code>
+VNPAY_HASH_SECRET=<VNPay merchant hash secret>
+VNPAY_RETURN_URL=https://develop.d1sbjmyazduh3v.amplifyapp.com/checkout/return
+AI_CHAT_PROVIDER_BASE_URL=<OpenAI-compatible provider origin>
+AI_CHAT_PROVIDER_API_KEY=<provider API key>
+AI_CHAT_PROVIDER_MODEL=<provider-supported model>
 FRONTEND_BASE_URL=https://develop.d1sbjmyazduh3v.amplifyapp.com
 CORS_ALLOWED_ORIGINS=https://develop.d1sbjmyazduh3v.amplifyapp.com
 ```
 
 Never commit real passwords, JWT secrets, or OAuth secrets to Git.
+
+`PAYOUT_SECURITY_SECRET` is not supplied by VNPay, AWS, or a bank. Generate it
+once for ManabiHub and store it as an Elastic Beanstalk environment property.
+Generate `KYC_IDENTITY_SECRET` separately; do not reuse the same value:
+
+```powershell
+$secretBytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($secretBytes)
+[Convert]::ToBase64String($secretBytes)
+```
+
+Run the command twice and copy each output directly into the corresponding
+environment property. The command prints a newly generated secret, so do not
+paste its output into chat, Jira, source code, screenshots, or logs.
+
+Keep both secrets stable:
+
+- changing `PAYOUT_SECURITY_SECRET` without a key-rotation migration makes
+  existing encrypted bank-account numbers unreadable and changes OTP/account
+  fingerprints;
+- changing `KYC_IDENTITY_SECRET` changes identity fingerprints and can break
+  duplicate-identity detection;
+- changing `JWT_SECRET` invalidates active sessions, which is normally safe but
+  should still be scheduled.
+
+Before deployment, load the intended environment values in a secure terminal
+and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/check-release-config.ps1
+```
+
+The script reports only presence and length, never the secret values. AI
+provider behavior and the live smoke procedure are documented in
+`docs/AI_PROVIDER_RUNBOOK.md`.
 
 Set the environment health check path to:
 
@@ -97,3 +142,7 @@ If nginx returns `502`, inspect `/var/log/web.stdout.log` and
 `/var/log/nginx/error.log` from the Elastic Beanstalk full logs. The common
 causes are a missing production environment property, failed RDS connectivity,
 or an incorrectly structured source bundle.
+
+The three `@manabihub.local` demo administrators are disabled by migration in
+every environment. Only the Spring `local` profile re-enables them. Never set a
+production deployment to the `local` profile.

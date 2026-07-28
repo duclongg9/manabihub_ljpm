@@ -32,4 +32,18 @@ public interface InternalAdminAccountRepository extends JpaRepository<InternalAd
         )
         """, nativeQuery = true)
     boolean existsByAdminIdAndRoleCodes(@Param("adminId") UUID adminId, @Param("roleCodes") Collection<String> roleCodes);
+
+    @Query(value = """
+        SELECT DISTINCT role.code
+        FROM internal_admin_accounts admin
+        JOIN internal_admin_roles admin_role ON admin_role.admin_account_id = admin.id
+        JOIN roles role ON role.id = admin_role.role_id
+        WHERE admin.id = :adminId
+          AND role.code IN (:roleCodes)
+          AND admin.account_status = 'ACTIVE'
+        """, nativeQuery = true)
+    List<String> findActiveRoleCodesByAdminId(
+            @Param("adminId") UUID adminId,
+            @Param("roleCodes") Collection<String> roleCodes
+    );
 }

@@ -35,6 +35,8 @@ management:
 manabihub:
   kyc:
     identity-secret: ${KYC_IDENTITY_SECRET:}
+  payout:
+    security-secret: ${PAYOUT_SECURITY_SECRET:}
   ai:
     chat:
       base-url: ${AI_CHAT_PROVIDER_BASE_URL:}
@@ -58,4 +60,4 @@ manabihub:
       order-type: ${VNPAY_ORDER_TYPE:other}
       locale: ${VNPAY_LOCALE:vn}
       currency: ${VNPAY_CURRENCY:VND}
-      dev-simulator-enabled: ${VNPAY_DEV_SIMULATOR_ENABLED:true}
+      dev-simulator-enabled: ${VNPAY_DEV_SIMULATOR_ENABLED:false}
