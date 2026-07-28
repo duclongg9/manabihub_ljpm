@@ -168,6 +168,21 @@ public final class MessageCodes {
     public static final String LEARNING_WISHLIST_REMOVED = "LEARNING_WISHLIST_REMOVED";
     public static final String LEARNING_WISHLIST_DUPLICATE = "LEARNING_WISHLIST_DUPLICATE";
     public static final String LEARNING_WISHLIST_ITEM_NOT_FOUND = "LEARNING_WISHLIST_ITEM_NOT_FOUND";
+    public static final String COURSE_REVIEW_SAVED = "COURSE_REVIEW_SAVED";
+    public static final String COURSE_REVIEW_NOT_ELIGIBLE = "COURSE_REVIEW_NOT_ELIGIBLE";
+    public static final String COURSE_REVIEW_INVALID = "COURSE_REVIEW_INVALID";
+
+    // SYSTEM CONFIGURATION / INTERNAL ADMIN RBAC — UC-31
+    public static final String SYSTEM_SETTING_UPDATED = "SYSTEM_SETTING_UPDATED";
+    public static final String SYSTEM_SETTING_INVALID = "SYSTEM_SETTING_INVALID";
+    public static final String SYSTEM_SETTING_NOT_EDITABLE = "SYSTEM_SETTING_NOT_EDITABLE";
+    public static final String SYSTEM_ADMIN_REQUIRED = "SYSTEM_ADMIN_REQUIRED";
+    public static final String INTERNAL_ROLE_UPDATED = "INTERNAL_ROLE_UPDATED";
+    public static final String INTERNAL_ROLE_INVALID = "INTERNAL_ROLE_INVALID";
+    public static final String INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN =
+            "INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN";
+    public static final String LAST_SYSTEM_ADMIN_REQUIRED = "LAST_SYSTEM_ADMIN_REQUIRED";
+    public static final String ADMIN_SESSION_STALE = "ADMIN_SESSION_STALE";
     public static final String LEARNING_STUDENT_PROFILE_NOT_FOUND = "LEARNING_STUDENT_PROFILE_NOT_FOUND";
 
     // ──────────────────────────────────────────────
@@ -234,6 +249,9 @@ public final class MessageCodes {
     public static final String PAYOUT_PENDING_REQUEST_EXISTS = "PAYOUT_PENDING_REQUEST_EXISTS";
     public static final String PAYOUT_MONTHLY_LIMIT_EXCEEDED = "PAYOUT_MONTHLY_LIMIT_EXCEEDED";
     public static final String PAYOUT_BANK_ACCOUNT_REQUIRED = "PAYOUT_BANK_ACCOUNT_REQUIRED";
+    public static final String PAYOUT_EMAIL_REQUIRED = "PAYOUT_EMAIL_REQUIRED";
+    public static final String PAYOUT_INVALID_OTP = "PAYOUT_INVALID_OTP";
+    public static final String PAYOUT_OTP_RATE_LIMITED = "PAYOUT_OTP_RATE_LIMITED";
     public static final String PAYOUT_NOT_FOUND = "PAYOUT_NOT_FOUND";
     public static final String PAYOUT_INVALID_STATUS = "PAYOUT_INVALID_STATUS";
     public static final String PAYOUT_SETTLEMENT_PROCESSING = "PAYOUT_SETTLEMENT_PROCESSING";

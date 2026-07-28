@@ -34,6 +34,7 @@ import com.manabihub.learning.repository.LearningCertificateRepository;
 import com.manabihub.learning.repository.WishlistItemRepository;
 import com.manabihub.learning.repository.QuizAttemptRepository;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
+import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
 import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
@@ -175,6 +176,9 @@ class ManabiHubApplicationTests {
     @MockBean
     private SystemSettingRepository systemSettingRepository;
 
+    @MockBean
+    private CourseReviewRepository courseReviewRepository;
+
     // UC-08 purchase flow repositories.
     @MockBean
     private com.manabihub.order.repository.OrderRepository orderRepository;
@@ -211,6 +215,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private com.manabihub.payout.repository.TeacherBankAccountRepository teacherBankAccountRepository;
+
+    @MockBean
+    private com.manabihub.payout.repository.WithdrawalOtpChallengeRepository withdrawalOtpChallengeRepository;
 
     @Test
     void contextLoads() {

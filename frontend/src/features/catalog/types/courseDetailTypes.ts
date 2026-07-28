@@ -3,6 +3,7 @@ export interface PublicTeacherProfile {
   name: string;
   avatarUrl?: string;
   bio?: string;
+  verified: boolean;
 }
 
 export interface PublicLessonBlock {
@@ -40,5 +41,7 @@ export interface PublicCourseDetail {
   isEnrolled: boolean;
   totalDurationMinutes: number;
   totalLessons: number;
+  averageRating?: number;
+  reviewCount?: number;
   modules: PublicModule[];
 }

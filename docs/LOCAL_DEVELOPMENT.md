@@ -46,6 +46,22 @@ powershell -ExecutionPolicy Bypass -File scripts\dev-backend.ps1
 powershell -ExecutionPolicy Bypass -File scripts\dev-frontend.ps1
 ```
 
+### Local Admin Portal Accounts
+
+The `local` Spring profile enables three demo-only accounts after Flyway has
+finished. They all use `Admin@123` unless `DEMO_ADMIN_PASSWORD` is set before
+starting the backend:
+
+| Role | Email |
+|---|---|
+| System Admin | `sysadmin@manabihub.local` |
+| Course Manager | `course.manager@manabihub.local` |
+| Finance Manager | `finance.manager@manabihub.local` |
+
+These accounts are disabled by default in the database migration and are
+re-enabled only by a `@Profile("local")` initializer. Do not run a shared,
+staging, or production environment with the `local` profile.
+
 ### Resetting the Database
 To wipe the local database and run Flyway migrations from scratch:
 ```powershell

@@ -1,8 +1,9 @@
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
 import LanguageIcon from '@mui/icons-material/Language';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
+import StarRoundedIcon from '@mui/icons-material/StarRounded';
 
-import DOMPurify from 'dompurify';
+import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
 
 interface CourseHeroProps {
   course: PublicCourseDetail;
@@ -53,11 +54,20 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
           {/* Description */}
           <div
             className="text-base sm:text-lg text-slate-300 my-6 max-w-3xl leading-relaxed prose prose-invert"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.description || course.introduction || '') }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichText(course.description || course.introduction) }}
           />
 
           {/* Meta Info */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-400">
+            {(course.reviewCount ?? 0) > 0 && course.averageRating != null && (
+              <span className="flex items-center text-amber-300 font-semibold">
+                <StarRoundedIcon fontSize="small" className="mr-1" />
+                {course.averageRating.toFixed(1)}
+                <span className="ml-1 text-slate-300 font-normal">
+                  ({course.reviewCount} đánh giá đã xác minh)
+                </span>
+              </span>
+            )}
             <span className="flex items-center">
               Tạo bởi&nbsp;<span className="text-white font-medium">{course.teacher.name}</span>
             </span>

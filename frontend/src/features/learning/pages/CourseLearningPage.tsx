@@ -35,7 +35,7 @@ import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
 import { isAxiosError } from 'axios';
 import ReactPlayer from 'react-player';
-import DOMPurify from 'dompurify';
+import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
 import { learningService } from '../services/learningService';
 import type {
   CourseLearning,
@@ -435,7 +435,7 @@ function BlockContent({
       return (
         <Box
           sx={{ whiteSpace: 'pre-wrap', typography: 'body1' }}
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(block.content || '') }}
+          dangerouslySetInnerHTML={{ __html: sanitizeRichText(block.content) }}
         />
       );
     case 'QUIZ':

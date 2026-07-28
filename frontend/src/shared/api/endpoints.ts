@@ -27,6 +27,13 @@ export const ENDPOINTS = {
     MANUAL_PROOF: (withdrawalRequestId: string) =>
       `/admin/payouts/${withdrawalRequestId}/manual-transfer/proof`,
   },
+  SYSTEM_ADMIN: {
+    SETTINGS: '/v1/admin/system-settings',
+    SETTING: (key: string) => `/v1/admin/system-settings/${encodeURIComponent(key)}`,
+    INTERNAL_ACCOUNTS: '/v1/admin/internal-accounts',
+    INTERNAL_ACCOUNT_ROLE: (adminId: string) =>
+      `/v1/admin/internal-accounts/${adminId}/role`,
+  },
   teacherKyc: {
     status: '/v1/teacher/kyc/status',
     identityVerifications: '/v1/teacher/kyc/identity-verifications',
@@ -58,6 +65,7 @@ export const ENDPOINTS = {
     courses: '/v1/student/courses',
     wishlist: '/v1/student/wishlist',
     wishlistCourse: (courseId: string) => `/v1/student/wishlist/${courseId}`,
+    courseReview: (courseId: string) => `/v1/student/courses/${courseId}/review`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>
@@ -88,6 +96,12 @@ export const ENDPOINTS = {
   },
   publicCourses: {
     list: '/v1/public/courses',
+    reviews: (courseIdentifier: string) =>
+      `/v1/public/courses/${courseIdentifier}/reviews`,
+  },
+  publicTeachers: {
+    list: '/v1/public/teachers',
+    detail: (teacherId: string) => `/v1/public/teachers/${teacherId}`,
   },
   orders: {
     create: '/v1/orders',
@@ -98,7 +112,6 @@ export const ENDPOINTS = {
     // Local dev simulator for the VNPay IPN callback (no tunnel needed).
     devIpn: '/v1/payments/dev/ipn',
     // Confirms an order from the browser return redirect (checksum-verified backend-side).
-    confirmReturn: '/v1/payments/vnpay/confirm-return',
   },
   LEARNING: {
     COURSE_LEARN: (courseId: string) => `/v1/student/courses/${courseId}/learn`,

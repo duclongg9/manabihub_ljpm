@@ -1,19 +1,37 @@
 package com.manabihub.payout.mapper;
 
 import com.manabihub.payout.dto.response.WithdrawalRequestResponse;
+import com.manabihub.payout.entity.BankAccountSnapshot;
 import com.manabihub.payout.entity.WithdrawalRequest;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import com.manabihub.payout.security.PayoutSecurityService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
-@Mapper(componentModel = "spring")
-public interface WithdrawalMapper {
-    @Mapping(target = "bankCode", source = "bankAccountSnapshot.bankCode")
-    @Mapping(target = "bankName", source = "bankAccountSnapshot.bankName")
-    @Mapping(target = "accountHolderName", source = "bankAccountSnapshot.accountHolderName")
-    @Mapping(target = "accountNumberMasked", source = "bankAccountSnapshot.accountNumber") // In real life, mask it here or keep it masked in snapshot
-    @Mapping(target = "branch", source = "bankAccountSnapshot.branch")
-    @Mapping(target = "reviewedAt", source = "decidedAt")
-    @Mapping(target = "rejectionReason", source = "decisionNote")
-    @Mapping(target = "currency", constant = "VND")
-    WithdrawalRequestResponse toResponse(WithdrawalRequest request);
+@Component
+@RequiredArgsConstructor
+public class WithdrawalMapper {
+
+    private final PayoutSecurityService securityService;
+
+    public WithdrawalRequestResponse toResponse(WithdrawalRequest request) {
+        BankAccountSnapshot bank = request.getBankAccountSnapshot();
+        return WithdrawalRequestResponse.builder()
+                .id(request.getId() == null ? null : request.getId().toString())
+                .requestedAmount(request.getRequestedAmount())
+                .currency("VND")
+                .status(request.getStatus())
+                .bankCode(bank == null ? null : bank.getBankCode())
+                .bankName(bank == null ? null : bank.getBankName())
+                .accountHolderName(bank == null ? null : bank.getAccountHolderName())
+                .accountNumberMasked(
+                        bank == null
+                                ? null
+                                : securityService.maskAccountNumber(bank.getAccountNumber())
+                )
+                .branch(bank == null ? null : bank.getBranch())
+                .requestedAt(request.getRequestedAt())
+                .reviewedAt(request.getDecidedAt())
+                .rejectionReason(request.getDecisionNote())
+                .build();
+    }
 }

@@ -10,9 +10,13 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useRef, useState } from 'react';
-// @ts-ignore - Bypass type resolution issue in some strict TS bundler environments
-import * as XLSX from 'xlsx';
 import type { FinalTestQuestion } from '../services/finalTestService';
+import {
+  createFinalTestCsvTemplate,
+  FinalTestCsvError,
+  MAX_FINAL_TEST_CSV_BYTES,
+  parseFinalTestCsv,
+} from '../utils/finalTestCsv';
 
 interface Props {
   questions: FinalTestQuestion[];
@@ -25,7 +29,7 @@ interface Props {
 export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExpanded, onNotify }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // States for Excel Import Dialog
+  // State for the bounded, dependency-free CSV import preview.
   const [pendingImport, setPendingImport] = useState<FinalTestQuestion[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
 
@@ -34,99 +38,57 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
   };
 
   const handleDownloadTemplate = () => {
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['Nội dung câu hỏi', 'Lựa chọn 1', 'Lựa chọn 2', 'Lựa chọn 3', 'Lựa chọn 4', 'Đáp án đúng (1-4)', 'Giải thích đáp án'],
-      ['Kanji của từ "Điện thoại" là gì?', '電話', '電車', '電気', '電話機', 1, 'Điện thoại là 電話 (Denwa)']
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    XLSX.writeFile(wb, 'Template_Cau_Hoi.xlsx');
+    const blob = new Blob([createFinalTestCsvTemplate()], { type: 'text/csv;charset=utf-8' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = 'Template_Cau_Hoi.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1 });
-
-        const headerRow = data[0];
-        if (!headerRow || !headerRow.some((col: any) => String(col).toLowerCase().includes('câu hỏi'))) {
-          onNotify("File Excel không đúng định dạng. Cột đầu tiên phải chứa từ 'Câu hỏi'.", "error");
-          if (fileInputRef.current) fileInputRef.current.value = '';
-          return;
-        }
-
-        const existingContents = new Set(questions.map(q => q.content.trim().toLowerCase()));
-        let duplicateCount = 0;
-
-        const newQuestions: FinalTestQuestion[] = [];
-        for (let i = 1; i < data.length; i++) {
-          const row = data[i];
-          if (!row || row.length === 0 || !row[0]) continue;
-
-          const content = String(row[0] || '').trim();
-          if (!content) continue;
-
-          // Bỏ qua nếu nội dung câu hỏi đã tồn tại
-          const normalizedContent = content.toLowerCase();
-          if (existingContents.has(normalizedContent)) {
-            duplicateCount++;
-            continue;
-          }
-          // Thêm vào set để tránh trùng lặp ngay trong chính file Excel
-          existingContents.add(normalizedContent);
-
-          const c1 = String(row[1] || '');
-          const c2 = String(row[2] || '');
-          const c3 = String(row[3] || '');
-          const c4 = String(row[4] || '');
-          const rawCorrect = Number(row[5]);
-          const correctIdx = isNaN(rawCorrect) ? 1 : Math.max(1, Math.min(4, rawCorrect));
-          const explanation = String(row[6] || '');
-
-          newQuestions.push({
-            content,
-            explanation,
-            choices: [
-              { content: c1, isCorrect: correctIdx === 1 },
-              { content: c2, isCorrect: correctIdx === 2 },
-              { content: c3, isCorrect: correctIdx === 3 },
-              { content: c4, isCorrect: correctIdx === 4 },
-            ]
-          });
-        }
-
-        if (newQuestions.length > 0) {
-          if (duplicateCount > 0) {
-            onNotify(`Hệ thống tự động bỏ qua ${duplicateCount} câu hỏi bị trùng lặp nội dung. Tìm thấy ${newQuestions.length} câu hỏi mới hợp lệ.`, "warning");
-          } else {
-            onNotify(`Đã tải thành công ${newQuestions.length} câu hỏi từ Excel.`, "success");
-          }
-          setPendingImport(newQuestions);
-          setOpenDialog(true);
-        } else {
-          if (duplicateCount > 0) {
-            onNotify(`Tất cả ${duplicateCount} câu hỏi trong file Excel đều đã có sẵn trong danh sách. Không có câu hỏi mới nào được thêm.`, "info");
-          } else {
-            onNotify("Không tìm thấy câu hỏi hợp lệ nào trong file.", "warning");
-          }
-        }
-      } catch (err) {
-        console.error("Error parsing Excel:", err);
-        onNotify("Có lỗi xảy ra khi đọc file Excel.", "error");
+    try {
+      if (!file.name.toLocaleLowerCase('vi').endsWith('.csv')) {
+        throw new FinalTestCsvError('Chỉ chấp nhận file CSV từ mẫu của hệ thống.');
       }
+      if (file.size > MAX_FINAL_TEST_CSV_BYTES) {
+        throw new FinalTestCsvError('File CSV vượt quá giới hạn 1 MB.');
+      }
+
+      const { duplicateCount, questions: newQuestions } = parseFinalTestCsv(
+        await file.text(),
+        questions,
+      );
+
+      if (newQuestions.length > 0) {
+        if (duplicateCount > 0) {
+          onNotify(`Hệ thống tự động bỏ qua ${duplicateCount} câu hỏi bị trùng lặp nội dung. Tìm thấy ${newQuestions.length} câu hỏi mới hợp lệ.`, 'warning');
+        } else {
+          onNotify(`Đã đọc thành công ${newQuestions.length} câu hỏi từ CSV.`, 'success');
+        }
+        setPendingImport(newQuestions);
+        setOpenDialog(true);
+      } else if (duplicateCount > 0) {
+        onNotify(`Tất cả ${duplicateCount} câu hỏi trong file CSV đều đã có sẵn trong danh sách. Không có câu hỏi mới nào được thêm.`, 'info');
+      } else {
+        onNotify('Không tìm thấy câu hỏi hợp lệ nào trong file CSV.', 'warning');
+      }
+    } catch (error) {
+      const message = error instanceof FinalTestCsvError
+        ? error.message
+        : 'Có lỗi xảy ra khi đọc file CSV.';
+      onNotify(message, 'error');
+    } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    };
-    reader.readAsBinaryString(file);
+    }
   };
 
   const handleConfirmImport = () => {
@@ -240,7 +202,7 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
             Chưa có câu hỏi nào trong đề thi này
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Hãy bấm "Thêm câu hỏi" để tự soạn, hoặc "Import từ Excel" để nạp hàng loạt câu hỏi một cách nhanh chóng!
+            Hãy bấm "Thêm câu hỏi" để tự soạn, hoặc "Import CSV" để nạp hàng loạt câu hỏi một cách nhanh chóng!
           </Typography>
         </Box>
       ) : (
@@ -359,7 +321,7 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
           startIcon={<UploadFileIcon />}
           onClick={() => fileInputRef.current?.click()}
         >
-          Import từ Excel
+          Import CSV
         </Button>
         <Button
           variant="text"
@@ -371,7 +333,7 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
         </Button>
         <input
           type="file"
-          accept=".xlsx, .xls, .csv"
+          accept=".csv,text/csv"
           hidden
           ref={fileInputRef}
           onChange={handleFileUpload}
@@ -379,10 +341,10 @@ export const FinalTestQuestionsEditor = ({ questions, onChange, expanded, setExp
       </Stack>
 
       <Dialog open={openDialog} onClose={handleCancelImport} maxWidth="md" fullWidth>
-        <DialogTitle>Xác nhận Import Excel</DialogTitle>
+        <DialogTitle>Xác nhận Import CSV</DialogTitle>
         <DialogContent dividers>
           <DialogContentText sx={{ mb: 2 }}>
-            Hệ thống đã quét và tìm thấy <strong>{pendingImport.length}</strong> câu hỏi hợp lệ từ file Excel.
+            Hệ thống đã quét và tìm thấy <strong>{pendingImport.length}</strong> câu hỏi hợp lệ từ file CSV.
             Dữ liệu mới sẽ được nối thêm vào cuối danh sách hiện tại.
           </DialogContentText>
 

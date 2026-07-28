@@ -33,15 +33,18 @@ export function WithdrawalRequestModal({
   ) => {
     createWithdrawal.mutate({
       amount: values.amount,
-      bankAccount: {
-        accountHolderName: values.accountHolderName || '',
-        accountNumber: values.accountNumber || '',
-        bankCode: values.bankCode || '',
-        bankName: values.bankName || '',
-        branch: values.branch,
-      },
+      bankAccountId: values.useNewAccount ? undefined : values.bankAccountId,
+      bankAccount: values.useNewAccount
+        ? {
+            accountHolderName: values.accountHolderName || '',
+            accountNumber: values.accountNumber || '',
+            bankCode: values.bankCode || '',
+            bankName: values.bankName || '',
+            branch: values.branch,
+          }
+        : undefined,
       otpCode: values.otpCode,
-      saveAccount: values.saveAccount,
+      saveAccount: values.useNewAccount && values.saveAccount,
     }, {
       onSuccess: () => {
         toast.success('Đã gửi yêu cầu rút tiền');
