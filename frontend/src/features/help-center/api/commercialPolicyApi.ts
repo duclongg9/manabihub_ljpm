@@ -1,24 +1,78 @@
 import type { CommercialPolicy } from '../types';
+import { axiosClient } from '../../../shared/api/axiosClient';
+import { ENDPOINTS } from '../../../shared/api/endpoints';
+import type { ApiResponse } from '../../../shared/types/api';
 
-// Mock backend API response based on section 4.7 of the brief
+export const PROVISIONAL_COMMERCIAL_POLICY: Readonly<CommercialPolicy> = {
+  currency: 'VND',
+  commissionRate: 0.2,
+  refundWindowDays: 7,
+  refundProgressLimitPercent: 30,
+  escrowHoldingDays: 14,
+  payoutThreshold: 100_000,
+  withdrawalFee: 0,
+  kycTargetDaysMin: 1,
+  kycTargetDaysMax: 2,
+  policyVersion: 'provisional-2026-07-28',
+  effectiveAt: '2026-07-28T00:00:00+07:00',
+};
+
+const isFiniteNumber = (value: unknown): value is number => (
+  typeof value === 'number' && Number.isFinite(value)
+);
+
+export const parseCommercialPolicy = (value: unknown): CommercialPolicy => {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Invalid commercial policy response');
+  }
+
+  const policy = value as Record<string, unknown>;
+  const isValid = (
+    typeof policy.currency === 'string'
+    && policy.currency.length > 0
+    && isFiniteNumber(policy.commissionRate)
+    && policy.commissionRate >= 0
+    && policy.commissionRate <= 1
+    && isFiniteNumber(policy.refundWindowDays)
+    && Number.isInteger(policy.refundWindowDays)
+    && policy.refundWindowDays >= 0
+    && isFiniteNumber(policy.refundProgressLimitPercent)
+    && policy.refundProgressLimitPercent >= 0
+    && policy.refundProgressLimitPercent <= 100
+    && isFiniteNumber(policy.escrowHoldingDays)
+    && Number.isInteger(policy.escrowHoldingDays)
+    && policy.escrowHoldingDays >= 0
+    && isFiniteNumber(policy.payoutThreshold)
+    && policy.payoutThreshold >= 0
+    && isFiniteNumber(policy.withdrawalFee)
+    && policy.withdrawalFee >= 0
+    && isFiniteNumber(policy.kycTargetDaysMin)
+    && Number.isInteger(policy.kycTargetDaysMin)
+    && policy.kycTargetDaysMin > 0
+    && isFiniteNumber(policy.kycTargetDaysMax)
+    && Number.isInteger(policy.kycTargetDaysMax)
+    && policy.kycTargetDaysMax >= policy.kycTargetDaysMin
+    && typeof policy.policyVersion === 'string'
+    && policy.policyVersion.length > 0
+    && typeof policy.effectiveAt === 'string'
+    && !Number.isNaN(Date.parse(policy.effectiveAt))
+  );
+
+  if (!isValid) {
+    throw new Error('Invalid commercial policy response');
+  }
+
+  return policy as unknown as CommercialPolicy;
+};
+
 export const getCommercialPolicy = async (): Promise<CommercialPolicy> => {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  
-  // NOTE: These are provisional values for UI shell development ONLY.
-  // When PR 1 backend API is ready, this should fetch from:
-  // GET /api/v1/public/commercial-policy/current
-  return {
-    currency: 'VND',
-    commissionRate: 0.20,
-    refundWindowDays: 7,
-    refundProgressLimitPercent: 20, // Example fallback for current backend setting
-    escrowHoldingDays: 14,
-    payoutThreshold: 100000,
-    withdrawalFee: 0,
-    kycTargetDaysMin: 1,
-    kycTargetDaysMax: 2,
-    policyVersion: '1.0.0-provisional',
-    effectiveAt: new Date().toISOString(),
-  };
+  if (import.meta.env.DEV) {
+    return parseCommercialPolicy({ ...PROVISIONAL_COMMERCIAL_POLICY });
+  }
+
+  const response = await axiosClient.get<ApiResponse<unknown>>(
+    ENDPOINTS.publicCommercialPolicy.current,
+  );
+
+  return parseCommercialPolicy(response.data.data);
 };

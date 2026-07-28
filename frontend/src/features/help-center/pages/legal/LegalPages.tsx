@@ -1,52 +1,37 @@
-import { PolicyBoundary } from '../../components/PolicyBoundary';
 import { ArticleLayout } from '../../components/ArticleLayout';
+import { getHelpArticle } from '../../content/articleRegistry';
 
-export const TermsPage = () => (
-  <PolicyBoundary>
-    {(policy) => (
-      <ArticleLayout title="Điều khoản sử dụng" lastUpdated={new Date(policy.effectiveAt).toLocaleDateString('vi-VN')}>
-        <p>Nội dung chi tiết Điều khoản sử dụng của ManabiHub.</p>
-      </ArticleLayout>
-    )}
-  </PolicyBoundary>
-);
+const draftCopy: Record<string, string> = {
+  terms: 'Điều khoản sử dụng đầy đủ cần được chủ dự án rà soát và phê duyệt trước khi công bố.',
+  privacy: 'Chính sách cần mô tả đầy đủ dữ liệu thu thập, mục đích, thời hạn lưu trữ và quyền của người dùng.',
+  'instructor-terms': 'Điều khoản thương mại cần được đối chiếu với luồng tiền đã được backend thực thi.',
+  'refund-policy': 'Chính sách hoàn tiền cần được đối chiếu với điều kiện và trạng thái xử lý thực tế.',
+  'ai-notice': 'Thông báo AI cần được đối chiếu với nhà cung cấp, dữ liệu gửi đi và chính sách lưu trữ.',
+};
 
-export const PrivacyPage = () => (
-  <PolicyBoundary>
-    {(policy) => (
-      <ArticleLayout title="Chính sách bảo mật" lastUpdated={new Date(policy.effectiveAt).toLocaleDateString('vi-VN')}>
-        <p>Chính sách bảo mật thông tin người dùng.</p>
-      </ArticleLayout>
-    )}
-  </PolicyBoundary>
-);
+const DraftLegalPage = ({ articleId }: { articleId: string }) => {
+  const article = getHelpArticle(articleId);
 
-export const InstructorTermsPage = () => (
-  <PolicyBoundary>
-    {(policy) => (
-      <ArticleLayout title="Điều khoản dành cho Giảng viên" lastUpdated={new Date(policy.effectiveAt).toLocaleDateString('vi-VN')}>
-        <p>Điều khoản thương mại dành cho giảng viên, bao gồm mức phí hoa hồng là {(policy.commissionRate * 100).toFixed(0)}% và thời gian tạm giữ {policy.escrowHoldingDays} ngày.</p>
-      </ArticleLayout>
-    )}
-  </PolicyBoundary>
-);
+  return (
+    <ArticleLayout article={article}>
+      <div className="border-l-4 border-amber-500 bg-amber-50 p-4 text-amber-950">
+        <p><strong>Tài liệu này chưa có hiệu lực.</strong></p>
+        <p>{draftCopy[articleId]}</p>
+      </div>
+      <p>
+        Trang được dựng để hoàn thiện luồng giao diện và liên kết. Không sử dụng nội
+        dung này làm căn cứ giao dịch hoặc sự chấp thuận của người dùng.
+      </p>
+    </ArticleLayout>
+  );
+};
 
-export const RefundPolicyPage = () => (
-  <PolicyBoundary>
-    {(policy) => (
-      <ArticleLayout title="Chính sách hoàn tiền" lastUpdated={new Date(policy.effectiveAt).toLocaleDateString('vi-VN')}>
-        <p>Chính sách hoàn tiền trong vòng {policy.refundWindowDays} ngày.</p>
-      </ArticleLayout>
-    )}
-  </PolicyBoundary>
-);
+export const TermsPage = () => <DraftLegalPage articleId="terms" />;
 
-export const AiNoticePage = () => (
-  <PolicyBoundary>
-    {(policy) => (
-      <ArticleLayout title="Thông báo về Trí tuệ nhân tạo (AI)" lastUpdated={new Date(policy.effectiveAt).toLocaleDateString('vi-VN')}>
-        <p>Thông tin về việc sử dụng AI trên nền tảng ManabiHub.</p>
-      </ArticleLayout>
-    )}
-  </PolicyBoundary>
-);
+export const PrivacyPage = () => <DraftLegalPage articleId="privacy" />;
+
+export const InstructorTermsPage = () => <DraftLegalPage articleId="instructor-terms" />;
+
+export const RefundPolicyPage = () => <DraftLegalPage articleId="refund-policy" />;
+
+export const AiNoticePage = () => <DraftLegalPage articleId="ai-notice" />;

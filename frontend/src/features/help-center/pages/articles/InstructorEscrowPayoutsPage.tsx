@@ -1,38 +1,63 @@
 import { PolicyBoundary } from '../../components/PolicyBoundary';
 import { ArticleLayout } from '../../components/ArticleLayout';
+import { getHelpArticle } from '../../content/articleRegistry';
+import { formatPolicyCurrency } from '../../utils/policyFormatting';
+
+const article = getHelpArticle('instructor-escrow-payouts');
 
 export const InstructorEscrowPayoutsPage = () => {
   return (
-    <PolicyBoundary>
-      {(policy) => (
-        <ArticleLayout 
-          title="Tạm giữ doanh thu và Rút tiền" 
-          lastUpdated={new Date(policy.effectiveAt).toLocaleDateString('vi-VN')}
-          breadcrumbs={[{ label: 'Dành cho Giảng viên', to: '/help?category=instructors' }]}
-        >
+    <ArticleLayout article={article}>
+      <PolicyBoundary>
+        {(policy) => (
+          <>
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mt-8 mb-4">Thời gian tạm giữ (Escrow)</h2>
+            <h2>Vì sao doanh thu được tạm giữ?</h2>
             <p>
-              Để đảm bảo quyền lợi cho học viên và xử lý các yêu cầu hoàn tiền nếu có, doanh thu từ mỗi đơn hàng sẽ được tạm giữ trong <strong>{policy.escrowHoldingDays} ngày</strong>.
+              Phần thu nhập của giảng viên được tạm giữ trong
+              {' '}
+              <strong>{policy.escrowHoldingDays} ngày theo lịch</strong>
+              {' '}
+              để bao phủ cửa sổ hoàn tiền và thời gian đối soát.
             </p>
-            <p className="mt-4">
-              Sau {policy.escrowHoldingDays} ngày kể từ thời điểm giao dịch thành công (và không có yêu cầu hoàn tiền hợp lệ nào), số tiền này sẽ được chuyển vào Số dư khả dụng của bạn.
+            <p>
+              Ví giảng viên phải hiển thị ngày giải ngân dự kiến của từng giao dịch.
+              Nếu không có hoàn tiền hoặc chặn đối soát hợp lệ, tiền được chuyển sang
+              số dư khả dụng khi đến thời điểm đó.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mt-8 mb-4">Điều kiện và Phí rút tiền</h2>
-            <ul className="list-disc pl-5 mt-4 space-y-2">
+            <h2>Điều kiện rút tiền</h2>
+            <ul>
               <li>
-                <strong>Hạn mức tối thiểu:</strong> Bạn có thể yêu cầu rút tiền khi số dư khả dụng đạt tối thiểu {policy.payoutThreshold.toLocaleString('vi-VN')} {policy.currency}.
+                Số dư khả dụng tối thiểu:
+                {' '}
+                <strong>{formatPolicyCurrency(policy.payoutThreshold, policy.currency)}</strong>.
               </li>
               <li>
-                <strong>Phí xử lý rút tiền:</strong> {policy.withdrawalFee === 0 ? 'Miễn phí' : `${policy.withdrawalFee.toLocaleString('vi-VN')} ${policy.currency} cho mỗi lần rút`}.
+                Phí nền tảng thu từ giảng viên:
+                {' '}
+                <strong>{formatPolicyCurrency(policy.withdrawalFee, policy.currency)}</strong>.
               </li>
             </ul>
+            <p>
+              Thời gian ngân hàng ghi có chỉ là ước tính. Mỗi yêu cầu rút tiền phải
+              có trạng thái và bằng chứng đối soát riêng.
+            </p>
           </section>
-        </ArticleLayout>
-      )}
-    </PolicyBoundary>
+
+          <section>
+            <h2>Khi escrow bị chặn</h2>
+            <p>
+              Giao dịch có thể bị giữ lâu hơn khi đang hoàn tiền, tranh chấp hoặc
+              đối soát. Màn hình ví phải nêu lý do và hành động tiếp theo; hệ thống
+              không được âm thầm thay đổi số dư.
+            </p>
+          </section>
+          </>
+        )}
+      </PolicyBoundary>
+    </ArticleLayout>
   );
 };

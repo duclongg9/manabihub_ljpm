@@ -45,9 +45,22 @@ import { HelpCenterLayout } from '../features/help-center/layouts/HelpCenterLayo
 import { HelpCenterIndexPage } from '../features/help-center/pages/HelpCenterIndexPage';
 import { InstructorRevenueSharePage } from '../features/help-center/pages/articles/InstructorRevenueSharePage';
 import { InstructorEscrowPayoutsPage } from '../features/help-center/pages/articles/InstructorEscrowPayoutsPage';
-import { InstructorVerificationPage, InstructorCourseReviewPage } from '../features/help-center/pages/articles/InstructorArticles';
-import { LearnerPaymentsRefundsPage, TrustSafetyPage, AiAndDataPage } from '../features/help-center/pages/articles/GeneralArticles';
-import { TermsPage, PrivacyPage, InstructorTermsPage, RefundPolicyPage, AiNoticePage } from '../features/help-center/pages/legal/LegalPages';
+import {
+  InstructorCourseReviewPage,
+  InstructorVerificationPage,
+} from '../features/help-center/pages/articles/InstructorArticles';
+import {
+  AiAndDataPage,
+  LearnerPaymentsRefundsPage,
+  TrustSafetyPage,
+} from '../features/help-center/pages/articles/GeneralArticles';
+import {
+  AiNoticePage,
+  InstructorTermsPage,
+  PrivacyPage,
+  RefundPolicyPage,
+  TermsPage,
+} from '../features/help-center/pages/legal/LegalPages';
 
 export const router = createBrowserRouter([
   {
@@ -85,6 +98,7 @@ export const router = createBrowserRouter([
     path: '/legal',
     element: <HelpCenterLayout />,
     children: [
+      { index: true, element: <Navigate to="/help" replace /> },
       { path: 'terms', element: <TermsPage /> },
       { path: 'privacy', element: <PrivacyPage /> },
       { path: 'instructor-terms', element: <InstructorTermsPage /> },

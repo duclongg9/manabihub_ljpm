@@ -5,18 +5,25 @@ interface HelpLinkProps {
   to: string;
   label?: string;
   className?: string;
+  newTab?: boolean;
 }
 
-export const HelpLink = ({ to, label, className = '' }: HelpLinkProps) => {
+export const HelpLink = ({
+  to,
+  label,
+  className = '',
+  newTab = false,
+}: HelpLinkProps) => {
   return (
-    <Link 
-      to={to} 
-      className={`inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors ${className}`}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      to={to}
+      aria-label={label ?? 'Xem hướng dẫn liên quan'}
+      className={`inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 transition-colors hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${className}`}
+      target={newTab ? '_blank' : undefined}
+      rel={newTab ? 'noopener noreferrer' : undefined}
     >
-      <Info className="w-4 h-4" />
-      {label && <span>{label}</span>}
+      <Info aria-hidden="true" className="h-4 w-4 shrink-0" />
+      {label ? <span>{label}</span> : <span className="sr-only">Xem hướng dẫn liên quan</span>}
     </Link>
   );
 };

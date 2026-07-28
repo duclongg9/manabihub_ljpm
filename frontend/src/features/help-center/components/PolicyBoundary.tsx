@@ -10,11 +10,16 @@ export const PolicyBoundary = ({ children }: PolicyBoundaryProps) => {
 
   if (isLoading) {
     return (
-      <div className="p-4 rounded-md bg-gray-50 border border-gray-100 flex items-center justify-center min-h-[100px]">
-        <div className="animate-pulse flex space-x-2">
-          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+      <div
+        aria-live="polite"
+        aria-label="Đang tải điều khoản hiện hành"
+        className="flex min-h-28 items-center justify-center border-y border-gray-200 bg-gray-50 p-4"
+        role="status"
+      >
+        <div className="flex animate-pulse space-x-2" aria-hidden="true">
+          <div className="h-2 w-2 rounded-full bg-gray-400" />
+          <div className="h-2 w-2 rounded-full bg-gray-400" />
+          <div className="h-2 w-2 rounded-full bg-gray-400" />
         </div>
       </div>
     );
@@ -22,12 +27,19 @@ export const PolicyBoundary = ({ children }: PolicyBoundaryProps) => {
 
   if (isError || !policy) {
     return (
-      <div className="p-6 rounded-md bg-red-50 border border-red-100 text-center">
-        <h3 className="text-red-800 font-medium mb-2">Không thể tải điều khoản hiện hành</h3>
-        <p className="text-sm text-red-600 mb-4">Vui lòng thử lại sau.</p>
-        <button 
+      <div
+        aria-live="assertive"
+        className="border-y border-red-200 bg-red-50 p-6 text-center"
+        role="alert"
+      >
+        <h2 className="mb-2 font-semibold text-red-900">Không thể tải điều khoản hiện hành</h2>
+        <p className="mb-4 text-sm text-red-700">
+          ManabiHub không hiển thị số liệu tạm khi nguồn chính thức chưa sẵn sàng.
+        </p>
+        <button
+          type="button"
           onClick={() => refetch()}
-          className="px-4 py-2 bg-red-100 text-red-800 rounded hover:bg-red-200 transition-colors text-sm font-medium"
+          className="border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-900 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2"
         >
           Thử lại
         </button>
