@@ -41,6 +41,13 @@ import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsP
 import { PublicTeacherProfilePage } from '../features/teacher-discovery/pages/PublicTeacherProfilePage';
 import { SystemSettingsPage } from '../features/system-administration/pages/SystemSettingsPage';
 import { InternalAdminAccountsPage } from '../features/system-administration/pages/InternalAdminAccountsPage';
+import { HelpCenterLayout } from '../features/help-center/layouts/HelpCenterLayout';
+import { HelpCenterIndexPage } from '../features/help-center/pages/HelpCenterIndexPage';
+import { InstructorRevenueSharePage } from '../features/help-center/pages/articles/InstructorRevenueSharePage';
+import { InstructorEscrowPayoutsPage } from '../features/help-center/pages/articles/InstructorEscrowPayoutsPage';
+import { InstructorVerificationPage, InstructorCourseReviewPage } from '../features/help-center/pages/articles/InstructorArticles';
+import { LearnerPaymentsRefundsPage, TrustSafetyPage, AiAndDataPage } from '../features/help-center/pages/articles/GeneralArticles';
+import { TermsPage, PrivacyPage, InstructorTermsPage, RefundPolicyPage, AiNoticePage } from '../features/help-center/pages/legal/LegalPages';
 
 export const router = createBrowserRouter([
   {
@@ -59,6 +66,31 @@ export const router = createBrowserRouter([
   {
     path: '/onboarding/student',
     element: <StudentOnboardingPage />,
+  },
+  {
+    path: '/help',
+    element: <HelpCenterLayout />,
+    children: [
+      { index: true, element: <HelpCenterIndexPage /> },
+      { path: 'instructors/verification', element: <InstructorVerificationPage /> },
+      { path: 'instructors/revenue-share', element: <InstructorRevenueSharePage /> },
+      { path: 'instructors/escrow-and-payouts', element: <InstructorEscrowPayoutsPage /> },
+      { path: 'instructors/course-review-and-unpublishing', element: <InstructorCourseReviewPage /> },
+      { path: 'learners/payments-refunds-access', element: <LearnerPaymentsRefundsPage /> },
+      { path: 'trust-safety/reporting-and-actions', element: <TrustSafetyPage /> },
+      { path: 'ai-and-data', element: <AiAndDataPage /> },
+    ],
+  },
+  {
+    path: '/legal',
+    element: <HelpCenterLayout />,
+    children: [
+      { path: 'terms', element: <TermsPage /> },
+      { path: 'privacy', element: <PrivacyPage /> },
+      { path: 'instructor-terms', element: <InstructorTermsPage /> },
+      { path: 'refund-policy', element: <RefundPolicyPage /> },
+      { path: 'ai-notice', element: <AiNoticePage /> },
+    ],
   },
   {
     path: '/',
