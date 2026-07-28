@@ -103,6 +103,9 @@ export const ENDPOINTS = {
     list: '/v1/public/teachers',
     detail: (teacherId: string) => `/v1/public/teachers/${teacherId}`,
   },
+  publicCommercialPolicy: {
+    current: '/v1/public/commercial-policy/current',
+  },
   orders: {
     create: '/v1/orders',
     list: '/v1/orders',
