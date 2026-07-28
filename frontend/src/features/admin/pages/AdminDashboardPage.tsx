@@ -16,6 +16,7 @@ import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROUTES } from '../../../shared/constants/routes';
 import { ROLES } from '../../../shared/constants/roles';
 import { adminPayoutService } from '../../admin-payout/services/adminPayoutService';
+import { adminRefundApi } from '../../admin-refund/api/adminRefundApi';
 
 export const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -56,9 +57,7 @@ export const AdminDashboardPage: React.FC = () => {
             size: 1,
             reconciliationStatus: 'CRITICAL_MISMATCH',
           }),
-          fetch('/api/v1/refunds/admin/queue?page=0&size=1&status=PENDING', {
-            headers: { Authorization: `Bearer ${session.accessToken}` }
-          }).then(res => res.json())
+          adminRefundApi.getPendingRefunds(0, 1)
         ]);
         setPendingPayouts(pendingData.totalElements);
         setReconciliationAlerts(reconciliationData.totalElements);

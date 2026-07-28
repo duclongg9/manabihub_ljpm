@@ -3,7 +3,6 @@ import { ROUTES } from '../constants/routes';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import RuleIcon from '@mui/icons-material/Rule';
-import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import MoneyOffIcon from '@mui/icons-material/MoneyOff';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
