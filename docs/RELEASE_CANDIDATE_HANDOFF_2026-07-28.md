@@ -5,19 +5,18 @@ Candidate branch: `codex/release-candidate-regression`
 
 ## What is in this candidate
 
-This branch integrates the open implementation candidates without merging
-`develop`:
+This branch integrates the remaining implementation candidates on top of the
+latest `develop`, including merged PR #102 (escrow) and PR #109 (KYC/JLPT):
 
 - PR #101: course/payment/payout code-review blockers and payout security;
-- PR #102: escrow clearing job;
 - PR #103: AI provider contract tests and operations runbook;
 - PR #104: public Teacher profile/discovery;
 - PR #105: verified course ratings/reviews;
 - PR #106: System Settings and internal Admin roles;
 - PR #107: frontend dependency, CSV import, and rich-text hardening.
 
-The release branch is the tested combination. Do not merge both this branch and
-the individual PRs into `develop`; choose one integration strategy.
+The release branch is the tested combination. PRs #101 and #103-#107 are
+superseded by this candidate and must be closed after this branch merges.
 
 ## Integration defects found and fixed
 
@@ -27,10 +26,10 @@ the individual PRs into `develop`; choose one integration strategy.
 2. PR #105 and #107 both changed the course detail page. The candidate keeps
    the real reviews section and the shared rich-text sanitizer.
 3. PR #102 edited applied migration `V003`, which caused a real existing
-   database to fail Flyway checksum validation. `V003` is restored; `V041`
+   database to fail Flyway checksum validation. `V003` is restored; `V039`
    changes only the untouched seven-day escrow default to fourteen days.
 4. Known local demo Admin credentials could otherwise be present outside a
-   local environment. `V042` disables the accounts by default; a
+   local environment. `V043` disables the accounts by default; a
    `@Profile("local")` initializer creates a BCrypt hash and activates them only
    for local development.
 
@@ -38,15 +37,14 @@ No `flyway repair`, schema reset, or destructive database operation was used.
 
 ## Automated evidence
 
-- Backend release candidate: 367/367 Maven tests pass, including PostgreSQL
-  Testcontainers, all 42 Flyway migrations, and AI provider contracts.
+- Backend release candidate: 388/388 Maven tests pass, including PostgreSQL
+  Testcontainers, all 43 Flyway migrations, and AI provider contracts.
 - Frontend release candidate: 8 test files / 19 tests pass.
 - Frontend lint passes.
 - Frontend TypeScript and production build pass.
 - Dependency audit gate passes with only the documented RSC-only acceptance
   that expires on 2026-08-15.
-- Flyway validates the unchanged history and upgrades a real local PostgreSQL
-  database from v029 through v042.
+- Flyway validates the unchanged history and upgrades PostgreSQL through v043.
 
 ## Manual local smoke evidence
 
@@ -91,7 +89,7 @@ Freeze feature work when:
 1. the release-candidate PR is reviewed;
 2. CI is green on the final target branch;
 3. required AWS variables pass `scripts/check-release-config.ps1`;
-4. migrations v038-v042 are visible in deployment logs;
+4. migrations v038-v043 are visible in deployment logs;
 5. the smoke sequence above passes on AWS;
 6. the team records the deployed commit SHA and rollback version.
 
@@ -116,7 +114,7 @@ to that honest MVP scope.
 - Keep the previous Elastic Beanstalk application version and Amplify artifact.
 - Do not delete or renumber Flyway history.
 - Application rollback is safe only when the old code can tolerate schema
-  v042; otherwise roll forward with a corrective migration.
+  v043; otherwise roll forward with a corrective migration.
 - Never rotate `PAYOUT_SECURITY_SECRET` or `KYC_IDENTITY_SECRET` as a rollback.
 - If an external provider fails during the defense, use the documented
   unavailable/error state; do not fabricate a successful AI/payment response.

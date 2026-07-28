@@ -3,10 +3,15 @@ package com.manabihub.kyc.controller;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.kyc.dto.request.KycReviewRequest;
+import com.manabihub.kyc.dto.response.KycDocumentDownload;
 import com.manabihub.kyc.dto.response.KycRequestResponse;
 import com.manabihub.kyc.service.KycService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -56,17 +61,31 @@ public class AdminKycController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         UUID adminId = UUID.fromString(jwt.getSubject());
-        String adminEmail = jwt.getClaimAsString("email");
-        String adminRole = jwt.getClaimAsString("role");
-        if (adminRole == null) {
-            adminRole = "SYSTEM_ADMIN"; // Fallback for testing if missing
-        }
-
-        KycRequestResponse updated = kycService.reviewKyc(id, reviewRequest, adminId, adminRole, adminEmail);
+        KycRequestResponse updated = kycService.reviewKyc(id, reviewRequest, adminId);
         return ResponseEntity.ok(ApiResponse.success(
                 MessageCodes.ADMIN_ACTION_SUCCESS,
                 "Reviewed KYC successfully",
                 updated
         ));
+    }
+
+    @GetMapping("/{requestId}/documents/{documentId}")
+    public ResponseEntity<byte[]> getKycDocument(
+            @PathVariable UUID requestId,
+            @PathVariable UUID documentId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        UUID adminId = UUID.fromString(jwt.getSubject());
+        KycDocumentDownload document =
+                kycService.getKycDocument(requestId, documentId, adminId);
+        MediaType mediaType = MediaType.parseMediaType(document.mimeType());
+        ContentDisposition disposition = ContentDisposition.inline()
+                .filename(document.fileName())
+                .build();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(mediaType)
+                .body(document.content());
     }
 }

@@ -74,6 +74,9 @@ public final class MessageCodes {
     public static final String KYC_ALREADY_PENDING = "KYC_ALREADY_PENDING";
     public static final String KYC_ALREADY_APPROVED = "KYC_ALREADY_APPROVED";
     public static final String KYC_SUBMISSION_NOT_ALLOWED = "KYC_SUBMISSION_NOT_ALLOWED";
+    public static final String KYC_CERTIFICATE_ALREADY_CLAIMED = "KYC_CERTIFICATE_ALREADY_CLAIMED";
+    public static final String KYC_CERTIFICATE_OCR_MISMATCH = "KYC_CERTIFICATE_OCR_MISMATCH";
+    public static final String KYC_TRUST_CASE_REQUIRED = "KYC_TRUST_CASE_REQUIRED";
     public static final String MSG_KYC_002 = "MSG-KYC-002";
     public static final String MSG_KYC_003 = "MSG-KYC-003";
     public static final String MSG_KYC_006 = "MSG-KYC-006";

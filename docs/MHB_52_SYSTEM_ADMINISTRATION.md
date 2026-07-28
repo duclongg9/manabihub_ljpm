@@ -83,9 +83,10 @@ merge. Thay đổi cấu hình chỉ tác động quyết định mới; không 
 - UI:
   `frontend/src/features/system-administration`
 
-Migration `V040__add_system_administration_controls.sql` seed các key còn thiếu
+Migration `V042__add_system_administration_controls.sql` seed các key còn thiếu
 và tạo unique index cho một-role-mỗi-admin. Thứ tự triển khai bắt buộc là
-`V038` (payout), `V039` (review), rồi `V040` (system administration).
+`V038` (certificate claims), `V039` (escrow), `V040` (payout),
+`V041` (review), rồi `V042` (system administration).
 
 ## Test và bằng chứng
 

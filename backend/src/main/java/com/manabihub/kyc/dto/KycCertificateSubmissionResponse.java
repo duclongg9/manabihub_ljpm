@@ -12,6 +12,9 @@ public record KycCertificateSubmissionResponse(
         KycModuleStatusResponse certificateVerification,
         boolean adminNotificationCreated,
         boolean auditLogged,
+        boolean teacherWorkspaceAvailable,
+        String reviewEta,
+        String sessionToken,
         Map<String, Object> srsTrace
 ) {
 }

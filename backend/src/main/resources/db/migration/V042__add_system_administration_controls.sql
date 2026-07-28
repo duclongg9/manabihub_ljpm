@@ -1,4 +1,4 @@
--- MHB-52 follows V039 verified course reviews. Deploy V038/V039 first.
+-- MHB-52 follows V041 verified course reviews. Deploy V038-V041 first.
 
 INSERT INTO system_settings (
     id,

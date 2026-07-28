@@ -1,7 +1,7 @@
 -- MHB-68: enrollment-bound course ratings and reviews.
 --
--- V038 is reserved by the secure withdrawal work in PR #101. Merge/deploy
--- that migration before this one so production Flyway history stays ordered.
+-- V038/V039 are already owned by develop. V040 secures withdrawals before
+-- this review migration so production Flyway history remains linear.
 
 CREATE TABLE course_reviews (
     id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),

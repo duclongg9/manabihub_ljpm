@@ -67,24 +67,24 @@ that real route exists, the UI does not pretend reporting works.
   pagination and bulk aggregate queries.
 - `frontend/.../course-reviews/components/CourseReviewsSection.tsx`: review
   list/editor/states.
-- `V039__create_verified_course_reviews.sql`: table and database constraints.
+- `V041__create_verified_course_reviews.sql`: table and database constraints.
 
 ## Migration and deployment
 
-This change adds Flyway migration **V039**. PR #101 owns **V038**, so deploy in
-this order:
+This change is integrated as Flyway migration **V041** in the release
+candidate. Deploy in this order:
 
-1. Merge/deploy PR #101 so Flyway records V038.
-2. Merge MHB-67 / PR #104.
-3. Merge/deploy this change; backend applies V039.
-4. Deploy the frontend from the same revision.
+1. Apply `V038` certificate claims and `V039` escrow default from `develop`.
+2. Apply `V040` secure withdrawals.
+3. Apply `V041` verified reviews.
+4. Deploy the backend and frontend from the same release revision.
 5. Smoke-test a paid enrollment, a completed enrollment and a refunded
    enrollment before announcing the feature.
 
 No environment variable or secret is added.
 
 Rollback must not delete `course_reviews`. Roll back application binaries to
-the previous revision and leave V039/data in place; the previous application
+the previous revision and leave V041/data in place; the previous application
 does not reference the table. A destructive migration is unnecessary.
 
 ## Verification

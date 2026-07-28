@@ -159,4 +159,75 @@ class WalletServiceImplTest {
         assertEquals(BigDecimal.ZERO, teacherWallet.getFrozenBalance());
         verifyNoInteractions(walletTransactionRepository);
     }
+
+    @Test
+    void releaseEscrow_whenWalletIsFrozen_rejectsWithoutMutation() {
+        UUID escrowId = UUID.randomUUID();
+        wallet.setFrozen(true);
+        wallet.setFrozenBalance(new BigDecimal("150000.00"));
+        when(walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId()))
+                .thenReturn(Optional.of(wallet));
+        when(walletRepository.findByIdForUpdate(wallet.getId())).thenReturn(Optional.of(wallet));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.releaseEscrow(
+                        teacher,
+                        new BigDecimal("150000.00"),
+                        "ESCROW",
+                        escrowId,
+                        "Release"));
+
+        assertEquals(MessageCodes.WALLET_FROZEN, exception.getMessageCode());
+        assertEquals(BigDecimal.ZERO, wallet.getBalance());
+        assertEquals(new BigDecimal("150000.00"), wallet.getFrozenBalance());
+        verifyNoInteractions(walletTransactionRepository);
+    }
+
+    @Test
+    void releaseEscrow_whenFrozenBalanceIsInsufficient_rejectsWithoutMutation() {
+        UUID escrowId = UUID.randomUUID();
+        wallet.setFrozenBalance(new BigDecimal("100000.00"));
+        when(walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId()))
+                .thenReturn(Optional.of(wallet));
+        when(walletRepository.findByIdForUpdate(wallet.getId())).thenReturn(Optional.of(wallet));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.releaseEscrow(
+                        teacher,
+                        new BigDecimal("150000.00"),
+                        "ESCROW",
+                        escrowId,
+                        "Release"));
+
+        assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, exception.getMessageCode());
+        assertEquals(BigDecimal.ZERO, wallet.getBalance());
+        assertEquals(new BigDecimal("100000.00"), wallet.getFrozenBalance());
+        verifyNoInteractions(walletTransactionRepository);
+    }
+
+    @Test
+    void releaseEscrow_whenEligible_movesFrozenFundsAndRecordsLedger() {
+        UUID escrowId = UUID.randomUUID();
+        wallet.setFrozenBalance(new BigDecimal("150000.00"));
+        when(walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId()))
+                .thenReturn(Optional.of(wallet));
+        when(walletRepository.findByIdForUpdate(wallet.getId())).thenReturn(Optional.of(wallet));
+        when(walletTransactionRepository.save(any(WalletTransaction.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        WalletTransaction transaction = service.releaseEscrow(
+                teacher,
+                new BigDecimal("150000.00"),
+                "ESCROW",
+                escrowId,
+                "Release");
+
+        assertEquals(new BigDecimal("150000.00"), wallet.getBalance());
+        assertEquals(BigDecimal.ZERO.setScale(2), wallet.getFrozenBalance());
+        assertEquals(WalletTransactionType.ESCROW_RELEASE, transaction.getTransactionType());
+        assertEquals(WalletDirection.IN, transaction.getDirection());
+        assertEquals(escrowId, transaction.getReferenceId());
+    }
 }

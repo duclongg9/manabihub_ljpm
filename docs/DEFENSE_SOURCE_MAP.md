@@ -121,8 +121,9 @@ is the real security boundary.
 - PostgreSQL schema starts in `V001`/`V002`; later files are ordered business
   changes.
 - Never edit a migration already applied anywhere. Add a new version instead.
-- Release candidate order is `V038` payout security, `V039` reviews, `V040`
-  system administration, `V041` escrow default, `V042` demo-account hardening.
+- Release candidate order is `V038` certificate claims, `V039` escrow default,
+  `V040` payout security, `V041` reviews, `V042` system administration, and
+  `V043` demo-account hardening.
 - JPA uses `ddl-auto=validate` outside tests; Flyway owns production schema.
 
 ## Configuration: what you obtain and what you generate

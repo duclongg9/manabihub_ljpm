@@ -172,6 +172,12 @@ public class WalletServiceImpl implements WalletService {
     @Transactional
     public WalletTransaction releaseEscrow(TeacherProfile teacher, BigDecimal amount,
                                            String referenceType, UUID referenceId, String note) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Escrow release amount must be positive");
+        }
+
         Wallet wallet = getOrCreateTeacherWallet(teacher);
 
         Wallet locked = walletRepository.findByIdForUpdate(wallet.getId())
@@ -179,6 +185,18 @@ public class WalletServiceImpl implements WalletService {
                         MessageCodes.WALLET_NOT_FOUND,
                         "Teacher wallet was not found",
                         HttpStatus.NOT_FOUND));
+
+        if (locked.isFrozen()) {
+            throw new BusinessException(
+                    MessageCodes.WALLET_FROZEN,
+                    "Teacher wallet is frozen and cannot receive an escrow release");
+        }
+
+        if (locked.getFrozenBalance().compareTo(amount) < 0) {
+            throw new BusinessException(
+                    MessageCodes.WALLET_INSUFFICIENT_BALANCE,
+                    "Frozen wallet balance is lower than the escrow release amount");
+        }
 
         locked.setFrozenBalance(locked.getFrozenBalance().subtract(amount));
         locked.setBalance(locked.getBalance().add(amount));

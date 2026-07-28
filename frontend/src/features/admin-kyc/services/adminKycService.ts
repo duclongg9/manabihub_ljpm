@@ -8,14 +8,22 @@ export interface KycRequestResponse {
   teacherFullName: string;
   status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED' | 'REVOKED';
   displayName: string;
-  idCardFrontUrl: string;
-  idCardBackUrl: string;
-  certificateUrl: string;
-  selfieUrl: string;
+  idCardFrontUrl: string | null;
+  idCardBackUrl: string | null;
+  certificateUrl: string | null;
+  selfieUrl: string | null;
   copyrightAccepted: boolean;
-  vnptVerificationStatus: string;
-  vnptResponseDetails: string;
-  riskLevel: string;
+  vnptVerificationStatus: string | null;
+  vnptResponseDetails: string | null;
+  riskLevel: string | null;
+  exceptionStage: string | null;
+  exceptionType: string | null;
+  exceptionReason: string | null;
+  certificateCode: string | null;
+  certificateHolderName: string | null;
+  certificateDateOfBirth: string | null;
+  certificateLevel: string | null;
+  certificateOcrText: string | null;
   decisionNote: string | null;
   createdAt: string;
   updatedAt: string;
@@ -28,11 +36,11 @@ export interface ApiResponse<T> {
   messageCode: string;
   message: string;
   data: T;
-  errors?: any;
+  errors?: unknown;
 }
 
 export interface KycReviewRequest {
-  status: 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED' | 'REVOKED';
+  status: 'APPROVED' | 'REJECTED' | 'CORRECTION_REQUIRED';
   decisionNote?: string;
 }
 
@@ -67,5 +75,10 @@ export const adminKycService = {
       request
     );
     return response.data.data;
+  },
+
+  getDocumentObjectUrl: async (path: string): Promise<string> => {
+    const response = await axiosClient.get<Blob>(path, { responseType: 'blob' });
+    return URL.createObjectURL(response.data);
   },
 };

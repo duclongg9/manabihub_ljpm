@@ -12,6 +12,7 @@ import {
   DialogContent,
   FormControlLabel,
   IconButton,
+  MenuItem,
   Paper,
   Stack,
   Step,
@@ -31,6 +32,9 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import { X } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { storeAuthToken } from '../../shared/auth/authSession';
+import { recognizeJlptCertificate } from './certificateOcr';
 import {
   getTeacherKycStatus,
   restartTeacherVerification,
@@ -52,7 +56,12 @@ const KYC_COLORS = {
   sdkShell: '#0F172A',
 };
 
-type CertificateErrors = Partial<Record<'certificate' | 'certificateCode' | 'agreement', string>>;
+type CertificateErrors = Partial<
+  Record<
+    'certificate' | 'certificateCode' | 'holderName' | 'dateOfBirth' | 'level' | 'ocr' | 'agreement',
+    string
+  >
+>;
 type IdentitySummary = {
   fullName?: string;
   idNumber?: string;
@@ -69,7 +78,7 @@ type IdentityDiagnostics = {
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const CERTIFICATE_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+const CERTIFICATE_TYPES = new Set(['image/jpeg', 'image/png']);
 const IDENTITY_LAUNCH_COOLDOWN_MS = 60 * 1000;
 const IDENTITY_LAUNCH_COOLDOWN_STORAGE_KEY = 'manabihub_kyc_identity_launch_cooldown_until';
 
@@ -108,8 +117,15 @@ export function TeacherKycPage() {
 }
 
 function TeacherKycPageContent() {
+  const navigate = useNavigate();
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [certificateCode, setCertificateCode] = useState('');
+  const [certificateHolderName, setCertificateHolderName] = useState('');
+  const [certificateDateOfBirth, setCertificateDateOfBirth] = useState('');
+  const [certificateLevel, setCertificateLevel] = useState('');
+  const [certificateOcrText, setCertificateOcrText] = useState('');
+  const [certificateOcrProgress, setCertificateOcrProgress] = useState(0);
+  const [certificateOcrProcessing, setCertificateOcrProcessing] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [errors, setErrors] = useState<CertificateErrors>({});
   const [status, setStatus] = useState<KycStatusResponse | null>(null);
@@ -163,7 +179,11 @@ function TeacherKycPageContent() {
     && status?.teacherKycStatus !== 'APPROVED'
     && certificateStatus.status !== 'PENDING_REVIEW'
     && (identityStatus.canInteract || ['NOT_STARTED', 'FAILED'].includes(identityStatus.status));
-  const canSubmitCertificate = identityVerified && certificateStatus.canInteract && !certificateSubmitting;
+  const canSubmitCertificate =
+    identityVerified
+    && certificateStatus.canInteract
+    && !certificateSubmitting
+    && !certificateOcrProcessing;
   const shouldShowStatusChips = !statusLoadFailed;
   const pageStatus = status?.teacherKycStatus ?? 'UNKNOWN';
   const pageStatusLabel = status?.teacherKycStatusLabel ?? 'Đang tải...';
@@ -269,6 +289,11 @@ function TeacherKycPageContent() {
       setRestartEnvelope(response);
       setCertificateFile(null);
       setCertificateCode('');
+      setCertificateHolderName('');
+      setCertificateDateOfBirth('');
+      setCertificateLevel('');
+      setCertificateOcrText('');
+      setCertificateOcrProgress(0);
       setAgreementAccepted(false);
       setErrors({});
       await refreshStatus();
@@ -279,11 +304,55 @@ function TeacherKycPageContent() {
     }
   }
 
-  function handleCertificateChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleCertificateChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     setCertificateFile(file);
-    setErrors((current) => ({ ...current, certificate: undefined }));
+    setCertificateHolderName('');
+    setCertificateDateOfBirth('');
+    setCertificateLevel('');
+    setCertificateOcrText('');
+    setCertificateOcrProgress(0);
+    setErrors((current) => ({ ...current, certificate: undefined, ocr: undefined }));
     setCertificateEnvelope(null);
+
+    if (!file) {
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE || !CERTIFICATE_TYPES.has(file.type)) {
+      setErrors((current) => ({
+        ...current,
+        certificate:
+          file.size > MAX_FILE_SIZE
+            ? 'Ảnh chứng chỉ không được vượt quá 5MB.'
+            : 'Chỉ chấp nhận ảnh JPG hoặc PNG của chứng chỉ JLPT.',
+      }));
+      return;
+    }
+
+    setCertificateOcrProcessing(true);
+    try {
+      const result = await recognizeJlptCertificate(file, setCertificateOcrProgress);
+      setCertificateOcrText(result.rawText);
+      setCertificateHolderName(result.holderName);
+      setCertificateDateOfBirth(result.dateOfBirth);
+      setCertificateLevel(result.level);
+      if (!certificateCode.trim() && result.certificateCode) {
+        setCertificateCode(result.certificateCode);
+      }
+      if (!result.rawText || !result.holderName || !result.dateOfBirth || !result.level) {
+        setErrors((current) => ({
+          ...current,
+          ocr: 'OCR chưa đọc đủ họ tên, ngày sinh và cấp độ JLPT. Hãy dùng ảnh rõ, thẳng và đủ sáng.',
+        }));
+      }
+    } catch (error) {
+      setErrors((current) => ({
+        ...current,
+        ocr: `Không thể đọc ảnh chứng chỉ: ${readErrorMessage(error)}`,
+      }));
+    } finally {
+      setCertificateOcrProcessing(false);
+    }
   }
 
   async function handleCertificateSubmit(event: FormEvent<HTMLFormElement>) {
@@ -291,7 +360,15 @@ function TeacherKycPageContent() {
     setPageError(null);
     setCertificateEnvelope(null);
 
-    const nextErrors = validateCertificateForm(certificateFile, certificateCode, agreementAccepted);
+    const nextErrors = validateCertificateForm(
+      certificateFile,
+      certificateCode,
+      certificateHolderName,
+      certificateDateOfBirth,
+      certificateLevel,
+      certificateOcrText,
+      agreementAccepted,
+    );
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -304,8 +381,13 @@ function TeacherKycPageContent() {
       const response = await submitTeacherCertificate({
         certificate: certificateFile as File,
         certificateCode,
+        certificateHolderName,
+        certificateDateOfBirth,
+        certificateLevel,
+        certificateOcrText,
         copyrightAgreementAccepted: agreementAccepted,
       });
+      storeAuthToken('public', response.data.sessionToken);
       setCertificateEnvelope(response);
       await refreshStatus();
     } catch (error) {
@@ -419,8 +501,19 @@ function TeacherKycPageContent() {
         </Alert>
       )}
       {certificateEnvelope && (
-        <Alert severity="success" icon={<FactCheckIcon />}>
-          Chứng chỉ đã được ghi nhận và chuyển sang bước kiểm tra.
+        <Alert
+          severity="success"
+          icon={<FactCheckIcon />}
+          action={
+            <Button color="inherit" onClick={() => navigate('/teacher/dashboard')} size="small">
+              Vào trang giảng viên
+            </Button>
+          }
+        >
+          Đã nhận và đọc được chứng chỉ JLPT. Họ tên, ngày sinh đã khớp với CCCD và kiểm tra trùng
+          đã đạt. Course Manager sẽ xác minh tính xác thực trong 1-2 ngày làm việc, không tính thứ
+          Bảy, Chủ nhật và ngày nghỉ lễ. Bạn có thể sử dụng các tính năng giảng viên, nhưng khóa học
+          chưa được hiển thị trên nền tảng cho tới khi hồ sơ được duyệt.
         </Alert>
       )}
       {restartEnvelope && (
@@ -507,14 +600,16 @@ function TeacherKycPageContent() {
                 title="Cung cấp chứng chỉ chuyên môn"
               >
                 <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-                  Vui lòng tải lên chứng chỉ (JLPT / J-Test / NAT-TEST) và nhập mã chứng chỉ.
-                  Hệ thống sẽ tự động kiểm tra tính hợp lệ dựa trên thông tin đã xác minh ở Bước 1.
+                  Chỉ tải ảnh chứng chỉ JLPT. Hệ thống sẽ đọc ảnh, đối chiếu họ tên và ngày sinh với
+                  CCCD đã xác minh, đồng thời kiểm tra mã chứng chỉ có bị dùng trùng hay không.
                 </Typography>
 
                 <Paper elevation={0} sx={{ bgcolor: KYC_COLORS.surfaceMuted, border: '1px solid', borderColor: errors.certificate ? 'error.light' : KYC_COLORS.primaryBorder, borderRadius: 2, mt: 2, p: 2 }}>
                   <Stack spacing={1.25}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Chứng chỉ chuyên môn</Typography>
-                    <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>Ảnh hoặc PDF, tối đa 5MB.</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Ảnh chứng chỉ JLPT</Typography>
+                    <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>
+                      JPG hoặc PNG, tối đa 5MB. Chụp thẳng, đủ sáng và không cắt mất nội dung.
+                    </Typography>
                     <Button
                       component="label"
                       disabled={!canSubmitCertificate}
@@ -523,16 +618,76 @@ function TeacherKycPageContent() {
                       sx={{ borderColor: 'primary.main', color: 'primary.main', '&:hover': { borderColor: 'primary.dark', bgcolor: KYC_COLORS.primaryTint } }}
                     >
                       Tải chứng chỉ
-                      <input hidden accept="image/jpeg,image/png,application/pdf" type="file" onChange={handleCertificateChange} />
+                      <input hidden accept="image/jpeg,image/png" type="file" onChange={handleCertificateChange} />
                     </Button>
                     {certificateFile && (
                       <Typography sx={{ color: 'primary.main', fontSize: 13, fontWeight: 700, overflowWrap: 'anywhere' }}>
                         {certificateFile.name}
                       </Typography>
                     )}
+                    {certificateOcrProcessing && (
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <CircularProgress size={18} />
+                        <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>
+                          Đang đọc chứng chỉ... {certificateOcrProgress}%
+                        </Typography>
+                      </Stack>
+                    )}
                     {errors.certificate && <FieldError>{errors.certificate}</FieldError>}
+                    {errors.ocr && <FieldError>{errors.ocr}</FieldError>}
                   </Stack>
                 </Paper>
+
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mt: 2 }}>
+                  <TextField
+                    disabled={!canSubmitCertificate}
+                    error={Boolean(errors.holderName)}
+                    fullWidth
+                    helperText={errors.holderName}
+                    label="Họ tên đọc từ chứng chỉ"
+                    required
+                    value={certificateHolderName}
+                    onChange={(event) => {
+                      setCertificateHolderName(event.target.value);
+                      setErrors((current) => ({ ...current, holderName: undefined }));
+                    }}
+                  />
+                  <TextField
+                    disabled={!canSubmitCertificate}
+                    error={Boolean(errors.dateOfBirth)}
+                    fullWidth
+                    helperText={errors.dateOfBirth}
+                    label="Ngày sinh đọc từ chứng chỉ"
+                    required
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    type="date"
+                    value={certificateDateOfBirth}
+                    onChange={(event) => {
+                      setCertificateDateOfBirth(event.target.value);
+                      setErrors((current) => ({ ...current, dateOfBirth: undefined }));
+                    }}
+                  />
+                  <TextField
+                    disabled={!canSubmitCertificate}
+                    error={Boolean(errors.level)}
+                    fullWidth
+                    helperText={errors.level}
+                    label="Cấp độ JLPT"
+                    required
+                    select
+                    value={certificateLevel}
+                    onChange={(event) => {
+                      setCertificateLevel(event.target.value);
+                      setErrors((current) => ({ ...current, level: undefined }));
+                    }}
+                  >
+                    {['N1', 'N2', 'N3', 'N4', 'N5'].map((level) => (
+                      <MenuItem key={level} value={level}>
+                        {level}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Stack>
 
                 <TextField
                   fullWidth
@@ -553,6 +708,19 @@ function TeacherKycPageContent() {
                     setErrors((current) => ({ ...current, certificateCode: undefined }));
                   }}
                 />
+                <TextField
+                  fullWidth
+                  label="Nội dung OCR dùng để đối chiếu"
+                  margin="normal"
+                  minRows={4}
+                  multiline
+                  slotProps={{ input: { readOnly: true } }}
+                  value={certificateOcrText}
+                />
+                <Typography sx={{ color: 'text.secondary', fontSize: 12 }}>
+                  Dữ liệu OCR chỉ được dùng cho đối chiếu hồ sơ. Nếu thông tin chưa rõ, hãy tải lại
+                  ảnh tốt hơn thay vì đoán hoặc tự nhập thay nội dung ảnh.
+                </Typography>
               </ModuleCard>
 
               <Card variant="outlined">
@@ -593,7 +761,7 @@ function TeacherKycPageContent() {
               </Card>
 
               <Button
-                disabled={!canSubmitCertificate}
+                disabled={!canSubmitCertificate || !certificateOcrText}
                 fullWidth
                 size="large"
                 sx={{
@@ -606,7 +774,11 @@ function TeacherKycPageContent() {
                 type="submit"
                 variant="contained"
               >
-                {certificateSubmitting ? 'Đang nộp chứng chỉ...' : 'Nộp chứng chỉ'}
+                {certificateOcrProcessing
+                  ? 'Đang đọc chứng chỉ...'
+                  : certificateSubmitting
+                    ? 'Đang nộp chứng chỉ...'
+                    : 'Nộp chứng chỉ'}
               </Button>
             </Stack>
           </Box>
@@ -828,19 +1000,39 @@ function statusChipColor(status: string): 'default' | 'success' | 'warning' | 'e
   return 'default';
 }
 
-function validateCertificateForm(certificateFile: File | null, certificateCode: string, agreementAccepted: boolean) {
+function validateCertificateForm(
+  certificateFile: File | null,
+  certificateCode: string,
+  certificateHolderName: string,
+  certificateDateOfBirth: string,
+  certificateLevel: string,
+  certificateOcrText: string,
+  agreementAccepted: boolean,
+) {
   const nextErrors: CertificateErrors = {};
 
   if (!certificateFile) {
-    nextErrors.certificate = 'Vui lòng tải lên chứng chỉ chuyên môn (JLPT / J-Test / NAT-TEST).';
+    nextErrors.certificate = 'Vui lòng tải lên ảnh chứng chỉ JLPT.';
   } else if (certificateFile.size > MAX_FILE_SIZE) {
-    nextErrors.certificate = 'Chứng chỉ không được vượt quá 5MB.';
-  } else if (certificateFile.type && !CERTIFICATE_TYPES.has(certificateFile.type)) {
-    nextErrors.certificate = 'Chỉ chấp nhận định dạng JPG, PNG hoặc PDF.';
+    nextErrors.certificate = 'Ảnh chứng chỉ không được vượt quá 5MB.';
+  } else if (!CERTIFICATE_TYPES.has(certificateFile.type)) {
+    nextErrors.certificate = 'Chỉ chấp nhận ảnh JPG hoặc PNG.';
   }
 
   if (!certificateCode.trim()) {
-    nextErrors.certificateCode = 'Vui lòng nhập mã chứng chỉ.';
+    nextErrors.certificateCode = 'Vui lòng nhập mã chứng chỉ JLPT.';
+  }
+  if (!certificateHolderName.trim()) {
+    nextErrors.holderName = 'OCR phải đọc được họ tên trên chứng chỉ.';
+  }
+  if (!certificateDateOfBirth) {
+    nextErrors.dateOfBirth = 'OCR phải đọc được ngày sinh trên chứng chỉ.';
+  }
+  if (!/^N[1-5]$/.test(certificateLevel)) {
+    nextErrors.level = 'Chỉ chấp nhận cấp độ JLPT từ N1 đến N5.';
+  }
+  if (!certificateOcrText.trim()) {
+    nextErrors.ocr = 'Không có kết quả OCR để đối chiếu. Vui lòng tải lại ảnh rõ hơn.';
   }
 
   if (!agreementAccepted) {
