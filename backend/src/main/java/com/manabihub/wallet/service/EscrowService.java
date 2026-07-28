@@ -17,4 +17,10 @@ public interface EscrowService {
      * existing entries.
      */
     List<EscrowLedger> holdForOrder(Order order);
+
+    /**
+     * Reverses held escrow funds for an order that is being refunded.
+     * Only affects entries in HELD state.
+     */
+    List<EscrowLedger> reverseHold(Order order);
 }

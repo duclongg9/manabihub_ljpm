@@ -66,4 +66,38 @@ public class EscrowServiceImpl implements EscrowService {
 
         return created;
     }
+
+    @Override
+    @Transactional
+    public List<EscrowLedger> reverseHold(Order order) {
+        List<EscrowLedger> ledgers = escrowLedgerRepository.findByOrder_Id(order.getId());
+        
+        for (EscrowLedger ledger : ledgers) {
+            if (ledger.getStatus() == EscrowStatus.HELD) {
+                ledger.setStatus(EscrowStatus.REFUNDED);
+                escrowLedgerRepository.save(ledger);
+
+                walletService.reverseEscrowHold(
+                        ledger.getTeacher(),
+                        ledger.getAmount(),
+                        "ORDER",
+                        order.getId(),
+                        "Escrow reversed for refunded order " + order.getOrderCode()
+                );
+            } else if (ledger.getStatus() == EscrowStatus.RELEASED) {
+                ledger.setStatus(EscrowStatus.REFUNDED);
+                escrowLedgerRepository.save(ledger);
+
+                walletService.refundWallet(
+                        ledger.getTeacher(),
+                        ledger.getAmount(),
+                        "ORDER",
+                        order.getId(),
+                        "Wallet refunded for order " + order.getOrderCode()
+                );
+            }
+        }
+        
+        return ledgers;
+    }
 }

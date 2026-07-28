@@ -4,6 +4,7 @@ import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import RuleIcon from '@mui/icons-material/Rule';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import MoneyOffIcon from '@mui/icons-material/MoneyOff';
 
 export const ADMIN_MENU = [
   {
@@ -29,5 +30,11 @@ export const ADMIN_MENU = [
     path: ROUTES.ADMIN.COURSE_APPROVAL,
     icon: RuleIcon,
     roles: [ROLES.COURSE_MANAGER],
+  },
+  {
+    title: 'Refund Review',
+    path: ROUTES.ADMIN.REFUND_REVIEW,
+    icon: MoneyOffIcon,
+    roles: [ROLES.FINANCE_MANAGER],
   },
 ];

@@ -26,4 +26,16 @@ public interface WalletService {
      */
     WalletTransaction holdEscrow(TeacherProfile teacher, BigDecimal amount,
                                  String referenceType, UUID referenceId, String note);
+
+    /**
+     * Deducts from the teacher's frozen (held) balance for an escrow hold that was reversed/refunded.
+     */
+    WalletTransaction reverseEscrowHold(TeacherProfile teacher, BigDecimal amount,
+                                        String referenceType, UUID referenceId, String note);
+
+    /**
+     * Deducts from the teacher's available balance if the escrow was already released.
+     */
+    WalletTransaction refundWallet(TeacherProfile teacher, BigDecimal amount,
+                                   String referenceType, UUID referenceId, String note);
 }

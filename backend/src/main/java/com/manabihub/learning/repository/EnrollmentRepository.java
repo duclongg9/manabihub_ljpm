@@ -29,6 +29,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     // UC-10: study course lessons — resolve the current student's enrollment for a course.
     Optional<Enrollment> findByStudent_IdAndCourse_Id(UUID studentId, UUID courseId);
 
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM Enrollment e WHERE e.id = :id")
     Optional<Enrollment> findByIdForUpdate(@Param("id") UUID id);

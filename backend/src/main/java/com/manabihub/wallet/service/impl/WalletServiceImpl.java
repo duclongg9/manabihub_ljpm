@@ -73,4 +73,60 @@ public class WalletServiceImpl implements WalletService {
 
         return walletTransactionRepository.save(transaction);
     }
+
+    @Override
+    @Transactional
+    public WalletTransaction reverseEscrowHold(TeacherProfile teacher, BigDecimal amount,
+                                        String referenceType, UUID referenceId, String note) {
+        Wallet wallet = getOrCreateTeacherWallet(teacher);
+
+        Wallet locked = walletRepository.findByIdForUpdate(wallet.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.WALLET_NOT_FOUND,
+                        "Teacher wallet was not found",
+                        HttpStatus.NOT_FOUND));
+
+        locked.setFrozenBalance(locked.getFrozenBalance().subtract(amount));
+        walletRepository.save(locked);
+
+        WalletTransaction transaction = WalletTransaction.builder()
+                .wallet(locked)
+                .transactionType(WalletTransactionType.ESCROW_RELEASE)
+                .amount(amount)
+                .direction(WalletDirection.OUT)
+                .referenceType(referenceType)
+                .referenceId(referenceId)
+                .note(note)
+                .build();
+
+        return walletTransactionRepository.save(transaction);
+    }
+
+    @Override
+    @Transactional
+    public WalletTransaction refundWallet(TeacherProfile teacher, BigDecimal amount,
+                                   String referenceType, UUID referenceId, String note) {
+        Wallet wallet = getOrCreateTeacherWallet(teacher);
+
+        Wallet locked = walletRepository.findByIdForUpdate(wallet.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.WALLET_NOT_FOUND,
+                        "Teacher wallet was not found",
+                        HttpStatus.NOT_FOUND));
+
+        locked.setBalance(locked.getBalance().subtract(amount));
+        walletRepository.save(locked);
+
+        WalletTransaction transaction = WalletTransaction.builder()
+                .wallet(locked)
+                .transactionType(WalletTransactionType.REFUND)
+                .amount(amount)
+                .direction(WalletDirection.OUT)
+                .referenceType(referenceType)
+                .referenceId(referenceId)
+                .note(note)
+                .build();
+
+        return walletTransactionRepository.save(transaction);
+    }
 }

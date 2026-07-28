@@ -17,6 +17,8 @@ import { CourseDraftPage } from '../features/course-builder/pages/CourseDraftPag
 import { TeacherCoursesPage } from '../features/course-builder/pages/TeacherCoursesPage';
 import { CourseApprovalQueuePage } from '../features/admin-course-approval/pages/CourseApprovalQueuePage';
 import { CourseApprovalDetailPage } from '../features/admin-course-approval/pages/CourseApprovalDetailPage';
+import { AdminRefundQueue } from '../features/admin-refund/components/AdminRefundQueue';
+import { AdminRefundDetail } from '../features/admin-refund/components/AdminRefundDetail';
 import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
 import { CourseDetailPage } from '../features/catalog/pages/CourseDetailPage';
 import { CourseLearningPage } from '../features/learning/pages/CourseLearningPage';
@@ -241,6 +243,14 @@ export const router = createBrowserRouter([
       {
         path: 'finance',
         element: <Navigate to="/admin/dashboard" replace />,
+      },
+      {
+        path: 'refunds',
+        element: <AdminRefundQueue />,
+      },
+      {
+        path: 'refunds/:id',
+        element: <AdminRefundDetail />,
       },
     ],
   },
