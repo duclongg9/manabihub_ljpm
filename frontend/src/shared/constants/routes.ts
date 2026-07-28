@@ -41,6 +41,7 @@ export const ROUTES = {
     KYC_REVIEW: '/admin/kyc',
     FINANCE: '/admin/finance',
     PAYOUTS: '/admin/payouts',
+    VIOLATIONS: '/admin/violations',
     NOTIFICATIONS: '/admin/notifications',
   },
 };

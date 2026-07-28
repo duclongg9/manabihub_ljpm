@@ -35,6 +35,8 @@ import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistP
 import { TeacherWalletPage } from '../features/my-wallet/pages/TeacherWalletPage';
 import { PayoutQueuePage } from '../features/admin-payout/pages/PayoutQueuePage';
 import { PayoutSettlementPage } from '../features/admin-payout/pages/PayoutSettlementPage';
+import { ViolationQueuePage } from '../features/admin-violation/pages/ViolationQueuePage';
+import { ViolationDetailPage } from '../features/admin-violation/pages/ViolationDetailPage';
 import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
@@ -303,6 +305,14 @@ export const router = createBrowserRouter([
       {
         path: 'payouts/:id',
         element: <PayoutSettlementPage />,
+      },
+      {
+        path: 'violations',
+        element: <ViolationQueuePage />,
+      },
+      {
+        path: 'violations/:id',
+        element: <ViolationDetailPage />,
       },
     ],
   },

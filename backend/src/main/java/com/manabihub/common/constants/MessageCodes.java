@@ -286,6 +286,19 @@ public final class MessageCodes {
     public static final String ADMIN_ACTION_FORBIDDEN = "ADMIN_ACTION_FORBIDDEN";
     public static final String COURSE_MANAGER_REQUIRED = "COURSE_MANAGER_REQUIRED";
     public static final String ADMIN_PERMISSION_DENIED = "ADMIN_PERMISSION_DENIED";
+    
+    // Moderation specific codes
+    public static final String MODERATION_REPORT_NOT_FOUND = "MODERATION_REPORT_NOT_FOUND";
+    public static final String MODERATION_INVALID_STATUS = "MODERATION_INVALID_STATUS";
+    public static final String MODERATION_ALREADY_RESOLVED = "MODERATION_ALREADY_RESOLVED";
+    public static final String MODERATION_DECISION_NOTE_REQUIRED = "MODERATION_DECISION_NOTE_REQUIRED";
+    public static final String MODERATION_ACTION_REQUIRED = "MODERATION_ACTION_REQUIRED";
+    public static final String MODERATION_TARGET_NOT_FOUND = "MODERATION_TARGET_NOT_FOUND";
+    public static final String MODERATION_PENDING_EVIDENCE = "MODERATION_PENDING_EVIDENCE";
+    public static final String MODERATION_REPORT_DISMISSED = "MODERATION_REPORT_DISMISSED";
+    public static final String MODERATION_CONCURRENT_UPDATE = "MODERATION_CONCURRENT_UPDATE";
+    public static final String MODERATION_SEVERE_PERMISSION_REQUIRED = "MODERATION_SEVERE_PERMISSION_REQUIRED";
+    public static final String MSG_ADM_003 = "MSG-ADM-003"; // Moderation action applied
 
     // ──────────────────────────────────────────────
     // NOTIFICATION — notification system
