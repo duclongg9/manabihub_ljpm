@@ -13,6 +13,10 @@ import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.order.enums.OrderStatus;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import com.manabihub.wallet.entity.EscrowLedger;
+import com.manabihub.order.entity.OrderItemSnapshot;
+import com.manabihub.order.repository.OrderItemSnapshotRepository;
+import com.manabihub.wallet.entity.PlatformCommissionLedger;
+import com.manabihub.wallet.repository.PlatformCommissionLedgerRepository;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
 import com.manabihub.wallet.service.EscrowService;
@@ -22,6 +26,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -36,13 +49,19 @@ import java.util.UUID;
 public class EscrowServiceImpl implements EscrowService {
 
     private static final String ESCROW_HOLDING_DAYS = "ESCROW_HOLDING_DAYS";
+    private static final String COMMISSION_RATE = "COMMISSION_RATE";
+    private static final String POLICY_VERSION = "POLICY_VERSION";
     private static final int DEFAULT_HOLDING_DAYS = 14;
+    private static final BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("0.20");
+    private static final String DEFAULT_POLICY_VERSION = "1.0.0-provisional";
 
     private final EscrowLedgerRepository escrowLedgerRepository;
     private final OrderItemRepository orderItemRepository;
     private final WalletService walletService;
     private final AuditLogRepository auditLogRepository;
     private final SystemSettingRepository systemSettingRepository;
+    private final OrderItemSnapshotRepository orderItemSnapshotRepository;
+    private final PlatformCommissionLedgerRepository platformCommissionLedgerRepository;
 
     private int getEscrowHoldingDays() {
         String configuredValue = systemSettingRepository.findBySettingKey(ESCROW_HOLDING_DAYS)
@@ -73,22 +92,52 @@ public class EscrowServiceImpl implements EscrowService {
         Instant releaseAt = Instant.now().plus(Duration.ofDays(holdingDays));
         List<EscrowLedger> created = new ArrayList<>();
 
+        BigDecimal commissionRate = systemSettingRepository.findBySettingKey(COMMISSION_RATE)
+                .map(setting -> new BigDecimal(setting.getSettingValue()))
+                .orElse(DEFAULT_COMMISSION_RATE);
+
+        String policyVersion = systemSettingRepository.findBySettingKey(POLICY_VERSION)
+                .map(setting -> setting.getSettingValue())
+                .orElse(DEFAULT_POLICY_VERSION);
+
         for (OrderItem item : orderItemRepository.findByOrder_Id(order.getId())) {
             Course course = item.getCourse();
             TeacherProfile teacher = course.getTeacher();
+
+            BigDecimal grossAmount = item.getPrice();
+            BigDecimal platformCommission = grossAmount.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal teacherNet = grossAmount.subtract(platformCommission);
+
+            orderItemSnapshotRepository.save(OrderItemSnapshot.builder()
+                    .orderItem(item)
+                    .currency("VND")
+                    .grossAmount(grossAmount)
+                    .commissionRate(commissionRate)
+                    .commissionAmount(platformCommission)
+                    .teacherNetAmount(teacherNet)
+                    .commercialPolicyVersion(policyVersion)
+                    .escrowDays(holdingDays)
+                    .build());
 
             EscrowLedger ledger = escrowLedgerRepository.save(EscrowLedger.builder()
                     .order(order)
                     .course(course)
                     .teacher(teacher)
-                    .amount(item.getPrice())
+                    .amount(teacherNet)
                     .status(EscrowStatus.HELD)
                     .releaseAt(releaseAt)
                     .build());
 
+            platformCommissionLedgerRepository.save(PlatformCommissionLedger.builder()
+                    .order(order)
+                    .orderItem(item)
+                    .amount(platformCommission)
+                    .status(PlatformCommissionLedger.CommissionStatus.HELD)
+                    .build());
+
             walletService.holdEscrow(
                     teacher,
-                    item.getPrice(),
+                    teacherNet,
                     "ORDER",
                     order.getId(),
                     "Escrow hold for order " + order.getOrderCode());
@@ -149,6 +198,17 @@ public class EscrowServiceImpl implements EscrowService {
                 "ESCROW",
                 escrow.getId(),
                 "Escrow released to available balance");
+
+        // Recognize platform commission
+        for (OrderItem item : orderItemRepository.findByOrder_Id(escrow.getOrder().getId())) {
+            if (item.getCourse().getId().equals(escrow.getCourse().getId())) {
+                platformCommissionLedgerRepository.findByOrderItem_IdAndStatus(item.getId(), PlatformCommissionLedger.CommissionStatus.HELD)
+                        .ifPresent(ledger -> {
+                            ledger.setStatus(PlatformCommissionLedger.CommissionStatus.RECOGNIZED);
+                            platformCommissionLedgerRepository.save(ledger);
+                        });
+            }
+        }
 
         AuditLog auditLog = AuditLog.builder()
                 .actorType("SYSTEM")
