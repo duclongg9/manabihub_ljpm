@@ -66,7 +66,7 @@ public class CourseServiceImpl implements CourseService {
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
         UUID currentUserId = currentUserService.getCurrentUserId();
-        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         List<String> learningGoals = normalizeLearningGoals(request.learningGoals());
         validateDraftRequest(request, learningGoals);
         String title = normalizeDraftTitle(request.title());
@@ -101,7 +101,7 @@ public class CourseServiceImpl implements CourseService {
     @Transactional(readOnly = true)
     public List<CourseDraftResponse> listMyDrafts() {
         UUID currentUserId = currentUserService.getCurrentUserId();
-        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
 
         return courseRepository.findByTeacher_IdAndStatusOrderByCreatedAtDesc(
                         teacherProfile.getId(),
@@ -116,7 +116,7 @@ public class CourseServiceImpl implements CourseService {
     @Transactional(readOnly = true)
     public List<CourseDraftResponse> listMyCourses() {
         UUID currentUserId = currentUserService.getCurrentUserId();
-        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
 
         return courseRepository.findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(
                         teacherProfile.getId(),
@@ -131,7 +131,7 @@ public class CourseServiceImpl implements CourseService {
     @Transactional(readOnly = true)
     public com.manabihub.course.dto.response.TeacherDashboardResponse getTeacherDashboardStats() {
         UUID currentUserId = currentUserService.getCurrentUserId();
-        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
 
         List<Course> allCourses = courseRepository.findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(
                 teacherProfile.getId(), CourseStatus.ARCHIVED);
@@ -164,7 +164,7 @@ public class CourseServiceImpl implements CourseService {
     @Override
     public CourseDraftResponse updateDraft(UUID draftId, CreateCourseDraftRequest request) {
         UUID currentUserId = currentUserService.getCurrentUserId();
-        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
         List<String> learningGoals = normalizeLearningGoals(request.learningGoals());
         validateDraftRequest(request, learningGoals);
@@ -195,7 +195,7 @@ public class CourseServiceImpl implements CourseService {
     @Override
     public void deleteDraft(UUID draftId) {
         UUID currentUserId = currentUserService.getCurrentUserId();
-        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
 
         courseRepository.delete(course);
@@ -204,7 +204,7 @@ public class CourseServiceImpl implements CourseService {
     @Override
     public void submitForReview(UUID draftId) {
         UUID currentUserId = currentUserService.getCurrentUserId();
-        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
 
         if (course.getStatus() != CourseStatus.DRAFT && course.getStatus() != CourseStatus.REJECTED && course.getStatus() != CourseStatus.FORCED_DRAFT) {
@@ -250,7 +250,7 @@ public class CourseServiceImpl implements CourseService {
     @Override
     public void publishCourse(UUID courseId) {
         UUID currentUserId = currentUserService.getCurrentUserId();
-        TeacherProfile teacherProfile = resolveApprovedTeacher(currentUserId);
+        TeacherProfile teacherProfile = resolvePublishEligibleTeacher(currentUserId);
         Course course = courseRepository.findByIdAndTeacher_Id(courseId, teacherProfile.getId())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COURSE_NOT_FOUND,
@@ -402,22 +402,36 @@ public class CourseServiceImpl implements CourseService {
                 .build();
     }
 
-    private TeacherProfile resolveApprovedTeacher(UUID userId) {
+    private TeacherProfile resolveTeacherWorkspace(UUID userId) {
         TeacherProfile teacherProfile = teacherProfileRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.MSG_KYC_010,
-                        "Teacher KYC must be approved before creating a course draft",
+                        "Complete identity and JLPT submission before using the teacher workspace",
                         HttpStatus.FORBIDDEN
                 ));
 
-        if (teacherProfile.getKycStatus() != TeacherKycStatus.APPROVED || !teacherProfile.isCanPublishCourse()) {
+        if (teacherProfile.getKycStatus() != TeacherKycStatus.PENDING
+                && teacherProfile.getKycStatus() != TeacherKycStatus.APPROVED) {
             throw new BusinessException(
                     MessageCodes.MSG_KYC_010,
-                    "Teacher KYC must be approved before creating a course draft",
+                    "Complete identity and JLPT submission before using the teacher workspace",
                     HttpStatus.FORBIDDEN
             );
         }
 
+        return teacherProfile;
+    }
+
+    private TeacherProfile resolvePublishEligibleTeacher(UUID userId) {
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(userId);
+        if (teacherProfile.getKycStatus() != TeacherKycStatus.APPROVED
+                || !teacherProfile.isCanPublishCourse()) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_010,
+                    "JLPT authenticity review must be approved before a course can appear on the platform",
+                    HttpStatus.FORBIDDEN
+            );
+        }
         return teacherProfile;
     }
 

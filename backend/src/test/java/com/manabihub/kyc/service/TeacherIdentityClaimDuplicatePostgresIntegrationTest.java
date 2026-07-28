@@ -15,17 +15,13 @@ import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
 import com.manabihub.kyc.dto.KycIdentityVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
-import com.manabihub.kyc.port.NationalIdRecordDto;
-import com.manabihub.kyc.port.NationalIdRegistryPort;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import jakarta.persistence.EntityManager;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -36,7 +32,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,9 +44,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 @Testcontainers(disabledWithoutDocker = true)
@@ -102,17 +94,6 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
 
     @Autowired
     private EntityManager entityManager;
-
-    @MockBean
-    private NationalIdRegistryPort nationalIdRegistryPort;
-
-    @BeforeEach
-    void setUp() {
-        doAnswer(invocation -> {
-            String id = invocation.getArgument(0);
-            return Optional.of(new NationalIdRecordDto(id, "Nguyen Van A", LocalDate.of(1990, 1, 1)));
-        }).when(nationalIdRegistryPort).findActiveByIdNumber(anyString());
-    }
 
     private AppUser createTestUser(String emailPrefix, String fullName) {
         AppUser user = new AppUser();
@@ -193,9 +174,6 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             TeacherProfile profileA = teacherProfileRepository.findByUserId(userAId).orElseThrow();
             assertTrue(claimRepository.findByTeacherId(profileA.getId()).isPresent());
         });
-
-        // Verify registry received clean 12-digit string
-        verify(nationalIdRegistryPort).findActiveByIdNumber(cccdNormalized);
 
         // 3. Teacher A retries with same CCCD -> Idempotent success
         tx1.executeWithoutResult(status -> {

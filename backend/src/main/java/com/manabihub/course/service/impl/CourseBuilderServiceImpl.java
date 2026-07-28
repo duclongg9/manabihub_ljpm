@@ -212,10 +212,11 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
                         HttpStatus.FORBIDDEN
                 ));
 
-        if (teacherProfile.getKycStatus() != TeacherKycStatus.APPROVED || !teacherProfile.isCanPublishCourse()) {
+        if (teacherProfile.getKycStatus() != TeacherKycStatus.PENDING
+                && teacherProfile.getKycStatus() != TeacherKycStatus.APPROVED) {
             throw new BusinessException(
                     MessageCodes.MSG_KYC_010,
-                    "Teacher KYC must be approved before configuring course content",
+                    "Complete identity and JLPT submission before configuring course content",
                     HttpStatus.FORBIDDEN
             );
         }

@@ -427,7 +427,7 @@ class CourseServiceImplTest {
     }
 
     @Test
-    void createDraft_WhenTeacherKycIsNotApproved_ShouldThrowForbidden() {
+    void createDraft_WhenJlptAuthenticityReviewIsPending_ShouldAllowTeacherWorkspace() {
         TeacherProfile pendingTeacher = new TeacherProfile();
         pendingTeacher.setId(UUID.randomUUID());
         pendingTeacher.setKycStatus(TeacherKycStatus.PENDING);
@@ -435,12 +435,38 @@ class CourseServiceImplTest {
 
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(pendingTeacher));
+        when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
+        when(courseRepository.existsBySlug("jlpt-n5-foundation")).thenReturn(false);
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> {
+            Course course = invocation.getArgument(0);
+            course.setId(UUID.randomUUID());
+            return course;
+        });
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> courseService.createDraft(validRequest()));
+        CourseDraftResponse response = courseService.createDraft(validRequest());
+
+        assertEquals(CourseStatus.DRAFT, response.status());
+        assertEquals(pendingTeacher.getId(), response.teacherId());
+    }
+
+    @Test
+    void publishCourse_WhenJlptAuthenticityReviewIsPending_ShouldRemainLocked() {
+        UUID courseId = UUID.randomUUID();
+        TeacherProfile pendingTeacher = new TeacherProfile();
+        pendingTeacher.setId(UUID.randomUUID());
+        pendingTeacher.setKycStatus(TeacherKycStatus.PENDING);
+        pendingTeacher.setCanPublishCourse(false);
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(pendingTeacher));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> courseService.publishCourse(courseId)
+        );
 
         assertEquals(MessageCodes.MSG_KYC_010, exception.getMessageCode());
         assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
-        verify(courseRepository, never()).save(any());
+        verify(courseRepository, never()).findByIdAndTeacher_Id(any(), any());
     }
 
     private CreateCourseDraftRequest validRequest() {

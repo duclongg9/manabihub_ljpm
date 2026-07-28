@@ -66,9 +66,10 @@ export function KycQueuePage() {
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Ngoại lệ KYC cần xử lý</h2>
+          <h2 className="text-xl font-bold text-gray-900">Chứng chỉ JLPT chờ xác minh</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Chỉ hiển thị hồ sơ không thể tự động xác minh. Hồ sơ xác minh thành công không tạo công việc thủ công.
+            CCCD, OCR, đối chiếu danh tính và kiểm tra trùng đã đạt. Course Manager chỉ xác minh tính
+            xác thực của chứng chỉ theo hướng dẫn chính thức của Japan Foundation.
           </p>
         </div>
         <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1.5 rounded-full border border-amber-200">
@@ -125,22 +126,30 @@ export function KycQueuePage() {
                   </td>
                   <td className="py-4 px-6">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                      req.vnptVerificationStatus === 'SUCCESS'
+                      req.vnptVerificationStatus === 'SDK_VERIFIED'
                         ? 'bg-green-50 text-green-700 border-green-200'
                         : 'bg-red-50 text-red-700 border-red-200'
                     }`}>
-                      {req.vnptVerificationStatus === 'SUCCESS' ? 'Thành công' : 'Thất bại'}
+                      {req.vnptVerificationStatus === 'SDK_VERIFIED' ? 'Đã xác minh' : 'Cần kiểm tra'}
                     </span>
                   </td>
                   <td className="py-4 px-6">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                      req.riskLevel === 'LOW'
+                      !req.riskLevel
+                        ? 'bg-gray-50 text-gray-600 border-gray-200'
+                        : req.riskLevel === 'LOW'
                         ? 'bg-green-50 text-green-700 border-green-200'
                         : req.riskLevel === 'MEDIUM'
                         ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
                         : 'bg-red-50 text-red-700 border-red-200'
                     }`}>
-                      {req.riskLevel === 'LOW' ? 'Thấp' : req.riskLevel === 'MEDIUM' ? 'Trung bình' : 'Cao'}
+                      {!req.riskLevel
+                        ? 'Chưa đánh giá'
+                        : req.riskLevel === 'LOW'
+                          ? 'Thấp'
+                          : req.riskLevel === 'MEDIUM'
+                            ? 'Trung bình'
+                            : 'Cao'}
                     </span>
                   </td>
                   <td className="py-4 px-6 text-right">
