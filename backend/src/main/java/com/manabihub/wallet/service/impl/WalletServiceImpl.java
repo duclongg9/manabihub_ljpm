@@ -167,4 +167,51 @@ public class WalletServiceImpl implements WalletService {
                 
         transactionRepository.save(transaction);
     }
+
+    @Override
+    @Transactional
+    public WalletTransaction releaseEscrow(TeacherProfile teacher, BigDecimal amount,
+                                           String referenceType, UUID referenceId, String note) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Escrow release amount must be positive");
+        }
+
+        Wallet wallet = getOrCreateTeacherWallet(teacher);
+
+        Wallet locked = walletRepository.findByIdForUpdate(wallet.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.WALLET_NOT_FOUND,
+                        "Teacher wallet was not found",
+                        HttpStatus.NOT_FOUND));
+
+        if (locked.isFrozen()) {
+            throw new BusinessException(
+                    MessageCodes.WALLET_FROZEN,
+                    "Teacher wallet is frozen and cannot receive an escrow release");
+        }
+
+        if (locked.getFrozenBalance().compareTo(amount) < 0) {
+            throw new BusinessException(
+                    MessageCodes.WALLET_INSUFFICIENT_BALANCE,
+                    "Frozen wallet balance is lower than the escrow release amount");
+        }
+
+        locked.setFrozenBalance(locked.getFrozenBalance().subtract(amount));
+        locked.setBalance(locked.getBalance().add(amount));
+        walletRepository.save(locked);
+
+        WalletTransaction transaction = WalletTransaction.builder()
+                .walletId(locked.getId())
+                .transactionType(WalletTransactionType.ESCROW_RELEASE)
+                .amount(amount)
+                .direction(WalletDirection.IN)
+                .referenceType(referenceType)
+                .referenceId(referenceId)
+                .note(note)
+                .build();
+
+        return transactionRepository.save(transaction);
+    }
 }

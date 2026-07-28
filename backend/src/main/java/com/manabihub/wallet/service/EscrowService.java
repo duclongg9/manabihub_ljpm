@@ -4,6 +4,7 @@ import com.manabihub.order.entity.Order;
 import com.manabihub.wallet.entity.EscrowLedger;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Holds a paid order's funds in escrow for the teacher(s) of the purchased course(s).
@@ -17,4 +18,7 @@ public interface EscrowService {
      * existing entries.
      */
     List<EscrowLedger> holdForOrder(Order order);
+
+    /** Processes the release of a single eligible escrow record. Returns true if released, false if blocked. */
+    boolean processEscrowRelease(UUID escrowId);
 }
