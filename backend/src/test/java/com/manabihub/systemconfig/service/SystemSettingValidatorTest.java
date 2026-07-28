@@ -32,6 +32,14 @@ class SystemSettingValidatorTest {
         );
         assertThrows(
                 BusinessException.class,
+                () -> validator.normalize("COMMISSION_RATE", "0.12345")
+        );
+        assertThrows(
+                BusinessException.class,
+                () -> validator.normalize("ESCROW_HOLDING_DAYS", "0")
+        );
+        assertThrows(
+                BusinessException.class,
                 () -> validator.normalize("UNKNOWN_SECRET", "value")
         );
     }

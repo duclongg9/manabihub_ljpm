@@ -21,4 +21,14 @@ public interface EscrowService {
 
     /** Processes the release of a single eligible escrow record. Returns true if released, false if blocked. */
     boolean processEscrowRelease(UUID escrowId);
+
+    /**
+     * Reverses teacher and platform allocations while an order is still held.
+     * This is the idempotent accounting primitive used by the later refund use
+     * cases after the payment provider confirms the refund.
+     *
+     * @return true when at least one allocation was reversed, false when the
+     *         order had already been fully reversed
+     */
+    boolean reverseHeldAllocationsForRefund(UUID orderId);
 }

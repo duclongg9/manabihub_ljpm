@@ -236,6 +236,8 @@ public final class MessageCodes {
     public static final String REFUND_NOT_ELIGIBLE = "REFUND_NOT_ELIGIBLE";
     public static final String REFUND_REQUESTED = "REFUND_REQUESTED";
     public static final String REFUND_PROCESSED = "REFUND_PROCESSED";
+    public static final String FINANCIAL_INTEGRITY_VIOLATION = "FINANCIAL_INTEGRITY_VIOLATION";
+    public static final String REFUND_RECONCILIATION_REQUIRED = "REFUND_RECONCILIATION_REQUIRED";
 
     // ──────────────────────────────────────────────
     // PAYOUT — teacher payout

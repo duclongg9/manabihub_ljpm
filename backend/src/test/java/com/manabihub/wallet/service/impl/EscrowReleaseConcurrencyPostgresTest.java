@@ -63,32 +63,71 @@ class EscrowReleaseConcurrencyPostgresTest {
     @Test
     void concurrentReleaseCreditsWalletAndLedgerExactlyOnce() throws Exception {
         UUID orderId = UUID.randomUUID();
+        UUID orderItemId = UUID.randomUUID();
         UUID walletId = UUID.randomUUID();
         UUID escrowId = UUID.randomUUID();
-        BigDecimal amount = new BigDecimal("150000.00");
+        UUID snapshotId = UUID.randomUUID();
+        UUID heldCommissionId = UUID.randomUUID();
+        BigDecimal grossAmount = new BigDecimal("100000.00");
+        BigDecimal amount = new BigDecimal("80000.00");
+        BigDecimal commission = new BigDecimal("20000.00");
 
         jdbcTemplate.update("""
                 INSERT INTO orders
                     (id, student_id, order_code, total_amount, currency, order_status)
                 VALUES (?, ?, ?, ?, 'VND', 'PAID')
-                """, orderId, STUDENT_ID, "MHB38-" + orderId, amount);
+                """, orderId, STUDENT_ID, "MHB38-" + orderId, grossAmount);
+        jdbcTemplate.update("""
+                INSERT INTO order_items (id, order_id, course_id, price)
+                VALUES (?, ?, ?, ?)
+                """, orderItemId, orderId, COURSE_ID, grossAmount);
+        jdbcTemplate.update("""
+                INSERT INTO order_item_snapshots (
+                    id,
+                    order_item_id,
+                    currency,
+                    gross_amount,
+                    commission_rate,
+                    commission_amount,
+                    teacher_net_amount,
+                    commercial_policy_version,
+                    escrow_days
+                )
+                VALUES (?, ?, 'VND', ?, 0.20, ?, ?, 'release-test', 14)
+                """, snapshotId, orderItemId, grossAmount, commission, amount);
         jdbcTemplate.update("""
                 INSERT INTO wallets
                     (id, owner_type, teacher_id, balance, frozen_balance, currency, frozen)
-                VALUES (?, 'TEACHER', ?, 0, ?, 'VND', FALSE)
-                """, walletId, TEACHER_ID, amount);
+                VALUES (?, 'TEACHER', ?, ?, ?, 'VND', FALSE)
+                """, walletId, TEACHER_ID, amount, amount);
         jdbcTemplate.update("""
-                INSERT INTO escrow_ledger
-                    (id, order_id, course_id, teacher_id, amount, status, release_at, created_at)
-                VALUES (?, ?, ?, ?, ?, 'HELD', ?, ?)
+                INSERT INTO escrow_ledger (
+                    id,
+                    order_id,
+                    order_item_id,
+                    course_id,
+                    teacher_id,
+                    amount,
+                    status,
+                    release_at,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, 'HELD', ?, ?)
                 """,
                 escrowId,
                 orderId,
+                orderItemId,
                 COURSE_ID,
                 TEACHER_ID,
                 amount,
                 Timestamp.from(Instant.now().minusSeconds(60)),
                 Timestamp.from(Instant.now().minusSeconds(120)));
+        jdbcTemplate.update("""
+                INSERT INTO platform_commission_ledgers (
+                    id, order_id, order_item_id, amount, event_type
+                )
+                VALUES (?, ?, ?, ?, 'COMMISSION_HELD')
+                """, heldCommissionId, orderId, orderItemId, commission);
 
         int workers = 10;
         ExecutorService executor = Executors.newFixedThreadPool(workers);
@@ -152,5 +191,12 @@ class EscrowReleaseConcurrencyPostgresTest {
                 WHERE action = 'ESCROW_RELEASE'
                   AND target_id = ?
                 """, Integer.class, escrowId));
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM platform_commission_ledgers
+                WHERE order_item_id = ?
+                  AND event_type = 'COMMISSION_RECOGNIZED'
+                  AND amount = 20000.00
+                """, Integer.class, orderItemId));
     }
 }

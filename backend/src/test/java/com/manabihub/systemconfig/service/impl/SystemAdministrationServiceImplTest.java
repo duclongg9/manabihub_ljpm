@@ -11,6 +11,7 @@ import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.systemconfig.entity.SystemSetting;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
+import com.manabihub.systemconfig.service.CommercialPolicyService;
 import com.manabihub.systemconfig.service.SystemSettingValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,7 +52,8 @@ class SystemAdministrationServiceImplTest {
                 adminRepository,
                 roleRepository,
                 auditLogService,
-                new SystemSettingValidator()
+                new SystemSettingValidator(),
+                new CommercialPolicyService(settingRepository)
         );
         actorId = UUID.randomUUID();
         actor = account(actorId, "system@manabihub.local", RoleCode.SYSTEM_ADMIN);
@@ -72,8 +75,8 @@ class SystemAdministrationServiceImplTest {
                 .valueType("NUMBER")
                 .editable(true)
                 .build();
-        when(settingRepository.findBySettingKeyForUpdate("COMMISSION_RATE"))
-                .thenReturn(Optional.of(setting));
+        when(settingRepository.findAllBySettingKeyInForUpdate(any()))
+                .thenReturn(List.of(setting));
         when(settingRepository.save(setting)).thenReturn(setting);
 
         var response = service.updateSetting(
@@ -112,8 +115,8 @@ class SystemAdministrationServiceImplTest {
                 .valueType("NUMBER")
                 .editable(true)
                 .build();
-        when(settingRepository.findBySettingKeyForUpdate("COMMISSION_RATE"))
-                .thenReturn(Optional.of(setting));
+        when(settingRepository.findAllBySettingKeyInForUpdate(any()))
+                .thenReturn(List.of(setting));
 
         BusinessException error = assertThrows(
                 BusinessException.class,

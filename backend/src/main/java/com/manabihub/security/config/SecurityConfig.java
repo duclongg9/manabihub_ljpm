@@ -27,6 +27,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -95,6 +96,10 @@ public class SecurityConfig {
                                 "/uploads/course-thumbnails/**",
                                 "/uploads/user-avatars/**",
                                 "/api/admin/auth/login")
+                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/public/commercial-policy/current")
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(
