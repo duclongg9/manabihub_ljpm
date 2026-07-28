@@ -17,6 +17,7 @@ import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.repository.UserRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.repository.KycDocumentRepository;
+import com.manabihub.kyc.repository.TeacherCertificateClaimRepository;
 import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
@@ -71,6 +72,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private TeacherIdentityClaimRepository teacherIdentityClaimRepository;
+
+    @MockBean
+    private TeacherCertificateClaimRepository teacherCertificateClaimRepository;
 
     @MockBean
     private AuditLogRepository auditLogRepository;
