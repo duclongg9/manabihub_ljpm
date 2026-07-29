@@ -259,6 +259,9 @@ class ManabiHubApplicationTests {
     @MockBean
     private com.manabihub.refund.repository.RefundProviderAttemptRepository refundProviderAttemptRepository;
 
+    @MockBean
+    private com.manabihub.violation.repository.ViolationReportRepository violationReportRepository;
+
     @Test
     void contextLoads() {
         // Basic integration test to verify the Spring Application Context loads correctly.
