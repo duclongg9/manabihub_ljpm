@@ -33,7 +33,10 @@ import java.util.UUID;
 public class InternalAdminRoleFilter extends OncePerRequestFilter {
 
     private static final List<String> ADMIN_ROOTS = List.of("/api/v1/admin", "/api/admin");
-    private static final String LOGIN_PATH = "/api/admin/auth/login";
+    private static final List<String> PUBLIC_ADMIN_AUTH_PATHS = List.of(
+            "/api/admin/auth/login",
+            "/api/admin/auth/setup-password"
+    );
     private static final String LIVE_ROLE_SQL = """
             SELECT roles.code
             FROM internal_admin_accounts accounts
@@ -49,7 +52,7 @@ public class InternalAdminRoleFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = pathWithoutContext(request);
-        return path.equals(LOGIN_PATH)
+        return PUBLIC_ADMIN_AUTH_PATHS.contains(path)
                 || ADMIN_ROOTS.stream().noneMatch(root -> matchesPathOrDescendant(path, root));
     }
 

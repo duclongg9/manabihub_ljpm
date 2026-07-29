@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -64,7 +65,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     // - Đáp ứng tiêu chí: "Invalid/locked login is handled safely with generic error response." (Báo lỗi chung MSG-AUTH-007).
     // - Đáp ứng tiêu chí: "Locked/disabled internal account cannot log in." (Kiểm tra AccountStatus và In-memory lock).
     public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
-        String email = request.getEmail();
+        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
         checkInMemoryLock(email);
 
         InternalAdminAccount account = adminAccountRepository.findByEmail(email)

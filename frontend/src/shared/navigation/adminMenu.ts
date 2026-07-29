@@ -1,5 +1,3 @@
-import { ROLES } from '../constants/roles';
-import { ROUTES } from '../constants/routes';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import RuleIcon from '@mui/icons-material/Rule';
@@ -7,6 +5,9 @@ import MoneyOffIcon from '@mui/icons-material/MoneyOff';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
+import { ROLES } from '../constants/roles';
+import { ROUTES } from '../constants/routes';
 
 export const ADMIN_MENU = [
   {
@@ -40,13 +41,19 @@ export const ADMIN_MENU = [
     roles: [ROLES.COURSE_MANAGER],
   },
   {
-    title: 'Refund Review',
+    title: 'Duyệt hoàn tiền',
     path: ROUTES.ADMIN.REFUND_REVIEW,
     icon: MoneyOffIcon,
-    roles: [ROLES.FINANCE_MANAGER],
+    roles: [ROLES.FINANCE_MANAGER, ROLES.SYSTEM_ADMIN],
   },
   {
-    title: 'Payout Queue',
+    title: 'Báo cáo vi phạm',
+    path: ROUTES.ADMIN.VIOLATIONS,
+    icon: ReportProblemOutlinedIcon,
+    roles: [ROLES.COURSE_MANAGER, ROLES.SYSTEM_ADMIN],
+  },
+  {
+    title: 'Payout Settlement',
     path: ROUTES.ADMIN.PAYOUTS,
     icon: AccountBalanceOutlinedIcon,
     roles: [ROLES.FINANCE_MANAGER],

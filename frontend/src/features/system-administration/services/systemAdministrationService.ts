@@ -3,6 +3,8 @@ import { ENDPOINTS } from '../../../shared/api/endpoints';
 import type { ApiResponse } from '../../../shared/types/api';
 import type {
   InternalAdminAccount,
+  InviteInternalAdminPayload,
+  ResendInternalAdminInvitationPayload,
   UpdateInternalAdminRolePayload,
   UpdateSystemSettingPayload,
   SystemSetting,
@@ -37,6 +39,25 @@ export const systemAdministrationService = {
   ) {
     const response = await axiosClient.patch<ApiResponse<InternalAdminAccount>>(
       ENDPOINTS.SYSTEM_ADMIN.INTERNAL_ACCOUNT_ROLE(adminId),
+      payload,
+    );
+    return response.data.data;
+  },
+
+  async inviteInternalAdmin(payload: InviteInternalAdminPayload) {
+    const response = await axiosClient.post<ApiResponse<InternalAdminAccount>>(
+      ENDPOINTS.SYSTEM_ADMIN.INTERNAL_ACCOUNT_INVITATIONS,
+      payload,
+    );
+    return response.data.data;
+  },
+
+  async resendInternalAdminInvitation(
+    adminId: string,
+    payload: ResendInternalAdminInvitationPayload,
+  ) {
+    const response = await axiosClient.post<ApiResponse<InternalAdminAccount>>(
+      ENDPOINTS.SYSTEM_ADMIN.INTERNAL_ACCOUNT_INVITATION_RESEND(adminId),
       payload,
     );
     return response.data.data;

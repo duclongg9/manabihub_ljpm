@@ -12,6 +12,7 @@ import com.manabihub.identity.mapper.TeacherProfileMapper;
 import com.manabihub.identity.repository.AppUserRepository;
 import com.manabihub.identity.repository.IdentityTeacherProfileRepository;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.identity.repository.InternalAdminInvitationRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.repository.UserRepository;
@@ -96,6 +97,9 @@ class ManabiHubApplicationTests {
     private InternalAdminAccountRepository identityInternalAdminAccountRepository;
 
     @MockBean
+    private InternalAdminInvitationRepository internalAdminInvitationRepository;
+
+    @MockBean
     private RoleRepository roleRepository;
 
     @MockBean
@@ -178,6 +182,18 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private CourseReviewRepository courseReviewRepository;
+
+    @MockBean
+    private com.manabihub.moderation.repository.ViolationReportRepository violationReportRepository;
+
+    @MockBean
+    private com.manabihub.moderation.repository.ViolationEvidenceRepository violationEvidenceRepository;
+
+    @MockBean
+    private com.manabihub.moderation.repository.ModerationDecisionRepository moderationDecisionRepository;
+
+    @MockBean
+    private com.manabihub.moderation.repository.ModerationActionRecordRepository moderationActionRecordRepository;
 
     // UC-08 purchase flow repositories.
     @MockBean

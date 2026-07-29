@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
+import com.manabihub.course.entity.CourseModule;
+import com.manabihub.course.entity.LessonBlock;
+import com.manabihub.course.enums.LessonBlockType;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
@@ -21,6 +24,7 @@ import com.manabihub.learning.service.CertificateEligibilityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -57,6 +61,8 @@ class StudentCertificateServiceImplTest {
     private CertificateEligibilityService eligibilityService;
     @Mock
     private CurrentUserService currentUserService;
+    @Captor
+    private org.mockito.ArgumentCaptor<List<LessonBlock>> lessonBlocksCaptor;
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -158,6 +164,53 @@ class StudentCertificateServiceImplTest {
 
         assertEquals(MessageCodes.LEARNING_CERTIFICATE_NOT_ELIGIBLE, exception.getMessageCode());
         verify(certificateRepository, never()).save(any());
+    }
+
+    @Test
+    void generateCertificate_excludesModerationHiddenLessonsFromEligibility() {
+        CourseModule module = CourseModule.builder()
+                .id(UUID.randomUUID())
+                .blocks(new ArrayList<>())
+                .build();
+        LessonBlock visible = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .type(LessonBlockType.TEXT)
+                .title("Visible lesson")
+                .build();
+        LessonBlock hidden = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .type(LessonBlockType.TEXT)
+                .title("Hidden lesson")
+                .moderationHidden(true)
+                .build();
+        course.addModule(module);
+        module.addBlock(visible);
+        module.addBlock(hidden);
+        mockOwnedEnrollment();
+        when(enrollmentRepository.findByIdForUpdate(enrollment.getId()))
+                .thenReturn(Optional.of(enrollment));
+        when(certificateRepository.findByEnrollmentId(enrollment.getId()))
+                .thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollment.getId()))
+                .thenReturn(List.of());
+        when(eligibilityService.evaluate(any(), any(), any())).thenReturn(
+                new CertificateEligibilityResponse(
+                        false, false, false, false, null, 85, false,
+                        List.of("PROGRESS_INCOMPLETE")
+                )
+        );
+
+        assertThrows(
+                BusinessException.class,
+                () -> service.generateCertificate(course.getId())
+        );
+
+        verify(eligibilityService).evaluate(
+                any(),
+                lessonBlocksCaptor.capture(),
+                any()
+        );
+        assertEquals(List.of(visible), lessonBlocksCaptor.getValue());
     }
 
     @Test

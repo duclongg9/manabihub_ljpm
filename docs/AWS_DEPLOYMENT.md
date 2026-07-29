@@ -36,7 +36,7 @@ GOOGLE_CLIENT_SECRET=<Google OAuth client secret>
 JWT_SECRET=<random value with at least 32 bytes>
 KYC_IDENTITY_SECRET=<stable random value with at least 32 bytes>
 PAYOUT_SECURITY_SECRET=<stable random value with at least 32 bytes>
-MAIL_USERNAME=<SMTP username used for withdrawal OTP>
+MAIL_USERNAME=<SMTP username used for OTP and internal-admin invitations>
 MAIL_PASSWORD=<SMTP app password>
 VNPAY_TMN_CODE=<VNPay merchant terminal code>
 VNPAY_HASH_SECRET=<VNPay merchant hash secret>
@@ -169,3 +169,30 @@ properties from Elastic Beanstalk. Later restarts do not reset the password
 when an active `SYSTEM_ADMIN` already exists. If every system administrator is
 disabled in the future, startup fails closed until a deliberate bootstrap
 credential is configured again.
+
+### Invite later internal administrators
+
+The bootstrap exists only to establish the first `SYSTEM_ADMIN`. Do not add
+Course Manager or Finance Manager credentials as environment properties.
+After the first login, use **Admin Portal > Internal accounts** to invite each
+operator with exactly one role.
+
+An invited account remains `DISABLED` until the recipient follows the
+single-use password setup link. The backend stores only a SHA-256 token hash,
+expires invitations after `ADMIN_INVITATION_TTL_HOURS` (24 hours by default),
+and never sends a temporary password.
+
+Before creating an invitation, configure and verify:
+
+```text
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=<SMTP account>
+MAIL_PASSWORD=<SMTP app password or provider credential>
+FRONTEND_BASE_URL=https://develop.d1sbjmyazduh3v.amplifyapp.com
+ADMIN_INVITATION_TTL_HOURS=24
+```
+
+The invitation is persisted before email delivery is queued. If the mail
+provider rejects delivery, fix SMTP configuration and use **Send again** in
+the Admin Portal; this revokes every older open link for that account.

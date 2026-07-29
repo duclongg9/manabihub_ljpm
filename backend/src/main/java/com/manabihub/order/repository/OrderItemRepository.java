@@ -4,6 +4,8 @@ import com.manabihub.order.entity.OrderItem;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -17,4 +19,13 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
     @EntityGraph(attributePaths = {"order", "course", "course.teacher"})
     List<OrderItem> findByOrder_IdIn(Collection<UUID> orderIds);
+
+    @Query("""
+            SELECT COUNT(DISTINCT item.order.student.id)
+            FROM OrderItem item
+            WHERE item.course.id = :courseId
+              AND item.order.status = com.manabihub.order.enums.OrderStatus.PAID
+              AND item.price > 0
+            """)
+    long countPaidPurchasersByCourseId(@Param("courseId") UUID courseId);
 }

@@ -116,7 +116,9 @@ public class PublicTeacherProfileServiceImpl implements PublicTeacherProfileServ
             CourseReviewAggregateResponse reviewAggregate
     ) {
         int totalLessons = course.getModules().stream()
-                .mapToInt(module -> module.getBlocks().size())
+                .mapToInt(module -> Math.toIntExact(module.getBlocks().stream()
+                        .filter(block -> !block.isModerationHidden())
+                        .count()))
                 .sum();
 
         return new PublicTeacherCourseResponse(

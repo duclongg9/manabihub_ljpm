@@ -183,6 +183,18 @@ public final class MessageCodes {
             "INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN";
     public static final String LAST_SYSTEM_ADMIN_REQUIRED = "LAST_SYSTEM_ADMIN_REQUIRED";
     public static final String ADMIN_SESSION_STALE = "ADMIN_SESSION_STALE";
+    public static final String INTERNAL_ADMIN_INVITATION_CREATED =
+            "INTERNAL_ADMIN_INVITATION_CREATED";
+    public static final String INTERNAL_ADMIN_INVITATION_RESENT =
+            "INTERNAL_ADMIN_INVITATION_RESENT";
+    public static final String INTERNAL_ADMIN_INVITATION_CONFLICT =
+            "INTERNAL_ADMIN_INVITATION_CONFLICT";
+    public static final String INTERNAL_ADMIN_INVITATION_INVALID =
+            "INTERNAL_ADMIN_INVITATION_INVALID";
+    public static final String INTERNAL_ADMIN_PASSWORD_INVALID =
+            "INTERNAL_ADMIN_PASSWORD_INVALID";
+    public static final String INTERNAL_ADMIN_PASSWORD_SET =
+            "INTERNAL_ADMIN_PASSWORD_SET";
     public static final String LEARNING_STUDENT_PROFILE_NOT_FOUND = "LEARNING_STUDENT_PROFILE_NOT_FOUND";
 
     // ──────────────────────────────────────────────
@@ -288,6 +300,23 @@ public final class MessageCodes {
     public static final String ADMIN_ACTION_FORBIDDEN = "ADMIN_ACTION_FORBIDDEN";
     public static final String COURSE_MANAGER_REQUIRED = "COURSE_MANAGER_REQUIRED";
     public static final String ADMIN_PERMISSION_DENIED = "ADMIN_PERMISSION_DENIED";
+
+    // Moderation specific codes
+    public static final String MODERATION_REPORT_NOT_FOUND = "MODERATION_REPORT_NOT_FOUND";
+    public static final String MODERATION_INVALID_STATUS = "MODERATION_INVALID_STATUS";
+    public static final String MODERATION_ALREADY_RESOLVED = "MODERATION_ALREADY_RESOLVED";
+    public static final String MODERATION_DECISION_NOTE_REQUIRED = "MODERATION_DECISION_NOTE_REQUIRED";
+    public static final String MODERATION_ACTION_REQUIRED = "MODERATION_ACTION_REQUIRED";
+    public static final String MODERATION_TARGET_NOT_FOUND = "MODERATION_TARGET_NOT_FOUND";
+    public static final String MODERATION_PENDING_EVIDENCE = "MODERATION_PENDING_EVIDENCE";
+    public static final String MODERATION_REPORT_DISMISSED = "MODERATION_REPORT_DISMISSED";
+    public static final String MODERATION_CONCURRENT_UPDATE = "MODERATION_CONCURRENT_UPDATE";
+    public static final String MODERATION_SEVERE_PERMISSION_REQUIRED = "MODERATION_SEVERE_PERMISSION_REQUIRED";
+    public static final String MODERATION_CONTENT_PERMISSION_REQUIRED = "MODERATION_CONTENT_PERMISSION_REQUIRED";
+    public static final String MODERATION_INVALID_ACTION = "MODERATION_INVALID_ACTION";
+    public static final String MODERATION_INVALID_TRANSITION = "MODERATION_INVALID_TRANSITION";
+    public static final String AUTH_ACCOUNT_RESTRICTED = "AUTH_ACCOUNT_RESTRICTED";
+    public static final String MSG_ADM_003 = "MSG-ADM-003"; // Moderation action applied
 
     // ──────────────────────────────────────────────
     // NOTIFICATION — notification system

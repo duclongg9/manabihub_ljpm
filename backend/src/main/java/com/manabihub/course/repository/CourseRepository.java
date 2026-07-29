@@ -4,6 +4,10 @@ import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +40,16 @@ public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecif
     Optional<Course> findByIdAndStatus(UUID id, CourseStatus status);
 
     Optional<Course> findBySlugAndStatus(String slug, CourseStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT course
+            FROM Course course
+            JOIN FETCH course.teacher teacher
+            JOIN FETCH teacher.user
+            WHERE course.id = :courseId
+            """)
+    Optional<Course> findByIdForModeration(@Param("courseId") UUID courseId);
 
     List<Course> findAllByStatusInOrderBySubmittedAtDesc(java.util.Collection<CourseStatus> statuses);
 

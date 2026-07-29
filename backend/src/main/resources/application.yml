@@ -61,3 +61,9 @@ manabihub:
       locale: ${VNPAY_LOCALE:vn}
       currency: ${VNPAY_CURRENCY:VND}
       dev-simulator-enabled: ${VNPAY_DEV_SIMULATOR_ENABLED:false}
+  admin-invitation:
+    ttl-hours: ${ADMIN_INVITATION_TTL_HOURS:24}
+
+app:
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:5173}

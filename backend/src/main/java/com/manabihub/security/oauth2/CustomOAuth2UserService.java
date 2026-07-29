@@ -3,6 +3,7 @@ package com.manabihub.security.oauth2;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.RoleCode;
+import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.repository.AppUserRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +56,10 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                     .build();
             return appUserRepository.save(java.util.Objects.requireNonNull(newUser));
         });
+
+        if (appUser.getUserStatus() != AccountStatus.ACTIVE) {
+            throw new OAuth2AuthenticationException("This ManabiHub account is restricted");
+        }
 
         // Update avatar and name if changed on Google side
         boolean changed = false;

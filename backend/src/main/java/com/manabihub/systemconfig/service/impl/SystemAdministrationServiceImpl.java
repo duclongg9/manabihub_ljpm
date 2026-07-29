@@ -9,6 +9,7 @@ import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.repository.RoleRepository;
+import com.manabihub.identity.service.InternalAdminInvitationService;
 import com.manabihub.systemconfig.dto.response.InternalAdminAccountResponse;
 import com.manabihub.systemconfig.dto.response.SystemSettingResponse;
 import com.manabihub.systemconfig.entity.SystemSetting;
@@ -41,6 +42,7 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
     private final AuditLogService auditLogService;
     private final SystemSettingValidator validator;
     private final CommercialPolicyService commercialPolicyService;
+    private final InternalAdminInvitationService invitationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -124,10 +126,68 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
     @Transactional(readOnly = true)
     public List<InternalAdminAccountResponse> listInternalAdmins(UUID actorId) {
         requireLiveSystemAdmin(actorId);
-        return adminRepository.findAllByOrderByFullNameAsc()
-                .stream()
-                .map(this::toAdminResponse)
+        List<InternalAdminAccount> accounts = adminRepository.findAllByOrderByFullNameAsc();
+        Map<UUID, InternalAdminInvitationService.InvitationSummary> invitations =
+                invitationService.latestInvitationSummaries(
+                        accounts.stream().map(InternalAdminAccount::getId).toList()
+                );
+        return accounts.stream()
+                .map(account -> toAdminResponse(
+                        account,
+                        invitations.getOrDefault(
+                                account.getId(),
+                                InternalAdminInvitationService.InvitationSummary.none()
+                        )
+                ))
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public InternalAdminAccountResponse inviteInternalAdmin(
+            UUID actorId,
+            String email,
+            String fullName,
+            RoleCode roleCode,
+            String reason
+    ) {
+        InternalAdminAccount account = invitationService.invite(
+                actorId,
+                email,
+                fullName,
+                roleCode,
+                reason
+        );
+        return toAdminResponse(
+                account,
+                invitationService.latestInvitationSummaries(List.of(account.getId()))
+                        .getOrDefault(
+                                account.getId(),
+                                InternalAdminInvitationService.InvitationSummary.none()
+                        )
+        );
+    }
+
+    @Override
+    @Transactional
+    public InternalAdminAccountResponse resendInternalAdminInvitation(
+            UUID actorId,
+            UUID targetAdminId,
+            String reason
+    ) {
+        InternalAdminAccount account = invitationService.resend(
+                actorId,
+                targetAdminId,
+                reason
+        );
+        return toAdminResponse(
+                account,
+                invitationService.latestInvitationSummaries(List.of(account.getId()))
+                        .getOrDefault(
+                                account.getId(),
+                                InternalAdminInvitationService.InvitationSummary.none()
+                        )
+        );
     }
 
     @Override
@@ -179,7 +239,7 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
 
         RoleCode previousRole = target.getRole().getCode();
         if (previousRole == roleCode) {
-            return toAdminResponse(target);
+            return toAdminResponse(target, invitationSummary(target.getId()));
         }
 
         if (previousRole == RoleCode.SYSTEM_ADMIN && activeSystemAdmins.size() <= 1) {
@@ -213,7 +273,7 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
                         "requiresReauthentication", true
                 )
         );
-        return toAdminResponse(saved);
+        return toAdminResponse(saved, invitationSummary(saved.getId()));
     }
 
     private InternalAdminAccount requireLiveSystemAdmin(UUID actorId) {
@@ -248,7 +308,18 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
         );
     }
 
-    private InternalAdminAccountResponse toAdminResponse(InternalAdminAccount account) {
+    private InternalAdminInvitationService.InvitationSummary invitationSummary(UUID accountId) {
+        return invitationService.latestInvitationSummaries(List.of(accountId))
+                .getOrDefault(
+                        accountId,
+                        InternalAdminInvitationService.InvitationSummary.none()
+                );
+    }
+
+    private InternalAdminAccountResponse toAdminResponse(
+            InternalAdminAccount account,
+            InternalAdminInvitationService.InvitationSummary invitation
+    ) {
         return new InternalAdminAccountResponse(
                 account.getId(),
                 account.getEmail(),
@@ -256,7 +327,9 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
                 account.getAccountStatus(),
                 account.getRole().getCode(),
                 account.getLastLoginAt(),
-                account.getUpdatedAt()
+                account.getUpdatedAt(),
+                invitation.status(),
+                invitation.expiresAt()
         );
     }
 }

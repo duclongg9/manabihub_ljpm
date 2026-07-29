@@ -26,6 +26,7 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminSetupPasswordPage } from './pages/AdminSetupPasswordPage';
 import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
 import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
 import { TeacherDashboardPage } from '../features/teacher/pages/TeacherDashboardPage';
@@ -37,6 +38,8 @@ import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistP
 import { TeacherWalletPage } from '../features/my-wallet/pages/TeacherWalletPage';
 import { PayoutQueuePage } from '../features/admin-payout/pages/PayoutQueuePage';
 import { PayoutSettlementPage } from '../features/admin-payout/pages/PayoutSettlementPage';
+import { ViolationQueuePage } from '../features/admin-violation/pages/ViolationQueuePage';
+import { ViolationDetailPage } from '../features/admin-violation/pages/ViolationDetailPage';
 import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
@@ -77,6 +80,10 @@ export const router = createBrowserRouter([
   {
     path: '/admin/login',
     element: <AdminLoginPage />,
+  },
+  {
+    path: '/admin/setup-password',
+    element: <AdminSetupPasswordPage />,
   },
   {
     path: '/onboarding/student',
@@ -313,6 +320,14 @@ export const router = createBrowserRouter([
       {
         path: 'payouts/:id',
         element: <PayoutSettlementPage />,
+      },
+      {
+        path: 'violations',
+        element: <ViolationQueuePage />,
+      },
+      {
+        path: 'violations/:id',
+        element: <ViolationDetailPage />,
       },
     ],
   },
