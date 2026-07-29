@@ -22,7 +22,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/admin/refunds")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('FINANCE_MANAGER')")
+@PreAuthorize("hasAnyRole('FINANCE_MANAGER', 'SYSTEM_ADMIN')")
 public class RefundAdminController {
 
     private final RefundService refundService;

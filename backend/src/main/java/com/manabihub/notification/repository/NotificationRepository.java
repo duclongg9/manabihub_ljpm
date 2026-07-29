@@ -16,6 +16,8 @@ import java.util.UUID;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
 
+    boolean existsByDedupeKey(String dedupeKey);
+
     @Query(value = """
             SELECT admin.id
             FROM internal_admin_accounts admin

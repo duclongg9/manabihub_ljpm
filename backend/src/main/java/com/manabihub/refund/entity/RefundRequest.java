@@ -3,6 +3,9 @@ package com.manabihub.refund.entity;
 import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.order.entity.Order;
+import com.manabihub.order.entity.OrderItem;
+import com.manabihub.refund.enums.RefundDecisionReason;
+import com.manabihub.refund.enums.RefundProviderStatus;
 import com.manabihub.refund.enums.RefundStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,6 +50,10 @@ public class RefundRequest {
     private Order order;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_item_id")
+    private OrderItem orderItem;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_id", nullable = false)
     private StudentProfile student;
 
@@ -68,6 +75,22 @@ public class RefundRequest {
 
     @Column(name = "decision_note", columnDefinition = "TEXT")
     private String decisionNote;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "decision_reason_code", length = 60)
+    private RefundDecisionReason decisionReasonCode;
+
+    @Column(name = "reconciliation_reason_code", length = 80)
+    private String reconciliationReasonCode;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(name = "provider_status", nullable = false, length = 40)
+    private RefundProviderStatus providerStatus = RefundProviderStatus.NOT_REQUESTED;
+
+    @Builder.Default
+    @Column(name = "provider_attempt_count", nullable = false)
+    private int providerAttemptCount = 0;
 
     @Column(name = "decided_at")
     private Instant decidedAt;

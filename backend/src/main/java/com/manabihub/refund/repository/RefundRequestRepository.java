@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,4 +21,9 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, UU
     Optional<RefundRequest> findByIdForUpdate(@Param("id") UUID id);
 
     Page<RefundRequest> findByStatus(RefundStatus status, Pageable pageable);
+
+    Page<RefundRequest> findByStatusIn(
+            Collection<RefundStatus> statuses,
+            Pageable pageable
+    );
 }

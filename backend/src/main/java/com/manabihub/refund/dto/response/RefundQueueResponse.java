@@ -4,6 +4,7 @@ import com.manabihub.refund.enums.RefundStatus;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -18,5 +19,15 @@ public class RefundQueueResponse {
     private String studentEmail;
     private String reason;
     private RefundStatus status;
+    private UUID orderItemId;
+    private UUID courseId;
+    private String courseTitle;
+    private String currency;
+    private BigDecimal grossAmount;
+    private String paymentStatus;
+    private String paymentProvider;
+    private BigDecimal paymentAmount;
+    private String providerStatus;
+    private String reconciliationReasonCode;
     private Instant createdAt;
 }

@@ -1,6 +1,51 @@
-export type RefundStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+export type RefundStatus =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'RECONCILIATION_REQUIRED'
+  | 'CANCELLED';
 
-export interface RefundQueueResponse {
+export type RefundDecisionReasonCode =
+  | 'STANDARD_ELIGIBLE'
+  | 'DUPLICATE_CHARGE'
+  | 'CONFIRMED_PAYMENT_ERROR'
+  | 'PLATFORM_ACCESS_FAILURE'
+  | 'OUTSIDE_REFUND_WINDOW'
+  | 'PROGRESS_LIMIT_REACHED'
+  | 'PROTECTED_CONTENT_CONSUMED'
+  | 'PAYMENT_NOT_CONFIRMED'
+  | 'DUPLICATE_REQUEST'
+  | 'OTHER';
+
+export type RefundMoneyValue = number | string;
+
+interface RefundFinancialEvidence {
+  orderItemId?: string | null;
+  courseId?: string | null;
+  courseTitle?: string | null;
+  currency?: string | null;
+  grossAmount?: RefundMoneyValue | null;
+  commissionAmount?: RefundMoneyValue | null;
+  teacherNetAmount?: RefundMoneyValue | null;
+  paymentStatus?: string | null;
+  paymentProvider?: string | null;
+  paymentProviderTransactionId?: string | null;
+  paymentAmount?: RefundMoneyValue | null;
+  escrowStatus?: string | null;
+  escrowAmount?: RefundMoneyValue | null;
+  escrowReleaseAt?: string | null;
+  providerStatus?: string | null;
+  providerName?: string | null;
+  providerReference?: string | null;
+  providerResultCode?: string | null;
+  providerAttemptCount?: number | null;
+  reconciliationReasonCode?: string | null;
+  decisionReasonCode?: RefundDecisionReasonCode | null;
+  eligibilitySnapshot?: Record<string, unknown> | null;
+}
+
+export interface RefundQueueResponse extends RefundFinancialEvidence {
   id: string;
   orderId: string;
   orderCode: string;
@@ -12,7 +57,7 @@ export interface RefundQueueResponse {
   createdAt: string;
 }
 
-export interface RefundDetailResponse {
+export interface RefundDetailResponse extends RefundFinancialEvidence {
   id: string;
   orderId: string;
   orderCode: string;
@@ -21,7 +66,6 @@ export interface RefundDetailResponse {
   studentEmail: string;
   status: RefundStatus;
   reason: string;
-  eligibilitySnapshot: Record<string, any>;
   decidedBy?: string;
   decisionNote?: string;
   decidedAt?: string;
@@ -30,5 +74,6 @@ export interface RefundDetailResponse {
 }
 
 export interface RefundDecisionRequest {
+  reasonCode: RefundDecisionReasonCode;
   note: string;
 }

@@ -198,6 +198,15 @@ public class EscrowServiceImpl implements EscrowService {
 
     @Override
     @Transactional
+    public boolean reverseHeldAllocationForRefund(UUID orderItemId) {
+        EscrowLedger escrow = escrowLedgerRepository.findByOrderItemIdForUpdate(orderItemId)
+                .orElseThrow(() -> integrityViolation(
+                        "Paid order item has no escrow allocation"));
+        return reverseHeldEscrow(escrow);
+    }
+
+    @Override
+    @Transactional
     public boolean reverseHeldAllocationsForRefund(UUID orderId) {
         List<EscrowLedger> escrows = escrowLedgerRepository.findByOrderIdForUpdate(orderId);
         if (escrows.isEmpty()) {
@@ -215,45 +224,59 @@ public class EscrowServiceImpl implements EscrowService {
 
         boolean reversed = false;
         for (EscrowLedger escrow : escrows) {
-            if (escrow.getStatus() == EscrowStatus.REFUNDED) {
-                continue;
-            }
-            if (escrow.getStatus() != EscrowStatus.HELD
-                    && escrow.getStatus() != EscrowStatus.FROZEN) {
-                throw integrityViolation("Unsupported escrow state during refund reversal");
-            }
-
-            OrderItem item = requireOrderItem(escrow);
-            OrderItemSnapshot snapshot = requireSnapshot(item);
-            ensureCommissionEventAbsent(
-                    item,
-                    PlatformCommissionLedger.CommissionEventType.COMMISSION_REVERSED);
-
-            if (escrow.getAmount().signum() > 0) {
-                walletService.refundHeldEscrow(
-                        escrow.getTeacher(),
-                        escrow.getAmount(),
-                        "ESCROW",
-                        escrow.getId(),
-                        "Held teacher allocation reversed after confirmed refund");
-            }
-
-            appendCommissionEvent(
-                    escrow.getOrder(),
-                    item,
-                    snapshot.getCommissionAmount(),
-                    PlatformCommissionLedger.CommissionEventType.COMMISSION_REVERSED);
-
-            escrow.setStatus(EscrowStatus.REFUNDED);
-            escrowLedgerRepository.save(escrow);
-            auditLogRepository.save(audit(
-                    "ESCROW_REFUND_REVERSE",
-                    escrow,
-                    "confirmed refund reversed allocations before release"));
-            reversed = true;
+            reversed = reverseHeldEscrow(escrow) || reversed;
         }
 
         return reversed;
+    }
+
+    private boolean reverseHeldEscrow(EscrowLedger escrow) {
+        if (escrow.getStatus() == EscrowStatus.REFUNDED) {
+            return false;
+        }
+        if (escrow.getStatus() == EscrowStatus.RELEASED) {
+            throw new BusinessException(
+                    MessageCodes.REFUND_RECONCILIATION_REQUIRED,
+                    "Refund cannot be auto-posted after teacher funds were released",
+                    HttpStatus.CONFLICT);
+        }
+        if (escrow.getStatus() != EscrowStatus.HELD
+                && escrow.getStatus() != EscrowStatus.FROZEN) {
+            throw integrityViolation("Unsupported escrow state during refund reversal");
+        }
+
+        OrderItem item = requireOrderItem(escrow);
+        OrderItemSnapshot snapshot = requireSnapshot(item);
+        if (escrow.getAmount().compareTo(snapshot.getTeacherNetAmount()) != 0) {
+            throw integrityViolation(
+                    "Escrow amount does not match the immutable teacher-net snapshot");
+        }
+        ensureCommissionEventAbsent(
+                item,
+                PlatformCommissionLedger.CommissionEventType.COMMISSION_REVERSED);
+
+        if (escrow.getAmount().signum() > 0) {
+            walletService.refundHeldEscrow(
+                    escrow.getTeacher(),
+                    escrow.getAmount(),
+                    "ESCROW",
+                    escrow.getId(),
+                    "Held teacher allocation reversed after confirmed refund");
+        }
+
+        appendCommissionEvent(
+                escrow.getOrder(),
+                item,
+                snapshot.getCommissionAmount(),
+                PlatformCommissionLedger.CommissionEventType.COMMISSION_REVERSED);
+
+        escrow.setStatus(EscrowStatus.REFUNDED);
+        escrowLedgerRepository.save(escrow);
+        auditLogRepository.save(audit(
+                "ESCROW_REFUND_REVERSE",
+                escrow,
+                "provider-confirmed refund reversed this order item before release"));
+        return true;
     }
 
     private void requirePaidOrder(Order order) {
