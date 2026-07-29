@@ -10,9 +10,14 @@ export const components: Components<Theme> = {
       root: {
         borderRadius: 8,
         padding: '8px 16px',
+        minHeight: 40,
       },
       sizeLarge: {
         padding: '12px 24px',
+        minHeight: 48,
+      },
+      sizeSmall: {
+        minHeight: 32,
       },
     },
   },
@@ -22,7 +27,7 @@ export const components: Components<Theme> = {
     },
     styleOverrides: {
       root: {
-        borderRadius: 12,
+        borderRadius: 8,
         border: '1px solid #E5E7EB', // matching palette.divider
       },
     },

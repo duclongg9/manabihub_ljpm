@@ -5,16 +5,21 @@ import ErrorIcon from '@mui/icons-material/Error';
 interface ErrorStateProps {
   title?: string;
   message?: string;
+  retryLabel?: string;
   onRetry?: () => void;
+  fullHeight?: boolean;
 }
 
 export const ErrorState: React.FC<ErrorStateProps> = ({
-  title = 'Something went wrong',
-  message = 'An error occurred while loading this content. Please try again.',
+  title = 'Đã xảy ra lỗi',
+  message = 'Không thể tải nội dung. Vui lòng thử lại.',
+  retryLabel = 'Thử lại',
   onRetry,
+  fullHeight = false,
 }) => {
   return (
     <Box
+      role="alert"
       sx={{
         display: 'flex',
         flexDirection: 'column',
@@ -22,6 +27,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
         justifyContent: 'center',
         p: 6,
         textAlign: 'center',
+        minHeight: fullHeight ? '60vh' : 'auto',
       }}
     >
       <ErrorIcon color="error" sx={{ fontSize: 64, mb: 2 }} />
@@ -33,7 +39,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       </Typography>
       {onRetry && (
         <Button variant="outlined" color="primary" onClick={onRetry}>
-          Try Again
+          {retryLabel}
         </Button>
       )}
     </Box>

@@ -11,8 +11,8 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  title = 'No Data Found',
-  description = 'There is currently no data to display here.',
+  title = 'Không có dữ liệu',
+  description = 'Hiện không có dữ liệu để hiển thị.',
   actionLabel,
   onAction,
   icon = <FolderOffIcon sx={{ fontSize: 64, color: 'text.disabled' }} />,

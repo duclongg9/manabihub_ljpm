@@ -71,6 +71,7 @@ import {
   RefundPolicyPage,
   TermsPage,
 } from '../features/help-center/pages/legal/LegalPages';
+import { NotFoundPage } from '../shared/components/NotFoundPage/NotFoundPage';
 
 export const router = createBrowserRouter([
   {
@@ -347,5 +348,9 @@ export const router = createBrowserRouter([
         element: <ViolationDetailPage />,
       },
     ],
+  },
+  {
+    path: '*',
+    element: <NotFoundPage />,
   },
 ]);
