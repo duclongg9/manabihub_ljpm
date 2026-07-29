@@ -842,6 +842,7 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   async function handleFile(file: File | undefined) {
     if (!file) {
@@ -863,6 +864,7 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
+    setUploadError(null);
   }
 
   function handleCropComplete(_area: Area, areaPixels: Area) {
@@ -871,11 +873,12 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
 
   async function confirmCrop() {
     if (!cropDraft || !croppedAreaPixels) {
-      onError('Vui lòng chọn vùng ảnh 16:9 trước khi lưu.');
+      setUploadError('Vui lòng chọn vùng ảnh 16:9 trước khi lưu.');
       return;
     }
 
     setUploading(true);
+    setUploadError(null);
     try {
       const croppedBlob = await cropImageToBlob(cropDraft.dataUrl, croppedAreaPixels, cropDraft.mimeType);
       const croppedFile = new File([croppedBlob], normalizeImageFileName(cropDraft.fileName, cropDraft.mimeType), {
@@ -887,6 +890,7 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
       onChange(uploaded.publicUrl, previewUrl, uploaded.fileName);
       setCropDraft(null);
     } catch {
+      setUploadError('Không thể tải ảnh lên hệ thống. Vui lòng thử lại sau khi backend hoạt động ổn định.');
       onError('Không thể tải ảnh lên hệ thống. Vui lòng thử lại sau khi backend hoạt động ổn định.');
     } finally {
       setUploading(false);
@@ -1007,6 +1011,11 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
               Phóng to/thu nhỏ để đặt nội dung chính vào khung ảnh ngang.
             </Typography>
             <Slider min={1} max={3} step={0.1} value={zoom} onChange={(_, value) => setZoom(Number(value))} aria-label="Phóng to ảnh" />
+            {uploadError && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                {uploadError}
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -1014,7 +1023,7 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
             Hủy
           </Button>
           <Button variant="contained" onClick={() => void confirmCrop()} disabled={uploading} sx={{ textTransform: 'none', fontWeight: 700 }}>
-            {uploading ? 'Đang tải ảnh...' : 'Dùng ảnh này'}
+            {uploading ? 'Đang tải ảnh...' : (uploadError ? 'Thử lại' : 'Dùng ảnh này')}
           </Button>
         </DialogActions>
       </Dialog>

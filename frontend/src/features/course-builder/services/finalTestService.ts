@@ -31,9 +31,13 @@ export const finalTestService = {
     try {
       const { data } = await axiosClient.get<{ data: FinalTestConfig }>(`/v1/teacher/courses/${courseId}/final-test`);
       return data.data;
-    } catch {
-      // Return null if not configured yet (404/Empty)
-      return null;
+    } catch (err: any) {
+      // Return null only if not configured yet (404 Not Found)
+      if (err.response?.status === 404) {
+        return null;
+      }
+      // Re-throw other errors (e.g. 500, network error) so UI can show a failure state
+      throw err;
     }
   },
 
