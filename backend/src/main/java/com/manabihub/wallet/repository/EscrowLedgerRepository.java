@@ -33,6 +33,10 @@ public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID
     @Query("SELECT e FROM EscrowLedger e WHERE e.order.id = :orderId ORDER BY e.id ASC")
     List<EscrowLedger> findByOrderIdForUpdate(@Param("orderId") UUID orderId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM EscrowLedger e WHERE e.orderItem.id = :orderItemId")
+    Optional<EscrowLedger> findByOrderItemIdForUpdate(@Param("orderItemId") UUID orderItemId);
+
     @Query("SELECT e FROM EscrowLedger e WHERE e.status = :status AND e.releaseAt <= :releaseAt " +
            "AND (e.createdAt > :lastCreatedAt OR (e.createdAt = :lastCreatedAt AND e.id > :lastId)) " +
            "ORDER BY e.createdAt ASC, e.id ASC")
@@ -48,7 +52,12 @@ public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID
                 SELECT 1
                 FROM refund_requests request
                 WHERE request.order_id = :orderId
-                  AND request.status IN ('PENDING', 'APPROVED')
+                  AND request.status IN (
+                      'PENDING',
+                      'PROCESSING',
+                      'RECONCILIATION_REQUIRED',
+                      'APPROVED'
+                  )
             )
             """, nativeQuery = true)
     boolean existsBlockingRefundRequest(@Param("orderId") UUID orderId);

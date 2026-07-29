@@ -17,6 +17,7 @@ public interface WalletService {
 
     WalletTransaction holdEscrow(TeacherProfile teacher, BigDecimal amount,
                                  String referenceType, UUID referenceId, String note);
+
     WalletTransaction releaseEscrow(TeacherProfile teacher, BigDecimal amount,
                                     String referenceType, UUID referenceId, String note);
     WalletTransaction refundHeldEscrow(TeacherProfile teacher, BigDecimal amount,
@@ -41,4 +42,5 @@ public interface WalletService {
      * @param withdrawalId reference ID for the ledger
      */
     void releaseBalance(String teacherId, BigDecimal amount, String withdrawalId);
+
 }

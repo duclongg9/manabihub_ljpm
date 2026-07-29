@@ -1,12 +1,13 @@
-import { ROLES } from '../constants/roles';
-import { ROUTES } from '../constants/routes';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import RuleIcon from '@mui/icons-material/Rule';
+import MoneyOffIcon from '@mui/icons-material/MoneyOff';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
+import { ROLES } from '../constants/roles';
+import { ROUTES } from '../constants/routes';
 
 export const ADMIN_MENU = [
   {
@@ -38,6 +39,12 @@ export const ADMIN_MENU = [
     path: ROUTES.ADMIN.COURSE_APPROVAL,
     icon: RuleIcon,
     roles: [ROLES.COURSE_MANAGER],
+  },
+  {
+    title: 'Duyệt hoàn tiền',
+    path: ROUTES.ADMIN.REFUND_REVIEW,
+    icon: MoneyOffIcon,
+    roles: [ROLES.FINANCE_MANAGER, ROLES.SYSTEM_ADMIN],
   },
   {
     title: 'Báo cáo vi phạm',

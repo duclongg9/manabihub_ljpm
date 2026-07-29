@@ -1,0 +1,29 @@
+package com.manabihub.refund.repository;
+
+import com.manabihub.refund.entity.RefundRequest;
+import com.manabihub.refund.enums.RefundStatus;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.Collection;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface RefundRequestRepository extends JpaRepository<RefundRequest, UUID> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM RefundRequest r WHERE r.id = :id")
+    Optional<RefundRequest> findByIdForUpdate(@Param("id") UUID id);
+
+    Page<RefundRequest> findByStatus(RefundStatus status, Pageable pageable);
+
+    Page<RefundRequest> findByStatusIn(
+            Collection<RefundStatus> statuses,
+            Pageable pageable
+    );
+}

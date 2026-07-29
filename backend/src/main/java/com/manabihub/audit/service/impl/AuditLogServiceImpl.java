@@ -55,6 +55,7 @@ public class AuditLogServiceImpl implements AuditLogService {
             Map<String, Object> afterValue,
             Map<String, Object> metadata
     ) {
+
         AuditLog auditLog = AuditLog.builder()
                 .actorType("INTERNAL_ADMIN")
                 .actorAdminId(adminId)

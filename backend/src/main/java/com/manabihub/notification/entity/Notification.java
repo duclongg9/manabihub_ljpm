@@ -47,6 +47,9 @@ public class Notification {
     @Column(name = "action_url", length = 500)
     private String actionUrl;
 
+    @Column(name = "dedupe_key", length = 200)
+    private String dedupeKey;
+
     @Builder.Default
     @Column(name = "is_read", nullable = false)
     private boolean isRead = false;

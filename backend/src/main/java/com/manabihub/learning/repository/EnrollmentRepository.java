@@ -46,7 +46,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             @Param("studentId") UUID studentId,
             @Param("courseId") UUID courseId
     );
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM Enrollment e WHERE e.id = :id")
     Optional<Enrollment> findByIdForUpdate(@Param("id") UUID id);

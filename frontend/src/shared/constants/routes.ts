@@ -43,5 +43,6 @@ export const ROUTES = {
     PAYOUTS: '/admin/payouts',
     VIOLATIONS: '/admin/violations',
     NOTIFICATIONS: '/admin/notifications',
+    REFUND_REVIEW: '/admin/refunds',
   },
 };

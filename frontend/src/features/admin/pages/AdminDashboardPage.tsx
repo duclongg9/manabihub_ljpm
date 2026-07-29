@@ -16,6 +16,7 @@ import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROUTES } from '../../../shared/constants/routes';
 import { ROLES } from '../../../shared/constants/roles';
 import { adminPayoutService } from '../../admin-payout/services/adminPayoutService';
+import { adminRefundApi } from '../../admin-refund/api/adminRefundApi';
 
 export const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [kycQueue, setKycQueue] = useState<KycRequestResponse[]>([]);
   const [courseQueue, setCourseQueue] = useState<CourseApproval[]>([]);
   const [pendingPayouts, setPendingPayouts] = useState(0);
+  const [pendingRefunds, setPendingRefunds] = useState(0);
   const [reconciliationAlerts, setReconciliationAlerts] = useState(0);
 
   const isCourseManager = session ? hasAnyRole(session, [ROLES.COURSE_MANAGER]) : false;
@@ -48,16 +50,18 @@ export const AdminDashboardPage: React.FC = () => {
       }
 
       if (isFinanceManager) {
-        const [pendingData, reconciliationData] = await Promise.all([
+        const [pendingData, reconciliationData, refundData] = await Promise.all([
           adminPayoutService.getPayoutQueue({ page: 0, size: 1, status: 'PENDING' }),
           adminPayoutService.getPayoutQueue({
             page: 0,
             size: 1,
             reconciliationStatus: 'CRITICAL_MISMATCH',
           }),
+          adminRefundApi.getPendingRefunds(0, 1)
         ]);
         setPendingPayouts(pendingData.totalElements);
         setReconciliationAlerts(reconciliationData.totalElements);
+        setPendingRefunds(refundData?.totalElements || 0);
       }
     } catch {
       setError('Không thể tải dữ liệu vận hành. Vui lòng thử lại.');
@@ -113,7 +117,7 @@ export const AdminDashboardPage: React.FC = () => {
         </Grid>
       ) : isFinanceManager ? (
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <OperationalQueueCard
               title="Yêu cầu chi trả chờ xử lý"
               subtitle="Các yêu cầu rút tiền cần Finance Manager xem xét"
@@ -124,7 +128,7 @@ export const AdminDashboardPage: React.FC = () => {
               onAction={() => navigate(ROUTES.ADMIN.PAYOUTS)}
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <OperationalQueueCard
               title="Cảnh báo đối soát nghiêm trọng"
               subtitle="Sai lệch đang chặn việc thực hiện chi trả"
@@ -133,6 +137,17 @@ export const AdminDashboardPage: React.FC = () => {
               icon={<WarningAmberOutlinedIcon />}
               actionLabel="Kiểm tra đối soát"
               onAction={() => navigate(ROUTES.ADMIN.PAYOUTS)}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <OperationalQueueCard
+              title="Yêu cầu hoàn tiền chờ duyệt"
+              subtitle="Học viên yêu cầu hoàn tiền khóa học"
+              value={pendingRefunds}
+              loading={loading}
+              icon={<FactCheckIcon />}
+              actionLabel="Mở hàng đợi hoàn tiền"
+              onAction={() => navigate(ROUTES.ADMIN.REFUND_REVIEW)}
             />
           </Grid>
         </Grid>

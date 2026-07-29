@@ -31,4 +31,10 @@ public interface EscrowService {
      *         order had already been fully reversed
      */
     boolean reverseHeldAllocationsForRefund(UUID orderId);
+
+    /**
+     * Reverses exactly one order item's immutable teacher-net and commission
+     * allocation after a provider-confirmed refund.
+     */
+    boolean reverseHeldAllocationForRefund(UUID orderItemId);
 }

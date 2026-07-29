@@ -33,5 +33,18 @@ public interface NotificationService {
     void createNotification(UUID recipientUserId, String recipientEmail,
                             String title, String message, String type);
 
+    /**
+     * Creates and sends a notification at most once for the supplied business
+     * event key. Callers use this from an AFTER_COMMIT callback.
+     */
+    void createNotificationOnce(
+            String dedupeKey,
+            UUID recipientUserId,
+            String recipientEmail,
+            String title,
+            String message,
+            String type
+    );
+
     void sendTestEmailOnly(String recipientEmail, String title, String message, String type);
 }

@@ -15,7 +15,6 @@ public interface AuditLogService {
             Map<String, Object> afterValue,
             Map<String, Object> metadata
     );
-
     void logAdminAction(
             UUID adminId,
             String roleCode,
