@@ -196,9 +196,6 @@ class ManabiHubApplicationTests {
     private CourseReviewRepository courseReviewRepository;
 
     @MockBean
-    private com.manabihub.moderation.repository.ViolationReportRepository violationReportRepository;
-
-    @MockBean
     private com.manabihub.moderation.repository.ViolationEvidenceRepository violationEvidenceRepository;
 
     @MockBean
@@ -260,10 +257,14 @@ class ManabiHubApplicationTests {
     private com.manabihub.refund.repository.RefundProviderAttemptRepository refundProviderAttemptRepository;
 
     @MockBean
+    private com.manabihub.moderation.repository.ViolationReportRepository moderationViolationReportRepository;
+
+    @MockBean
     private com.manabihub.violation.repository.ViolationReportRepository violationReportRepository;
 
     @Test
     void contextLoads() {
-        // Basic integration test to verify the Spring Application Context loads correctly.
+        // Basic integration test to verify the Spring Application Context loads
+        // correctly.
     }
 }

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.UUID;
 
-@Repository
+@Repository("uc20ViolationReportRepository")
 public interface ViolationReportRepository extends JpaRepository<ViolationReport, UUID> {
 
     @org.springframework.data.jpa.repository.Query("SELECT CASE WHEN COUNT(v) > 0 THEN true ELSE false END FROM ViolationReport v " +

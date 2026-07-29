@@ -11,7 +11,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Instant;
 import java.util.UUID;
 
-@Entity
+@Entity(name = "Uc20ViolationReport")
 @Table(name = "violation_reports")
 @Getter
 @Setter
