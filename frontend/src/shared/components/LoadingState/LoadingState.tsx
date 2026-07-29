@@ -7,11 +7,13 @@ interface LoadingStateProps {
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({ 
-  message = 'Loading...', 
+  message = 'Đang tải...', 
   fullHeight = false 
 }) => {
   return (
     <Box
+      role="status"
+      aria-label={message}
       sx={{
         display: 'flex',
         flexDirection: 'column',

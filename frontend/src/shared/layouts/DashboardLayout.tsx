@@ -225,8 +225,9 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
         <Box sx={{ mt: 'auto', py: 3, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', color: 'text.secondary', fontSize: '0.85rem' }}>
           <Typography variant="body2">© 2026 ManabiHub. All rights reserved.</Typography>
           <Box sx={{ display: 'flex', gap: 3 }}>
-            <Box component="a" href="#" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Hỗ trợ</Box>
-            <Box component="a" href="#" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Điều khoản</Box>
+            <Box component="a" href="/help" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Hỗ trợ</Box>
+            <Box component="a" href="/legal/terms" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Điều khoản</Box>
+            <Box component="a" href="/legal/privacy" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Quyền riêng tư</Box>
           </Box>
         </Box>
       </Box>

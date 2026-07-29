@@ -12,7 +12,6 @@ import {
   DialogContent,
   FormControlLabel,
   IconButton,
-  MenuItem,
   Paper,
   Stack,
   Step,
@@ -646,11 +645,8 @@ function TeacherKycPageContent() {
                     helperText={errors.holderName}
                     label="Họ tên đọc từ chứng chỉ"
                     required
+                    slotProps={{ input: { readOnly: true } }}
                     value={certificateHolderName}
-                    onChange={(event) => {
-                      setCertificateHolderName(event.target.value);
-                      setErrors((current) => ({ ...current, holderName: undefined }));
-                    }}
                   />
                   <TextField
                     disabled={!canSubmitCertificate}
@@ -659,13 +655,9 @@ function TeacherKycPageContent() {
                     helperText={errors.dateOfBirth}
                     label="Ngày sinh đọc từ chứng chỉ"
                     required
-                    slotProps={{ inputLabel: { shrink: true } }}
+                    slotProps={{ inputLabel: { shrink: true }, input: { readOnly: true } }}
                     type="date"
                     value={certificateDateOfBirth}
-                    onChange={(event) => {
-                      setCertificateDateOfBirth(event.target.value);
-                      setErrors((current) => ({ ...current, dateOfBirth: undefined }));
-                    }}
                   />
                   <TextField
                     disabled={!canSubmitCertificate}
@@ -674,19 +666,9 @@ function TeacherKycPageContent() {
                     helperText={errors.level}
                     label="Cấp độ JLPT"
                     required
-                    select
+                    slotProps={{ input: { readOnly: true } }}
                     value={certificateLevel}
-                    onChange={(event) => {
-                      setCertificateLevel(event.target.value);
-                      setErrors((current) => ({ ...current, level: undefined }));
-                    }}
-                  >
-                    {['N1', 'N2', 'N3', 'N4', 'N5'].map((level) => (
-                      <MenuItem key={level} value={level}>
-                        {level}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                  />
                 </Stack>
 
                 <TextField
@@ -695,17 +677,14 @@ function TeacherKycPageContent() {
                   error={Boolean(errors.certificateCode)}
                   helperText={errors.certificateCode}
                   label="Mã chứng chỉ"
-                  placeholder="Nhập mã số ghi trên chứng chỉ"
+                  placeholder="Hệ thống tự động đọc mã số từ chứng chỉ"
                   margin="normal"
                   required
+                  slotProps={{ input: { readOnly: true } }}
                   value={certificateCode}
                   sx={{
                     '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
                     '& .MuiInputLabel-root.Mui-focused': { color: 'primary.main' },
-                  }}
-                  onChange={(event) => {
-                    setCertificateCode(event.target.value);
-                    setErrors((current) => ({ ...current, certificateCode: undefined }));
                   }}
                 />
                 <TextField
