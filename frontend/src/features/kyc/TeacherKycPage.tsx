@@ -12,6 +12,7 @@ import {
   DialogContent,
   FormControlLabel,
   IconButton,
+  Link,
   Paper,
   Stack,
   Step,
@@ -31,7 +32,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import { X } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { storeAuthToken } from '../../shared/auth/authSession';
 import { recognizeJlptCertificate } from './certificateOcr';
 import {
@@ -431,7 +432,19 @@ function TeacherKycPageContent() {
             </Typography>
             <Typography sx={{ color: 'text.secondary', maxWidth: 720, mt: 1, fontSize: 15, lineHeight: 1.65 }}>
               Để trở thành giáo viên, vui lòng hoàn tất 2 bước: Xác minh danh tính và Cung cấp chứng chỉ chuyên môn.
-              Quá trình này giúp bảo vệ tài khoản và chứng thực chuyên môn của bạn trên hệ thống.
+              Quá trình này giúp bảo vệ tài khoản và chứng thực chuyên môn của bạn trên hệ thống.{' '}
+              <Link
+                component={RouterLink}
+                to="/help/instructors/verification"
+                sx={{
+                  color: 'primary.main',
+                  textDecoration: 'none',
+                  fontWeight: 500,
+                  '&:hover': { textDecoration: 'underline' }
+                }}
+              >
+                Tìm hiểu thêm về chính sách KYC
+              </Link>
             </Typography>
           </Box>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' }, flexShrink: 0 }}>

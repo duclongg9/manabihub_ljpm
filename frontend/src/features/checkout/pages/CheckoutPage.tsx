@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
 import { getOrder, simulatePayment } from '../services/checkoutService';
 import type { OrderResponse } from '../types';
 
@@ -141,6 +141,15 @@ export const CheckoutPage = () => {
       </div>
 
       <p className="text-center text-xs text-slate-400 mt-6">
+        Bằng việc thanh toán, bạn đồng ý với{' '}
+        <RouterLink to="/legal/terms" target="_blank" className="text-indigo-600 hover:underline">
+          Điều khoản sử dụng
+        </RouterLink>{' '}
+        và{' '}
+        <RouterLink to="/legal/refund-policy" target="_blank" className="text-indigo-600 hover:underline">
+          Chính sách hoàn tiền
+        </RouterLink>.
+        <br />
         Thanh toán chỉ được xác nhận qua webhook (IPN) từ phía máy chủ, không qua trình duyệt.
       </p>
     </div>
