@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
+  Button,
   CircularProgress,
   Toolbar,
   useMediaQuery,
@@ -18,7 +20,7 @@ import {
   type AuthSession,
   type AuthSessionKind,
 } from '../auth/authSession';
-import { refreshAdminSession } from '../auth/adminAuthApi';
+import { refreshAdminSessionWithStatus } from '../auth/adminAuthApi';
 import { Header } from './Header';
 import {
   COLLAPSED_DRAWER_WIDTH,
@@ -52,6 +54,8 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
       && !getAuthSession('admin')
       && hasAdminRefreshSession(),
   );
+  const [restoreFailed, setRestoreFailed] = useState(false);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -69,6 +73,7 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
       if (currentSession || sessionKind !== 'admin' || !hasAdminRefreshSession()) {
         if (active) {
           setSession(currentSession);
+          setRestoreFailed(false);
           setRestoringSession(false);
         }
         return;
@@ -78,11 +83,13 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
         return;
       }
       restoreInProgress = true;
+      setRestoreFailed(false);
       setRestoringSession(true);
-      void refreshAdminSession()
-        .then(() => {
+      void refreshAdminSessionWithStatus()
+        .then((result) => {
           if (active) {
-            setSession(getAuthSession('admin'));
+            setSession(result.session);
+            setRestoreFailed(result.status === 'transient-error');
           }
         })
         .finally(() => {
@@ -99,7 +106,7 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
       active = false;
       unsubscribe();
     };
-  }, [sessionKind]);
+  }, [restoreAttempt, sessionKind]);
 
   if (restoringSession) {
     return (
@@ -113,6 +120,37 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
         }}
       >
         <CircularProgress size={32} />
+      </Box>
+    );
+  }
+
+  if (restoreFailed && !session) {
+    return (
+      <Box
+        sx={{
+          alignItems: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          p: 2,
+        }}
+      >
+        <Alert
+          action={(
+            <Button
+              color="inherit"
+              onClick={() => setRestoreAttempt((attempt) => attempt + 1)}
+              size="small"
+            >
+              Thử lại
+            </Button>
+          )}
+          severity="warning"
+          sx={{ maxWidth: 560 }}
+        >
+          Chưa thể xác minh phiên quản trị do kết nối tạm thời gián đoạn.
+          Phiên của bạn chưa bị đăng xuất.
+        </Alert>
       </Box>
     );
   }

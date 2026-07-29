@@ -11,7 +11,8 @@ password by email.
 
 ## Session Model
 
-- Access JWT: 15 minutes, stored in browser `sessionStorage`.
+- Access JWT: 15 minutes, held only in page memory. It is never persisted in
+  `localStorage` or `sessionStorage`.
 - Refresh token: random 256-bit value, stored only in a scoped `HttpOnly` cookie.
 - Remember me disabled: browser-session cookie, 12-hour absolute session.
 - Remember me enabled: 30-day absolute session and 7-day sliding idle timeout.
@@ -19,12 +20,21 @@ password by email.
   session family.
 - Logout revokes the server session before clearing browser state.
 - Role changes, account disabling, invitation acceptance, password reset, and
-  password change increment `credential_version` or revoke sessions so stale
-  JWTs stop working immediately.
+  password change increment `credential_version`, so stale JWTs stop working
+  immediately. Server-side session cleanup runs asynchronously after commit;
+  cleanup failure cannot make an old JWT valid again.
 - Password-reset links are one-time, expire after 30 minutes, and are delivered
   in a URL fragment so reverse proxies and server logs do not receive the token.
 - Requesting a reset does not invalidate the current password. A successful
   reset changes the password and revokes every active session.
+- Reset-request issuance and email delivery run asynchronously, keeping known
+  and unknown account responses indistinguishable at the HTTP boundary.
+- Forgot-password admission is limited synchronously by IP first and then email.
+  Accepted work uses a dedicated bounded executor (2 core threads, 4 maximum,
+  queue capacity 100); saturation drops work while preserving the generic HTTP
+  response and never falls back to the request thread.
+- Invalid current-password attempts are limited by account and IP buckets:
+  5 account attempts or 15 IP attempts in 15 minutes trigger a 30-minute block.
 
 ## Elastic Beanstalk Environment
 
@@ -55,7 +65,7 @@ is rejected at startup unless `ADMIN_COOKIE_SECURE=true`.
 
 For a long-lived production service, prefer Amazon SES or another transactional
 provider over a personal Gmail account. The current credential-email path sends
-after the database transaction commits. If delivery fails, the undelivered
+asynchronously after the database transaction commits. If delivery fails, the undelivered
 invitation/reset token is revoked and an audit event is stored, allowing a System
 Admin to resend safely.
 
@@ -72,7 +82,7 @@ Admin to resend safely.
 
 ## Database Migration
 
-Flyway migration `V046__secure_internal_admin_auth_lifecycle.sql` adds:
+Flyway migration `V049__secure_internal_admin_auth_lifecycle.sql` adds:
 
 - `credential_version` on internal admin accounts;
 - server-side admin sessions;
@@ -88,8 +98,8 @@ migration; add a new migration for future changes.
 1. Sign in without Remember me and verify the refresh cookie has `HttpOnly`,
    `Secure`, `SameSite=None`, no persistent `Max-Age`, and path
    `/api/admin/auth`.
-2. Reload an admin page after clearing only `sessionStorage`; the session should
-   restore through the cookie.
+2. Reload an admin page; the in-memory access token should be restored through
+   the refresh cookie without placing the new token in browser storage.
 3. Sign in with Remember me and verify a persistent cookie is issued.
 4. Open two tabs, let the access token refresh, and confirm both tabs remain
    usable.

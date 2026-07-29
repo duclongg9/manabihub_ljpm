@@ -7,8 +7,8 @@ import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
+import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
-import com.manabihub.identity.repository.InternalAdminSessionRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.service.InternalAdminInvitationService;
 import com.manabihub.systemconfig.dto.response.InternalAdminAccountResponse;
@@ -19,6 +19,7 @@ import com.manabihub.systemconfig.service.CommercialPolicyService;
 import com.manabihub.systemconfig.service.SystemAdministrationService;
 import com.manabihub.systemconfig.service.SystemSettingValidator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +46,7 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
     private final SystemSettingValidator validator;
     private final CommercialPolicyService commercialPolicyService;
     private final InternalAdminInvitationService invitationService;
-    private final InternalAdminSessionRepository adminSessionRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -262,7 +263,11 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
         target.setRole(newRole);
         target.setCredentialVersion(target.getCredentialVersion() + 1);
         InternalAdminAccount saved = adminRepository.save(target);
-        adminSessionRepository.revokeAllForAccount(targetAdminId, Instant.now());
+        eventPublisher.publishEvent(new InternalAdminSessionsInvalidatedEvent(
+                targetAdminId,
+                "ROLE_CHANGED",
+                Instant.now()
+        ));
 
         auditLogService.logAdminAction(
                 actorId,

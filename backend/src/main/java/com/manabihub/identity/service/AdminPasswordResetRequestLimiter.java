@@ -15,14 +15,6 @@ public class AdminPasswordResetRequestLimiter {
     }
 
     public boolean allow(String normalizedEmail, String ipAddress) {
-        boolean emailAllowed = rateLimiter.consume(
-                "admin-password-reset-email",
-                normalizedEmail,
-                "ADMIN_PASSWORD_FORGOT",
-                3,
-                WINDOW_SECONDS,
-                BLOCK_SECONDS
-        );
         boolean ipAllowed = rateLimiter.consume(
                 "admin-password-reset-ip",
                 ipAddress,
@@ -31,6 +23,16 @@ public class AdminPasswordResetRequestLimiter {
                 WINDOW_SECONDS,
                 BLOCK_SECONDS
         );
-        return emailAllowed && ipAllowed;
+        if (!ipAllowed) {
+            return false;
+        }
+        return rateLimiter.consume(
+                "admin-password-reset-email",
+                normalizedEmail,
+                "ADMIN_PASSWORD_FORGOT",
+                3,
+                WINDOW_SECONDS,
+                BLOCK_SECONDS
+        );
     }
 }

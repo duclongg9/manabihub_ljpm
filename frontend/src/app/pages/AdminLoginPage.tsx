@@ -26,7 +26,7 @@ import {
 } from 'react-router-dom';
 import { axiosClient } from '../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../shared/api/endpoints';
-import { refreshAdminSession } from '../../shared/auth/adminAuthApi';
+import { refreshAdminSessionWithStatus } from '../../shared/auth/adminAuthApi';
 import {
   clearAuthSession,
   consumePostLoginRoute,
@@ -58,10 +58,16 @@ export function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(hasAdminRefreshSession);
+  const logoutWasLocalOnly = searchParams.get('reason') === 'logout-local-only';
   const [errorMessage, setErrorMessage] = useState<string | null>(
-    searchParams.get('reason') === 'session-expired'
+    logoutWasLocalOnly
+      ? 'Thông tin đăng nhập trên thiết bị đã được xóa, nhưng máy chủ chưa xác nhận thu hồi phiên do mất kết nối. Phiên sẽ hết hạn tự động; hãy thử đăng xuất lại khi kết nối ổn định.'
+      : searchParams.get('reason') === 'session-expired'
       ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
       : null,
+  );
+  const [messageSeverity, setMessageSeverity] = useState<'error' | 'warning'>(
+    logoutWasLocalOnly ? 'warning' : 'error',
   );
 
   useEffect(() => {
@@ -78,11 +84,18 @@ export function AdminLoginPage() {
       }
 
       if (active) setRestoring(true);
-      const session = await refreshAdminSession();
+      const result = await refreshAdminSessionWithStatus();
       if (!active) return;
+      const session = result.session;
       if (session && hasAnyRole(session, INTERNAL_ROLES)) {
         navigate(consumePostLoginRoute('admin', session), { replace: true });
         return;
+      }
+      if (result.status === 'transient-error') {
+        setMessageSeverity('warning');
+        setErrorMessage(
+          'Chưa thể khôi phục phiên quản trị do kết nối tạm thời gián đoạn. Bạn có thể thử lại hoặc đăng nhập lại.',
+        );
       }
       setRestoring(false);
     };
@@ -99,6 +112,7 @@ export function AdminLoginPage() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    setMessageSeverity('error');
     setErrorMessage(null);
     setLoading(true);
 
@@ -220,7 +234,11 @@ export function AdminLoginPage() {
             Sử dụng tài khoản nội bộ được ManabiHub cấp.
           </Typography>
 
-          {errorMessage && <Alert severity="error" sx={{ mb: 3 }}>{errorMessage}</Alert>}
+          {errorMessage && (
+            <Alert severity={messageSeverity} sx={{ mb: 3 }}>
+              {errorMessage}
+            </Alert>
+          )}
 
           <Box component="form" onSubmit={handleSubmit}>
             <TextField

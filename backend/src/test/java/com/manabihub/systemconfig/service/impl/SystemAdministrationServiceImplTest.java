@@ -7,8 +7,8 @@ import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
+import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
-import com.manabihub.identity.repository.InternalAdminSessionRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.service.InternalAdminInvitationService;
 import com.manabihub.systemconfig.entity.SystemSetting;
@@ -21,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Map;
 import java.util.List;
@@ -43,7 +44,7 @@ class SystemAdministrationServiceImplTest {
     @Mock private RoleRepository roleRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private InternalAdminInvitationService invitationService;
-    @Mock private InternalAdminSessionRepository adminSessionRepository;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private SystemAdministrationServiceImpl service;
     private UUID actorId;
@@ -59,7 +60,7 @@ class SystemAdministrationServiceImplTest {
                 new SystemSettingValidator(),
                 new CommercialPolicyService(settingRepository),
                 invitationService,
-                adminSessionRepository
+                eventPublisher
         );
         actorId = UUID.randomUUID();
         actor = account(actorId, "system@manabihub.local", RoleCode.SYSTEM_ADMIN);
@@ -161,6 +162,12 @@ class SystemAdministrationServiceImplTest {
         );
 
         assertEquals(RoleCode.FINANCE_MANAGER, response.role());
+        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        InternalAdminSessionsInvalidatedEvent invalidated =
+                (InternalAdminSessionsInvalidatedEvent) eventCaptor.getValue();
+        assertEquals(targetId, invalidated.adminAccountId());
+        assertEquals("ROLE_CHANGED", invalidated.reason());
         verify(auditLogService).logAdminAction(
                 eq(actorId),
                 eq("SYSTEM_ADMIN"),

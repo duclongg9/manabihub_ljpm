@@ -5,6 +5,7 @@ import com.manabihub.identity.service.InternalAdminCredentialDeliveryFailureServ
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -30,6 +31,7 @@ public class InternalAdminPasswordEmailListener {
     private String frontendBaseUrl;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Async
     public void sendResetLink(InternalAdminPasswordResetIssuedEvent event) {
         String resetUrl = UriComponentsBuilder
                 .fromUriString(frontendBaseUrl.replaceAll("/+$", ""))
@@ -67,6 +69,7 @@ public class InternalAdminPasswordEmailListener {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Async
     public void sendPasswordChanged(InternalAdminPasswordChangedEvent event) {
         String body = """
                 <p>Xin chào %s,</p>

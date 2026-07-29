@@ -62,6 +62,8 @@ public final class MessageCodes {
             "ADMIN_PASSWORD_REUSE_FORBIDDEN";
     public static final String ADMIN_CURRENT_PASSWORD_INVALID =
             "ADMIN_CURRENT_PASSWORD_INVALID";
+    public static final String ADMIN_PASSWORD_CHANGE_RATE_LIMITED =
+            "ADMIN_PASSWORD_CHANGE_RATE_LIMITED";
     public static final String MSG_AUTH_007 = "MSG-AUTH-007"; // Admin login failed
     public static final String MSG_AUTH_008 = "MSG-AUTH-008"; // Admin account locked
     public static final String MSG_AUTH_009 = "MSG-AUTH-009";

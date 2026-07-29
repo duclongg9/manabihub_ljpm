@@ -9,10 +9,12 @@ import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.event.InternalAdminPasswordChangedEvent;
 import com.manabihub.identity.event.InternalAdminPasswordResetIssuedEvent;
+import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.repository.InternalAdminPasswordResetRepository;
-import com.manabihub.identity.repository.InternalAdminSessionRepository;
 import com.manabihub.identity.service.AdminLoginProtection;
+import com.manabihub.identity.service.AdminPasswordChangeProtection;
+import com.manabihub.identity.service.AdminPasswordResetRequestDispatcher;
 import com.manabihub.identity.service.AdminPasswordResetRequestLimiter;
 import com.manabihub.identity.service.InternalAdminPasswordPolicy;
 import com.manabihub.identity.service.SecureTokenService;
@@ -36,8 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -47,13 +50,14 @@ class AdminPasswordResetServiceImplTest {
 
     @Mock private InternalAdminAccountRepository accountRepository;
     @Mock private InternalAdminPasswordResetRepository passwordResetRepository;
-    @Mock private InternalAdminSessionRepository sessionRepository;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private InternalAdminPasswordPolicy passwordPolicy;
     @Mock private SecureTokenService tokenService;
     @Mock private AdminPasswordResetRequestLimiter requestLimiter;
+    @Mock private AdminPasswordResetRequestDispatcher requestDispatcher;
     @Mock private AdminLoginProtection loginProtection;
+    @Mock private AdminPasswordChangeProtection changeProtection;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     private AdminPasswordResetServiceImpl service;
@@ -63,24 +67,30 @@ class AdminPasswordResetServiceImplTest {
         service = new AdminPasswordResetServiceImpl(
                 accountRepository,
                 passwordResetRepository,
-                sessionRepository,
                 auditLogRepository,
                 passwordEncoder,
                 passwordPolicy,
                 tokenService,
                 requestLimiter,
+                requestDispatcher,
                 loginProtection,
+                changeProtection,
                 eventPublisher
         );
         ReflectionTestUtils.setField(service, "resetTtlMinutes", 30L);
         ReflectionTestUtils.setField(service, "resetCooldownSeconds", 60L);
+        lenient().when(requestDispatcher.dispatch(any(Runnable.class)))
+                .thenAnswer(invocation -> {
+                    invocation.getArgument(0, Runnable.class).run();
+                    return true;
+                });
     }
 
     @Test
     void unknownEmailReturnsSilentlyWithoutPublishingAReset() {
         when(requestLimiter.allow("unknown@example.com", "127.0.0.1"))
                 .thenReturn(true);
-        when(accountRepository.findByEmail("unknown@example.com"))
+        when(accountRepository.findByEmailIgnoreCaseForUpdate("unknown@example.com"))
                 .thenReturn(Optional.empty());
 
         service.request("unknown@example.com", "127.0.0.1", "JUnit");
@@ -89,11 +99,33 @@ class AdminPasswordResetServiceImplTest {
     }
 
     @Test
+    void rateLimitedRequestIsRejectedBeforeAsyncDispatch() {
+        when(requestLimiter.allow("blocked@example.com", "127.0.0.1"))
+                .thenReturn(false);
+
+        service.request("blocked@example.com", "127.0.0.1", "JUnit");
+
+        verify(requestDispatcher, never()).dispatch(any(Runnable.class));
+        verifyNoInteractions(accountRepository, passwordResetRepository, eventPublisher);
+    }
+
+    @Test
+    void admissionFailureIsFailClosedAndKeepsGenericControllerContract() {
+        when(requestLimiter.allow("admin@example.com", "127.0.0.1"))
+                .thenThrow(new IllegalStateException("database unavailable"));
+
+        service.request("admin@example.com", "127.0.0.1", "JUnit");
+
+        verify(requestDispatcher, never()).dispatch(any(Runnable.class));
+        verifyNoInteractions(accountRepository, passwordResetRepository, eventPublisher);
+    }
+
+    @Test
     void requestStoresOnlyHashAndLeavesCurrentPasswordAndSessionsUntouched() {
         InternalAdminAccount account = account();
         when(requestLimiter.allow(account.getEmail(), "127.0.0.1"))
                 .thenReturn(true);
-        when(accountRepository.findByEmail(account.getEmail()))
+        when(accountRepository.findByEmailIgnoreCaseForUpdate(account.getEmail()))
                 .thenReturn(Optional.of(account));
         when(passwordResetRepository.findOpenForAccount(account.getId()))
                 .thenReturn(Optional.empty());
@@ -115,18 +147,19 @@ class AdminPasswordResetServiceImplTest {
         );
         assertEquals("raw-reset-token", issued.rawToken());
         assertEquals(account.getId(), issued.adminAccountId());
-        verify(sessionRepository, never()).revokeAllForAccount(any(), any());
         assertEquals("old-password-hash", account.getPasswordHash());
     }
 
     @Test
-    void successfulResetChangesPasswordAndRevokesEverySession() {
+    void successfulResetChangesPasswordAndInvalidatesEverySessionAfterCommit() {
         InternalAdminAccount account = account();
         InternalAdminPasswordReset reset = new InternalAdminPasswordReset();
         reset.setAdminAccountId(account.getId());
         reset.setTokenHash("reset-hash");
         reset.setExpiresAt(Instant.now().plusSeconds(600));
         when(tokenService.hash("raw-reset-token")).thenReturn("reset-hash");
+        when(passwordResetRepository.findByTokenHash("reset-hash"))
+                .thenReturn(Optional.of(reset));
         when(passwordResetRepository.findByTokenHashForUpdate("reset-hash"))
                 .thenReturn(Optional.of(reset));
         when(accountRepository.findByIdForRoleUpdate(account.getId()))
@@ -146,14 +179,23 @@ class AdminPasswordResetServiceImplTest {
         assertEquals("new-password-hash", account.getPasswordHash());
         assertEquals(3, account.getCredentialVersion());
         assertNotNull(reset.getUsedAt());
-        verify(sessionRepository).revokeAllForAccount(eq(account.getId()), any());
         ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
-        InternalAdminPasswordChangedEvent changed = assertInstanceOf(
-                InternalAdminPasswordChangedEvent.class,
-                eventCaptor.getValue()
-        );
+        verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture());
+        InternalAdminPasswordChangedEvent changed = eventCaptor.getAllValues()
+                .stream()
+                .filter(InternalAdminPasswordChangedEvent.class::isInstance)
+                .map(InternalAdminPasswordChangedEvent.class::cast)
+                .findFirst()
+                .orElseThrow();
         assertEquals(account.getId(), changed.adminAccountId());
+        InternalAdminSessionsInvalidatedEvent invalidated = eventCaptor.getAllValues()
+                .stream()
+                .filter(InternalAdminSessionsInvalidatedEvent.class::isInstance)
+                .map(InternalAdminSessionsInvalidatedEvent.class::cast)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(account.getId(), invalidated.adminAccountId());
+        assertEquals("PASSWORD_RESET", invalidated.reason());
     }
 
     @Test
@@ -162,7 +204,7 @@ class AdminPasswordResetServiceImplTest {
         reset.setUsedAt(Instant.now());
         reset.setExpiresAt(Instant.now().plusSeconds(600));
         when(tokenService.hash("used-token")).thenReturn("used-hash");
-        when(passwordResetRepository.findByTokenHashForUpdate("used-hash"))
+        when(passwordResetRepository.findByTokenHash("used-hash"))
                 .thenReturn(Optional.of(reset));
 
         assertThrows(
@@ -175,7 +217,38 @@ class AdminPasswordResetServiceImplTest {
                 )
         );
 
-        verifyNoInteractions(accountRepository, sessionRepository);
+        verifyNoInteractions(accountRepository);
+    }
+
+    @Test
+    void invalidCurrentPasswordIsRateLimitedAndAudited() {
+        InternalAdminAccount account = account();
+        when(accountRepository.findByIdForRoleUpdate(account.getId()))
+                .thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("wrong-password", "old-password-hash"))
+                .thenReturn(false);
+
+        assertThrows(
+                BusinessException.class,
+                () -> service.change(
+                        account.getId(),
+                        "wrong-password",
+                        "NewPassword!42",
+                        "127.0.0.1",
+                        "JUnit"
+                )
+        );
+
+        verify(changeProtection).check(account.getId(), "127.0.0.1");
+        verify(changeProtection).recordFailure(account.getId(), "127.0.0.1");
+        verify(auditLogRepository).save(argThat(audit ->
+                "ADMIN_PASSWORD_CHANGE_FAILED".equals(audit.getAction())
+                        && account.getId().equals(audit.getActorAdminId())
+                        && "INVALID_CURRENT_PASSWORD".equals(
+                                audit.getMetadata().get("reason")
+                        )
+        ));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     private InternalAdminAccount account() {

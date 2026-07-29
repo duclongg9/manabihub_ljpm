@@ -22,12 +22,25 @@ const refreshClient = axios.create({
 const REFRESH_LOCK_KEY = 'manabihub_admin_refresh_lock';
 const REFRESH_LOCK_LEASE_MS = 20_000;
 const REFRESH_LOCK_WAIT_MS = 25_000;
-let refreshInFlight: Promise<AuthSession | null> | null = null;
+export type AdminRefreshResult =
+  | { status: 'authenticated'; session: AuthSession }
+  | { status: 'invalid-session'; session: null }
+  | { status: 'transient-error'; session: null }
+  | { status: 'unauthenticated'; session: null };
+
+let refreshInFlight: Promise<AdminRefreshResult> | null = null;
 let logoutInProgress = false;
 
 export async function refreshAdminSession(force = false) {
+  const result = await refreshAdminSessionWithStatus(force);
+  return result.session;
+}
+
+export async function refreshAdminSessionWithStatus(
+  force = false,
+): Promise<AdminRefreshResult> {
   if (logoutInProgress || !hasAdminRefreshSession()) {
-    return null;
+    return { status: 'unauthenticated', session: null };
   }
 
   if (refreshInFlight) {
@@ -35,24 +48,29 @@ export async function refreshAdminSession(force = false) {
   }
 
   const initialToken = getAuthSession('admin')?.token ?? null;
-  refreshInFlight = withCrossTabRefreshLock(async () => {
+  const refreshPromise = withCrossTabRefreshLock<AdminRefreshResult>(async () => {
     if (logoutInProgress || !hasAdminRefreshSession()) {
-      return null;
+      return { status: 'unauthenticated', session: null };
     }
 
     const currentSession = getAuthSession('admin');
-    const refreshedByAnotherTab = currentSession
-      && currentSession.token !== initialToken;
-    const comfortablyValid = currentSession
-      && currentSession.expiresAt - Date.now() > 60_000;
-
-    if (refreshedByAnotherTab || (!force && comfortablyValid)) {
-      return currentSession;
+    if (
+      currentSession
+      && (
+        currentSession.token !== initialToken
+        || (!force && currentSession.expiresAt - Date.now() > 60_000)
+      )
+    ) {
+      return {
+        status: 'authenticated',
+        session: currentSession,
+      };
     }
 
     const csrfToken = getAdminCsrfToken();
     if (!csrfToken) {
-      return null;
+      clearAuthSession('admin');
+      return { status: 'invalid-session', session: null };
     }
 
     const requestRevision = getAdminSessionRevision();
@@ -64,35 +82,44 @@ export async function refreshAdminSession(force = false) {
       );
       const credentials = response.data?.data as AdminSessionCredentials | undefined;
       if (!credentials?.token || !credentials.csrfToken) {
-        return null;
+        return { status: 'transient-error', session: null };
       }
       if (getAdminSessionRevision() !== requestRevision || !hasAdminRefreshSession()) {
-        return null;
+        const current = getAuthSession('admin');
+        return current
+          ? { status: 'authenticated', session: current }
+          : { status: 'unauthenticated', session: null };
       }
       if (logoutInProgress) {
         storeAdminRefreshMetadata(credentials);
-        return null;
+        return { status: 'unauthenticated', session: null };
       }
-      return storeAdminSession(credentials);
+      const session = storeAdminSession(credentials);
+      return session
+        ? { status: 'authenticated', session }
+        : { status: 'transient-error', session: null };
     } catch (error: unknown) {
       if (
         isConfirmedInvalidSession(error)
         && getAdminSessionRevision() === requestRevision
       ) {
         clearAuthSession('admin');
+        return { status: 'invalid-session', session: null };
       }
-      return null;
+      return { status: 'transient-error', session: null };
     }
   })
-    .catch(() => null)
+    .catch((): AdminRefreshResult => ({ status: 'transient-error', session: null }))
     .finally(() => {
       refreshInFlight = null;
     });
+  refreshInFlight = refreshPromise;
 
-  return refreshInFlight;
+  return refreshPromise;
 }
 
 export async function logoutAdminSession() {
+  let serverSessionRevoked = !hasAdminRefreshSession();
   logoutInProgress = true;
   try {
     await withCrossTabRefreshLock(async () => {
@@ -100,23 +127,20 @@ export async function logoutAdminSession() {
       if (!csrfToken) {
         return;
       }
-      try {
-        await refreshClient.post(
-          '/admin/auth/logout',
-          {},
-          { headers: { 'X-Admin-CSRF': csrfToken } },
-        );
-      } catch {
-        // Local credentials are still discarded; the server-side session expires
-        // naturally and cannot be refreshed without the cleared CSRF value.
-      }
+      await refreshClient.post(
+        '/admin/auth/logout',
+        {},
+        { headers: { 'X-Admin-CSRF': csrfToken } },
+      );
+      serverSessionRevoked = true;
     });
   } catch {
-    // A local lock failure must not prevent the user from discarding credentials.
+    serverSessionRevoked = false;
   } finally {
     clearAuthSession('admin');
     logoutInProgress = false;
   }
+  return serverSessionRevoked;
 }
 
 async function withCrossTabRefreshLock<T>(operation: () => Promise<T>): Promise<T> {

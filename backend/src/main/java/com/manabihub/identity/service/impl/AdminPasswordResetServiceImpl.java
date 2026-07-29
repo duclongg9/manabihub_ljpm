@@ -9,15 +9,18 @@ import com.manabihub.identity.entity.InternalAdminPasswordReset;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.event.InternalAdminPasswordChangedEvent;
 import com.manabihub.identity.event.InternalAdminPasswordResetIssuedEvent;
+import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.repository.InternalAdminPasswordResetRepository;
-import com.manabihub.identity.repository.InternalAdminSessionRepository;
 import com.manabihub.identity.service.AdminLoginProtection;
+import com.manabihub.identity.service.AdminPasswordChangeProtection;
+import com.manabihub.identity.service.AdminPasswordResetRequestDispatcher;
 import com.manabihub.identity.service.AdminPasswordResetRequestLimiter;
 import com.manabihub.identity.service.AdminPasswordResetService;
 import com.manabihub.identity.service.InternalAdminPasswordPolicy;
 import com.manabihub.identity.service.SecureTokenService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -34,17 +37,19 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AdminPasswordResetServiceImpl implements AdminPasswordResetService {
 
     private final InternalAdminAccountRepository accountRepository;
     private final InternalAdminPasswordResetRepository passwordResetRepository;
-    private final InternalAdminSessionRepository sessionRepository;
     private final AuditLogRepository auditLogRepository;
     private final PasswordEncoder passwordEncoder;
     private final InternalAdminPasswordPolicy passwordPolicy;
     private final SecureTokenService tokenService;
     private final AdminPasswordResetRequestLimiter requestLimiter;
+    private final AdminPasswordResetRequestDispatcher requestDispatcher;
     private final AdminLoginProtection loginProtection;
+    private final AdminPasswordChangeProtection changeProtection;
     private final ApplicationEventPublisher eventPublisher;
 
     @Value("${manabihub.admin-auth.password-reset-minutes:30}")
@@ -54,16 +59,29 @@ public class AdminPasswordResetServiceImpl implements AdminPasswordResetService 
     private long resetCooldownSeconds;
 
     @Override
-    @Transactional
     public void request(String email, String ipAddress, String userAgent) {
         String normalizedEmail = email == null
                 ? ""
                 : email.trim().toLowerCase(Locale.ROOT);
-        if (!requestLimiter.allow(normalizedEmail, ipAddress)) {
+        try {
+            if (!requestLimiter.allow(normalizedEmail, ipAddress)) {
+                return;
+            }
+        } catch (RuntimeException limiterFailure) {
+            log.warn(
+                    "Admin password reset admission check failed ({})",
+                    limiterFailure.getClass().getSimpleName()
+            );
             return;
         }
+        requestDispatcher.dispatch(
+                () -> issueReset(normalizedEmail, ipAddress, userAgent)
+        );
+    }
 
-        InternalAdminAccount account = accountRepository.findByEmail(normalizedEmail)
+    private void issueReset(String normalizedEmail, String ipAddress, String userAgent) {
+        InternalAdminAccount account = accountRepository
+                .findByEmailIgnoreCaseForUpdate(normalizedEmail)
                 .filter(candidate -> candidate.getAccountStatus() == AccountStatus.ACTIVE)
                 .orElse(null);
         if (account == null) {
@@ -116,19 +134,25 @@ public class AdminPasswordResetServiceImpl implements AdminPasswordResetService 
             String userAgent
     ) {
         passwordPolicy.validate(newPassword);
-        InternalAdminPasswordReset passwordReset = passwordResetRepository
-                .findByTokenHashForUpdate(safeHash(rawToken))
+        String tokenHash = safeHash(rawToken);
+        InternalAdminPasswordReset candidate = passwordResetRepository
+                .findByTokenHash(tokenHash)
                 .orElseThrow(this::invalidReset);
         Instant now = Instant.now();
-        if (passwordReset.getUsedAt() != null
-                || passwordReset.getRevokedAt() != null
-                || !now.isBefore(passwordReset.getExpiresAt())) {
+        if (!isOpen(candidate, now)) {
             throw invalidReset();
         }
 
         InternalAdminAccount account = accountRepository
-                .findByIdForRoleUpdate(passwordReset.getAdminAccountId())
+                .findByIdForRoleUpdate(candidate.getAdminAccountId())
                 .orElseThrow(this::invalidReset);
+        InternalAdminPasswordReset passwordReset = passwordResetRepository
+                .findByTokenHashForUpdate(tokenHash)
+                .orElseThrow(this::invalidReset);
+        if (!passwordReset.getAdminAccountId().equals(account.getId())
+                || !isOpen(passwordReset, Instant.now())) {
+            throw invalidReset();
+        }
         if (account.getAccountStatus() != AccountStatus.ACTIVE) {
             throw invalidReset();
         }
@@ -140,7 +164,6 @@ public class AdminPasswordResetServiceImpl implements AdminPasswordResetService 
         passwordReset.setUsedAt(now);
         passwordResetRepository.save(passwordReset);
         passwordResetRepository.revokeOpenForAccount(account.getId(), now);
-        sessionRepository.revokeAllForAccount(account.getId(), now);
         loginProtection.reset(
                 account.getEmail().toLowerCase(Locale.ROOT),
                 ipAddress
@@ -158,10 +181,11 @@ public class AdminPasswordResetServiceImpl implements AdminPasswordResetService 
                 account.getFullName(),
                 now
         ));
+        publishSessionInvalidation(account.getId(), "PASSWORD_RESET", now);
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public void change(
             UUID adminId,
             String currentPassword,
@@ -169,12 +193,15 @@ public class AdminPasswordResetServiceImpl implements AdminPasswordResetService 
             String ipAddress,
             String userAgent
     ) {
+        changeProtection.check(adminId, ipAddress);
         passwordPolicy.validate(newPassword);
         InternalAdminAccount account = accountRepository
                 .findByIdForRoleUpdate(adminId)
                 .orElseThrow(this::invalidCurrentPassword);
         if (account.getAccountStatus() != AccountStatus.ACTIVE
                 || !passwordEncoder.matches(currentPassword, account.getPasswordHash())) {
+            changeProtection.recordFailure(adminId, ipAddress);
+            recordPasswordChangeFailure(account, ipAddress, userAgent);
             throw invalidCurrentPassword();
         }
         rejectPasswordReuse(account, newPassword);
@@ -184,11 +211,11 @@ public class AdminPasswordResetServiceImpl implements AdminPasswordResetService 
         account.setCredentialVersion(account.getCredentialVersion() + 1);
         accountRepository.save(account);
         passwordResetRepository.revokeOpenForAccount(account.getId(), now);
-        sessionRepository.revokeAllForAccount(account.getId(), now);
         loginProtection.reset(
                 account.getEmail().toLowerCase(Locale.ROOT),
                 ipAddress
         );
+        changeProtection.reset(account.getId());
         recordPasswordChange(
                 account,
                 "ADMIN_PASSWORD_CHANGED",
@@ -201,6 +228,7 @@ public class AdminPasswordResetServiceImpl implements AdminPasswordResetService 
                 account.getFullName(),
                 now
         ));
+        publishSessionInvalidation(account.getId(), "PASSWORD_CHANGED", now);
     }
 
     private void rejectPasswordReuse(
@@ -228,10 +256,54 @@ public class AdminPasswordResetServiceImpl implements AdminPasswordResetService 
                 .action(action)
                 .targetType("INTERNAL_ADMIN_ACCOUNT")
                 .targetId(account.getId())
-                .metadata(Map.of("sessionsRevoked", true))
+                .metadata(Map.of(
+                        "sessionsInvalidated", true,
+                        "cleanupMode", "AFTER_COMMIT"
+                ))
                 .ipAddress(safeMetadata(ipAddress))
                 .userAgent(safeMetadata(userAgent))
                 .build());
+    }
+
+    private void recordPasswordChangeFailure(
+            InternalAdminAccount account,
+            String ipAddress,
+            String userAgent
+    ) {
+        auditLogRepository.save(AuditLog.builder()
+                .actorType("INTERNAL_ADMIN")
+                .actorAdminId(account.getId())
+                .actorRoleCode(account.getRole() == null
+                        ? "UNKNOWN"
+                        : account.getRole().getCode().name())
+                .action("ADMIN_PASSWORD_CHANGE_FAILED")
+                .targetType("INTERNAL_ADMIN_ACCOUNT")
+                .targetId(account.getId())
+                .metadata(Map.of("reason", "INVALID_CURRENT_PASSWORD"))
+                .ipAddress(safeMetadata(ipAddress))
+                .userAgent(safeMetadata(userAgent))
+                .build());
+    }
+
+    private boolean isOpen(
+            InternalAdminPasswordReset passwordReset,
+            Instant now
+    ) {
+        return passwordReset.getUsedAt() == null
+                && passwordReset.getRevokedAt() == null
+                && now.isBefore(passwordReset.getExpiresAt());
+    }
+
+    private void publishSessionInvalidation(
+            UUID adminAccountId,
+            String reason,
+            Instant occurredAt
+    ) {
+        eventPublisher.publishEvent(new InternalAdminSessionsInvalidatedEvent(
+                adminAccountId,
+                reason,
+                occurredAt
+        ));
     }
 
     private String safeHash(String rawToken) {

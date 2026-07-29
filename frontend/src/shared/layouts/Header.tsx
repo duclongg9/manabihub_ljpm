@@ -64,7 +64,14 @@ export const Header: React.FC<HeaderProps> = ({
 
     setAccountAnchor(null);
     if (session.kind === 'admin') {
-      await logoutAdminSession();
+      const serverSessionRevoked = await logoutAdminSession();
+      navigate(
+        serverSessionRevoked
+          ? getLoginRoute(session.kind)
+          : `${getLoginRoute(session.kind)}?reason=logout-local-only`,
+        { replace: true },
+      );
+      return;
     } else {
       clearAuthSession(session.kind);
     }

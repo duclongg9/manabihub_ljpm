@@ -15,6 +15,8 @@ import java.util.UUID;
 public interface InternalAdminPasswordResetRepository
         extends JpaRepository<InternalAdminPasswordReset, UUID> {
 
+    Optional<InternalAdminPasswordReset> findByTokenHash(String tokenHash);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select passwordReset

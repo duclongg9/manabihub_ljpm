@@ -7,10 +7,12 @@ import {
   hasAdminRefreshSession,
   storeAdminSession,
   storeAuthToken,
+  synchronizeAdminAccessToken,
 } from './authSession';
 
 describe('authSession', () => {
   beforeEach(() => {
+    clearAuthSession('admin');
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
@@ -60,6 +62,21 @@ describe('authSession', () => {
     expect(canAccessPath(admin, '/student/dashboard')).toBe(false);
     expect(canAccessPath(admin, '//example.com')).toBe(false);
   });
+
+  it('accepts a refreshed token from another tab without persisting it', () => {
+    const firstToken = createToken(ROLES.SYSTEM_ADMIN, 3600);
+    const refreshedToken = createToken(ROLES.SYSTEM_ADMIN, 7200);
+    storeAdminSession({
+      token: firstToken,
+      csrfToken: 'csrf-token',
+      remembered: true,
+    }, false);
+
+    expect(synchronizeAdminAccessToken(refreshedToken)?.token).toBe(refreshedToken);
+    expect(getAuthSession('admin')?.token).toBe(refreshedToken);
+    expect(window.localStorage.getItem('admin_token')).toBeNull();
+    expect(window.sessionStorage.getItem('admin_token')).toBeNull();
+  });
 });
 
 function getSession(kind: 'public' | 'admin', role: string) {
@@ -78,12 +95,12 @@ function getSession(kind: 'public' | 'admin', role: string) {
   return session;
 }
 
-function createToken(role: string) {
+function createToken(role: string, expiresInSeconds = 3600) {
   const header = encodeBase64Url({ alg: 'none', typ: 'JWT' });
   const payload = encodeBase64Url({
     sub: '00000000-0000-0000-0000-000000000001',
     email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
+    exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
     role,
   });
   return `${header}.${payload}.test-signature`;

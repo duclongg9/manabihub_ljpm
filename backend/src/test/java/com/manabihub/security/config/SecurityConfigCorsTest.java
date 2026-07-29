@@ -38,6 +38,7 @@ class SecurityConfigCorsTest {
         SecurityConfig config = new SecurityConfig(
                 mock(TeacherEligibilityFilter.class),
                 mock(InternalAdminRoleFilter.class),
+                mock(AppUserStatusFilter.class),
                 environment
         );
         ReflectionTestUtils.setField(config, "allowedOrigins", origins);

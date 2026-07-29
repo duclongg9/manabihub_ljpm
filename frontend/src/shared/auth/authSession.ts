@@ -149,8 +149,26 @@ export function storeAdminSession(
   if (broadcast) {
     broadcastAdminSession({
       type: 'SESSION_UPDATED',
+      token: credentials.token,
     });
   }
+  return session;
+}
+
+export function synchronizeAdminAccessToken(token: string) {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const session = parseAuthToken(token, 'admin');
+  if (!session) {
+    return null;
+  }
+
+  adminAccessToken = token;
+  adminSessionRevision += 1;
+  window.sessionStorage.removeItem(TOKEN_KEYS.admin);
+  notifySessionChanged('admin');
   return session;
 }
 
@@ -307,7 +325,7 @@ function notifySessionChanged(kind: AuthSessionKind) {
 }
 
 type AdminSessionMessage =
-  | { type: 'SESSION_UPDATED' }
+  | { type: 'SESSION_UPDATED'; token: string }
   | { type: 'SIGNED_OUT' };
 
 let adminSessionChannel: BroadcastChannel | null = null;
@@ -320,10 +338,7 @@ function getAdminSessionChannel() {
     adminSessionChannel = new BroadcastChannel(ADMIN_SESSION_CHANNEL);
     adminSessionChannel.addEventListener('message', (event: MessageEvent<AdminSessionMessage>) => {
       if (event.data.type === 'SESSION_UPDATED') {
-        adminAccessToken = null;
-        adminSessionRevision += 1;
-        window.sessionStorage.removeItem(TOKEN_KEYS.admin);
-        notifySessionChanged('admin');
+        synchronizeAdminAccessToken(event.data.token);
         return;
       }
       if (event.data.type === 'SIGNED_OUT') {

@@ -22,6 +22,7 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import axios from 'axios';
 import {
   Link as RouterLink,
   useNavigate,
@@ -149,8 +150,8 @@ export function AdminResetPasswordPage() {
       setPassword('');
       setConfirmation('');
       setCompleted(true);
-    } catch {
-      setError('Liên kết không hợp lệ, đã hết hạn hoặc đã được sử dụng.');
+    } catch (requestError: unknown) {
+      setError(getAdminPasswordError(requestError, 'reset'));
     } finally {
       setSubmitting(false);
     }
@@ -216,8 +217,8 @@ export function AdminChangePasswordPage() {
       });
       clearAuthSession('admin');
       navigate(`${ROUTES.ADMIN.LOGIN}?reason=password-changed`, { replace: true });
-    } catch {
-      setError('Không thể đổi mật khẩu. Hãy kiểm tra mật khẩu hiện tại và thử lại.');
+    } catch (requestError: unknown) {
+      setError(getAdminPasswordError(requestError, 'change'));
     } finally {
       setSubmitting(false);
     }
@@ -333,17 +334,21 @@ function PasswordFields(props: PasswordFieldsProps) {
       <Box
         aria-label="Yêu cầu mật khẩu"
         aria-live="polite"
+        component="ul"
         sx={{
           display: 'grid',
           gap: 1,
           gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+          listStyle: 'none',
+          m: 0,
+          p: 0,
         }}
       >
         {Object.entries(POLICY_LABELS).map(([key, label]) => {
           const passed = props.policy.checks[key as keyof typeof props.policy.checks];
           return (
             <Box
-              aria-label={`${passed ? 'Đạt' : 'Chưa đạt'}: ${label}`}
+              component="li"
               key={key}
               sx={{ alignItems: 'center', display: 'flex', gap: 1 }}
             >
@@ -353,10 +358,13 @@ function PasswordFields(props: PasswordFieldsProps) {
                 fontSize="small"
               />
               <Typography
-                aria-hidden
                 color={passed ? 'success.main' : 'text.secondary'}
+                component="span"
                 variant="body2"
               >
+                <Box component="span" sx={VISUALLY_HIDDEN}>
+                  {passed ? 'Đạt: ' : 'Chưa đạt: '}
+                </Box>
                 {label}
               </Typography>
             </Box>
@@ -476,3 +484,64 @@ function readFragmentToken() {
   if (typeof window === 'undefined') return '';
   return new URLSearchParams(window.location.hash.replace(/^#/, '')).get('token') ?? '';
 }
+
+type AdminPasswordOperation = 'change' | 'reset';
+
+function getAdminPasswordError(
+  requestError: unknown,
+  operation: AdminPasswordOperation,
+) {
+  const unavailable = 'Dịch vụ tạm thời không khả dụng. Dữ liệu bạn nhập vẫn được giữ; vui lòng thử lại.';
+  if (!axios.isAxiosError(requestError) || !requestError.response) {
+    return unavailable;
+  }
+
+  const status = requestError.response.status;
+  const responseData = requestError.response.data as {
+    errorCode?: string;
+    messageCode?: string;
+  } | undefined;
+  const code = responseData?.messageCode ?? responseData?.errorCode;
+
+  if (status >= 500) {
+    return unavailable;
+  }
+  if (status === 429 || code === 'ADMIN_PASSWORD_CHANGE_RATE_LIMITED') {
+    return 'Bạn đã thử quá nhiều lần. Vui lòng đợi trước khi thử lại.';
+  }
+  if (code === 'ADMIN_PASSWORD_REUSE_FORBIDDEN') {
+    return 'Mật khẩu mới không được trùng với mật khẩu hiện tại.';
+  }
+  if (code === 'INTERNAL_ADMIN_PASSWORD_INVALID') {
+    return 'Mật khẩu mới chưa đáp ứng đầy đủ chính sách bảo mật.';
+  }
+  if (
+    operation === 'reset'
+    && (
+      code === 'ADMIN_PASSWORD_RESET_INVALID'
+      || status === 404
+      || status === 410
+    )
+  ) {
+    return 'Liên kết không hợp lệ, đã hết hạn hoặc đã được sử dụng.';
+  }
+  if (operation === 'change' && code === 'ADMIN_CURRENT_PASSWORD_INVALID') {
+    return 'Mật khẩu hiện tại không chính xác.';
+  }
+
+  return operation === 'reset'
+    ? 'Không thể đặt lại mật khẩu với yêu cầu này. Vui lòng kiểm tra thông tin và thử lại.'
+    : 'Không thể đổi mật khẩu với yêu cầu này. Vui lòng kiểm tra thông tin và thử lại.';
+}
+
+const VISUALLY_HIDDEN = {
+  border: 0,
+  clip: 'rect(0 0 0 0)',
+  height: 1,
+  m: -1,
+  overflow: 'hidden',
+  p: 0,
+  position: 'absolute',
+  whiteSpace: 'nowrap',
+  width: 1,
+} as const;
