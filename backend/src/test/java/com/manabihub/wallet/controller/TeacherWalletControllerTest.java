@@ -6,6 +6,7 @@ import com.manabihub.security.oauth2.CustomOAuth2UserService;
 import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
 import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
+import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.service.WalletService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,7 @@ class TeacherWalletControllerTest {
     @Autowired private MockMvc mockMvc;
 
     @MockBean private WalletService walletService;
+    @MockBean private EscrowService escrowService;
     @MockBean private CustomOAuth2UserService customOAuth2UserService;
     @MockBean private OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     @MockBean private OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;

@@ -48,6 +48,7 @@ import {
 } from '../services/payoutError';
 import { adminPayoutService } from '../services/adminPayoutService';
 import type { PayoutDetail, ReconciliationAlert } from '../types/payout.types';
+import { formatCurrency } from '../../../shared/utils/formatCurrency';
 
 export function PayoutSettlementPage() {
   const { id } = useParams<{ id: string }>();
@@ -215,7 +216,7 @@ export function PayoutSettlementPage() {
           <Box>
             <Typography variant="body2" color="text.secondary">Số tiền cần quyết toán</Typography>
             <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em', mt: 0.25 }}>
-              {formatVnd(detail.requestedAmount)}
+              {formatCurrency(detail.requestedAmount)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Tạo lúc {formatDate(detail.requestedAt)} · {detail.teacherName}
@@ -262,10 +263,10 @@ export function PayoutSettlementPage() {
         </InfoCard>
 
         <InfoCard title="Số dư quyết toán" icon={CreditCard}>
-          <InfoRow label="Số tiền yêu cầu" value={formatVnd(detail.requestedAmount)} emphasize />
-          <InfoRow label="Số dư khả dụng" value={formatVnd(detail.availableBalance)} />
-          <InfoRow label="Số dư đang giữ" value={formatVnd(detail.reservedBalance)} />
-          <InfoRow label="Đang chờ clearing" value={formatVnd(detail.pendingClearing)} />
+          <InfoRow label="Số tiền yêu cầu" value={formatCurrency(detail.requestedAmount)} emphasize />
+          <InfoRow label="Số dư khả dụng" value={formatCurrency(detail.availableBalance)} />
+          <InfoRow label="Số dư đang giữ" value={formatCurrency(detail.reservedBalance)} />
+          <InfoRow label="Đang chờ clearing" value={formatCurrency(detail.pendingClearing)} />
         </InfoCard>
 
         <InfoCard title="Đích nhận tiền" icon={Building2}>
@@ -504,10 +505,6 @@ function InfoRow({
       </dd>
     </div>
   );
-}
-
-function formatVnd(value: number) {
-  return `${new Intl.NumberFormat('vi-VN').format(value)} ₫`;
 }
 
 function shortId(value: string) {
