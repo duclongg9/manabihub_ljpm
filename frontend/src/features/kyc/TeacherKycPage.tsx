@@ -12,7 +12,6 @@ import {
   DialogContent,
   FormControlLabel,
   IconButton,
-  MenuItem,
   Paper,
   Stack,
   Step,
