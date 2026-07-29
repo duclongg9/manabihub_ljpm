@@ -146,3 +146,26 @@ or an incorrectly structured source bundle.
 The three `@manabihub.local` demo administrators are disabled by migration in
 every environment. Only the Spring `local` profile re-enables them. Never set a
 production deployment to the `local` profile.
+
+### Bootstrap the first production administrator
+
+Production must never reuse the known local demo password. If the database has
+no active `SYSTEM_ADMIN`, configure these Elastic Beanstalk environment
+properties before deploying:
+
+```text
+ADMIN_BOOTSTRAP_EMAIL=<real administrator email>
+ADMIN_BOOTSTRAP_PASSWORD=<20-72 byte strong random password>
+ADMIN_BOOTSTRAP_FULL_NAME=<administrator display name>
+```
+
+The password must contain uppercase, lowercase, digit, and special characters
+without whitespace. On startup, the application takes a PostgreSQL advisory
+lock and creates or reactivates exactly one `SYSTEM_ADMIN`. The operation is
+audited without storing the credential.
+
+After the administrator has successfully logged in, remove all three bootstrap
+properties from Elastic Beanstalk. Later restarts do not reset the password
+when an active `SYSTEM_ADMIN` already exists. If every system administrator is
+disabled in the future, startup fails closed until a deliberate bootstrap
+credential is configured again.
