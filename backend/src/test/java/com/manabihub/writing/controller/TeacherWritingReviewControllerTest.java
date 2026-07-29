@@ -10,6 +10,8 @@ import com.manabihub.writing.dto.response.WritingSubmissionSummaryResponse;
 import com.manabihub.writing.enums.WritingSubmissionStatus;
 import com.manabihub.writing.service.TeacherWritingReviewService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -84,6 +86,28 @@ class TeacherWritingReviewControllerTest {
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_TEACHER")))
                         .contentType("application/json")
                         .content("{\"score\":8.5,\"comment\":\"  \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messageCode").value("VALIDATION_FAILED"));
+    }
+
+    @ParameterizedTest(name = "UTC boundary accepted: score={0}")
+    @ValueSource(strings = {"0", "10"})
+    void saveFeedback_withScoreAtInclusiveBoundary_returnsOk(String score) throws Exception {
+        mockMvc.perform(put("/api/v1/teacher/writing-submissions/{id}/feedback", UUID.randomUUID())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_TEACHER")))
+                        .contentType("application/json")
+                        .content("{\"score\":" + score + ",\"comment\":\"Boundary score\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messageCode").value("TEACHER_FEEDBACK_SUBMITTED"));
+    }
+
+    @ParameterizedTest(name = "UTC boundary rejected: score={0}")
+    @ValueSource(strings = {"-0.01", "10.01"})
+    void saveFeedback_withScoreOutsideInclusiveBoundary_returnsBadRequest(String score) throws Exception {
+        mockMvc.perform(put("/api/v1/teacher/writing-submissions/{id}/feedback", UUID.randomUUID())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_TEACHER")))
+                        .contentType("application/json")
+                        .content("{\"score\":" + score + ",\"comment\":\"Invalid score\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.messageCode").value("VALIDATION_FAILED"));
     }

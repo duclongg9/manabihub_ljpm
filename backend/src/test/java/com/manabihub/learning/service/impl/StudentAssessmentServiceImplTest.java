@@ -29,7 +29,11 @@ import com.manabihub.learning.repository.FinalTestAttemptRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.repository.QuizAttemptRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -56,6 +60,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class StudentAssessmentServiceImplTest {
 
     @Mock private CourseRepository courseRepository;
@@ -175,6 +180,8 @@ class StudentAssessmentServiceImplTest {
     }
 
     @Test
+    @Order(1201)
+    @DisplayName("UTC01: Correct answers pass the quiz and complete the block")
     void submitQuiz_whenPassing_persistsAttemptAndCompletesBlock() {
         when(lessonBlockRepository.findById(quizBlock.getId())).thenReturn(Optional.of(quizBlock));
         when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(
@@ -199,6 +206,8 @@ class StudentAssessmentServiceImplTest {
     }
 
     @Test
+    @Order(1202)
+    @DisplayName("UTC02: Reject an answer outside the configured options")
     void submitQuiz_whenAnswerDoesNotBelongToQuestion_rejectsRequest() {
         when(lessonBlockRepository.findById(quizBlock.getId())).thenReturn(Optional.of(quizBlock));
 
@@ -207,6 +216,132 @@ class StudentAssessmentServiceImplTest {
                 () -> service.submitQuiz(
                         quizBlock.getId(),
                         new QuizSubmissionRequest(List.of("NOT_AN_OPTION", "D"))
+                )
+        );
+
+        assertEquals(MessageCodes.LEARNING_INVALID_QUIZ_ANSWERS, exception.getMessageCode());
+        verify(quizAttemptRepository, never()).save(any());
+    }
+
+    @Test
+    @Order(1203)
+    @DisplayName("UTC03: Missing quiz block returns content not found")
+    void submitQuiz_whenBlockIsMissing_returnsNotFound() {
+        UUID missingBlockId = UUID.randomUUID();
+        when(lessonBlockRepository.findById(missingBlockId)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.submitQuiz(
+                        missingBlockId,
+                        new QuizSubmissionRequest(List.of("A", "D"))
+                )
+        );
+
+        assertEquals(MessageCodes.CONTENT_NOT_FOUND, exception.getMessageCode());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getHttpStatus());
+        verify(quizAttemptRepository, never()).save(any());
+    }
+
+    @Test
+    @Order(1204)
+    @DisplayName("UTC04: Reject a lesson block that is not a quiz")
+    void submitQuiz_whenBlockTypeIsNotQuiz_rejectsRequest() {
+        when(lessonBlockRepository.findById(textBlock.getId())).thenReturn(Optional.of(textBlock));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.submitQuiz(
+                        textBlock.getId(),
+                        new QuizSubmissionRequest(List.of("A"))
+                )
+        );
+
+        assertEquals(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, exception.getMessageCode());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getHttpStatus());
+        verify(quizAttemptRepository, never()).save(any());
+    }
+
+    @Test
+    @Order(1205)
+    @DisplayName("UTC05: Reject submission with an unanswered question")
+    void submitQuiz_whenAnswerCountIsIncomplete_rejectsRequest() {
+        when(lessonBlockRepository.findById(quizBlock.getId())).thenReturn(Optional.of(quizBlock));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.submitQuiz(
+                        quizBlock.getId(),
+                        new QuizSubmissionRequest(List.of("A"))
+                )
+        );
+
+        assertEquals(MessageCodes.LEARNING_INVALID_QUIZ_ANSWERS, exception.getMessageCode());
+        verify(quizAttemptRepository, never()).save(any());
+    }
+
+    @Test
+    @Order(1206)
+    @DisplayName("UTC06: Exactly 80 percent is the passing-score boundary")
+    void submitQuiz_whenScoreIsExactlyEighty_passesBoundary() {
+        quizBlock.setQuizItemsJson("""
+                [
+                  {"question":"Q1","options":["A","B"],"answer":"A"},
+                  {"question":"Q2","options":["C","D"],"answer":"C"},
+                  {"question":"Q3","options":["E","F"],"answer":"E"},
+                  {"question":"Q4","options":["G","H"],"answer":"G"},
+                  {"question":"Q5","options":["I","J"],"answer":"I"}
+                ]
+                """);
+        when(lessonBlockRepository.findById(quizBlock.getId())).thenReturn(Optional.of(quizBlock));
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(
+                enrollment.getId(), quizBlock.getId()
+        )).thenReturn(Optional.empty());
+
+        var result = service.submitQuiz(
+                quizBlock.getId(),
+                new QuizSubmissionRequest(List.of("A", "C", "E", "G", "J"))
+        );
+
+        assertTrue(result.passed());
+        assertEquals(0, result.score().compareTo(new java.math.BigDecimal("80.00")));
+        assertEquals(4, result.correctCount());
+        assertEquals(LessonProgressStatus.COMPLETED, result.progressStatus());
+    }
+
+    @Test
+    @Order(1207)
+    @DisplayName("UTC07: A valid failed attempt keeps the block in progress")
+    void submitQuiz_whenScoreIsBelowPassing_savesInProgressAttempt() {
+        when(lessonBlockRepository.findById(quizBlock.getId())).thenReturn(Optional.of(quizBlock));
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(
+                enrollment.getId(), quizBlock.getId()
+        )).thenReturn(Optional.empty());
+
+        var result = service.submitQuiz(
+                quizBlock.getId(),
+                new QuizSubmissionRequest(List.of("A", "C"))
+        );
+
+        assertFalse(result.passed());
+        assertEquals(0, result.score().compareTo(new java.math.BigDecimal("50.00")));
+        assertEquals(LessonProgressStatus.IN_PROGRESS, result.progressStatus());
+        verify(quizAttemptRepository).save(any());
+        verify(lessonBlockProgressRepository).save(any());
+    }
+
+    @Test
+    @Order(1208)
+    @DisplayName("UTC08: Empty quiz configuration is rejected")
+    void submitQuiz_whenQuizHasNoQuestions_rejectsConfiguration() {
+        quizBlock.setQuizItemsJson("[]");
+        when(lessonBlockRepository.findById(quizBlock.getId())).thenReturn(Optional.of(quizBlock));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.submitQuiz(
+                        quizBlock.getId(),
+                        new QuizSubmissionRequest(List.of())
                 )
         );
 

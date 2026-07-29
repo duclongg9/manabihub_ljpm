@@ -649,7 +649,8 @@ class LearningServiceImplTest {
     // ==========================================
 
     @Test
-    @DisplayName("Review Flashcard - Wrong Type")
+    @Order(1301)
+    @DisplayName("UTC01: Reject a lesson block that is not a flashcard")
     void testReviewFlashcard_WrongType() {
         mockActiveEnrollment();
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
@@ -663,7 +664,26 @@ class LearningServiceImplTest {
     }
 
     @Test
-    @DisplayName("Review Flashcard - Invalid Index")
+    @Order(1302)
+    @DisplayName("UTC02: Negative card index is rejected")
+    void testReviewFlashcard_NegativeIndex() {
+        mockActiveEnrollment();
+        LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
+                .flashcardsJson("[{\"front\":\"A\",\"back\":\"B\"}]").module(courseModule).build();
+        when(lessonBlockRepository.findById(fb.getId())).thenReturn(Optional.of(fb));
+
+        com.manabihub.learning.dto.request.ReviewFlashcardRequest request = new com.manabihub.learning.dto.request.ReviewFlashcardRequest(-1, com.manabihub.learning.enums.FlashcardStatus.REMEMBERED);
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.reviewFlashcard(fb.getId(), request));
+
+        assertEquals(MessageCodes.LEARNING_INVALID_FLASHCARD_INDEX, exception.getMessageCode());
+        verify(flashcardProgressRepository, never()).upsertStatus(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    @Order(1303)
+    @DisplayName("UTC03: Card index equal to set size is rejected")
     void testReviewFlashcard_InvalidIndex() {
         mockActiveEnrollment();
         LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
@@ -679,7 +699,25 @@ class LearningServiceImplTest {
     }
 
     @Test
-    @DisplayName("Review Flashcard - Success - In Progress")
+    @Order(1304)
+    @DisplayName("UTC04: Empty flashcard set rejects review activity")
+    void testReviewFlashcard_EmptySet() {
+        mockActiveEnrollment();
+        LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
+                .flashcardsJson("[]").module(courseModule).build();
+        when(lessonBlockRepository.findById(fb.getId())).thenReturn(Optional.of(fb));
+
+        com.manabihub.learning.dto.request.ReviewFlashcardRequest request = new com.manabihub.learning.dto.request.ReviewFlashcardRequest(0, com.manabihub.learning.enums.FlashcardStatus.REMEMBERED);
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.reviewFlashcard(fb.getId(), request));
+
+        assertEquals(MessageCodes.LEARNING_INVALID_FLASHCARD_INDEX, exception.getMessageCode());
+    }
+
+    @Test
+    @Order(1305)
+    @DisplayName("UTC05: First classified card moves progress to in progress")
     void testReviewFlashcard_Success_InProgress() {
         mockActiveEnrollment();
         LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
@@ -698,7 +736,8 @@ class LearningServiceImplTest {
     }
 
     @Test
-    @DisplayName("Review Flashcard - Success - Completed")
+    @Order(1306)
+    @DisplayName("UTC06: Classifying every card completes the flashcard block")
     void testReviewFlashcard_Success_Completed() {
         mockActiveEnrollment();
         LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
@@ -718,10 +757,238 @@ class LearningServiceImplTest {
         verify(flashcardProgressRepository).upsertStatus(enrollmentId, fb.getId(), 1, com.manabihub.learning.enums.FlashcardStatus.NEEDS_REVIEW);
     }
 
+    @Test
+    @Order(1307)
+    @DisplayName("UTC07: Missing enrollment lock denies flashcard update")
+    void testReviewFlashcard_MissingEnrollmentLock() {
+        mockActiveEnrollment();
+        LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
+                .flashcardsJson("[{\"front\":\"A\",\"back\":\"B\"}]").module(courseModule).build();
+        when(lessonBlockRepository.findById(fb.getId())).thenReturn(Optional.of(fb));
+        when(enrollmentRepository.findByIdForUpdate(enrollmentId)).thenReturn(Optional.empty());
+
+        com.manabihub.learning.dto.request.ReviewFlashcardRequest request = new com.manabihub.learning.dto.request.ReviewFlashcardRequest(0, com.manabihub.learning.enums.FlashcardStatus.REMEMBERED);
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.reviewFlashcard(fb.getId(), request));
+
+        assertEquals(MessageCodes.LEARNING_NOT_ENROLLED, exception.getMessageCode());
+        verify(flashcardProgressRepository, never()).upsertStatus(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    @Order(1308)
+    @DisplayName("UTC08: Reviewing again does not downgrade completed progress")
+    void testReviewFlashcard_CompletedProgressIsNotDowngraded() {
+        mockActiveEnrollment();
+        LessonBlock fb = LessonBlock.builder().id(UUID.randomUUID()).type(LessonBlockType.FLASHCARD)
+                .flashcardsJson("[{\"front\":\"A\",\"back\":\"B\"}, {\"front\":\"C\",\"back\":\"D\"}]").module(courseModule).build();
+        when(lessonBlockRepository.findById(fb.getId())).thenReturn(Optional.of(fb));
+        when(flashcardProgressRepository.countByEnrollmentIdAndLessonBlockId(enrollmentId, fb.getId())).thenReturn(1);
+        Instant completedAt = Instant.parse("2026-07-28T00:00:00Z");
+        LessonBlockProgress existingProgress = LessonBlockProgress.builder().id(UUID.randomUUID())
+                .enrollmentId(enrollmentId).lessonBlockId(fb.getId())
+                .status(LessonProgressStatus.COMPLETED).completedAt(completedAt).build();
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, fb.getId()))
+                .thenReturn(Optional.of(existingProgress));
+        when(lessonBlockProgressRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        com.manabihub.learning.dto.request.ReviewFlashcardRequest request = new com.manabihub.learning.dto.request.ReviewFlashcardRequest(0, com.manabihub.learning.enums.FlashcardStatus.NEEDS_REVIEW);
+        LessonProgressResponse response = learningService.reviewFlashcard(fb.getId(), request);
+
+        assertEquals(LessonProgressStatus.COMPLETED, response.status());
+        assertEquals(completedAt, response.completedAt());
+    }
+
     // --- Writing Assignment & AI Tests ---
 
     @Test
-    @DisplayName("getWritingSubmission returns distinct non-official AI suggestion and official teacher feedback")
+    @Order(1401)
+    @DisplayName("UTC01: Submit writing creates submission and completes new block progress")
+    void submitWriting_createsSubmissionAndCompletesNewProgress() {
+        UUID writingBlockId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId).type(LessonBlockType.WRITING).title("Writing")
+                .module(courseModule).build();
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        mockActiveEnrollment();
+        when(writingSubmissionRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            com.manabihub.writing.entity.WritingSubmission saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            return saved;
+        });
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, writingBlockId))
+                .thenReturn(Optional.empty());
+
+        var response = learningService.submitWriting(
+                writingBlockId,
+                new com.manabihub.writing.dto.request.WritingSubmissionRequest("My Japanese essay")
+        );
+
+        assertEquals(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED, response.status());
+        assertEquals("My Japanese essay", response.content());
+        verify(lessonBlockProgressRepository).save(argThat(progress ->
+                progress.getStatus() == LessonProgressStatus.COMPLETED
+                        && progress.getCompletedAt() != null));
+    }
+
+    @Test
+    @Order(1402)
+    @DisplayName("UTC02: Submit writing reuses existing progress and marks it completed")
+    void submitWriting_reusesExistingProgress() {
+        UUID writingBlockId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId).type(LessonBlockType.WRITING).title("Writing")
+                .module(courseModule).build();
+        LessonBlockProgress existing = LessonBlockProgress.builder()
+                .id(UUID.randomUUID()).enrollmentId(enrollmentId).lessonBlockId(writingBlockId)
+                .status(LessonProgressStatus.IN_PROGRESS).build();
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        mockActiveEnrollment();
+        when(writingSubmissionRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            com.manabihub.writing.entity.WritingSubmission saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            return saved;
+        });
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, writingBlockId))
+                .thenReturn(Optional.of(existing));
+
+        learningService.submitWriting(
+                writingBlockId,
+                new com.manabihub.writing.dto.request.WritingSubmissionRequest("Revision")
+        );
+
+        assertEquals(LessonProgressStatus.COMPLETED, existing.getStatus());
+        assertNotNull(existing.getCompletedAt());
+        verify(lessonBlockProgressRepository).save(existing);
+    }
+
+    @Test
+    @Order(1403)
+    @DisplayName("UTC03: Submit writing rejects a non-writing block")
+    void submitWriting_rejectsNonWritingBlock() {
+        when(lessonBlockRepository.findById(blockTextId)).thenReturn(Optional.of(textBlock));
+        mockActiveEnrollment();
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.submitWriting(
+                        blockTextId,
+                        new com.manabihub.writing.dto.request.WritingSubmissionRequest("Essay")
+                ));
+
+        assertEquals(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, exception.getMessageCode());
+        verifyNoInteractions(writingSubmissionRepository);
+    }
+
+    @Test
+    @Order(1404)
+    @DisplayName("UTC04: Duplicate writing submission returns conflict")
+    void submitWriting_rejectsDuplicateSubmission() {
+        UUID writingBlockId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId).type(LessonBlockType.WRITING).title("Writing")
+                .module(courseModule).build();
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        mockActiveEnrollment();
+        when(writingSubmissionRepository.saveAndFlush(any())).thenThrow(
+                new org.springframework.dao.DataIntegrityViolationException(
+                        "duplicate",
+                        new RuntimeException("uq_writing_submissions_enrollment_block")
+                ));
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.submitWriting(
+                        writingBlockId,
+                        new com.manabihub.writing.dto.request.WritingSubmissionRequest("Essay")
+                ));
+
+        assertEquals(MessageCodes.COMMON_CONFLICT, exception.getMessageCode());
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, exception.getHttpStatus());
+        verifyNoInteractions(lessonBlockProgressRepository);
+    }
+
+    @Test
+    @Order(1405)
+    @DisplayName("UTC05: Missing enrollment lock blocks writing submission")
+    void submitWriting_rejectsMissingEnrollmentLock() {
+        UUID writingBlockId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId).type(LessonBlockType.WRITING).title("Writing")
+                .module(courseModule).build();
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        mockActiveEnrollment();
+        when(enrollmentRepository.findByIdForUpdate(enrollmentId)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.submitWriting(
+                        writingBlockId,
+                        new com.manabihub.writing.dto.request.WritingSubmissionRequest("Essay")
+                ));
+
+        assertEquals(MessageCodes.COMMON_NOT_FOUND, exception.getMessageCode());
+        verifyNoInteractions(writingSubmissionRepository);
+    }
+
+    @Test
+    @Order(1406)
+    @DisplayName("UTC08: Disabled AI writing feature logs and blocks assistance")
+    void requestAiWritingAssistance_blocksDisabledFeature() {
+        UUID submissionId = UUID.randomUUID();
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+        mockActiveEnrollment();
+        com.manabihub.writing.entity.WritingSubmission submission =
+                com.manabihub.writing.entity.WritingSubmission.builder()
+                        .id(submissionId).enrollment(enrollment).lessonBlockId(blockVideoId)
+                        .status(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED).build();
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(
+                submissionId, enrollmentId, blockVideoId)).thenReturn(Optional.of(submission));
+        when(currentUserService.getCurrentUserId()).thenReturn(currentUserId);
+        when(aiChatSettingsService.getSettings()).thenReturn(
+                new com.manabihub.ai.service.AiChatSettingsService.AiChatSettings(
+                        true, true, false, new java.math.BigDecimal("100000"), 5, 20));
+        course.setPrice(new java.math.BigDecimal("200000"));
+        course.setAiSupported(true);
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.requestAiWritingAssistance(blockVideoId, submissionId));
+
+        assertEquals(MessageCodes.AI_NOT_AVAILABLE_FOR_COURSE, exception.getMessageCode());
+        verify(aiUsageLogService).record(any(), any(), any(), any(), any(),
+                eq(com.manabihub.ai.enums.AiUsageRequestStatus.BLOCKED),
+                isNull(), eq(0), eq(0), eq("Feature disabled"));
+        verifyNoInteractions(aiWritingAssistanceProvider);
+    }
+
+    @Test
+    @Order(1407)
+    @DisplayName("UTC09: Price immediately below AI floor is rejected")
+    void requestAiWritingAssistance_rejectsPriceBelowFloor() {
+        UUID submissionId = UUID.randomUUID();
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+        mockActiveEnrollment();
+        com.manabihub.writing.entity.WritingSubmission submission =
+                com.manabihub.writing.entity.WritingSubmission.builder()
+                        .id(submissionId).enrollment(enrollment).lessonBlockId(blockVideoId)
+                        .status(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED).build();
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(
+                submissionId, enrollmentId, blockVideoId)).thenReturn(Optional.of(submission));
+        when(currentUserService.getCurrentUserId()).thenReturn(currentUserId);
+        when(aiChatSettingsService.getSettings()).thenReturn(
+                new com.manabihub.ai.service.AiChatSettingsService.AiChatSettings(
+                        true, true, true, new java.math.BigDecimal("100000"), 5, 20));
+        course.setPrice(new java.math.BigDecimal("99999.99"));
+        course.setAiSupported(true);
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.requestAiWritingAssistance(blockVideoId, submissionId));
+
+        assertEquals(MessageCodes.AI_NOT_AVAILABLE_FOR_COURSE, exception.getMessageCode());
+        verifyNoInteractions(aiWritingAssistanceProvider);
+    }
+
+    @Test
+    @Order(1501)
+    @DisplayName("UTC01: View writing returns separate AI and official teacher feedback")
     void testGetWritingSubmission_ReturnsBothFeedbackSources() {
         UUID writingBlockId = UUID.randomUUID();
         UUID submissionId = UUID.randomUUID();
@@ -778,7 +1045,8 @@ class LearningServiceImplTest {
     }
 
     @Test
-    @DisplayName("getWritingSubmission scopes lookup to current student's enrollment")
+    @Order(1502)
+    @DisplayName("UTC02: View writing returns empty state for current enrollment without submission")
     void testGetWritingSubmission_UsesCurrentEnrollmentOnly() {
         UUID writingBlockId = UUID.randomUUID();
         LessonBlock writingBlock = LessonBlock.builder()
@@ -799,7 +1067,8 @@ class LearningServiceImplTest {
     }
 
     @Test
-    @DisplayName("requestAiWritingAssistance - Forbidden - Another student's submission")
+    @Order(1408)
+    @DisplayName("UTC10: AI assistance cannot access another student's submission")
     void testRequestAiWriting_Forbidden_OtherStudent() {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
@@ -816,7 +1085,8 @@ class LearningServiceImplTest {
     }
 
     @Test
-    @DisplayName("requestAiWritingAssistance - Rate Limit - Minute limit exceeded")
+    @Order(1409)
+    @DisplayName("UTC11: AI minute limit is enforced at the configured boundary")
     void testRequestAiWriting_MinuteRateLimit() {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
@@ -843,7 +1113,49 @@ class LearningServiceImplTest {
     }
 
     @Test
-    @DisplayName("requestAiWritingAssistance - Success")
+    @Order(1410)
+    @DisplayName("UTC12: AI provider failure preserves submission and records failed suggestion")
+    void requestAiWritingAssistance_providerFailureMarksSuggestionFailed() {
+        UUID submissionId = UUID.randomUUID();
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+        mockActiveEnrollment();
+        com.manabihub.writing.entity.WritingSubmission submission =
+                com.manabihub.writing.entity.WritingSubmission.builder()
+                        .id(submissionId).enrollment(enrollment).lessonBlockId(blockVideoId)
+                        .content("Hello").status(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED)
+                        .submittedAt(Instant.now()).build();
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(
+                submissionId, enrollmentId, blockVideoId)).thenReturn(Optional.of(submission));
+        when(writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockIdForUpdate(
+                submissionId, enrollmentId, blockVideoId)).thenReturn(Optional.of(submission));
+        when(writingSubmissionRepository.findById(submissionId)).thenReturn(Optional.of(submission));
+        when(currentUserService.getCurrentUserId()).thenReturn(currentUserId);
+        when(aiChatSettingsService.getSettings()).thenReturn(
+                new com.manabihub.ai.service.AiChatSettingsService.AiChatSettings(
+                        true, true, true, new java.math.BigDecimal("100000"), 5, 20));
+        course.setPrice(new java.math.BigDecimal("100000"));
+        course.setAiSupported(true);
+        when(aiUsageLogRepository.countByUserIdAndFeatureCodeAndRequestStatusAndCreatedAtAfter(
+                any(), any(), any(), any())).thenReturn(0L);
+        when(aiWritingAssistanceProvider.generate(any(), any(), any())).thenThrow(
+                new com.manabihub.ai.provider.AiChatProviderException("provider timeout"));
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.requestAiWritingAssistance(blockVideoId, submissionId));
+
+        assertEquals(MessageCodes.MSG_AI_002, exception.getMessageCode());
+        assertEquals(com.manabihub.writing.enums.WritingSubmissionStatus.SUGGESTION_FAILED,
+                submission.getStatus());
+        verify(aiWritingSuggestionRepository).save(argThat(suggestion ->
+                "FAILED".equals(suggestion.getStatus()) && !suggestion.isOfficial()));
+        verify(aiUsageLogService).record(any(), any(), any(), any(), any(),
+                eq(com.manabihub.ai.enums.AiUsageRequestStatus.FAILED),
+                isNull(), eq(0), eq(0), eq("Provider error"));
+    }
+
+    @Test
+    @Order(1411)
+    @DisplayName("UTC13: Eligible writing receives preliminary AI suggestions")
     void testRequestAiWriting_Success() throws Exception {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
@@ -879,5 +1191,55 @@ class LearningServiceImplTest {
         verify(writingSubmissionRepository, atLeastOnce()).save(any());
         verify(aiWritingSuggestionRepository, atLeastOnce()).save(any());
         verify(aiUsageLogService).record(any(), any(), any(), any(), any(), eq(com.manabihub.ai.enums.AiUsageRequestStatus.SUCCESS), any(), any(), any(), any());
+    }
+
+    @Test
+    @Order(1503)
+    @DisplayName("UTC03: View writing rejects a missing lesson block")
+    void getWritingSubmission_rejectsMissingBlock() {
+        UUID missingBlockId = UUID.randomUUID();
+        when(lessonBlockRepository.findById(missingBlockId)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.getWritingSubmission(missingBlockId));
+
+        assertEquals(MessageCodes.CONTENT_NOT_FOUND, exception.getMessageCode());
+        verifyNoInteractions(writingSubmissionRepository);
+    }
+
+    @Test
+    @Order(1504)
+    @DisplayName("UTC04: View writing rejects a non-writing block")
+    void getWritingSubmission_rejectsNonWritingBlock() {
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+        mockActiveEnrollment();
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.getWritingSubmission(blockVideoId));
+
+        assertEquals(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, exception.getMessageCode());
+        verifyNoInteractions(writingSubmissionRepository);
+    }
+
+    @Test
+    @Order(1505)
+    @DisplayName("UTC05: View writing denies a student without active enrollment")
+    void getWritingSubmission_rejectsMissingEnrollment() {
+        UUID writingBlockId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId).type(LessonBlockType.WRITING).title("Writing")
+                .module(courseModule).build();
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        when(currentUserService.getCurrentUserId()).thenReturn(currentUserId);
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(studentProfileRepository.findByUser_Id(currentUserId)).thenReturn(Optional.of(studentProfile));
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(studentId, courseId))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                learningService.getWritingSubmission(writingBlockId));
+
+        assertEquals(MessageCodes.LEARNING_NOT_ENROLLED, exception.getMessageCode());
+        verifyNoInteractions(writingSubmissionRepository);
     }
 }

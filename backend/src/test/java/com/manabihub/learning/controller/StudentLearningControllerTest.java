@@ -11,6 +11,7 @@ import com.manabihub.security.oauth2.CustomOAuth2UserService;
 import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
 import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -442,6 +443,45 @@ class StudentLearningControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
                 .andExpect(jsonPath("$.data.status", is("SUBMITTED")));
+    }
+
+    @Test
+    @DisplayName("UTC06: Writing content at 10,000-character boundary is accepted")
+    void submitWriting_atTenThousandCharacterBoundary_isAccepted() throws Exception {
+        UUID lessonBlockId = UUID.randomUUID();
+        String content = "a".repeat(10_000);
+        var response = new com.manabihub.writing.dto.response.StudentWritingSubmissionResponse(
+                UUID.randomUUID(), lessonBlockId, content,
+                com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED,
+                Instant.now(), null, null
+        );
+        when(learningService.submitWriting(eq(lessonBlockId), any())).thenReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/v1/student/lessons/{lessonBlockId}/writing-submissions", lessonBlockId)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"" + content + "\"}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("SUBMITTED")));
+    }
+
+    @Test
+    @DisplayName("UTC07: Writing content above 10,000-character boundary is rejected")
+    void submitWriting_aboveTenThousandCharacterBoundary_isRejected() throws Exception {
+        String content = "a".repeat(10_001);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/v1/student/lessons/{lessonBlockId}/writing-submissions", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"" + content + "\"}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messageCode", is("VALIDATION_FAILED")));
+
+        verifyNoInteractions(learningService);
     }
 
     @Test
