@@ -52,6 +52,13 @@ export const LandingHeader: React.FC = () => {
     }
   };
 
+  const handleLogout = () => {
+    setProfileAnchorEl(null);
+    setSession(null);
+    clearAuthSession('public');
+    window.location.replace(ROUTES.PUBLIC.HOME);
+  };
+
   return (
     <AppBar
       position="sticky"
@@ -226,11 +233,7 @@ export const LandingHeader: React.FC = () => {
                 }} sx={{ py: 1.5, color: '#475569' }}>
                   Hồ sơ cá nhân
                 </MenuItem>
-                <MenuItem onClick={() => { 
-                  setProfileAnchorEl(null);
-                  clearAuthSession('public');
-                  navigate(ROUTES.PUBLIC.HOME, { replace: true });
-                }} sx={{ py: 1.5, color: '#C41E3A' }}>
+                <MenuItem onClick={handleLogout} sx={{ py: 1.5, color: '#C41E3A' }}>
                   Đăng xuất
                 </MenuItem>
               </Menu>

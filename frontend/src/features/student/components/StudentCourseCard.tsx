@@ -48,10 +48,14 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        border: '1px solid #E4E7EC',
+        borderRadius: '8px',
+        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.045)',
+        overflow: 'hidden',
         transition: 'transform 0.2s, box-shadow 0.2s',
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: 4,
+          transform: 'translateY(-2px)',
+          boxShadow: '0 12px 28px rgba(15, 23, 42, 0.08)',
         },
       }}
     >
@@ -72,8 +76,8 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'grey.100',
-            color: 'text.disabled',
+            bgcolor: '#F2F4F7',
+            color: '#98A2B3',
           }}
         >
           <ImageNotSupportedOutlinedIcon sx={{ fontSize: 48 }} />
@@ -82,7 +86,8 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
       <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Typography gutterBottom variant="h6" component="h2" sx={{
-            fontWeight: 'bold',
+            color: '#172033',
+            fontWeight: 900,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             display: '-webkit-box',
@@ -118,7 +123,12 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
             variant="determinate"
             value={progress}
             aria-label={`Tiến độ ${Math.round(progress)}%`}
-            sx={{ height: 7, borderRadius: 1 }}
+            sx={{
+              height: 7,
+              borderRadius: '4px',
+              bgcolor: '#EEF0F3',
+              '& .MuiLinearProgress-bar': { bgcolor: '#C41E3A' },
+            }}
           />
         </Box>
 
@@ -133,19 +143,31 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 variant="outlined"
-                color="primary"
                 size="small"
                 onClick={handleViewCourse}
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+                sx={{
+                  borderColor: '#CBD2DC',
+                  borderRadius: '6px',
+                  color: '#1B2A4A',
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  '&:hover': { borderColor: '#C41E3A', color: '#C41E3A' },
+                }}
               >
                 Chi tiết
               </Button>
               <Button
                 variant="contained"
-                color="primary"
                 size="small"
                 onClick={handleStudyCourse}
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+                sx={{
+                  borderRadius: '6px',
+                  bgcolor: '#C41E3A',
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  boxShadow: 'none',
+                  '&:hover': { bgcolor: '#A71931', boxShadow: 'none' },
+                }}
               >
                 {course.enrollmentStatus === 'COMPLETED' ? 'Xem lại' : 'Học tiếp'}
               </Button>

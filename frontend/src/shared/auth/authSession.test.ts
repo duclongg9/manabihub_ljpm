@@ -52,6 +52,26 @@ describe('authSession', () => {
     expect(window.localStorage.getItem('admin_csrf_token')).toBeNull();
   });
 
+  it('clears current and legacy public session state without touching admin refresh state', () => {
+    storeAuthToken('public', createToken(ROLES.STUDENT));
+    window.localStorage.setItem('auth_session', 'legacy-token');
+    window.sessionStorage.setItem('auth_return_to', '/student/dashboard');
+    storeAdminSession({
+      token: createToken(ROLES.SYSTEM_ADMIN),
+      csrfToken: 'csrf-token',
+      remembered: true,
+    });
+
+    clearAuthSession('public');
+
+    expect(getAuthSession('public')).toBeNull();
+    expect(window.localStorage.getItem('auth_token')).toBeNull();
+    expect(window.localStorage.getItem('auth_session')).toBeNull();
+    expect(window.sessionStorage.getItem('auth_return_to')).toBeNull();
+    expect(getAuthSession('admin')).not.toBeNull();
+    expect(hasAdminRefreshSession()).toBe(true);
+  });
+
   it('rejects unsafe and cross-portal return paths', () => {
     const student = getSession('public', ROLES.STUDENT);
     const admin = getSession('admin', ROLES.FINANCE_MANAGER);
