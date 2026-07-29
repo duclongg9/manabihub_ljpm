@@ -1,3 +1,4 @@
+-- Moderation schema extension (V046).
 -- 1. Update violation_reports status
 ALTER TABLE violation_reports DROP CONSTRAINT chk_violation_reports_status;
 

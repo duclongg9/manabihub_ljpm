@@ -29,7 +29,7 @@ class ModerationMigrationPostgresTest {
             new PostgreSQLContainer<>("postgres:17-alpine");
 
     @Test
-    void v45PreservesLegacyEnforcementDecisionsAsActionRecords() {
+    void v46PreservesLegacyEnforcementDecisionsAsActionRecords() {
         Flyway.configure()
                 .dataSource(
                         POSTGRES.getJdbcUrl(),
@@ -70,7 +70,7 @@ class ModerationMigrationPostgresTest {
                         POSTGRES.getPassword()
                 )
                 .locations("classpath:db/migration")
-                .target(MigrationVersion.fromVersion("46"))
+                .target(MigrationVersion.fromVersion("47"))
                 .load()
                 .migrate();
 

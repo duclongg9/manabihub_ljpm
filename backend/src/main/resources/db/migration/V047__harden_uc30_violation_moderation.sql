@@ -1,4 +1,4 @@
--- UC-30 hardening: permission separation, evidence, immutable action snapshots,
+-- UC-30 hardening (V047): permission separation, evidence, immutable action snapshots,
 -- and soft removal metadata. This migration deliberately preserves all
 -- historical reports, decisions, enrollments, purchases and course content.
 
