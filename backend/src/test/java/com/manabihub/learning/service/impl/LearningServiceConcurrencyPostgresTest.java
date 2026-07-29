@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 public class LearningServiceConcurrencyPostgresTest {
 
     private static final UUID DEMO_USER_ID = UUID.fromString("d0000000-0000-0000-0000-000000000001");

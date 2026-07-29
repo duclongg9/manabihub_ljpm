@@ -9,6 +9,7 @@ import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.repository.RoleRepository;
+import com.manabihub.identity.service.InternalAdminInvitationService;
 import com.manabihub.systemconfig.entity.SystemSetting;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import com.manabihub.systemconfig.service.CommercialPolicyService;
@@ -40,6 +41,7 @@ class SystemAdministrationServiceImplTest {
     @Mock private InternalAdminAccountRepository adminRepository;
     @Mock private RoleRepository roleRepository;
     @Mock private AuditLogService auditLogService;
+    @Mock private InternalAdminInvitationService invitationService;
 
     private SystemAdministrationServiceImpl service;
     private UUID actorId;
@@ -53,11 +55,15 @@ class SystemAdministrationServiceImplTest {
                 roleRepository,
                 auditLogService,
                 new SystemSettingValidator(),
-                new CommercialPolicyService(settingRepository)
+                new CommercialPolicyService(settingRepository),
+                invitationService
         );
         actorId = UUID.randomUUID();
         actor = account(actorId, "system@manabihub.local", RoleCode.SYSTEM_ADMIN);
         when(adminRepository.findById(actorId)).thenReturn(Optional.of(actor));
+        org.mockito.Mockito.lenient()
+                .when(invitationService.latestInvitationSummaries(any()))
+                .thenReturn(Map.of());
         org.mockito.Mockito.lenient()
                 .when(adminRepository.findAllByStatusAndRoleCodeForUpdate(
                         AccountStatus.ACTIVE,

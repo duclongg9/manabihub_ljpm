@@ -20,6 +20,20 @@ public interface SystemAdministrationService {
 
     List<InternalAdminAccountResponse> listInternalAdmins(UUID actorId);
 
+    InternalAdminAccountResponse inviteInternalAdmin(
+            UUID actorId,
+            String email,
+            String fullName,
+            RoleCode roleCode,
+            String reason
+    );
+
+    InternalAdminAccountResponse resendInternalAdminInvitation(
+            UUID actorId,
+            UUID targetAdminId,
+            String reason
+    );
+
     InternalAdminAccountResponse updateInternalAdminRole(
             UUID actorId,
             UUID targetAdminId,

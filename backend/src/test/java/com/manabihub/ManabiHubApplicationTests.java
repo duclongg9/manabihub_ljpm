@@ -12,6 +12,7 @@ import com.manabihub.identity.mapper.TeacherProfileMapper;
 import com.manabihub.identity.repository.AppUserRepository;
 import com.manabihub.identity.repository.IdentityTeacherProfileRepository;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.identity.repository.InternalAdminInvitationRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.repository.UserRepository;
@@ -94,6 +95,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private InternalAdminAccountRepository identityInternalAdminAccountRepository;
+
+    @MockBean
+    private InternalAdminInvitationRepository internalAdminInvitationRepository;
 
     @MockBean
     private RoleRepository roleRepository;

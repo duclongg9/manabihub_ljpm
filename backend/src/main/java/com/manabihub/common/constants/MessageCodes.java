@@ -183,6 +183,18 @@ public final class MessageCodes {
             "INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN";
     public static final String LAST_SYSTEM_ADMIN_REQUIRED = "LAST_SYSTEM_ADMIN_REQUIRED";
     public static final String ADMIN_SESSION_STALE = "ADMIN_SESSION_STALE";
+    public static final String INTERNAL_ADMIN_INVITATION_CREATED =
+            "INTERNAL_ADMIN_INVITATION_CREATED";
+    public static final String INTERNAL_ADMIN_INVITATION_RESENT =
+            "INTERNAL_ADMIN_INVITATION_RESENT";
+    public static final String INTERNAL_ADMIN_INVITATION_CONFLICT =
+            "INTERNAL_ADMIN_INVITATION_CONFLICT";
+    public static final String INTERNAL_ADMIN_INVITATION_INVALID =
+            "INTERNAL_ADMIN_INVITATION_INVALID";
+    public static final String INTERNAL_ADMIN_PASSWORD_INVALID =
+            "INTERNAL_ADMIN_PASSWORD_INVALID";
+    public static final String INTERNAL_ADMIN_PASSWORD_SET =
+            "INTERNAL_ADMIN_PASSWORD_SET";
     public static final String LEARNING_STUDENT_PROFILE_NOT_FOUND = "LEARNING_STUDENT_PROFILE_NOT_FOUND";
 
     // ──────────────────────────────────────────────

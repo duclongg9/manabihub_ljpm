@@ -19,6 +19,14 @@ import java.util.UUID;
 public interface InternalAdminAccountRepository extends JpaRepository<InternalAdminAccount, UUID> {
     Optional<InternalAdminAccount> findByEmail(String email);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select account
+            from IdentityInternalAdminAccount account
+            where lower(account.email) = lower(:email)
+            """)
+    Optional<InternalAdminAccount> findByEmailIgnoreCaseForUpdate(@Param("email") String email);
+
     @EntityGraph(attributePaths = "role")
     List<InternalAdminAccount> findAllByOrderByFullNameAsc();
 
