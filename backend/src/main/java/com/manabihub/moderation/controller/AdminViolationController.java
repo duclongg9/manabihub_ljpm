@@ -35,7 +35,7 @@ public class AdminViolationController {
             @RequestParam(required = false) ViolationReportStatus status,
             @PageableDefault(size = 20) Pageable pageable,
             @AuthenticationPrincipal Jwt jwt) {
-        
+
         Page<ViolationQueueItemResponse> queue = violationModerationService.getViolationQueue(
                 status,
                 pageable,
@@ -62,7 +62,7 @@ public class AdminViolationController {
             @PathVariable UUID id,
             @RequestBody @Valid ResolveViolationRequest request,
             @AuthenticationPrincipal Jwt jwt) {
-            
+
         UUID adminId = UUID.fromString(jwt.getSubject());
         ViolationDetailResponse result = violationModerationService.resolveViolation(id, request, adminId);
         return ApiResponse.success("MSG-ADM-003", "Violation resolved successfully", result);

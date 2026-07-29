@@ -66,9 +66,9 @@ export interface ViolationTarget {
   courseId?: string;
   courseTitle?: string;
   currentStatus?: string;
-  teacherProfileId?: string;
-  teacherUserId?: string;
-  teacherName?: string;
+  affectedTeacherProfileId?: string;
+  affectedUserId?: string;
+  affectedUserName?: string;
   contentTitle?: string;
 }
 

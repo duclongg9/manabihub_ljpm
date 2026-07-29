@@ -14,11 +14,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ViolationReportRepository extends JpaRepository<ViolationReport, UUID> {
-    
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT v FROM ViolationReport v WHERE v.id = :id")
     Optional<ViolationReport> findByIdLocked(@Param("id") UUID id);
-    
+
     Page<ViolationReport> findByStatus(ViolationReportStatus status, Pageable pageable);
 
     long countByTargetTypeIgnoreCaseAndTargetIdAndStatus(

@@ -158,11 +158,10 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
         UUID correlationId = UUID.randomUUID();
         ViolationReportStatus statusBefore = report.getStatus();
         ViolationReportStatus statusAfter = mapStatus(request.getDecision());
-        TargetContext targetContext = null;
-
-        if (request.getDecision() != ModerationDecisionType.DISMISSED) {
-            targetContext = loadTargetContextForUpdate(report);
-        }
+        TargetContext targetContext =
+                request.getDecision() == ModerationDecisionType.DISMISSED
+                        ? loadTargetContext(report)
+                        : loadTargetContextForUpdate(report);
 
         ModerationDecision decision = decisionRepository.save(
                 ModerationDecision.builder()
@@ -231,11 +230,14 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
                         .map(ViolationEvidence::getId)
                         .toList()
         );
-        if (targetContext != null && targetContext.teacherProfileId() != null) {
-            auditMetadata.put("teacherProfileId", targetContext.teacherProfileId());
+        if (targetContext.affectedTeacherProfileId() != null) {
+            auditMetadata.put(
+                    "affectedTeacherProfileId",
+                    targetContext.affectedTeacherProfileId()
+            );
         }
-        if (targetContext != null && targetContext.teacherUser() != null) {
-            auditMetadata.put("teacherUserId", targetContext.teacherUser().getId());
+        if (targetContext.affectedUser() != null) {
+            auditMetadata.put("affectedUserId", targetContext.affectedUser().getId());
         }
         auditMetadata.put("permission", PERMISSION_RESOLVE);
 
@@ -309,7 +311,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             case FORCE_DRAFT -> "COURSE_FORCE_DRAFTED";
             case HIDE_COURSE -> "COURSE_HIDDEN";
             case REMOVE_CONTENT -> "CONTENT_REMOVED";
-            case BAN_ACCOUNT -> "TEACHER_ACCOUNT_BANNED";
+            case BAN_ACCOUNT -> "ACCOUNT_BANNED";
             case FREEZE_BALANCE -> "TEACHER_BALANCE_FROZEN";
             case NONE -> throw invalidAction("NONE does not have an enforcement audit action");
         };
@@ -412,7 +414,6 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
                 CourseReviewStatus before = review.get().getStatus();
                 review.get().setStatus(CourseReviewStatus.HIDDEN);
                 courseReviewRepository.save(review.get());
-                affectedCourse = course;
                 records.add(actionRecord(
                         decision,
                         ModerationActionType.REMOVE_CONTENT,
@@ -442,7 +443,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             ModerationDecision decision,
             TargetContext context
     ) {
-        AppUser affectedUser = context.teacherUser();
+        AppUser affectedUser = context.affectedUser();
         if (affectedUser == null) {
             throw invalidAction("BAN_ACCOUNT requires an affected user account");
         }
@@ -471,12 +472,12 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             ModerationDecision decision,
             TargetContext context
     ) {
-        if (context.teacherProfileId() == null) {
+        if (context.affectedTeacherProfileId() == null) {
             throw invalidAction("FREEZE_BALANCE requires an affected teacher wallet");
         }
 
         TeacherWallet wallet = teacherWalletRepository
-                .findByTeacherIdForUpdate(context.teacherProfileId())
+                .findByTeacherIdForUpdate(context.affectedTeacherProfileId())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.MODERATION_TARGET_NOT_FOUND,
                         "The affected teacher wallet does not exist",
@@ -581,13 +582,13 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
 
     private TargetContext contextFromReview(CourseReview review) {
         Course course = review.getEnrollment().getCourse();
-        TeacherProfile profile = course.getTeacher();
+        AppUser reviewAuthor = review.getEnrollment().getStudent().getUser();
         return new TargetContext(
                 course,
                 null,
                 review,
-                profile,
-                resolveIdentityUser(profile),
+                null,
+                reviewAuthor,
                 "Course review"
         );
     }
@@ -635,13 +636,13 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
                         .courseId(context.course() == null ? null : context.course().getId())
                         .courseTitle(context.course() == null ? null : context.course().getTitle())
                         .currentStatus(resolveCurrentStatus(context))
-                        .teacherProfileId(context.teacherProfileId())
-                        .teacherUserId(context.teacherUser() == null
+                        .affectedTeacherProfileId(context.affectedTeacherProfileId())
+                        .affectedUserId(context.affectedUser() == null
                                 ? null
-                                : context.teacherUser().getId())
-                        .teacherName(context.teacherUser() == null
+                                : context.affectedUser().getId())
+                        .affectedUserName(context.affectedUser() == null
                                 ? null
-                                : context.teacherUser().getFullName())
+                                : context.affectedUser().getFullName())
                         .contentTitle(context.contentTitle())
                         .build();
 
@@ -663,7 +664,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
 
         boolean canApplyContent = hasPermission(adminId, PERMISSION_CONTENT);
         boolean canApplySevere = hasPermission(adminId, PERMISSION_SEVERE)
-                && context.teacherUser() != null;
+                && context.affectedUser() != null;
 
         return ViolationDetailResponse.builder()
                 .reportId(report.getId())
@@ -724,17 +725,17 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             boolean canApplySevere
     ) {
         List<ModerationActionType> actions = new ArrayList<>();
-        if (canApplyContent && context.course() != null) {
+        if (canApplyContent
+                && (context.lesson() != null || context.review() != null)) {
+            actions.add(ModerationActionType.REMOVE_CONTENT);
+        } else if (canApplyContent && context.course() != null) {
             actions.add(ModerationActionType.FORCE_DRAFT);
             actions.add(ModerationActionType.HIDE_COURSE);
-            actions.add(ModerationActionType.REMOVE_CONTENT);
-        } else if (canApplyContent
-                && (context.lesson() != null || context.review() != null)) {
             actions.add(ModerationActionType.REMOVE_CONTENT);
         }
         if (canApplySevere) {
             actions.add(ModerationActionType.BAN_ACCOUNT);
-            if (context.teacherProfileId() != null) {
+            if (context.affectedTeacherProfileId() != null) {
                 actions.add(ModerationActionType.FREEZE_BALANCE);
             }
         }
@@ -847,35 +848,29 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             List<ModerationActionRecord> actions
     ) {
         if (request.getDecision() == ModerationDecisionType.DISMISSED) {
-            AppUser reporter = report.getReporter();
-            if (reporter != null) {
-                eventPublisher.publishEvent(new ModerationNotificationEvent(
-                        reporter.getId(),
-                        reporter.getEmail(),
-                        "Violation report reviewed",
-                        "Your report was reviewed and the reported violation was not confirmed. "
-                                + request.getDecisionNote().trim(),
-                        request.getDecision().name()
-                ));
-            }
+            publishOutcomeNotifications(
+                    report.getReporter(),
+                    context == null ? null : context.affectedUser(),
+                    "Violation report reviewed",
+                    "The report was reviewed and the reported violation was not confirmed. "
+                            + request.getDecisionNote().trim(),
+                    request.getDecision()
+            );
             return;
         }
 
-        AppUser teacher = context == null ? null : context.teacherUser();
+        AppUser affectedUser = context == null ? null : context.affectedUser();
         if (request.getDecision() == ModerationDecisionType.PENDING_EVIDENCE) {
             publishEvidenceRequestNotifications(
                     report.getReporter(),
-                    teacher,
+                    affectedUser,
                     request.getEvidenceRequestedFrom(),
                     request.getDecisionNote().trim()
             );
             return;
         }
-        if (teacher == null) {
-            return;
-        }
         String title = request.getDecision() == ModerationDecisionType.CORRECTION_REQUIRED
-                ? "Course correction required"
+                ? "Content correction required"
                 : "Violation report upheld";
         String actionNames = actions.stream()
                 .map(record -> record.getActionType().name())
@@ -883,18 +878,61 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
                 .reduce((left, right) -> left + ", " + right)
                 .orElse("NONE");
         String message = request.getDecision() == ModerationDecisionType.CORRECTION_REQUIRED
-                ? "Changes are required before your content can proceed. "
+                ? "The reported content requires changes before it can proceed. "
                         + request.getDecisionNote().trim()
                 : "A violation was confirmed. Applied actions: "
                         + actionNames
                         + ". Reason: "
                         + request.getDecisionNote().trim();
-        eventPublisher.publishEvent(new ModerationNotificationEvent(
-                teacher.getId(),
-                teacher.getEmail(),
+        publishOutcomeNotifications(
+                report.getReporter(),
+                affectedUser,
                 title,
                 message,
-                request.getDecision().name()
+                request.getDecision()
+        );
+    }
+
+    private void publishOutcomeNotifications(
+            AppUser reporter,
+            AppUser affectedUser,
+            String title,
+            String message,
+            ModerationDecisionType decision
+    ) {
+        Set<UUID> notifiedUserIds = new LinkedHashSet<>();
+        publishOutcomeNotification(
+                reporter,
+                title,
+                message,
+                decision,
+                notifiedUserIds
+        );
+        publishOutcomeNotification(
+                affectedUser,
+                title,
+                message,
+                decision,
+                notifiedUserIds
+        );
+    }
+
+    private void publishOutcomeNotification(
+            AppUser recipient,
+            String title,
+            String message,
+            ModerationDecisionType decision,
+            Set<UUID> notifiedUserIds
+    ) {
+        if (recipient == null || !notifiedUserIds.add(recipient.getId())) {
+            return;
+        }
+        eventPublisher.publishEvent(new ModerationNotificationEvent(
+                recipient.getId(),
+                recipient.getEmail(),
+                title,
+                message,
+                decision.name()
         ));
     }
 
@@ -1000,8 +1038,8 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
         if (context.course() != null) {
             return context.course().getStatus().name();
         }
-        if (context.teacherUser() != null) {
-            return context.teacherUser().getUserStatus().name();
+        if (context.affectedUser() != null) {
+            return context.affectedUser().getUserStatus().name();
         }
         return "MISSING";
     }
@@ -1089,16 +1127,16 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             Course course,
             LessonBlock lesson,
             CourseReview review,
-            TeacherProfile teacherProfile,
-            AppUser teacherUser,
+            TeacherProfile affectedTeacherProfile,
+            AppUser affectedUser,
             String contentTitle
     ) {
         private static TargetContext empty() {
             return new TargetContext(null, null, null, null, null, null);
         }
 
-        private UUID teacherProfileId() {
-            return teacherProfile == null ? null : teacherProfile.getId();
+        private UUID affectedTeacherProfileId() {
+            return affectedTeacherProfile == null ? null : affectedTeacherProfile.getId();
         }
     }
 }

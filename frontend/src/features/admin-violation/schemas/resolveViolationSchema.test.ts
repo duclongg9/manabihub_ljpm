@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createResolveViolationSchema,
   parseTargetIds,
   resolveViolationSchema,
 } from './resolveViolationSchema';
@@ -81,6 +82,68 @@ describe('resolveViolationSchema', () => {
       decisionNote: 'Ẩn nội dung.',
       actions: ['REMOVE_CONTENT'],
       targetIdsText: 'not-a-uuid',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('requires at least one removal target for a course report', () => {
+    const result = createResolveViolationSchema('COURSE').safeParse({
+      decision: 'UPHELD',
+      decisionNote: 'Ẩn nội dung vi phạm.',
+      actions: ['REMOVE_CONTENT'],
+      targetIdsText: '   ',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: ['targetIdsText'] }),
+        ]),
+      );
+    }
+  });
+
+  it('rejects a commas-only removal target for a course report', () => {
+    const result = createResolveViolationSchema('COURSE').safeParse({
+      decision: 'UPHELD',
+      decisionNote: 'Ẩn nội dung vi phạm.',
+      actions: ['REMOVE_CONTENT'],
+      targetIdsText: ' , , ',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a valid removal target for a course report', () => {
+    const result = createResolveViolationSchema('COURSE').safeParse({
+      decision: 'UPHELD',
+      decisionNote: 'Ẩn nội dung vi phạm.',
+      actions: ['REMOVE_CONTENT'],
+      targetIdsText: '47ab7801-4f35-4677-8c13-598f297f9911',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('allows an empty removal target for a review report', () => {
+    const result = createResolveViolationSchema('REVIEW').safeParse({
+      decision: 'UPHELD',
+      decisionNote: 'Ẩn review bị báo cáo.',
+      actions: ['REMOVE_CONTENT'],
+      targetIdsText: '',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a UUID-shaped string that is not a valid UUID', () => {
+    const result = createResolveViolationSchema('COURSE').safeParse({
+      decision: 'UPHELD',
+      decisionNote: 'Ẩn nội dung vi phạm.',
+      actions: ['REMOVE_CONTENT'],
+      targetIdsText: '------------------------------------',
     });
 
     expect(result.success).toBe(false);

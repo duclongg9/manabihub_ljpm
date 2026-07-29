@@ -27,8 +27,8 @@ import { ViolationStatusBadge } from '../components/ViolationStatusBadge';
 import { useResolveViolation } from '../hooks/useResolveViolation';
 import { useViolationDetail } from '../hooks/useViolationDetail';
 import {
+  createResolveViolationSchema,
   parseTargetIds,
-  resolveViolationSchema,
   type ResolveViolationFormValues,
 } from '../schemas/resolveViolationSchema';
 import type { ResolveViolationRequest } from '../types/violation.types';
@@ -119,7 +119,9 @@ export function ViolationDetailPage() {
     if (resolveMutation.isPending) {
       return;
     }
-    const result = resolveViolationSchema.safeParse(rawValues);
+    const result = createResolveViolationSchema(
+      detail.target.targetType,
+    ).safeParse(rawValues);
     if (!result.success) {
       for (const issue of result.error.issues) {
         const field = issue.path[0];
@@ -272,13 +274,13 @@ export function ViolationDetailPage() {
                       />
                     </Box>
                   </Grid>
-                  {detail.target.teacherName && (
+                  {detail.target.affectedUserName && (
                     <Grid size={{ xs: 12 }}>
                       <Typography variant="caption" color="text.secondary">
-                        Giáo viên chịu ảnh hưởng
+                        Người dùng chịu ảnh hưởng
                       </Typography>
                       <Typography sx={{ fontWeight: 600 }}>
-                        {detail.target.teacherName}
+                        {detail.target.affectedUserName}
                       </Typography>
                     </Grid>
                   )}

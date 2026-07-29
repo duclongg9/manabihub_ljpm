@@ -288,7 +288,7 @@ public final class MessageCodes {
     public static final String ADMIN_ACTION_FORBIDDEN = "ADMIN_ACTION_FORBIDDEN";
     public static final String COURSE_MANAGER_REQUIRED = "COURSE_MANAGER_REQUIRED";
     public static final String ADMIN_PERMISSION_DENIED = "ADMIN_PERMISSION_DENIED";
-    
+
     // Moderation specific codes
     public static final String MODERATION_REPORT_NOT_FOUND = "MODERATION_REPORT_NOT_FOUND";
     public static final String MODERATION_INVALID_STATUS = "MODERATION_INVALID_STATUS";

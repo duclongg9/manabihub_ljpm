@@ -59,7 +59,7 @@ const statusOptions: Array<{ value: ViolationReportStatus; label: string }> = [
 export function ViolationQueuePage() {
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState('');
-  
+
   const params = useMemo(() => ({
     page,
     size: PAGE_SIZE,

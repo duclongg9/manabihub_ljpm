@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
-const uuidListPattern =
-  /^\s*[0-9a-fA-F-]{36}\s*(,\s*[0-9a-fA-F-]{36}\s*)*$/;
+const uuidSchema = z.string().uuid();
 
-export const resolveViolationSchema = z
+const resolveViolationFormSchema = z
   .object({
     decision: z.enum([
       'UPHELD',
@@ -28,8 +27,10 @@ export const resolveViolationSchema = z
       .enum(['REPORTER', 'CREATOR', 'BOTH'])
       .optional(),
     targetIdsText: z.string().trim(),
-  })
-  .superRefine((value, context) => {
+  });
+
+export function createResolveViolationSchema(targetType?: string) {
+  return resolveViolationFormSchema.superRefine((value, context) => {
     if (value.decision === 'UPHELD' && value.actions.length === 0) {
       context.addIssue({
         code: 'custom',
@@ -54,10 +55,21 @@ export const resolveViolationSchema = z
         message: 'Chọn người cần bổ sung bằng chứng.',
       });
     }
+    const removalTargetIds = parseTargetIds(value.targetIdsText);
     if (
       value.actions.includes('REMOVE_CONTENT') &&
-      value.targetIdsText.length > 0 &&
-      !uuidListPattern.test(value.targetIdsText)
+      targetType?.toUpperCase() === 'COURSE' &&
+      !removalTargetIds?.length
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['targetIdsText'],
+        message: 'Nhập ít nhất một ID lesson/review cần ẩn.',
+      });
+    }
+    if (
+      value.actions.includes('REMOVE_CONTENT') &&
+      removalTargetIds?.some((targetId) => !uuidSchema.safeParse(targetId).success)
     ) {
       context.addIssue({
         code: 'custom',
@@ -66,8 +78,11 @@ export const resolveViolationSchema = z
       });
     }
   });
+}
 
-export type ResolveViolationFormValues = z.infer<typeof resolveViolationSchema>;
+export const resolveViolationSchema = createResolveViolationSchema();
+
+export type ResolveViolationFormValues = z.infer<typeof resolveViolationFormSchema>;
 
 export function parseTargetIds(value: string) {
   if (!value.trim()) {

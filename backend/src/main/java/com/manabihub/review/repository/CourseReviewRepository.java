@@ -24,6 +24,8 @@ public interface CourseReviewRepository extends JpaRepository<CourseReview, UUID
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {
             "enrollment",
+            "enrollment.student",
+            "enrollment.student.user",
             "enrollment.course",
             "enrollment.course.teacher",
             "enrollment.course.teacher.user"

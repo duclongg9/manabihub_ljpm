@@ -5,8 +5,10 @@ import com.manabihub.course.dto.response.PublicTeacherProfileResponse;
 import com.manabihub.course.dto.response.PublicTeacherSummaryResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseModule;
+import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.enums.JlptLevel;
+import com.manabihub.course.enums.LessonBlockType;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.TeacherKycStatus;
@@ -75,6 +77,17 @@ class PublicTeacherProfileServiceImplTest {
 
     @Test
     void getProfile_UsesStrictEligibilityAndReturnsPublishedCoursesOnly() {
+        LessonBlock visibleLesson = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .type(LessonBlockType.TEXT)
+                .title("Visible lesson")
+                .build();
+        LessonBlock hiddenLesson = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .type(LessonBlockType.TEXT)
+                .title("Hidden lesson")
+                .moderationHidden(true)
+                .build();
         Course publishedCourse = Course.builder()
                 .id(UUID.randomUUID())
                 .teacher(profile)
@@ -85,7 +98,9 @@ class PublicTeacherProfileServiceImplTest {
                 .currency("VND")
                 .status(CourseStatus.PUBLISHED)
                 .publishedAt(Instant.now())
-                .modules(List.of(CourseModule.builder().blocks(List.of()).build()))
+                .modules(List.of(CourseModule.builder()
+                        .blocks(List.of(visibleLesson, hiddenLesson))
+                        .build()))
                 .build();
 
         when(teacherProfileRepository
@@ -111,6 +126,7 @@ class PublicTeacherProfileServiceImplTest {
         assertTrue(response.verified());
         assertEquals(1, response.publishedCourseCount());
         assertEquals("n5-foundations", response.courses().getFirst().slug());
+        assertEquals(1, response.courses().getFirst().totalLessons());
 
         verify(courseRepository).findByTeacher_IdAndStatusOrderByPublishedAtDesc(
                 profile.getId(),

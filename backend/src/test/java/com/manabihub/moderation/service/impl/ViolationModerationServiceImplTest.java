@@ -10,6 +10,7 @@ import com.manabihub.course.repository.LessonBlockRepository;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.entity.Role;
+import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.repository.AppUserRepository;
@@ -28,13 +29,17 @@ import com.manabihub.moderation.repository.ModerationActionRecordRepository;
 import com.manabihub.moderation.repository.ModerationDecisionRepository;
 import com.manabihub.moderation.repository.ViolationEvidenceRepository;
 import com.manabihub.moderation.repository.ViolationReportRepository;
+import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.order.repository.OrderItemRepository;
+import com.manabihub.review.entity.CourseReview;
+import com.manabihub.review.enums.CourseReviewStatus;
 import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.wallet.entity.TeacherWallet;
 import com.manabihub.wallet.repository.TeacherWalletRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -45,9 +50,11 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,6 +63,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -87,6 +95,7 @@ class ViolationModerationServiceImplTest {
     private UUID courseId;
     private ViolationReport report;
     private InternalAdminAccount admin;
+    private AppUser reporterUser;
     private AppUser teacherUser;
     private Course course;
     private TeacherWallet wallet;
@@ -103,6 +112,12 @@ class ViolationModerationServiceImplTest {
                 .id(teacherUserId)
                 .email("teacher@test.com")
                 .fullName("Teacher")
+                .userStatus(AccountStatus.ACTIVE)
+                .build();
+        reporterUser = AppUser.builder()
+                .id(UUID.randomUUID())
+                .email("reporter@test.com")
+                .fullName("Reporter")
                 .userStatus(AccountStatus.ACTIVE)
                 .build();
 
@@ -126,7 +141,7 @@ class ViolationModerationServiceImplTest {
 
         report = ViolationReport.builder()
                 .id(reportId)
-                .reporter(teacherUser)
+                .reporter(reporterUser)
                 .targetType("COURSE")
                 .targetId(courseId)
                 .reason("Copyright report")
@@ -159,7 +174,8 @@ class ViolationModerationServiceImplTest {
         assertEquals(ViolationReportStatus.RESOLVED_NO_VIOLATION, report.getStatus());
         verify(courseRepository, never()).save(any());
         verify(teacherWalletRepository, never()).save(any());
-        verify(eventPublisher).publishEvent(any(ModerationNotificationEvent.class));
+        verify(eventPublisher, times(2))
+                .publishEvent(any(ModerationNotificationEvent.class));
     }
 
     @Test
@@ -178,7 +194,8 @@ class ViolationModerationServiceImplTest {
 
         assertEquals(CourseStatus.FORCED_DRAFT, course.getStatus());
         verify(courseRepository).save(course);
-        verify(eventPublisher).publishEvent(any(ModerationNotificationEvent.class));
+        verify(eventPublisher, times(2))
+                .publishEvent(any(ModerationNotificationEvent.class));
     }
 
     @Test
@@ -353,6 +370,87 @@ class ViolationModerationServiceImplTest {
         verify(courseReviewRepository, never()).findByIdForModeration(any());
     }
 
+    @Test
+    void removingReportedReviewHidesOnlyReviewAndNotifiesReporterAndAuthor() {
+        CourseReview review = reviewBy(newReviewAuthor());
+        report.setTargetType("REVIEW");
+        report.setTargetId(review.getId());
+        stubResolvePermission();
+        when(adminRepository.hasPermission(adminId, "VIOLATION_CONTENT_ENFORCE"))
+                .thenReturn(true);
+        stubSuccessfulReviewResolutionReads(review);
+
+        moderationService.resolveViolation(
+                reportId,
+                request(
+                        ModerationDecisionType.UPHELD,
+                        List.of(ModerationActionType.REMOVE_CONTENT)
+                ),
+                adminId
+        );
+
+        assertEquals(CourseReviewStatus.HIDDEN, review.getStatus());
+        assertEquals(CourseStatus.PUBLISHED, course.getStatus());
+        verify(courseRepository, never()).save(any());
+        verify(courseReviewRepository).save(review);
+
+        ArgumentCaptor<ModerationNotificationEvent> eventCaptor =
+                ArgumentCaptor.forClass(ModerationNotificationEvent.class);
+        verify(eventPublisher, times(2)).publishEvent(eventCaptor.capture());
+        Set<UUID> recipientIds = eventCaptor.getAllValues().stream()
+                .map(ModerationNotificationEvent::recipientUserId)
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(
+                Set.of(reporterUser.getId(), review.getEnrollment().getStudent().getUser().getId()),
+                recipientIds
+        );
+        assertFalse(recipientIds.contains(teacherUserId));
+    }
+
+    @Test
+    void banningReportedReviewLocksAuthorInsteadOfCourseTeacher() {
+        AppUser reviewAuthor = newReviewAuthor();
+        CourseReview review = reviewBy(reviewAuthor);
+        report.setTargetType("REVIEW");
+        report.setTargetId(review.getId());
+        stubResolvePermission();
+        when(adminRepository.hasPermission(adminId, "VIOLATION_SEVERE_ENFORCE"))
+                .thenReturn(true);
+        stubSuccessfulReviewResolutionReads(review);
+        when(appUserRepository.findByIdForUpdate(reviewAuthor.getId()))
+                .thenReturn(Optional.of(reviewAuthor));
+
+        moderationService.resolveViolation(
+                reportId,
+                request(
+                        ModerationDecisionType.UPHELD,
+                        List.of(ModerationActionType.BAN_ACCOUNT)
+                ),
+                adminId
+        );
+
+        assertEquals(AccountStatus.LOCKED, reviewAuthor.getUserStatus());
+        assertEquals(AccountStatus.ACTIVE, teacherUser.getUserStatus());
+        verify(appUserRepository).findByIdForUpdate(reviewAuthor.getId());
+        verify(appUserRepository, never()).findByIdForUpdate(teacherUserId);
+        verify(teacherWalletRepository, never()).findByTeacherIdForUpdate(any());
+    }
+
+    @Test
+    void outcomeNotificationIsDeduplicatedWhenReporterIsAffectedUser() {
+        report.setReporter(teacherUser);
+        stubResolvePermission();
+        stubSuccessfulResolutionReads();
+
+        moderationService.resolveViolation(
+                reportId,
+                request(ModerationDecisionType.DISMISSED, List.of()),
+                adminId
+        );
+
+        verify(eventPublisher).publishEvent(any(ModerationNotificationEvent.class));
+    }
+
     private void stubResolvePermission() {
         when(adminRepository.findById(adminId)).thenReturn(Optional.of(admin));
         when(adminRepository.hasPermission(adminId, "VIOLATION_RESOLVE")).thenReturn(true);
@@ -375,6 +473,56 @@ class ViolationModerationServiceImplTest {
                 courseId,
                 ViolationReportStatus.RESOLVED_UPHELD
         )).thenReturn(0L);
+    }
+
+    private void stubSuccessfulReviewResolutionReads(CourseReview review) {
+        when(reportRepository.findByIdLocked(reportId)).thenReturn(Optional.of(report));
+        when(reportRepository.save(any(ViolationReport.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        stubDecisionSave();
+        when(actionRecordRepository.saveAll(anyList()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(evidenceRepository.findByViolationReport_IdOrderByCreatedAtAsc(reportId))
+                .thenReturn(List.of());
+        when(courseReviewRepository.findByIdForModeration(review.getId()))
+                .thenReturn(Optional.of(review));
+        when(courseReviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(decisionRepository.findByViolationReportIdOrderByCreatedAtDesc(reportId))
+                .thenReturn(Collections.emptyList());
+        when(orderItemRepository.countPaidPurchasersByCourseId(courseId)).thenReturn(0L);
+        when(reportRepository.countByTargetTypeIgnoreCaseAndTargetIdAndStatus(
+                "REVIEW",
+                review.getId(),
+                ViolationReportStatus.RESOLVED_UPHELD
+        )).thenReturn(0L);
+    }
+
+    private AppUser newReviewAuthor() {
+        return AppUser.builder()
+                .id(UUID.randomUUID())
+                .email("reviewer@test.com")
+                .fullName("Review Author")
+                .userStatus(AccountStatus.ACTIVE)
+                .build();
+    }
+
+    private CourseReview reviewBy(AppUser reviewAuthor) {
+        StudentProfile student = StudentProfile.builder()
+                .id(UUID.randomUUID())
+                .user(reviewAuthor)
+                .build();
+        Enrollment enrollment = Enrollment.builder()
+                .id(UUID.randomUUID())
+                .student(student)
+                .course(course)
+                .build();
+        return CourseReview.builder()
+                .id(UUID.randomUUID())
+                .enrollment(enrollment)
+                .rating(1)
+                .reviewText("Reported review")
+                .status(CourseReviewStatus.APPROVED)
+                .build();
     }
 
     private void stubDecisionSave() {

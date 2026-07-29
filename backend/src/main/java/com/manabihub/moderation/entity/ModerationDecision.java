@@ -41,7 +41,7 @@ public class ModerationDecision {
 
     @Column(columnDefinition = "TEXT")
     private String reason;
-    
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status_before")
     private ViolationReportStatus statusBefore;
@@ -60,7 +60,7 @@ public class ModerationDecision {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
-    
+
     @OneToMany(mappedBy = "moderationDecision", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ModerationActionRecord> actions;
 }

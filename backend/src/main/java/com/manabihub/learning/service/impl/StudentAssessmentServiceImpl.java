@@ -416,6 +416,7 @@ public class StudentAssessmentServiceImpl implements StudentAssessmentService {
     ) {
         List<LessonBlock> blocks = enrollment.getCourse().getModules().stream()
                 .flatMap(module -> module.getBlocks().stream())
+                .filter(block -> !block.isModerationHidden())
                 .toList();
         Set<UUID> completedBlockIds = lessonBlockProgressRepository
                 .findByEnrollmentId(enrollment.getId())

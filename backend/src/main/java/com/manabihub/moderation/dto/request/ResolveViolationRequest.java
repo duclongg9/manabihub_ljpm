@@ -11,18 +11,18 @@ import java.util.UUID;
 
 @Data
 public class ResolveViolationRequest {
-    
+
     @NotNull(message = "{MSG-COM-002}")
     private ModerationDecisionType decision;
-    
+
     @Size(max = 10, message = "Too many moderation actions")
     private List<@NotNull ModerationActionType> actions;
-    
+
     @Size(max = 2000, message = "Decision note must not exceed 2000 characters")
     private String decisionNote;
 
     private EvidenceRequestedFrom evidenceRequestedFrom;
-    
+
     @Size(max = 100, message = "Too many moderation targets")
     private List<@NotNull UUID> targetIds;
 }

@@ -17,17 +17,17 @@ public class ViolationDetailResponse {
     private String reason;
     private String description;
     private Instant submittedAt;
-    
+
     private ReporterSummary reporter;
     private ViolationTarget target;
     private List<ViolationEvidenceResponse> evidence;
     private List<ModerationHistoryItem> moderationHistory;
-    
+
     private int previousWarnings;
     private int paidEnrollmentCount;
     private List<ModerationActionType> availableActions;
     private boolean severeActionAllowed;
-    
+
     @Data
     @Builder
     public static class ReporterSummary {
@@ -36,7 +36,7 @@ public class ViolationDetailResponse {
         private String role;
         private String accountAge;
     }
-    
+
     @Data
     @Builder
     public static class ViolationTarget {
@@ -45,12 +45,12 @@ public class ViolationDetailResponse {
         private UUID courseId;
         private String courseTitle;
         private String currentStatus;
-        private UUID teacherProfileId;
-        private UUID teacherUserId;
-        private String teacherName;
+        private UUID affectedTeacherProfileId;
+        private UUID affectedUserId;
+        private String affectedUserName;
         private String contentTitle;
     }
-    
+
     @Data
     @Builder
     public static class ModerationHistoryItem {
