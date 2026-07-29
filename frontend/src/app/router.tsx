@@ -27,6 +27,11 @@ import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminSetupPasswordPage } from './pages/AdminSetupPasswordPage';
+import {
+  AdminChangePasswordPage,
+  AdminForgotPasswordPage,
+  AdminResetPasswordPage,
+} from './pages/AdminPasswordPages';
 import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
 import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
 import { TeacherDashboardPage } from '../features/teacher/pages/TeacherDashboardPage';
@@ -84,6 +89,14 @@ export const router = createBrowserRouter([
   {
     path: '/admin/setup-password',
     element: <AdminSetupPasswordPage />,
+  },
+  {
+    path: '/admin/forgot-password',
+    element: <AdminForgotPasswordPage />,
+  },
+  {
+    path: '/admin/reset-password',
+    element: <AdminResetPasswordPage />,
   },
   {
     path: '/onboarding/student',
@@ -264,6 +277,10 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <AdminDashboardPage />,
+      },
+      {
+        path: 'change-password',
+        element: <AdminChangePasswordPage />,
       },
       {
         path: 'notifications',

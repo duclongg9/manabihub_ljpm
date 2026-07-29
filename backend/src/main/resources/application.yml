@@ -63,6 +63,15 @@ manabihub:
       dev-simulator-enabled: ${VNPAY_DEV_SIMULATOR_ENABLED:false}
   admin-invitation:
     ttl-hours: ${ADMIN_INVITATION_TTL_HOURS:24}
+  admin-auth:
+    access-token-minutes: ${ADMIN_ACCESS_TOKEN_MINUTES:15}
+    session-hours: ${ADMIN_SESSION_HOURS:12}
+    remember-session-days: ${ADMIN_REMEMBER_SESSION_DAYS:30}
+    remember-idle-days: ${ADMIN_REMEMBER_IDLE_DAYS:7}
+    password-reset-minutes: ${ADMIN_PASSWORD_RESET_MINUTES:30}
+    password-reset-cooldown-seconds: ${ADMIN_PASSWORD_RESET_COOLDOWN_SECONDS:60}
+    cookie-secure: ${ADMIN_COOKIE_SECURE:false}
+    cookie-same-site: ${ADMIN_COOKIE_SAME_SITE:Lax}
 
 app:
   frontend:

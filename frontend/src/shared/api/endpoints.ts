@@ -141,4 +141,9 @@ export const ENDPOINTS = {
   },
   ADMIN_LOGIN: '/admin/auth/login',
   ADMIN_SETUP_PASSWORD: '/admin/auth/setup-password',
+  ADMIN_REFRESH: '/admin/auth/refresh',
+  ADMIN_LOGOUT: '/admin/auth/logout',
+  ADMIN_FORGOT_PASSWORD: '/admin/auth/password/forgot',
+  ADMIN_RESET_PASSWORD: '/admin/auth/password/reset',
+  ADMIN_CHANGE_PASSWORD: '/admin/auth/password/change',
 };

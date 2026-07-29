@@ -108,4 +108,25 @@ public class SecurityAuditService {
 
         auditLogRepository.save(auditLog);
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logInternalAdminAuthenticationFailure(
+            UUID adminId,
+            String role,
+            String reason,
+            String ipAddress,
+            String userAgent
+    ) {
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("INTERNAL_ADMIN")
+                .actorAdminId(adminId)
+                .actorRoleCode(role)
+                .action("LOGIN_FAILED")
+                .targetType("ADMIN_AUTHENTICATION")
+                .metadata(Map.of("reason", reason))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
+        auditLogRepository.save(auditLog);
+    }
 }

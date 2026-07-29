@@ -7,6 +7,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -48,14 +50,21 @@ class InternalAdminRoleFilterTest {
     }
 
     @Test
-    void matchingLiveRoleAllowsAdminRequest() throws Exception {
-        UUID adminId = authenticate("SYSTEM_ADMIN");
-        when(jdbcTemplate.queryForList(anyString(), eq(String.class), eq(adminId)))
-                .thenReturn(List.of("SYSTEM_ADMIN"));
-        MockHttpServletRequest request = new MockHttpServletRequest(
-                "GET",
-                "/api/v1/admin/system-settings"
-        );
+    void matchingLiveRoleAndCredentialVersionAllowsAdminRequest() throws Exception {
+        AuthenticationIds ids = authenticate("SYSTEM_ADMIN", 3);
+        when(jdbcTemplate.query(
+                anyString(),
+                any(RowMapper.class),
+                eq(ids.adminId()),
+                eq(ids.sessionId())
+        )).thenReturn(List.of(
+                new InternalAdminRoleFilter.LiveAdminSession(
+                        "SYSTEM_ADMIN",
+                        3,
+                        3
+                )
+        ));
+        MockHttpServletRequest request = adminRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, filterChain);
@@ -64,26 +73,76 @@ class InternalAdminRoleFilterTest {
     }
 
     @Test
-    void staleRoleReturns401SoFrontendClearsAdminSession() throws Exception {
-        UUID adminId = authenticate("SYSTEM_ADMIN");
-        when(jdbcTemplate.queryForList(anyString(), eq(String.class), eq(adminId)))
-                .thenReturn(List.of("COURSE_MANAGER"));
-        MockHttpServletRequest request = new MockHttpServletRequest(
-                "GET",
-                "/api/v1/admin/system-settings"
-        );
+    void changedRoleReturns401SoFrontendClearsAdminSession() throws Exception {
+        AuthenticationIds ids = authenticate("SYSTEM_ADMIN", 3);
+        when(jdbcTemplate.query(
+                anyString(),
+                any(RowMapper.class),
+                eq(ids.adminId()),
+                eq(ids.sessionId())
+        )).thenReturn(List.of(
+                new InternalAdminRoleFilter.LiveAdminSession(
+                        "COURSE_MANAGER",
+                        3,
+                        3
+                )
+        ));
+        MockHttpServletRequest request = adminRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, filterChain);
 
-        assertEquals(401, response.getStatus());
-        assertEquals(
-                MessageCodes.ADMIN_SESSION_STALE,
-                new ObjectMapper().readTree(response.getContentAsByteArray())
-                        .get("messageCode")
-                        .asText()
-        );
+        assertStaleSession(response);
         verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void changedCredentialVersionReturns401() throws Exception {
+        AuthenticationIds ids = authenticate("SYSTEM_ADMIN", 3);
+        when(jdbcTemplate.query(
+                anyString(),
+                any(RowMapper.class),
+                eq(ids.adminId()),
+                eq(ids.sessionId())
+        )).thenReturn(List.of(
+                new InternalAdminRoleFilter.LiveAdminSession(
+                        "SYSTEM_ADMIN",
+                        4,
+                        3
+                )
+        ));
+        MockHttpServletRequest request = adminRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertStaleSession(response);
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void malformedAdminTokenReturns401WithoutDatabaseLookup() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        Jwt jwt = Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .subject(adminId.toString())
+                .claim("role", "SYSTEM_ADMIN")
+                .claim("sid", UUID.randomUUID().toString())
+                .claim("cv", "not-a-number")
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(
+                        jwt,
+                        List.of(new SimpleGrantedAuthority("ROLE_SYSTEM_ADMIN"))
+                )
+        );
+        MockHttpServletRequest request = adminRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertStaleSession(response);
+        verifyNoInteractions(jdbcTemplate);
     }
 
     @Test
@@ -100,12 +159,18 @@ class InternalAdminRoleFilterTest {
         verifyNoInteractions(jdbcTemplate);
     }
 
-    private UUID authenticate(String role) {
+    private AuthenticationIds authenticate(String role, long credentialVersion) {
         UUID adminId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
         Jwt jwt = Jwt.withTokenValue("token")
                 .header("alg", "none")
+                .issuer("manabihub-admin")
+                .audience(List.of("admin-api"))
                 .subject(adminId.toString())
                 .claim("role", role)
+                .claim("type", "ADMIN_ACCESS")
+                .claim("sid", sessionId.toString())
+                .claim("cv", credentialVersion)
                 .build();
         SecurityContextHolder.getContext().setAuthentication(
                 new JwtAuthenticationToken(
@@ -113,6 +178,27 @@ class InternalAdminRoleFilterTest {
                         List.of(new SimpleGrantedAuthority("ROLE_" + role))
                 )
         );
-        return adminId;
+        return new AuthenticationIds(adminId, sessionId);
+    }
+
+    private MockHttpServletRequest adminRequest() {
+        return new MockHttpServletRequest(
+                "GET",
+                "/api/v1/admin/system-settings"
+        );
+    }
+
+    private void assertStaleSession(MockHttpServletResponse response)
+            throws Exception {
+        assertEquals(401, response.getStatus());
+        assertEquals(
+                MessageCodes.ADMIN_SESSION_STALE,
+                new ObjectMapper().readTree(response.getContentAsByteArray())
+                        .get("messageCode")
+                        .asText()
+        );
+    }
+
+    private record AuthenticationIds(UUID adminId, UUID sessionId) {
     }
 }

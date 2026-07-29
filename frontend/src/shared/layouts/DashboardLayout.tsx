@@ -1,13 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Box, Toolbar, useMediaQuery, useTheme, Typography } from '@mui/material';
+import {
+  Box,
+  CircularProgress,
+  Toolbar,
+  useMediaQuery,
+  useTheme,
+  Typography,
+} from '@mui/material';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import {
   getAuthSession,
   getDefaultRoute,
   getLoginRoute,
+  hasAdminRefreshSession,
   hasAnyRole,
+  subscribeToAuthSessionChanges,
+  type AuthSession,
   type AuthSessionKind,
 } from '../auth/authSession';
+import { refreshAdminSession } from '../auth/adminAuthApi';
 import { Header } from './Header';
 import {
   COLLAPSED_DRAWER_WIDTH,
@@ -33,7 +44,14 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
     typeof window !== 'undefined'
       && window.localStorage.getItem(SIDEBAR_PREFERENCE_KEY) === 'true',
   );
-  const session = getAuthSession(sessionKind);
+  const [session, setSession] = useState<AuthSession | null>(
+    () => getAuthSession(sessionKind),
+  );
+  const [restoringSession, setRestoringSession] = useState(
+    () => sessionKind === 'admin'
+      && !getAuthSession('admin')
+      && hasAdminRefreshSession(),
+  );
 
   useEffect(() => {
     setMobileOpen(false);
@@ -42,6 +60,62 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_PREFERENCE_KEY, String(desktopCollapsed));
   }, [desktopCollapsed]);
+
+  useEffect(() => {
+    let active = true;
+    let restoreInProgress = false;
+    const syncSession = () => {
+      const currentSession = getAuthSession(sessionKind);
+      if (currentSession || sessionKind !== 'admin' || !hasAdminRefreshSession()) {
+        if (active) {
+          setSession(currentSession);
+          setRestoringSession(false);
+        }
+        return;
+      }
+
+      if (restoreInProgress) {
+        return;
+      }
+      restoreInProgress = true;
+      setRestoringSession(true);
+      void refreshAdminSession()
+        .then(() => {
+          if (active) {
+            setSession(getAuthSession('admin'));
+          }
+        })
+        .finally(() => {
+          restoreInProgress = false;
+          if (active) {
+            setRestoringSession(false);
+          }
+        });
+    };
+    const unsubscribe = subscribeToAuthSessionChanges(syncSession);
+    syncSession();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [sessionKind]);
+
+  if (restoringSession) {
+    return (
+      <Box
+        aria-label="Đang khôi phục phiên quản trị"
+        sx={{
+          alignItems: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          minHeight: '100vh',
+        }}
+      >
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
 
   if (!session) {
     return (

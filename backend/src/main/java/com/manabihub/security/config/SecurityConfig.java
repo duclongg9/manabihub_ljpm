@@ -10,6 +10,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -37,6 +38,7 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import javax.crypto.spec.SecretKeySpec;
 import java.util.List;
 import java.util.UUID;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -52,15 +54,18 @@ public class SecurityConfig {
     private final TeacherEligibilityFilter teacherEligibilityFilter;
     private final InternalAdminRoleFilter internalAdminRoleFilter;
     private final AppUserStatusFilter appUserStatusFilter;
+    private final Environment environment;
 
     public SecurityConfig(
             TeacherEligibilityFilter teacherEligibilityFilter,
             InternalAdminRoleFilter internalAdminRoleFilter,
-            AppUserStatusFilter appUserStatusFilter
+            AppUserStatusFilter appUserStatusFilter,
+            Environment environment
     ) {
         this.teacherEligibilityFilter = teacherEligibilityFilter;
         this.internalAdminRoleFilter = internalAdminRoleFilter;
         this.appUserStatusFilter = appUserStatusFilter;
+        this.environment = environment;
     }
 
     @Bean
@@ -99,7 +104,11 @@ public class SecurityConfig {
                                 "/uploads/course-thumbnails/**",
                                 "/uploads/user-avatars/**",
                                 "/api/admin/auth/login",
-                                "/api/admin/auth/setup-password")
+                                "/api/admin/auth/setup-password",
+                                "/api/admin/auth/refresh",
+                                "/api/admin/auth/logout",
+                                "/api/admin/auth/password/forgot",
+                                "/api/admin/auth/password/reset")
                         .permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -143,8 +152,15 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        boolean production = Arrays.stream(environment.getActiveProfiles())
+                .anyMatch("prod"::equalsIgnoreCase);
 
         if (allowedOrigins.size() == 1 && "*".equals(allowedOrigins.get(0))) {
+            if (production) {
+                throw new IllegalStateException(
+                        "CORS_ALLOWED_ORIGINS must list exact trusted origins in production"
+                );
+            }
             configuration.setAllowedOriginPatterns(List.of("*"));
         } else {
             configuration.setAllowedOrigins(allowedOrigins);

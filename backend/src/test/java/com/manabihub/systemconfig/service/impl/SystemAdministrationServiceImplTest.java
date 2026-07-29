@@ -8,6 +8,7 @@ import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.identity.repository.InternalAdminSessionRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.service.InternalAdminInvitationService;
 import com.manabihub.systemconfig.entity.SystemSetting;
@@ -42,6 +43,7 @@ class SystemAdministrationServiceImplTest {
     @Mock private RoleRepository roleRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private InternalAdminInvitationService invitationService;
+    @Mock private InternalAdminSessionRepository adminSessionRepository;
 
     private SystemAdministrationServiceImpl service;
     private UUID actorId;
@@ -56,7 +58,8 @@ class SystemAdministrationServiceImplTest {
                 auditLogService,
                 new SystemSettingValidator(),
                 new CommercialPolicyService(settingRepository),
-                invitationService
+                invitationService,
+                adminSessionRepository
         );
         actorId = UUID.randomUUID();
         actor = account(actorId, "system@manabihub.local", RoleCode.SYSTEM_ADMIN);

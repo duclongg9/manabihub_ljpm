@@ -33,6 +33,10 @@ export const ROUTES = {
     PROFILE: '/teacher/profile',
   },
   ADMIN: {
+    LOGIN: '/admin/login',
+    FORGOT_PASSWORD: '/admin/forgot-password',
+    RESET_PASSWORD: '/admin/reset-password',
+    CHANGE_PASSWORD: '/admin/change-password',
     DASHBOARD: '/admin/dashboard',
     SYSTEM_SETTINGS: '/admin/settings',
     USERS: '/admin/users',

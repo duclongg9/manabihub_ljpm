@@ -1,34 +1,52 @@
-import React, { useState } from 'react';
-import { Box, Typography, TextField, Button, Alert, InputAdornment, IconButton, keyframes } from '@mui/material';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { useEffect, useState, type FormEvent } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  CircularProgress,
+  FormControlLabel,
+  IconButton,
+  InputAdornment,
+  Link,
+  TextField,
+  Typography,
+} from '@mui/material';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getAsset } from '../../shared/utils/assets';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import axios from 'axios';
+import {
+  Link as RouterLink,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom';
 import { axiosClient } from '../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../shared/api/endpoints';
+import { refreshAdminSession } from '../../shared/auth/adminAuthApi';
 import {
   clearAuthSession,
   consumePostLoginRoute,
+  getAuthSession,
+  hasAdminRefreshSession,
   hasAnyRole,
   rememberPostLoginRoute,
-  storeAuthToken,
+  storeAdminSession,
+  subscribeToAuthSessionChanges,
+  type AdminSessionCredentials,
 } from '../../shared/auth/authSession';
 import { ROLES } from '../../shared/constants/roles';
+import { ROUTES } from '../../shared/constants/routes';
+import { getAsset } from '../../shared/utils/assets';
 
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
-const pulseGlow = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
-  70% { box-shadow: 0 0 0 15px rgba(37, 99, 235, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
-`;
+const INTERNAL_ROLES = [
+  ROLES.SYSTEM_ADMIN,
+  ROLES.COURSE_MANAGER,
+  ROLES.FINANCE_MANAGER,
+];
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
@@ -36,198 +54,279 @@ export function AdminLoginPage() {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(() =>
+  const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(hasAdminRefreshSession);
+  const [errorMessage, setErrorMessage] = useState<string | null>(
     searchParams.get('reason') === 'session-expired'
-      ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.'
+      ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
       : null,
   );
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
+  useEffect(() => {
+    let active = true;
+    const restore = async () => {
+      const existing = getAuthSession('admin');
+      if (existing && hasAnyRole(existing, INTERNAL_ROLES)) {
+        navigate(consumePostLoginRoute('admin', existing), { replace: true });
+        return;
+      }
+      if (!hasAdminRefreshSession()) {
+        if (active) setRestoring(false);
+        return;
+      }
+
+      if (active) setRestoring(true);
+      const session = await refreshAdminSession();
+      if (!active) return;
+      if (session && hasAnyRole(session, INTERNAL_ROLES)) {
+        navigate(consumePostLoginRoute('admin', session), { replace: true });
+        return;
+      }
+      setRestoring(false);
+    };
+    const unsubscribe = subscribeToAuthSessionChanges(() => {
+      void restore();
+    });
+    void restore();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [navigate]);
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setErrorMessage(null);
     setLoading(true);
 
     try {
-      const response = await axiosClient.post(ENDPOINTS.ADMIN_LOGIN, { email, password });
-      const token = response.data?.data?.token;
+      const response = await axiosClient.post(ENDPOINTS.ADMIN_LOGIN, {
+        email,
+        password,
+        rememberMe,
+      });
+      const credentials = response.data?.data as AdminSessionCredentials | undefined;
+      const session = credentials
+        ? storeAdminSession(credentials)
+        : null;
 
-      if (token) {
-        const session = storeAuthToken('admin', token);
-        const internalRoles = [ROLES.SYSTEM_ADMIN, ROLES.COURSE_MANAGER, ROLES.FINANCE_MANAGER];
-
-        if (!session || !hasAnyRole(session, internalRoles)) {
-          clearAuthSession('admin');
-          setErrorMsg('Tài khoản không có quyền truy cập Cổng quản trị.');
-          return;
-        }
-
-        const returnTo = (location.state as { from?: unknown } | null)?.from;
-        if (typeof returnTo === 'string') {
-          rememberPostLoginRoute('admin', returnTo);
-        }
-
-        navigate(consumePostLoginRoute('admin', session), { replace: true });
-      } else {
-        setErrorMsg('Không nhận được token từ máy chủ.');
-      }
-    } catch (error: any) {
-      console.error('Admin login error:', error);
-      if (!error.response) {
-        setErrorMsg('Lỗi kết nối. Vui lòng kiểm tra lại mạng hoặc xem Backend đã chạy chưa.');
-        setLoading(false);
+      if (!session || !hasAnyRole(session, INTERNAL_ROLES)) {
+        clearAuthSession('admin');
+        setErrorMessage('Tài khoản không có quyền truy cập Cổng quản trị.');
         return;
       }
-      const errorCode = error.response?.data?.errorCode;
-      if (errorCode === 'MSG-AUTH-008') {
-        setErrorMsg('Tài khoản quản trị đã bị tạm khóa do đăng nhập sai quá số lần cho phép.');
+
+      const returnTo = (location.state as { from?: unknown } | null)?.from;
+      if (typeof returnTo === 'string') {
+        rememberPostLoginRoute('admin', returnTo);
+      }
+      navigate(consumePostLoginRoute('admin', session), { replace: true });
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && !error.response) {
+        setErrorMessage('Không thể kết nối máy chủ. Vui lòng thử lại sau.');
       } else {
-        setErrorMsg('Tên đăng nhập hoặc mật khẩu quản trị không chính xác.');
+        const responseData = axios.isAxiosError(error)
+          ? error.response?.data as { messageCode?: string; errorCode?: string }
+          : undefined;
+        const code = responseData?.messageCode ?? responseData?.errorCode;
+        setErrorMessage(
+          code === 'MSG-AUTH-008'
+            ? 'Tài khoản đang bị khóa tạm thời. Vui lòng thử lại sau.'
+            : 'Email hoặc mật khẩu không chính xác.',
+        );
       }
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#0f172a', fontFamily: '"Inter", "Roboto", sans-serif' }}>
-      {/* Left Panel - Branding */}
+  if (restoring) {
+    return (
       <Box
+        aria-label="Đang khôi phục phiên quản trị"
         sx={{
-          display: { xs: 'none', lg: 'flex' },
-          flex: 6,
-          position: 'relative',
-          overflow: 'hidden',
-          '&::before': {
-            content: '""', position: 'absolute', inset: 0,
-            background: 'rgba(0, 0, 0, 0.6)',
-            zIndex: 1
-          }
+          alignItems: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          minHeight: '100vh',
         }}
       >
-        <Box sx={{ position: 'absolute', inset: 0 }}>
-          <img src={getAsset('hero.png')} alt="Hero" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </Box>
-        <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', p: 8, width: '100%' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{ width: 40, height: 40, bgcolor: '#3b82f6', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.39)' }}>
-              <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
-            </Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: 'white', letterSpacing: '-0.5px' }}>
-              ManabiHub
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ bgcolor: 'background.paper', display: 'flex', minHeight: '100vh' }}>
+      <Box
+        sx={{
+          display: { xs: 'none', lg: 'block' },
+          flex: 1,
+          minWidth: 0,
+          position: 'relative',
+        }}
+      >
+        <Box
+          alt=""
+          component="img"
+          src={getAsset('hero.png')}
+          sx={{ height: '100%', objectFit: 'cover', width: '100%' }}
+        />
+        <Box
+          sx={{
+            bgcolor: 'rgba(15, 23, 42, 0.72)',
+            color: 'common.white',
+            display: 'flex',
+            flexDirection: 'column',
+            inset: 0,
+            justifyContent: 'space-between',
+            p: 8,
+            position: 'absolute',
+          }}
+        >
+          <Brand color="common.white" />
+          <Box sx={{ maxWidth: 520 }}>
+            <Typography component="h1" sx={{ fontSize: '3rem', fontWeight: 800, mb: 2 }}>
+              Cổng quản trị
             </Typography>
-          </Box>
-          <Box sx={{ maxWidth: 500, mb: 4, animation: `${fadeIn} 1s ease-out` }}>
-            <Typography variant="h2" sx={{ fontWeight: 800, color: 'white', mb: 3, lineHeight: 1.1, fontSize: '3.5rem' }}>
-              Admin Portal
-            </Typography>
-            <Typography variant="h6" sx={{ color: '#cbd5e1', fontWeight: 400, lineHeight: 1.6 }}>
-              Hệ thống quản trị và vận hành nội bộ dành riêng cho Ban quản lý ManabiHub. Trải nghiệm bảo mật và an toàn tối đa.
+            <Typography color="grey.300" variant="h6">
+              Không gian vận hành nội bộ của ManabiHub.
             </Typography>
           </Box>
         </Box>
       </Box>
 
-      {/* Right Panel - Auth Action */}
       <Box
+        component="main"
         sx={{
-          flex: { xs: 1, lg: 4 },
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          p: { xs: 3, sm: 6, md: 8 },
-          position: 'relative',
-          bgcolor: '#ffffff',
+          alignItems: 'center',
+          display: 'flex',
+          flex: { xs: 1, lg: '0 0 480px' },
+          justifyContent: 'center',
+          p: { xs: 3, sm: 6 },
         }}
       >
-        <Box sx={{ width: '100%', maxWidth: 400, animation: `${fadeIn} 0.6s ease-out` }}>
-          {/* Mobile Header Logo */}
-          <Box sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 6 }}>
-            <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
-            </Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>ManabiHub</Typography>
+        <Box sx={{ maxWidth: 400, width: '100%' }}>
+          <Box sx={{ display: { xs: 'flex', lg: 'none' }, mb: 6 }}>
+            <Brand color="primary.main" />
           </Box>
+          <Typography component="h1" sx={{ fontSize: '2rem', fontWeight: 800, mb: 1 }}>
+            Đăng nhập
+          </Typography>
+          <Typography color="text.secondary" sx={{ mb: 4 }}>
+            Sử dụng tài khoản nội bộ được ManabiHub cấp.
+          </Typography>
 
-          <Box sx={{ textAlign: 'center', mb: 5 }}>
-            <Box sx={{ width: 64, height: 64, margin: '0 auto 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: `${pulseGlow} 2s infinite` }}>
-              <ManageAccountsIcon sx={{ fontSize: 32, color: '#2563eb' }} />
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#0f172a', mb: 1.5, letterSpacing: '-0.5px' }}>
-              Chào mừng trở lại
-            </Typography>
-            <Typography variant="body1" sx={{ color: '#64748b' }}>
-              Đăng nhập bằng tài khoản Internal Admin
-            </Typography>
-          </Box>
+          {errorMessage && <Alert severity="error" sx={{ mb: 3 }}>{errorMessage}</Alert>}
 
-          {errorMsg && (
-            <Alert
-              severity="error"
-              sx={{ mb: 4, borderRadius: 2, bgcolor: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', '& .MuiAlert-icon': { color: '#dc2626' } }}
-            >
-              {errorMsg}
-            </Alert>
-          )}
-
-          <form onSubmit={handleSubmit}>
+          <Box component="form" onSubmit={handleSubmit}>
             <TextField
+              autoComplete="username"
+              disabled={loading}
               fullWidth
-              placeholder="Email hoặc Tên đăng nhập"
+              label="Email"
+              margin="normal"
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
               slotProps={{
                 input: {
-                  startAdornment: <InputAdornment position="start"><EmailOutlinedIcon sx={{ color: '#94a3b8' }} /></InputAdornment>,
-                  sx: { borderRadius: 3, bgcolor: '#f8fafc', '&:hover': { bgcolor: '#f1f5f9' }, '&.Mui-focused': { bgcolor: '#ffffff', boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)' } }
-                }
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <EmailOutlinedIcon />
+                    </InputAdornment>
+                  ),
+                },
               }}
-              sx={{ mb: 3 }}
             />
-
             <TextField
-              fullWidth
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Mật khẩu"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
+              autoComplete="current-password"
               disabled={loading}
+              fullWidth
+              label="Mật khẩu"
+              margin="normal"
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              type={showPassword ? 'text' : 'password'}
+              value={password}
               slotProps={{
                 input: {
-                  startAdornment: <InputAdornment position="start"><LockOutlinedIcon sx={{ color: '#94a3b8' }} /></InputAdornment>,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LockOutlinedIcon />
+                    </InputAdornment>
+                  ),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" disabled={loading}>
-                        {showPassword ? <VisibilityOff sx={{ color: '#94a3b8' }} /> : <Visibility sx={{ color: '#94a3b8' }} />}
+                      <IconButton
+                        aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                        edge="end"
+                        onClick={() => setShowPassword((visible) => !visible)}
+                      >
+                        {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                       </IconButton>
                     </InputAdornment>
                   ),
-                  sx: { borderRadius: 3, bgcolor: '#f8fafc', '&:hover': { bgcolor: '#f1f5f9' }, '&.Mui-focused': { bgcolor: '#ffffff', boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)' } }
-                }
+                },
               }}
-              sx={{ mb: 4 }}
             />
-
-            <Button
-              type="submit"
-              fullWidth
-              disabled={loading}
+            <Box
               sx={{
-                py: 2, borderRadius: 3, textTransform: 'none', fontWeight: 700, fontSize: '1.1rem', color: 'white',
-                background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
-                boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.4)',
-                transition: 'all 0.3s ease',
-                '&:hover': { background: 'linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%)', transform: 'translateY(-2px)', boxShadow: '0 15px 25px -5px rgba(37, 99, 235, 0.5)' },
-                '&:disabled': { background: '#94a3b8', color: '#f1f5f9' }
+                alignItems: 'center',
+                display: 'flex',
+                justifyContent: 'space-between',
+                mb: 3,
+                mt: 1,
               }}
             >
-              {loading ? 'Đang xác thực...' : 'Đăng nhập hệ thống'}
+              <FormControlLabel
+                control={(
+                  <Checkbox
+                    checked={rememberMe}
+                    onChange={(event) => setRememberMe(event.target.checked)}
+                  />
+                )}
+                label="Ghi nhớ đăng nhập"
+              />
+              <Link component={RouterLink} to={ROUTES.ADMIN.FORGOT_PASSWORD}>
+                Quên mật khẩu?
+              </Link>
+            </Box>
+            <Button
+              disabled={loading}
+              fullWidth
+              size="large"
+              type="submit"
+              variant="contained"
+            >
+              {loading ? 'Đang xác thực...' : 'Đăng nhập'}
             </Button>
-          </form>
+          </Box>
+          <Button
+            component={RouterLink}
+            sx={{ mt: 2 }}
+            to={ROUTES.PUBLIC.HOME}
+            fullWidth
+          >
+            Về trang chủ
+          </Button>
         </Box>
       </Box>
+    </Box>
+  );
+}
+
+function Brand({ color }: { color: string }) {
+  return (
+    <Box sx={{ alignItems: 'center', color, display: 'flex', gap: 1.5 }}>
+      <MenuBookIcon />
+      <Typography sx={{ fontSize: '1.25rem', fontWeight: 800 }}>
+        ManabiHub
+      </Typography>
     </Box>
   );
 }

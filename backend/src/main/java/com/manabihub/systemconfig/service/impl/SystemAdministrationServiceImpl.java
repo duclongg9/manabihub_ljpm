@@ -8,6 +8,7 @@ import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.identity.repository.InternalAdminSessionRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.service.InternalAdminInvitationService;
 import com.manabihub.systemconfig.dto.response.InternalAdminAccountResponse;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +45,7 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
     private final SystemSettingValidator validator;
     private final CommercialPolicyService commercialPolicyService;
     private final InternalAdminInvitationService invitationService;
+    private final InternalAdminSessionRepository adminSessionRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -257,7 +260,9 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
                 ));
 
         target.setRole(newRole);
+        target.setCredentialVersion(target.getCredentialVersion() + 1);
         InternalAdminAccount saved = adminRepository.save(target);
+        adminSessionRepository.revokeAllForAccount(targetAdminId, Instant.now());
 
         auditLogService.logAdminAction(
                 actorId,
