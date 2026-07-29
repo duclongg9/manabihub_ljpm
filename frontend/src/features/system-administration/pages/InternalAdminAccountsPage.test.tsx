@@ -7,6 +7,8 @@ vi.mock('../services/systemAdministrationService', () => ({
   systemAdministrationService: {
     listInternalAdmins: vi.fn(),
     updateInternalAdminRole: vi.fn(),
+    inviteInternalAdmin: vi.fn(),
+    resendInternalAdminInvitation: vi.fn(),
   },
 }));
 
@@ -28,20 +30,23 @@ describe('InternalAdminAccountsPage', () => {
         role: 'COURSE_MANAGER',
         lastLoginAt: null,
         updatedAt: null,
+        invitationStatus: 'NONE',
+        invitationExpiresAt: null,
       },
     ]);
   });
 
-  it('renders only public-safe account fields and the live-role warning', async () => {
+  it('renders safe account fields and invitation guidance', async () => {
     render(<InternalAdminAccountsPage />);
 
     expect(await screen.findByText('Course Manager')).toBeInTheDocument();
     expect(screen.getByText('course.manager@manabihub.local')).toBeInTheDocument();
-    expect(screen.getByText(/JWT cũ sẽ bị từ chối/)).toBeInTheDocument();
-    expect(screen.queryByText(/password/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Người nhận tự đặt mật khẩu/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mời tài khoản' })).toBeInTheDocument();
+    expect(screen.queryByText(/password_hash/i)).not.toBeInTheDocument();
   });
 
-  it('shows a retryable empty-safe error state', async () => {
+  it('shows a retryable error state', async () => {
     listInternalAdminsMock.mockRejectedValueOnce(new Error('offline'));
 
     render(<InternalAdminAccountsPage />);

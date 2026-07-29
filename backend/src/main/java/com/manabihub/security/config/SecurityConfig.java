@@ -98,7 +98,8 @@ public class SecurityConfig {
                                 "/api/v1/payments/vnpay/ipn",
                                 "/uploads/course-thumbnails/**",
                                 "/uploads/user-avatars/**",
-                                "/api/admin/auth/login")
+                                "/api/admin/auth/login",
+                                "/api/admin/auth/setup-password")
                         .permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,

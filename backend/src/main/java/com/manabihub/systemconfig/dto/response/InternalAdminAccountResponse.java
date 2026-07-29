@@ -1,6 +1,7 @@
 package com.manabihub.systemconfig.dto.response;
 
 import com.manabihub.identity.enums.AccountStatus;
+import com.manabihub.identity.enums.InternalAdminInvitationStatus;
 import com.manabihub.identity.enums.RoleCode;
 
 import java.time.Instant;
@@ -13,6 +14,8 @@ public record InternalAdminAccountResponse(
         AccountStatus status,
         RoleCode role,
         Instant lastLoginAt,
-        Instant updatedAt
+        Instant updatedAt,
+        InternalAdminInvitationStatus invitationStatus,
+        Instant invitationExpiresAt
 ) {
 }

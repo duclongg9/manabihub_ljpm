@@ -4,6 +4,8 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.systemconfig.dto.request.UpdateInternalAdminRoleRequest;
 import com.manabihub.systemconfig.dto.request.UpdateSystemSettingRequest;
+import com.manabihub.systemconfig.dto.request.InviteInternalAdminRequest;
+import com.manabihub.systemconfig.dto.request.ResendInternalAdminInvitationRequest;
 import com.manabihub.systemconfig.dto.response.InternalAdminAccountResponse;
 import com.manabihub.systemconfig.dto.response.SystemSettingResponse;
 import com.manabihub.systemconfig.service.SystemAdministrationService;
@@ -14,6 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -61,6 +64,41 @@ public class SystemAdministrationController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         return ApiResponse.success(administrationService.listInternalAdmins(actorId(jwt)));
+    }
+
+    @PostMapping("/internal-accounts/invitations")
+    public ApiResponse<InternalAdminAccountResponse> inviteInternalAdmin(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody InviteInternalAdminRequest request
+    ) {
+        return ApiResponse.success(
+                MessageCodes.INTERNAL_ADMIN_INVITATION_CREATED,
+                "Internal administrator invitation queued",
+                administrationService.inviteInternalAdmin(
+                        actorId(jwt),
+                        request.email(),
+                        request.fullName(),
+                        request.roleCode(),
+                        request.reason()
+                )
+        );
+    }
+
+    @PostMapping("/internal-accounts/{adminId}/invitation/resend")
+    public ApiResponse<InternalAdminAccountResponse> resendInternalAdminInvitation(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID adminId,
+            @Valid @RequestBody ResendInternalAdminInvitationRequest request
+    ) {
+        return ApiResponse.success(
+                MessageCodes.INTERNAL_ADMIN_INVITATION_RESENT,
+                "Internal administrator invitation queued again",
+                administrationService.resendInternalAdminInvitation(
+                        actorId(jwt),
+                        adminId,
+                        request.reason()
+                )
+        );
     }
 
     @PatchMapping("/internal-accounts/{adminId}/role")
