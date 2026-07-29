@@ -60,6 +60,11 @@ management:
       enabled: false
 
 manabihub:
+  bootstrap:
+    admin:
+      email: ${ADMIN_BOOTSTRAP_EMAIL:}
+      password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+      full-name: ${ADMIN_BOOTSTRAP_FULL_NAME:ManabiHub System Administrator}
   security:
     mock-jwt: false
 
