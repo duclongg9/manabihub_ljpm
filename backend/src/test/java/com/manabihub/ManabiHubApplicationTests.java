@@ -211,6 +211,12 @@ class ManabiHubApplicationTests {
     private com.manabihub.wallet.repository.EscrowLedgerRepository escrowLedgerRepository;
 
     @MockBean
+    private com.manabihub.order.repository.OrderItemSnapshotRepository orderItemSnapshotRepository;
+
+    @MockBean
+    private com.manabihub.wallet.repository.PlatformCommissionLedgerRepository platformCommissionLedgerRepository;
+
+    @MockBean
     private TransactionTemplate transactionTemplate;
 
     @MockBean

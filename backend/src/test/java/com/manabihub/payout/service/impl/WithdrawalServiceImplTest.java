@@ -16,6 +16,8 @@ import com.manabihub.payout.repository.WithdrawalRequestRepository;
 import com.manabihub.payout.security.PayoutSecurityService;
 import com.manabihub.payout.service.WithdrawalOtpService;
 import com.manabihub.payout.service.WithdrawalNotificationService;
+import com.manabihub.systemconfig.model.CommercialPolicy;
+import com.manabihub.systemconfig.service.CommercialPolicyService;
 import com.manabihub.wallet.entity.TeacherWallet;
 import com.manabihub.wallet.repository.TeacherWalletRepository;
 import com.manabihub.wallet.service.WalletService;
@@ -25,10 +27,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-import com.manabihub.systemconfig.service.SystemSettingValueService;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,7 +56,7 @@ class WithdrawalServiceImplTest {
     @Mock private WithdrawalNotificationService notificationService;
     @Mock private WithdrawalOtpService otpService;
     @Mock private PayoutSecurityService securityService;
-    @Mock private SystemSettingValueService settingValueService;
+    @Mock private CommercialPolicyService commercialPolicyService;
 
     @InjectMocks
     private WithdrawalServiceImpl withdrawalService;
@@ -69,14 +70,9 @@ class WithdrawalServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(
-                withdrawalService,
-                "minimumPayoutAmount",
-                minimumPayout
-        );
         org.mockito.Mockito.lenient()
-                .when(settingValueService.getDecimal(any(String.class), any(BigDecimal.class)))
-                .thenAnswer(invocation -> invocation.getArgument(1));
+                .when(commercialPolicyService.getCurrentPolicy())
+                .thenReturn(policy(minimumPayout));
 
         TeacherProfile teacherProfile = new TeacherProfile();
         teacherProfile.setId(teacherProfileId);
@@ -205,8 +201,8 @@ class WithdrawalServiceImplTest {
     void createWithdrawalRequest_UsesRuntimePayoutThresholdBeforeOtp() {
         CreateWithdrawalRequest request = newRequest();
         request.setAmount(new BigDecimal("600000"));
-        when(settingValueService.getDecimal("PAYOUT_THRESHOLD", minimumPayout))
-                .thenReturn(new BigDecimal("700000"));
+        when(commercialPolicyService.getCurrentPolicy())
+                .thenReturn(policy(new BigDecimal("700000")));
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -214,7 +210,7 @@ class WithdrawalServiceImplTest {
         );
 
         assertEquals(MessageCodes.PAYOUT_AMOUNT_BELOW_MINIMUM, exception.getMessageCode());
-        verify(settingValueService).getDecimal("PAYOUT_THRESHOLD", minimumPayout);
+        verify(commercialPolicyService).getCurrentPolicy();
         verifyNoInteractions(otpService, walletService);
         verify(teacherWalletRepository, never()).findByTeacherIdForUpdate(any());
     }
@@ -273,5 +269,20 @@ class WithdrawalServiceImplTest {
                         .accountNumber("123456789")
                         .build())
                 .build();
+    }
+
+    private CommercialPolicy policy(BigDecimal payoutThreshold) {
+        return new CommercialPolicy(
+                "VND",
+                new BigDecimal("0.20"),
+                7,
+                30,
+                14,
+                payoutThreshold,
+                BigDecimal.ZERO,
+                1,
+                2,
+                "test-policy",
+                Instant.parse("2026-07-28T00:00:00Z"));
     }
 }

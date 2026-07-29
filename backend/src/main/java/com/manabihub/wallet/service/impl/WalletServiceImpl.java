@@ -4,6 +4,8 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.systemconfig.model.CommercialPolicy;
+import com.manabihub.systemconfig.service.CommercialPolicyService;
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
 import com.manabihub.wallet.entity.TeacherWallet;
 import com.manabihub.wallet.entity.Wallet;
@@ -17,7 +19,6 @@ import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import com.manabihub.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,9 +36,7 @@ public class WalletServiceImpl implements WalletService {
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository transactionRepository;
     private final WalletMapper walletMapper;
-
-    @Value("${manabihub.wallet.minimum-payout-amount:500000}")
-    private BigDecimal minimumPayoutAmount;
+    private final CommercialPolicyService commercialPolicyService;
 
     @Override
     @Transactional(readOnly = true)
@@ -51,11 +50,15 @@ public class WalletServiceImpl implements WalletService {
         TeacherWallet wallet = teacherWalletRepository.findByTeacherId(teacherProfile.getId())
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
-        // Hardcoding clearing period and next payout date for now as per requirement constraints
-        int clearingPeriodDays = 14; 
-        LocalDate nextPayoutDate = LocalDate.now().plusDays(14); 
+        CommercialPolicy policy = commercialPolicyService.getCurrentPolicy();
+        int clearingPeriodDays = policy.escrowHoldingDays();
+        LocalDate nextPayoutDate = LocalDate.now().plusDays(clearingPeriodDays);
 
-        return walletMapper.toResponse(wallet, minimumPayoutAmount, clearingPeriodDays, nextPayoutDate);
+        return walletMapper.toResponse(
+                wallet,
+                policy.payoutThreshold(),
+                clearingPeriodDays,
+                nextPayoutDate);
     }
 
     @Override
@@ -81,6 +84,12 @@ public class WalletServiceImpl implements WalletService {
     @Transactional
     public WalletTransaction holdEscrow(TeacherProfile teacher, BigDecimal amount,
                                         String referenceType, UUID referenceId, String note) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Escrow hold amount must be positive");
+        }
+
         Wallet wallet = getOrCreateTeacherWallet(teacher);
         Wallet locked = walletRepository.findByIdForUpdate(wallet.getId())
                 .orElseThrow(() -> new BusinessException(
@@ -88,6 +97,7 @@ public class WalletServiceImpl implements WalletService {
                         "Teacher wallet was not found",
                         HttpStatus.NOT_FOUND));
 
+        locked.setBalance(locked.getBalance().add(amount));
         locked.setFrozenBalance(locked.getFrozenBalance().add(amount));
         walletRepository.save(locked);
 
@@ -199,7 +209,6 @@ public class WalletServiceImpl implements WalletService {
         }
 
         locked.setFrozenBalance(locked.getFrozenBalance().subtract(amount));
-        locked.setBalance(locked.getBalance().add(amount));
         walletRepository.save(locked);
 
         WalletTransaction transaction = WalletTransaction.builder()
@@ -213,5 +222,57 @@ public class WalletServiceImpl implements WalletService {
                 .build();
 
         return transactionRepository.save(transaction);
+    }
+
+    @Override
+    @Transactional
+    public WalletTransaction refundHeldEscrow(
+            TeacherProfile teacher,
+            BigDecimal amount,
+            String referenceType,
+            UUID referenceId,
+            String note
+    ) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Escrow refund amount must be positive");
+        }
+
+        return transactionRepository
+                .findByReferenceTypeAndReferenceIdAndTransactionType(
+                        referenceType,
+                        referenceId,
+                        WalletTransactionType.REFUND)
+                .orElseGet(() -> {
+                    Wallet wallet = getOrCreateTeacherWallet(teacher);
+                    Wallet locked = walletRepository.findByIdForUpdate(wallet.getId())
+                            .orElseThrow(() -> new BusinessException(
+                                    MessageCodes.WALLET_NOT_FOUND,
+                                    "Teacher wallet was not found",
+                                    HttpStatus.NOT_FOUND));
+
+                    if (locked.getFrozenBalance().compareTo(amount) < 0
+                            || locked.getBalance().compareTo(amount) < 0) {
+                        throw new BusinessException(
+                                MessageCodes.WALLET_INSUFFICIENT_BALANCE,
+                                "Wallet balance is lower than the escrow refund amount",
+                                HttpStatus.CONFLICT);
+                    }
+
+                    locked.setBalance(locked.getBalance().subtract(amount));
+                    locked.setFrozenBalance(locked.getFrozenBalance().subtract(amount));
+                    walletRepository.save(locked);
+
+                    return transactionRepository.save(WalletTransaction.builder()
+                            .walletId(locked.getId())
+                            .transactionType(WalletTransactionType.REFUND)
+                            .amount(amount)
+                            .direction(WalletDirection.OUT)
+                            .referenceType(referenceType)
+                            .referenceId(referenceId)
+                            .note(note)
+                            .build());
+                });
     }
 }

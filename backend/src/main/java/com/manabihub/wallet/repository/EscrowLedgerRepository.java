@@ -23,9 +23,15 @@ public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID
 
     List<EscrowLedger> findByOrder_Id(UUID orderId);
 
+    Optional<EscrowLedger> findByOrderItem_Id(UUID orderItemId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM EscrowLedger e WHERE e.id = :id")
     Optional<EscrowLedger> findByIdForUpdate(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM EscrowLedger e WHERE e.order.id = :orderId ORDER BY e.id ASC")
+    List<EscrowLedger> findByOrderIdForUpdate(@Param("orderId") UUID orderId);
 
     @Query("SELECT e FROM EscrowLedger e WHERE e.status = :status AND e.releaseAt <= :releaseAt " +
            "AND (e.createdAt > :lastCreatedAt OR (e.createdAt = :lastCreatedAt AND e.id > :lastId)) " +
