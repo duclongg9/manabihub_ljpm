@@ -395,7 +395,10 @@ public class CourseServiceImpl implements CourseService {
                 .id(module.getId())
                 .title(module.getTitle())
                 .orderIndex(module.getOrderIndex())
-                .blocks(module.getBlocks().stream().map(this::mapBlockToPublicResponse).toList())
+                .blocks(module.getBlocks().stream()
+                        .filter(block -> !block.isModerationHidden())
+                        .map(this::mapBlockToPublicResponse)
+                        .toList())
                 .build();
     }
 
@@ -665,7 +668,9 @@ public class CourseServiceImpl implements CourseService {
     ) {
         int totalLessons = 0;
         for (CourseModule module : course.getModules()) {
-            totalLessons += module.getBlocks().size();
+            totalLessons += Math.toIntExact(module.getBlocks().stream()
+                    .filter(block -> !block.isModerationHidden())
+                    .count());
         }
 
         String teacherName = null;

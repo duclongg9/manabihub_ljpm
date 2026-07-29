@@ -233,6 +233,24 @@ class StudentAssessmentServiceImplTest {
     }
 
     @Test
+    void getFinalTestEligibility_ignoresModerationHiddenLessons() {
+        textBlock.setModerationHidden(true);
+        when(finalTestRepository.findByCourseId(course.getId())).thenReturn(Optional.of(finalTest));
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollment.getId()))
+                .thenReturn(List.of(completedProgress(quizBlock)));
+        when(finalTestAttemptRepository.countByEnrollmentIdAndFinalTestId(
+                enrollment.getId(),
+                finalTest.getId()
+        )).thenReturn(0L);
+
+        var result = service.getFinalTestEligibility(course.getId());
+
+        assertTrue(result.eligible());
+        assertEquals(1, result.completedLessons());
+        assertEquals(1, result.totalLessons());
+    }
+
+    @Test
     void startFinalTest_returnsQuestionsWithoutCorrectnessMetadata() {
         mockAllLessonsCompleted();
         when(finalTestRepository.findByCourseId(course.getId())).thenReturn(Optional.of(finalTest));

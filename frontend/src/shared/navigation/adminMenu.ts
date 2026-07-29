@@ -6,6 +6,7 @@ import RuleIcon from '@mui/icons-material/Rule';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 
 export const ADMIN_MENU = [
   {
@@ -37,6 +38,12 @@ export const ADMIN_MENU = [
     path: ROUTES.ADMIN.COURSE_APPROVAL,
     icon: RuleIcon,
     roles: [ROLES.COURSE_MANAGER],
+  },
+  {
+    title: 'Báo cáo vi phạm',
+    path: ROUTES.ADMIN.VIOLATIONS,
+    icon: ReportProblemOutlinedIcon,
+    roles: [ROLES.COURSE_MANAGER, ROLES.SYSTEM_ADMIN],
   },
   {
     title: 'Payout Settlement',

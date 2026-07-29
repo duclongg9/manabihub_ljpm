@@ -183,6 +183,18 @@ class ManabiHubApplicationTests {
     @MockBean
     private CourseReviewRepository courseReviewRepository;
 
+    @MockBean
+    private com.manabihub.moderation.repository.ViolationReportRepository violationReportRepository;
+
+    @MockBean
+    private com.manabihub.moderation.repository.ViolationEvidenceRepository violationEvidenceRepository;
+
+    @MockBean
+    private com.manabihub.moderation.repository.ModerationDecisionRepository moderationDecisionRepository;
+
+    @MockBean
+    private com.manabihub.moderation.repository.ModerationActionRecordRepository moderationActionRecordRepository;
+
     // UC-08 purchase flow repositories.
     @MockBean
     private com.manabihub.order.repository.OrderRepository orderRepository;

@@ -51,4 +51,24 @@ public interface InternalAdminAccountRepository extends JpaRepository<InternalAd
             @Param("status") AccountStatus status,
             @Param("roleCode") RoleCode roleCode
     );
+
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM internal_admin_accounts account
+                JOIN internal_admin_roles assignment
+                  ON assignment.admin_account_id = account.id
+                JOIN role_permissions role_permission
+                  ON role_permission.role_id = assignment.role_id
+                JOIN permissions permission
+                  ON permission.id = role_permission.permission_id
+                WHERE account.id = :adminId
+                  AND account.account_status = 'ACTIVE'
+                  AND permission.code = :permissionCode
+            )
+            """, nativeQuery = true)
+    boolean hasPermission(
+            @Param("adminId") UUID adminId,
+            @Param("permissionCode") String permissionCode
+    );
 }

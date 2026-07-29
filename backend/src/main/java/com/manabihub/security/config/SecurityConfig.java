@@ -51,13 +51,16 @@ public class SecurityConfig {
 
     private final TeacherEligibilityFilter teacherEligibilityFilter;
     private final InternalAdminRoleFilter internalAdminRoleFilter;
+    private final AppUserStatusFilter appUserStatusFilter;
 
     public SecurityConfig(
             TeacherEligibilityFilter teacherEligibilityFilter,
-            InternalAdminRoleFilter internalAdminRoleFilter
+            InternalAdminRoleFilter internalAdminRoleFilter,
+            AppUserStatusFilter appUserStatusFilter
     ) {
         this.teacherEligibilityFilter = teacherEligibilityFilter;
         this.internalAdminRoleFilter = internalAdminRoleFilter;
+        this.appUserStatusFilter = appUserStatusFilter;
     }
 
     @Bean
@@ -108,6 +111,7 @@ public class SecurityConfig {
 
         http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
         http.addFilterAfter(internalAdminRoleFilter, BearerTokenAuthenticationFilter.class);
+        http.addFilterAfter(appUserStatusFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }
@@ -239,6 +243,16 @@ public class SecurityConfig {
             InternalAdminRoleFilter filter
     ) {
         FilterRegistrationBean<InternalAdminRoleFilter> registration =
+                new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<AppUserStatusFilter> appUserStatusFilterRegistration(
+            AppUserStatusFilter filter
+    ) {
+        FilterRegistrationBean<AppUserStatusFilter> registration =
                 new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;

@@ -8,7 +8,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import java.util.Collection;
 import java.util.List;
@@ -18,6 +20,18 @@ import java.util.UUID;
 public interface CourseReviewRepository extends JpaRepository<CourseReview, UUID> {
 
     Optional<CourseReview> findByEnrollment_Id(UUID enrollmentId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "enrollment",
+            "enrollment.student",
+            "enrollment.student.user",
+            "enrollment.course",
+            "enrollment.course.teacher",
+            "enrollment.course.teacher.user"
+    })
+    @Query("SELECT review FROM CourseReview review WHERE review.id = :reviewId")
+    Optional<CourseReview> findByIdForModeration(@Param("reviewId") UUID reviewId);
 
     @EntityGraph(attributePaths = {
             "enrollment",
