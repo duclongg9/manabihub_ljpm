@@ -6,6 +6,7 @@ import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
+import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.ApplicationArguments;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -44,6 +46,8 @@ class ProductionAdminBootstrapInitializerTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private AuditLogRepository auditLogRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
     @Mock
     private ApplicationArguments applicationArguments;
 
@@ -95,7 +99,8 @@ class ProductionAdminBootstrapInitializerTest {
                 RoleCode.SYSTEM_ADMIN
         )).thenReturn(List.of());
         when(roleRepository.findByCode(RoleCode.SYSTEM_ADMIN)).thenReturn(Optional.of(systemAdminRole));
-        when(adminAccountRepository.findByEmail("admin@example.com")).thenReturn(Optional.empty());
+        when(adminAccountRepository.findByEmailIgnoreCaseForUpdate("admin@example.com"))
+                .thenReturn(Optional.empty());
         when(passwordEncoder.encode(STRONG_PASSWORD)).thenReturn("bcrypt-hash");
         when(adminAccountRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             InternalAdminAccount account = invocation.getArgument(0);
@@ -134,13 +139,14 @@ class ProductionAdminBootstrapInitializerTest {
         disabledAccount.setId(UUID.randomUUID());
         disabledAccount.setEmail("admin@example.com");
         disabledAccount.setAccountStatus(AccountStatus.DISABLED);
+        disabledAccount.setCredentialVersion(4);
 
         when(adminAccountRepository.findAllByStatusAndRoleCodeForUpdate(
                 AccountStatus.ACTIVE,
                 RoleCode.SYSTEM_ADMIN
         )).thenReturn(List.of());
         when(roleRepository.findByCode(RoleCode.SYSTEM_ADMIN)).thenReturn(Optional.of(systemAdminRole));
-        when(adminAccountRepository.findByEmail("admin@example.com"))
+        when(adminAccountRepository.findByEmailIgnoreCaseForUpdate("admin@example.com"))
                 .thenReturn(Optional.of(disabledAccount));
         when(passwordEncoder.encode(STRONG_PASSWORD)).thenReturn("new-hash");
         when(adminAccountRepository.saveAndFlush(disabledAccount)).thenReturn(disabledAccount);
@@ -151,6 +157,19 @@ class ProductionAdminBootstrapInitializerTest {
         assertThat(disabledAccount.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(disabledAccount.getRole()).isSameAs(systemAdminRole);
         assertThat(disabledAccount.getPasswordHash()).isEqualTo("new-hash");
+        assertThat(disabledAccount.getCredentialVersion()).isEqualTo(5);
+        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue())
+                .isInstanceOfSatisfying(
+                        InternalAdminSessionsInvalidatedEvent.class,
+                        invalidated -> {
+                            assertThat(invalidated.adminAccountId())
+                                    .isEqualTo(disabledAccount.getId());
+                            assertThat(invalidated.reason())
+                                    .isEqualTo("BOOTSTRAP_CREDENTIAL_REPLACED");
+                        }
+                );
         verify(auditLogRepository).save(any(AuditLog.class));
     }
 
@@ -181,6 +200,7 @@ class ProductionAdminBootstrapInitializerTest {
                 roleRepository,
                 passwordEncoder,
                 auditLogRepository,
+                eventPublisher,
                 email,
                 password,
                 fullName

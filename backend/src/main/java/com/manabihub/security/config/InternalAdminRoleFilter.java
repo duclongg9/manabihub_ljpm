@@ -35,15 +35,26 @@ public class InternalAdminRoleFilter extends OncePerRequestFilter {
     private static final List<String> ADMIN_ROOTS = List.of("/api/v1/admin", "/api/admin");
     private static final List<String> PUBLIC_ADMIN_AUTH_PATHS = List.of(
             "/api/admin/auth/login",
-            "/api/admin/auth/setup-password"
+            "/api/admin/auth/setup-password",
+            "/api/admin/auth/refresh",
+            "/api/admin/auth/logout",
+            "/api/admin/auth/password/forgot",
+            "/api/admin/auth/password/reset"
     );
     private static final String LIVE_ROLE_SQL = """
-            SELECT roles.code
+            SELECT roles.code,
+                   accounts.credential_version AS account_version,
+                   sessions.credential_version AS session_version
             FROM internal_admin_accounts accounts
             JOIN internal_admin_roles assignments ON assignments.admin_account_id = accounts.id
             JOIN roles ON roles.id = assignments.role_id
+            JOIN internal_admin_sessions sessions ON sessions.admin_account_id = accounts.id
             WHERE accounts.id = ?
+              AND sessions.id = ?
               AND accounts.account_status = 'ACTIVE'
+              AND sessions.revoked_at IS NULL
+              AND sessions.expires_at > CURRENT_TIMESTAMP
+              AND sessions.idle_expires_at > CURRENT_TIMESTAMP
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -73,23 +84,44 @@ public class InternalAdminRoleFilter extends OncePerRequestFilter {
         }
 
         UUID adminId;
+        UUID sessionId;
+        long tokenCredentialVersion;
         try {
             adminId = UUID.fromString(jwt.getSubject());
-        } catch (IllegalArgumentException | NullPointerException exception) {
+            sessionId = UUID.fromString(jwt.getClaimAsString("sid"));
+            Number credentialVersion = jwt.getClaim("cv");
+            tokenCredentialVersion = credentialVersion.longValue();
+        } catch (IllegalArgumentException
+                 | NullPointerException
+                 | ClassCastException exception) {
             writeStaleSession(request, response);
             return;
         }
 
-        List<String> liveRoles = jdbcTemplate.queryForList(
+        List<LiveAdminSession> liveSessions = jdbcTemplate.query(
                 LIVE_ROLE_SQL,
-                String.class,
-                adminId
+                (resultSet, rowNumber) -> new LiveAdminSession(
+                        resultSet.getString("code"),
+                        resultSet.getLong("account_version"),
+                        resultSet.getLong("session_version")
+                ),
+                adminId,
+                sessionId
         );
-        boolean jwtMatchesLiveRole = liveRoles.size() == 1
+        boolean internalAdminToken = "ADMIN_ACCESS".equals(jwt.getClaimAsString("type"))
+                && "manabihub-admin".equals(jwt.getClaimAsString("iss"))
+                && jwt.getAudience() != null
+                && jwt.getAudience().contains("admin-api");
+        boolean jwtMatchesLiveState = internalAdminToken
+                && liveSessions.size() == 1
+                && liveSessions.getFirst().accountVersion() == tokenCredentialVersion
+                && liveSessions.getFirst().sessionVersion() == tokenCredentialVersion
                 && authentication.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + liveRoles.getFirst()));
+                .anyMatch(authority -> authority.getAuthority().equals(
+                        "ROLE_" + liveSessions.getFirst().role()
+                ));
 
-        if (!jwtMatchesLiveRole) {
+        if (!jwtMatchesLiveState) {
             log.warn(
                     "Admin session rejected for account {} on {} because the JWT role does not match live state.",
                     adminId,
@@ -123,5 +155,12 @@ public class InternalAdminRoleFilter extends OncePerRequestFilter {
 
     private boolean matchesPathOrDescendant(String path, String root) {
         return path.equals(root) || path.startsWith(root + "/");
+    }
+
+    record LiveAdminSession(
+            String role,
+            long accountVersion,
+            long sessionVersion
+    ) {
     }
 }

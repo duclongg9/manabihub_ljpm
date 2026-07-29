@@ -2,8 +2,11 @@ package com.manabihub.identity.event;
 
 import com.manabihub.common.mail.EmailService;
 import com.manabihub.identity.enums.RoleCode;
+import com.manabihub.identity.service.InternalAdminCredentialDeliveryFailureService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -15,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class InternalAdminInvitationEmailListener {
 
     private static final DateTimeFormatter EXPIRY_FORMAT =
@@ -22,11 +26,13 @@ public class InternalAdminInvitationEmailListener {
                     .withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
 
     private final EmailService emailService;
+    private final InternalAdminCredentialDeliveryFailureService deliveryFailureService;
 
     @Value("${app.frontend.base-url:http://localhost:5173}")
     private String frontendBaseUrl;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Async
     public void sendInvitation(InternalAdminInvitationIssuedEvent event) {
         String setupUrl = UriComponentsBuilder
                 .fromUriString(frontendBaseUrl.replaceAll("/+$", ""))
@@ -51,11 +57,19 @@ public class InternalAdminInvitationEmailListener {
                 bạn cung cấp mã mời cho người khác.</p>
                 """.formatted(safeName, safeRole, safeUrl, expiry);
 
-        emailService.sendEmail(
-                event.email(),
-                "Thiết lập tài khoản quản trị ManabiHub",
-                body
-        );
+        try {
+            emailService.sendEmailSynchronously(
+                    event.email(),
+                    "Thiết lập tài khoản quản trị ManabiHub",
+                    body
+            );
+        } catch (RuntimeException exception) {
+            log.error(
+                    "Internal administrator invitation email delivery failed",
+                    exception
+            );
+            deliveryFailureService.revokeInvitation(event.rawToken());
+        }
     }
 
     private String roleLabel(RoleCode role) {

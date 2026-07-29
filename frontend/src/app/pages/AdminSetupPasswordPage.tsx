@@ -241,6 +241,5 @@ function readInvitationToken() {
   const fragmentToken = new URLSearchParams(
     window.location.hash.replace(/^#/, ''),
   ).get('token');
-  const legacyQueryToken = new URLSearchParams(window.location.search).get('token');
-  return fragmentToken ?? legacyQueryToken ?? '';
+  return fragmentToken ?? '';
 }

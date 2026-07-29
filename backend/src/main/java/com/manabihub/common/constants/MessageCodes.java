@@ -50,6 +50,20 @@ public final class MessageCodes {
     public static final String AUTH_TOKEN_INVALID = "AUTH_TOKEN_INVALID";
     public static final String AUTH_LOGIN_SUCCESS = "AUTH_LOGIN_SUCCESS";
     public static final String AUTH_LOGOUT_SUCCESS = "AUTH_LOGOUT_SUCCESS";
+    public static final String ADMIN_SESSION_INVALID = "ADMIN_SESSION_INVALID";
+    public static final String ADMIN_PASSWORD_RESET_REQUEST_ACCEPTED =
+            "ADMIN_PASSWORD_RESET_REQUEST_ACCEPTED";
+    public static final String ADMIN_PASSWORD_RESET_COMPLETED =
+            "ADMIN_PASSWORD_RESET_COMPLETED";
+    public static final String ADMIN_PASSWORD_RESET_INVALID =
+            "ADMIN_PASSWORD_RESET_INVALID";
+    public static final String ADMIN_PASSWORD_CHANGED = "ADMIN_PASSWORD_CHANGED";
+    public static final String ADMIN_PASSWORD_REUSE_FORBIDDEN =
+            "ADMIN_PASSWORD_REUSE_FORBIDDEN";
+    public static final String ADMIN_CURRENT_PASSWORD_INVALID =
+            "ADMIN_CURRENT_PASSWORD_INVALID";
+    public static final String ADMIN_PASSWORD_CHANGE_RATE_LIMITED =
+            "ADMIN_PASSWORD_CHANGE_RATE_LIMITED";
     public static final String MSG_AUTH_007 = "MSG-AUTH-007"; // Admin login failed
     public static final String MSG_AUTH_008 = "MSG-AUTH-008"; // Admin account locked
     public static final String MSG_AUTH_009 = "MSG-AUTH-009";

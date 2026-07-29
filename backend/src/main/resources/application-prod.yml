@@ -67,6 +67,9 @@ manabihub:
       full-name: ${ADMIN_BOOTSTRAP_FULL_NAME:ManabiHub System Administrator}
   security:
     mock-jwt: false
+  admin-auth:
+    cookie-secure: true
+    cookie-same-site: None
 
 jwt:
   secret: ${JWT_SECRET}

@@ -18,6 +18,7 @@ import com.manabihub.identity.service.InternalAdminPasswordPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -92,7 +93,7 @@ public class InternalAdminInvitationServiceImpl implements InternalAdminInvitati
         account.setRole(role);
         account.setAccountStatus(AccountStatus.DISABLED);
         account.setPasswordHash(passwordEncoder.encode(randomToken()));
-        InternalAdminAccount saved = adminRepository.saveAndFlush(account);
+        InternalAdminAccount saved = saveInvitedAccount(account);
 
         issueInvitation(actor, saved);
         auditLogService.logAdminAction(
@@ -179,6 +180,7 @@ public class InternalAdminInvitationServiceImpl implements InternalAdminInvitati
         }
 
         account.setPasswordHash(passwordEncoder.encode(password));
+        account.setCredentialVersion(account.getCredentialVersion() + 1);
         account.setAccountStatus(AccountStatus.ACTIVE);
         adminRepository.save(account);
         invitation.setUsedAt(now);
@@ -246,6 +248,35 @@ public class InternalAdminInvitationServiceImpl implements InternalAdminInvitati
                 rawToken,
                 saved.getExpiresAt()
         ));
+    }
+
+    private InternalAdminAccount saveInvitedAccount(InternalAdminAccount account) {
+        try {
+            return adminRepository.saveAndFlush(account);
+        } catch (DataIntegrityViolationException exception) {
+            if (containsConstraint(
+                    exception,
+                    "internal_admin_accounts_email_key"
+            )) {
+                throw invitationConflict();
+            }
+            throw exception;
+        }
+    }
+
+    private boolean containsConstraint(
+            Throwable exception,
+            String constraintName
+    ) {
+        Throwable current = exception;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.contains(constraintName)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private InternalAdminAccount requireLiveSystemAdmin(UUID actorId) {

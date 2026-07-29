@@ -6,6 +6,7 @@ import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
+import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,6 +41,7 @@ public class ProductionAdminBootstrapInitializer implements ApplicationRunner {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogRepository auditLogRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final String bootstrapEmail;
     private final String bootstrapPassword;
     private final String bootstrapFullName;
@@ -48,6 +52,7 @@ public class ProductionAdminBootstrapInitializer implements ApplicationRunner {
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
             AuditLogRepository auditLogRepository,
+            ApplicationEventPublisher eventPublisher,
             @Value("${manabihub.bootstrap.admin.email:}") String bootstrapEmail,
             @Value("${manabihub.bootstrap.admin.password:}") String bootstrapPassword,
             @Value("${manabihub.bootstrap.admin.full-name:ManabiHub System Administrator}")
@@ -58,6 +63,7 @@ public class ProductionAdminBootstrapInitializer implements ApplicationRunner {
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditLogRepository = auditLogRepository;
+        this.eventPublisher = eventPublisher;
         this.bootstrapEmail = bootstrapEmail;
         this.bootstrapPassword = bootstrapPassword;
         this.bootstrapFullName = bootstrapFullName;
@@ -84,14 +90,29 @@ public class ProductionAdminBootstrapInitializer implements ApplicationRunner {
                         "SYSTEM_ADMIN role is missing; production admin bootstrap cannot continue."
                 ));
 
-        InternalAdminAccount account = adminAccountRepository.findByEmail(credential.email())
+        InternalAdminAccount account = adminAccountRepository
+                .findByEmailIgnoreCaseForUpdate(credential.email())
                 .orElseGet(InternalAdminAccount::new);
+        boolean reactivatingExistingAccount = account.getId() != null;
         account.setEmail(credential.email());
         account.setFullName(credential.fullName());
         account.setPasswordHash(passwordEncoder.encode(credential.password()));
         account.setAccountStatus(AccountStatus.ACTIVE);
         account.setRole(systemAdminRole);
+        if (reactivatingExistingAccount) {
+            account.setCredentialVersion(Math.max(
+                    1,
+                    account.getCredentialVersion() + 1
+            ));
+        }
         InternalAdminAccount savedAccount = adminAccountRepository.saveAndFlush(account);
+        if (reactivatingExistingAccount) {
+            eventPublisher.publishEvent(new InternalAdminSessionsInvalidatedEvent(
+                    savedAccount.getId(),
+                    "BOOTSTRAP_CREDENTIAL_REPLACED",
+                    Instant.now()
+            ));
+        }
 
         auditLogRepository.save(AuditLog.builder()
                 .actorType("SYSTEM")

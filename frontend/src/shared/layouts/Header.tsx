@@ -18,6 +18,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LoginIcon from '@mui/icons-material/Login';
+import PasswordIcon from '@mui/icons-material/Password';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -28,6 +29,7 @@ import {
 } from '../auth/authSession';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
+import { logoutAdminSession } from '../auth/adminAuthApi';
 
 interface HeaderProps {
   menuExpanded?: boolean;
@@ -57,11 +59,22 @@ export const Header: React.FC<HeaderProps> = ({
   const primaryRole = session?.roles[0];
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (!session) return;
 
     setAccountAnchor(null);
-    clearAuthSession(session.kind);
+    if (session.kind === 'admin') {
+      const serverSessionRevoked = await logoutAdminSession();
+      navigate(
+        serverSessionRevoked
+          ? getLoginRoute(session.kind)
+          : `${getLoginRoute(session.kind)}?reason=logout-local-only`,
+        { replace: true },
+      );
+      return;
+    } else {
+      clearAuthSession(session.kind);
+    }
     navigate(getLoginRoute(session.kind), { replace: true });
   };
 
@@ -151,7 +164,16 @@ export const Header: React.FC<HeaderProps> = ({
               Hồ sơ
             </MenuItem>
           )}
-          <MenuItem onClick={handleLogout}>
+          {session.kind === 'admin' && (
+            <MenuItem onClick={() => {
+              setAccountAnchor(null);
+              navigate(ROUTES.ADMIN.CHANGE_PASSWORD);
+            }}>
+              <ListItemIcon><PasswordIcon fontSize="small" /></ListItemIcon>
+              Đổi mật khẩu
+            </MenuItem>
+          )}
+          <MenuItem onClick={() => void handleLogout()}>
             <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
             Đăng xuất
           </MenuItem>
