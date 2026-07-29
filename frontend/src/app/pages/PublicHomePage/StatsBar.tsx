@@ -5,11 +5,31 @@ import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import GroupsIcon from '@mui/icons-material/Groups';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 
-const STATS = [
-  { icon: <GroupsIcon sx={{ fontSize: 28 }} />, value: '500+', label: 'Học viên', color: '#C41E3A' },
-  { icon: <AutoStoriesIcon sx={{ fontSize: 28 }} />, value: '50+', label: 'Khóa học', color: '#D4A017' },
-  { icon: <SchoolIcon sx={{ fontSize: 28 }} />, value: '10+', label: 'Giảng viên', color: '#5B8C5A' },
-  { icon: <EmojiEventsIcon sx={{ fontSize: 28 }} />, value: 'N5→N1', label: 'Đầy đủ cấp độ', color: '#1B2A4A' },
+const HIGHLIGHTS = [
+  {
+    icon: <EmojiEventsIcon sx={{ fontSize: 28 }} />,
+    value: 'N5 → N1',
+    label: 'Lộ trình JLPT',
+    color: '#C41E3A',
+  },
+  {
+    icon: <SchoolIcon sx={{ fontSize: 28 }} />,
+    value: 'Xác minh',
+    label: 'Hồ sơ giảng viên',
+    color: '#D4A017',
+  },
+  {
+    icon: <AutoStoriesIcon sx={{ fontSize: 28 }} />,
+    value: 'Thực hành',
+    label: 'Video, quiz, flashcard và viết',
+    color: '#5B8C5A',
+  },
+  {
+    icon: <GroupsIcon sx={{ fontSize: 28 }} />,
+    value: 'Minh bạch',
+    label: 'Thanh toán và chính sách',
+    color: '#1B2A4A',
+  },
 ];
 
 export const StatsBar: React.FC = () => {
@@ -61,9 +81,9 @@ export const StatsBar: React.FC = () => {
               gap: { xs: 4, sm: 2 },
             }}
           >
-            {STATS.map((stat, index) => (
+            {HIGHLIGHTS.map((stat, index) => (
               <Box
-                key={index}
+                key={stat.label}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',

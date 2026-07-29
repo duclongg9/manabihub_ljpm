@@ -27,6 +27,7 @@ const TOKEN_KEYS: Record<AuthSessionKind, string> = {
 const ADMIN_CSRF_KEY = 'admin_csrf_token';
 const ADMIN_REFRESH_EXPECTED_KEY = 'admin_refresh_expected';
 const ADMIN_REMEMBERED_KEY = 'admin_remembered';
+const LEGACY_PUBLIC_TOKEN_KEYS = ['auth_session'];
 const AUTH_SESSION_CHANGED_EVENT = 'manabihub:auth-session-changed';
 const ADMIN_SESSION_CHANNEL = 'manabihub-admin-session';
 let adminAccessToken: string | null = null;
@@ -116,6 +117,8 @@ export function clearAuthSession(kind: AuthSessionKind) {
       broadcastAdminSession({ type: 'SIGNED_OUT' });
     } else {
       window.localStorage.removeItem(TOKEN_KEYS.public);
+      LEGACY_PUBLIC_TOKEN_KEYS.forEach((key) => window.localStorage.removeItem(key));
+      window.sessionStorage.removeItem(RETURN_TO_KEYS.public);
     }
     notifySessionChanged(kind);
   }
@@ -204,8 +207,18 @@ export function subscribeToAuthSessionChanges(listener: () => void) {
     return () => undefined;
   }
 
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === TOKEN_KEYS.public || LEGACY_PUBLIC_TOKEN_KEYS.includes(event.key ?? '')) {
+      listener();
+    }
+  };
+
   window.addEventListener(AUTH_SESSION_CHANGED_EVENT, listener);
-  return () => window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, listener);
+  window.addEventListener('storage', handleStorage);
+  return () => {
+    window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, listener);
+    window.removeEventListener('storage', handleStorage);
+  };
 }
 
 export function hasAnyRole(session: AuthSession, allowedRoles: readonly string[]) {
