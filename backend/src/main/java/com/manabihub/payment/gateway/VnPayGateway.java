@@ -26,6 +26,10 @@ import java.util.stream.Collectors;
 /**
  * VNPay implementation of {@link PaymentGateway} following the VNPay 2.1.0
  * pay/IPN contract (HMAC-SHA512 checksum over sorted, URL-encoded parameters).
+ * <p>
+ * Everything is expressed in terms of a {@link PaymentIntent}; the {@code Order} overloads
+ * simply adapt an order into one, so course purchases (UC-08) and wallet top-ups (UC-17)
+ * share exactly the same signing and verification code path.
  */
 @Component
 @RequiredArgsConstructor
@@ -49,8 +53,8 @@ public class VnPayGateway implements PaymentGateway {
     }
 
     @Override
-    public String buildPaymentUrl(Order order, String clientIp) {
-        Map<String, String> params = baseRequestParams(order, clientIp);
+    public String buildPaymentUrl(PaymentIntent intent, String clientIp) {
+        Map<String, String> params = baseRequestParams(intent, clientIp);
 
         List<String> fieldNames = new ArrayList<>(params.keySet());
         java.util.Collections.sort(fieldNames);
@@ -76,6 +80,11 @@ public class VnPayGateway implements PaymentGateway {
         query.append('&').append(SECURE_HASH).append('=').append(secureHash);
 
         return properties.getPayUrl() + "?" + query;
+    }
+
+    @Override
+    public String buildPaymentUrl(Order order, String clientIp) {
+        return buildPaymentUrl(toIntent(order), clientIp);
     }
 
     @Override
@@ -109,39 +118,53 @@ public class VnPayGateway implements PaymentGateway {
     }
 
     @Override
-    public Map<String, String> buildSignedCallbackParams(Order order, boolean success) {
+    public Map<String, String> buildSignedCallbackParams(PaymentIntent intent, boolean success) {
         Map<String, String> params = new HashMap<>();
         params.put("vnp_TmnCode", properties.getTmnCode());
-        params.put("vnp_Amount", minorAmount(order));
+        params.put("vnp_Amount", minorAmount(intent.amount()));
         params.put("vnp_BankCode", "NCB");
         params.put("vnp_CardType", "ATM");
-        params.put("vnp_OrderInfo", orderInfo(order));
+        params.put("vnp_OrderInfo", intent.description());
         params.put("vnp_PayDate", VNP_TIME.format(Instant.now()));
         params.put("vnp_ResponseCode", success ? "00" : "24");
         params.put("vnp_TransactionNo", String.format("%010d", Math.abs(RANDOM.nextLong() % 10_000_000_000L)));
         params.put("vnp_TransactionStatus", success ? "00" : "02");
-        params.put("vnp_TxnRef", order.getOrderCode());
+        params.put("vnp_TxnRef", intent.reference());
         params.put("vnp_SecureHashType", "SHA512");
 
         params.put(SECURE_HASH, sign(params));
         return params;
     }
 
+    @Override
+    public Map<String, String> buildSignedCallbackParams(Order order, boolean success) {
+        return buildSignedCallbackParams(toIntent(order), success);
+    }
+
     // ── internals ───────────────────────────────────────────────────────────
 
-    private Map<String, String> baseRequestParams(Order order, String clientIp) {
+    /** Adapts a course order into the provider-neutral intent shape. */
+    private PaymentIntent toIntent(Order order) {
+        return new PaymentIntent(
+                order.getOrderCode(),
+                order.getTotalAmount(),
+                "Thanh toan don hang " + order.getOrderCode(),
+                PaymentIntent.withQuery(properties.getReturnUrl(), "orderId=" + order.getId()));
+    }
+
+    private Map<String, String> baseRequestParams(PaymentIntent intent, String clientIp) {
         Instant now = Instant.now();
         Map<String, String> params = new HashMap<>();
         params.put("vnp_Version", properties.getVersion());
         params.put("vnp_Command", properties.getCommand());
         params.put("vnp_TmnCode", properties.getTmnCode());
-        params.put("vnp_Amount", minorAmount(order));
+        params.put("vnp_Amount", minorAmount(intent.amount()));
         params.put("vnp_CurrCode", properties.getCurrency());
-        params.put("vnp_TxnRef", order.getOrderCode());
-        params.put("vnp_OrderInfo", orderInfo(order));
+        params.put("vnp_TxnRef", intent.reference());
+        params.put("vnp_OrderInfo", intent.description());
         params.put("vnp_OrderType", properties.getOrderType());
         params.put("vnp_Locale", properties.getLocale());
-        params.put("vnp_ReturnUrl", buildReturnUrl(order));
+        params.put("vnp_ReturnUrl", intent.returnUrl());
         params.put("vnp_IpAddr", clientIp == null || clientIp.isBlank() ? "127.0.0.1" : clientIp);
         params.put("vnp_CreateDate", VNP_TIME.format(now));
         params.put("vnp_ExpireDate", VNP_TIME.format(now.plus(Duration.ofMinutes(15))));
@@ -149,18 +172,8 @@ public class VnPayGateway implements PaymentGateway {
     }
 
     /** VNPay amount is expressed in minor units (VND × 100), integer, no decimals. */
-    private String minorAmount(Order order) {
-        return String.valueOf(order.getTotalAmount().multiply(MINOR_UNIT_FACTOR).longValue());
-    }
-
-    private String orderInfo(Order order) {
-        return "Thanh toan don hang " + order.getOrderCode();
-    }
-
-    private String buildReturnUrl(Order order) {
-        String base = properties.getReturnUrl();
-        String separator = base.contains("?") ? "&" : "?";
-        return base + separator + "orderId=" + order.getId();
+    private String minorAmount(BigDecimal amount) {
+        return String.valueOf(amount.multiply(MINOR_UNIT_FACTOR).longValue());
     }
 
     /**

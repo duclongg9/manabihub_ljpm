@@ -12,6 +12,8 @@ export const ROUTES = {
     MY_COURSES: '/student/courses',
     BROWSE_COURSES: '/student/browse',
     WISHLIST: '/student/wishlist',
+    WALLET: '/student/wallet',
+    WALLET_TOPUP_RETURN: '/student/wallet/top-up/return',
     COURSE_LEARN: (courseId: string) => `/student/courses/${courseId}/learn`,
     PAYMENTS: '/student/payments',
     NOTIFICATIONS: '/student/notifications',

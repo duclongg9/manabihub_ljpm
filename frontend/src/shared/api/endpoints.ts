@@ -39,6 +39,17 @@ export const ENDPOINTS = {
     wishlist: '/v1/student/wishlist',
     wishlistCourse: (courseId: string) => `/v1/student/wishlist/${courseId}`,
   },
+  studentWallet: {
+    summary: '/v1/student/wallet',
+    transactions: '/v1/student/wallet/transactions',
+    topUps: '/v1/student/wallet/top-ups',
+    topUpDetail: (topUpId: string) => `/v1/student/wallet/top-ups/${topUpId}`,
+  },
+  teacherWallet: {
+    summary: '/v1/teacher/wallet',
+    escrow: '/v1/teacher/wallet/escrow',
+    transactions: '/v1/teacher/wallet/transactions',
+  },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>
       `/v1/student/courses/${courseId}/lesson-blocks/${lessonBlockId}/ai-chat/eligibility`,
@@ -76,6 +87,8 @@ export const ENDPOINTS = {
     devIpn: '/v1/payments/dev/ipn',
     // Confirms an order from the browser return redirect (checksum-verified backend-side).
     confirmReturn: '/v1/payments/vnpay/confirm-return',
+    // Local dev simulator for the UC-17 wallet top-up callback.
+    devWalletTopUpIpn: '/v1/payments/dev/wallet-topup-ipn',
   },
   LEARNING: {
     COURSE_LEARN: (courseId: string) => `/v1/student/courses/${courseId}/learn`,

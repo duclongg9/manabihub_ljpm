@@ -32,6 +32,13 @@ public class VnPayProperties {
     /** Where VNPay redirects the browser after payment (a frontend page that polls order status). */
     private String returnUrl = "http://localhost:5173/checkout/return";
 
+    /**
+     * Where VNPay redirects the browser after a wallet top-up (UC-17) — a frontend page that
+     * polls the top-up status. Separate from {@link #returnUrl} because a top-up has no order
+     * and lands back inside the student's wallet, not the course player.
+     */
+    private String walletReturnUrl = "http://localhost:5173/student/wallet/top-up/return";
+
     private String version = "2.1.0";
     private String command = "pay";
     private String orderType = "other";

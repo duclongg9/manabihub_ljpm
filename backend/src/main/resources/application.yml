@@ -53,6 +53,7 @@ manabihub:
       pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
       api-url: ${VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
       return-url: ${VNPAY_RETURN_URL:http://localhost:5173/checkout/return}
+      wallet-return-url: ${VNPAY_WALLET_RETURN_URL:http://localhost:5173/student/wallet/top-up/return}
       version: ${VNPAY_VERSION:2.1.0}
       command: ${VNPAY_COMMAND:pay}
       order-type: ${VNPAY_ORDER_TYPE:other}

@@ -88,6 +88,7 @@ public class SecurityConfig {
                                 "/api/v1/payments/vnpay/ipn",
                                 "/api/v1/payments/vnpay/confirm-return",
                                 "/api/v1/payments/dev/ipn",
+                                "/api/v1/payments/dev/wallet-topup-ipn",
                                 "/uploads/course-thumbnails/**",
                                 "/uploads/user-avatars/**",
                                 "/api/admin/auth/login")

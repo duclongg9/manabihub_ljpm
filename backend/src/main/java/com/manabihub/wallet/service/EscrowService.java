@@ -1,5 +1,6 @@
 package com.manabihub.wallet.service;
 
+import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.order.entity.Order;
 import com.manabihub.wallet.entity.EscrowLedger;
 
@@ -17,4 +18,11 @@ public interface EscrowService {
      * existing entries.
      */
     List<EscrowLedger> holdForOrder(Order order);
+
+    /**
+     * Returns the teacher's escrow entries that are not yet released (status
+     * {@code HELD} or {@code FROZEN}) for the UC-17 "pending escrow" section,
+     * newest first.
+     */
+    List<EscrowLedger> findPendingEscrowForTeacher(TeacherProfile teacher);
 }

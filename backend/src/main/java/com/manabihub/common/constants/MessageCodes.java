@@ -211,6 +211,16 @@ public final class MessageCodes {
     // ──────────────────────────────────────────────
     public static final String WALLET_NOT_FOUND = "WALLET_NOT_FOUND";
     public static final String WALLET_INSUFFICIENT_BALANCE = "WALLET_INSUFFICIENT_BALANCE";
+    public static final String WALLET_TOPUP_NOT_FOUND = "WALLET_TOPUP_NOT_FOUND";
+    public static final String WALLET_TOPUP_AMOUNT_INVALID = "WALLET_TOPUP_AMOUNT_INVALID";
+
+    // Canonical wallet message codes defined by the SRS (UC-17, MSG-WALLET catalogue).
+    public static final String MSG_WALLET_001 = "MSG-WALLET-001"; // Wallet overview loaded
+    public static final String MSG_WALLET_002 = "MSG-WALLET-002"; // Top-up pending — awaiting gateway confirmation
+    public static final String MSG_WALLET_003 = "MSG-WALLET-003"; // Top-up successful — balance credited
+    public static final String MSG_WALLET_004 = "MSG-WALLET-004"; // Top-up failed
+    public static final String MSG_WALLET_005 = "MSG-WALLET-005"; // Duplicate top-up callback (already credited)
+    public static final String MSG_WALLET_006 = "MSG-WALLET-006"; // Wallet action not allowed for this role
 
     // ──────────────────────────────────────────────
     // REFUND — refund processing

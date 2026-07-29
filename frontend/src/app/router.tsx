@@ -37,6 +37,9 @@ import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
 
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
+import { StudentWalletPage } from '../features/wallet/pages/StudentWalletPage';
+import { WalletTopUpReturnPage } from '../features/wallet/pages/WalletTopUpReturnPage';
+import { TeacherWalletPage } from '../features/wallet/pages/TeacherWalletPage';
 
 export const router = createBrowserRouter([
   {
@@ -127,6 +130,14 @@ export const router = createBrowserRouter([
         element: <StudentWishlistPage />,
       },
       {
+        path: 'wallet',
+        element: <StudentWalletPage />,
+      },
+      {
+        path: 'wallet/top-up/return',
+        element: <WalletTopUpReturnPage />,
+      },
+      {
         path: 'courses/:courseId/learn',
         element: <CourseLearningPage />,
       },
@@ -186,7 +197,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'wallet',
-        element: <Navigate to="/teacher/dashboard" replace />,
+        element: <TeacherWalletPage />,
       },
     ],
   },

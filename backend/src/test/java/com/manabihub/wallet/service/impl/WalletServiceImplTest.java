@@ -1,5 +1,6 @@
 package com.manabihub.wallet.service.impl;
 
+import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
@@ -85,5 +86,34 @@ class WalletServiceImplTest {
 
         assertEquals(WalletOwnerType.TEACHER, created.getOwnerType());
         assertEquals(teacher, created.getTeacher());
+    }
+
+    @Test
+    void getOrCreateStudentWallet_whenExists_returnsExistingWallet() {
+        StudentProfile student = StudentProfile.builder().id(UUID.randomUUID()).build();
+        Wallet studentWallet = Wallet.builder()
+                .id(UUID.randomUUID())
+                .ownerType(WalletOwnerType.STUDENT)
+                .student(student)
+                .build();
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, student.getId()))
+                .thenReturn(Optional.of(studentWallet));
+
+        Wallet result = service.getOrCreateStudentWallet(student);
+
+        assertEquals(studentWallet, result);
+    }
+
+    @Test
+    void getOrCreateStudentWallet_whenMissing_createsNewStudentWallet() {
+        StudentProfile student = StudentProfile.builder().id(UUID.randomUUID()).build();
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, student.getId()))
+                .thenReturn(Optional.empty());
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Wallet created = service.getOrCreateStudentWallet(student);
+
+        assertEquals(WalletOwnerType.STUDENT, created.getOwnerType());
+        assertEquals(student, created.getStudent());
     }
 }

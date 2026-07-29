@@ -66,4 +66,11 @@ public class EscrowServiceImpl implements EscrowService {
 
         return created;
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EscrowLedger> findPendingEscrowForTeacher(TeacherProfile teacher) {
+        return escrowLedgerRepository.findByTeacher_IdAndStatusInOrderByCreatedAtDesc(
+                teacher.getId(), List.of(EscrowStatus.HELD, EscrowStatus.FROZEN));
+    }
 }

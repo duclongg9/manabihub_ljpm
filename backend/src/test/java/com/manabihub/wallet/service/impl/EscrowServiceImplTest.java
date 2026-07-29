@@ -71,6 +71,19 @@ class EscrowServiceImplTest {
     }
 
     @Test
+    void findPendingEscrowForTeacher_returnsHeldAndFrozenEntriesForTeacher() {
+        EscrowLedger heldEntry = EscrowLedger.builder().id(UUID.randomUUID()).teacher(teacher)
+                .status(EscrowStatus.HELD).amount(new BigDecimal("150000.00")).build();
+        when(escrowLedgerRepository.findByTeacher_IdAndStatusInOrderByCreatedAtDesc(
+                eq(teacher.getId()), eq(List.of(EscrowStatus.HELD, EscrowStatus.FROZEN))))
+                .thenReturn(List.of(heldEntry));
+
+        List<EscrowLedger> result = service.findPendingEscrowForTeacher(teacher);
+
+        assertEquals(List.of(heldEntry), result);
+    }
+
+    @Test
     void holdForOrder_whenEscrowAlreadyExists_isIdempotentNoOp() {
         when(escrowLedgerRepository.existsByOrder_Id(order.getId())).thenReturn(true);
         when(escrowLedgerRepository.findByOrder_Id(order.getId())).thenReturn(List.of(new EscrowLedger()));

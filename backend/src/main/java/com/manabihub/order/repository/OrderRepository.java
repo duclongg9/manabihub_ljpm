@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +18,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findByOrderCode(String orderCode);
 
     boolean existsByOrderCode(String orderCode);
+
+    /** Used by the student "My Wallet" view to surface payment/refund history. */
+    List<Order> findByStudent_IdOrderByCreatedAtDesc(UUID studentId);
 
     /**
      * Loads an order by its code holding a pessimistic write lock.
