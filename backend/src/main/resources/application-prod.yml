@@ -73,6 +73,7 @@ jwt:
 
 app:
   frontend:
+    base-url: ${FRONTEND_BASE_URL}
     login-url: ${FRONTEND_BASE_URL}/login
     onboarding-url: ${FRONTEND_BASE_URL}/onboarding/student
     success-url: ${FRONTEND_BASE_URL}/auth/callback

@@ -1,6 +1,12 @@
 export type SystemSettingValueType = 'NUMBER' | 'BOOLEAN' | 'STRING' | 'JSON';
 export type InternalAdminRole = 'SYSTEM_ADMIN' | 'COURSE_MANAGER' | 'FINANCE_MANAGER';
 export type InternalAdminStatus = 'ACTIVE' | 'LOCKED' | 'DISABLED';
+export type InternalAdminInvitationStatus =
+  | 'NONE'
+  | 'PENDING'
+  | 'EXPIRED'
+  | 'ACCEPTED'
+  | 'REVOKED';
 
 export interface SystemSetting {
   id: string;
@@ -21,6 +27,8 @@ export interface InternalAdminAccount {
   role: InternalAdminRole;
   lastLoginAt: string | null;
   updatedAt: string | null;
+  invitationStatus: InternalAdminInvitationStatus;
+  invitationExpiresAt: string | null;
 }
 
 export interface UpdateSystemSettingPayload {
@@ -30,5 +38,16 @@ export interface UpdateSystemSettingPayload {
 
 export interface UpdateInternalAdminRolePayload {
   roleCode: InternalAdminRole;
+  reason: string;
+}
+
+export interface InviteInternalAdminPayload {
+  email: string;
+  fullName: string;
+  roleCode: InternalAdminRole;
+  reason: string;
+}
+
+export interface ResendInternalAdminInvitationPayload {
   reason: string;
 }

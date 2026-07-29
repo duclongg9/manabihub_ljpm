@@ -16,7 +16,7 @@ export const axiosClient = axios.create({
 });
 
 axiosClient.interceptors.request.use((config) => {
-  if (isLoginRequest(config.url)) {
+  if (isPublicAdminAuthRequest(config.url)) {
     return config;
   }
 
@@ -38,7 +38,7 @@ axiosClient.interceptors.response.use(
 
     if (
       status === 401
-      && !isLoginRequest(requestUrl)
+      && !isPublicAdminAuthRequest(requestUrl)
       && !isPublicApiRequest(requestUrl)
     ) {
       const kind = resolveSessionKind(requestUrl);
@@ -62,8 +62,10 @@ function resolveSessionKind(requestUrl?: string): AuthSessionKind {
   return isAdminEndpoint || isAdminScreen ? 'admin' : 'public';
 }
 
-function isLoginRequest(requestUrl?: string) {
-  return requestUrl?.includes('/admin/auth/login') ?? false;
+function isPublicAdminAuthRequest(requestUrl?: string) {
+  return requestUrl?.includes('/admin/auth/login')
+    || requestUrl?.includes('/admin/auth/setup-password')
+    || false;
 }
 
 function isPublicApiRequest(requestUrl?: string) {
@@ -79,7 +81,9 @@ function isProtectedScreen(kind: AuthSessionKind) {
 
   const path = window.location.pathname;
   return kind === 'admin'
-    ? path.startsWith('/admin') && path !== '/admin/login'
+    ? path.startsWith('/admin')
+      && path !== '/admin/login'
+      && path !== '/admin/setup-password'
     : path.startsWith('/student') || path.startsWith('/teacher');
 }
 

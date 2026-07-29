@@ -1,10 +1,13 @@
 package com.manabihub.identity.controller;
 
 import com.manabihub.common.response.ApiResponse;
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.identity.dto.request.LoginRequest;
+import com.manabihub.identity.dto.request.SetupAdminPasswordRequest;
 import com.manabihub.identity.dto.response.AdminProfileResponse;
 import com.manabihub.identity.dto.response.LoginResponse;
 import com.manabihub.identity.service.AdminAuthService;
+import com.manabihub.identity.service.InternalAdminInvitationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +31,7 @@ import java.util.UUID;
 public class AdminAuthController {
 
     private final AdminAuthService adminAuthService;
+    private final InternalAdminInvitationService invitationService;
 
     @Operation(summary = "Login to Admin Portal", description = "Authenticates internal admins via email/password and returns a JWT.")
     // [CODE NOTE - UC-03]: API Đăng nhập dành riêng cho Admin Portal (Username/Password), độc lập với App User (Google OAuth).
@@ -37,6 +41,28 @@ public class AdminAuthController {
         String userAgent = httpRequest.getHeader("User-Agent");
         LoginResponse response = adminAuthService.login(request, ipAddress, userAgent);
         return ApiResponse.success(response);
+    }
+
+    @Operation(
+            summary = "Set password from an internal administrator invitation",
+            description = "Consumes a one-time invitation token and activates the account."
+    )
+    @PostMapping("/setup-password")
+    public ApiResponse<Void> setupPassword(
+            @Valid @RequestBody SetupAdminPasswordRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        invitationService.accept(
+                request.token(),
+                request.password(),
+                httpRequest.getRemoteAddr(),
+                httpRequest.getHeader("User-Agent")
+        );
+        return ApiResponse.success(
+                MessageCodes.INTERNAL_ADMIN_PASSWORD_SET,
+                "Administrator password set; sign in to continue",
+                null
+        );
     }
 
     @Operation(summary = "Get current admin profile", description = "Returns the profile and role of the currently logged-in admin.")

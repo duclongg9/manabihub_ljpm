@@ -23,8 +23,10 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -125,6 +127,40 @@ class SystemAdministrationControllerTest {
     void anonymousCannotReadSettings() throws Exception {
         mockMvc.perform(get("/api/v1/admin/system-settings"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void onlySystemAdminCanCreateInternalAccountInvitation() throws Exception {
+        UUID actorId = UUID.randomUUID();
+        String body = """
+                {
+                  "email":"manager@example.com",
+                  "fullName":"Course Manager",
+                  "roleCode":"COURSE_MANAGER",
+                  "reason":"Approved staffing request"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/admin/internal-accounts/invitations")
+                        .with(adminJwt(actorId, "SYSTEM_ADMIN"))
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messageCode")
+                        .value("INTERNAL_ADMIN_INVITATION_CREATED"));
+        verify(administrationService).inviteInternalAdmin(
+                actorId,
+                "manager@example.com",
+                "Course Manager",
+                com.manabihub.identity.enums.RoleCode.COURSE_MANAGER,
+                "Approved staffing request"
+        );
+
+        mockMvc.perform(post("/api/v1/admin/internal-accounts/invitations")
+                        .with(adminJwt(UUID.randomUUID(), "COURSE_MANAGER"))
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isForbidden());
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor adminJwt(

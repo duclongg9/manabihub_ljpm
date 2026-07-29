@@ -24,6 +24,7 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminSetupPasswordPage } from './pages/AdminSetupPasswordPage';
 import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
 import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
 import { TeacherDashboardPage } from '../features/teacher/pages/TeacherDashboardPage';
@@ -75,6 +76,10 @@ export const router = createBrowserRouter([
   {
     path: '/admin/login',
     element: <AdminLoginPage />,
+  },
+  {
+    path: '/admin/setup-password',
+    element: <AdminSetupPasswordPage />,
   },
   {
     path: '/onboarding/student',

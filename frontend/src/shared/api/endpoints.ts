@@ -31,6 +31,9 @@ export const ENDPOINTS = {
     SETTINGS: '/v1/admin/system-settings',
     SETTING: (key: string) => `/v1/admin/system-settings/${encodeURIComponent(key)}`,
     INTERNAL_ACCOUNTS: '/v1/admin/internal-accounts',
+    INTERNAL_ACCOUNT_INVITATIONS: '/v1/admin/internal-accounts/invitations',
+    INTERNAL_ACCOUNT_INVITATION_RESEND: (adminId: string) =>
+      `/v1/admin/internal-accounts/${adminId}/invitation/resend`,
     INTERNAL_ACCOUNT_ROLE: (adminId: string) =>
       `/v1/admin/internal-accounts/${adminId}/role`,
   },
@@ -132,4 +135,5 @@ export const ENDPOINTS = {
     WRITING_SUBMISSION_AI: (blockId: string, submissionId: string) => `/v1/student/lessons/${blockId}/writing-submissions/${submissionId}/ai-assistance`,
   },
   ADMIN_LOGIN: '/admin/auth/login',
+  ADMIN_SETUP_PASSWORD: '/admin/auth/setup-password',
 };
