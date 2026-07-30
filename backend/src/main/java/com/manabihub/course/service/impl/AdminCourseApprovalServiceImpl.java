@@ -153,6 +153,11 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
         notificationRepository.save(notification);
 
         // Create Audit Log
+        Map<String, Object> metadata = null;
+        if (request.getReason() != null && !request.getReason().isBlank()) {
+            metadata = Map.of("reason", request.getReason());
+        }
+
         AuditLog auditLog = AuditLog.builder()
                 .actorType("INTERNAL_ADMIN")
                 .actorAdminId(adminId)
@@ -162,6 +167,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
                 .targetId(course.getId())
                 .beforeValue(Map.of("status", oldStatus.name()))
                 .afterValue(Map.of("status", course.getStatus().name()))
+                .metadata(metadata)
                 .build();
         auditLogRepository.save(auditLog);
     }

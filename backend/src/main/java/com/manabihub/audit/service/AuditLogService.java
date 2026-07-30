@@ -25,4 +25,7 @@ public interface AuditLogService {
             Map<String, Object> afterValue,
             Map<String, Object> metadata
     );
+
+    com.manabihub.common.response.PageResponse<com.manabihub.audit.dto.AuditLogDto> getAuditLogs(com.manabihub.audit.dto.AuditLogFilterDto filter, org.springframework.data.domain.Pageable pageable);
+    com.manabihub.audit.dto.AuditLogDetailDto getAuditLogDetail(UUID id);
 }

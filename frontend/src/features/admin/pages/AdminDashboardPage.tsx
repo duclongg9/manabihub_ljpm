@@ -114,6 +114,15 @@ export const AdminDashboardPage: React.FC = () => {
               onAction={() => navigate(ROUTES.ADMIN.USERS)}
             />
           </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AdminActionCard
+              title="Nhật ký hệ thống"
+              subtitle="Theo dõi và kiểm tra các thao tác nhạy cảm của người dùng và quản trị viên"
+              icon={<FactCheckIcon />}
+              actionLabel="Xem nhật ký"
+              onAction={() => navigate(ROUTES.ADMIN.AUDIT_LOGS)}
+            />
+          </Grid>
         </Grid>
       ) : isFinanceManager ? (
         <Grid container spacing={3}>
