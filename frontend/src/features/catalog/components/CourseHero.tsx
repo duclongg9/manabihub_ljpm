@@ -4,12 +4,26 @@ import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
 
 import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
+import { useState, useEffect } from 'react';
+import { getAuthSession, type AuthSession } from '../../../shared/auth/authSession';
+import { ROLES } from '../../../shared/constants/roles';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
+import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
 
 interface CourseHeroProps {
   course: PublicCourseDetail;
 }
 
 export const CourseHero = ({ course }: CourseHeroProps) => {
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+
+  useEffect(() => {
+    setSession(getAuthSession('public'));
+  }, []);
+
+  const canReport = session && (session.roles.includes(ROLES.STUDENT) || session.roles.includes(ROLES.TEACHER));
+
   return (
     <div className="relative bg-slate-900 text-white pt-12 pb-12 sm:pt-16 sm:pb-16 overflow-hidden rounded-t-3xl rounded-b-[2.5rem] shadow-xl mt-4">
       {/* Background Gradient Meshes */}
@@ -82,6 +96,25 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
               Tiếng Việt
             </span>
           </div>
+
+          {canReport && (
+            <button
+              onClick={() => setReportModalOpen(true)}
+              className="flex items-center gap-1 mt-6 px-4 py-2 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:text-red-200 rounded-lg text-sm font-medium transition-colors border border-red-500/20 shadow-sm"
+              title="Báo cáo nội dung vi phạm"
+            >
+              <ReportProblemIcon fontSize="small" /> Báo cáo vi phạm
+            </button>
+          )}
+
+          {reportModalOpen && (
+            <ReportViolationModal
+              open={reportModalOpen}
+              onClose={() => setReportModalOpen(false)}
+              targetType="COURSE"
+              targetId={course.id}
+            />
+          )}
         </div>
       </div>
     </div>

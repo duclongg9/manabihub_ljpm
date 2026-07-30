@@ -72,6 +72,8 @@ manabihub:
     password-reset-cooldown-seconds: ${ADMIN_PASSWORD_RESET_COOLDOWN_SECONDS:60}
     cookie-secure: ${ADMIN_COOKIE_SECURE:false}
     cookie-same-site: ${ADMIN_COOKIE_SAME_SITE:Lax}
+  violation:
+    spam-window-minutes: 60
 
 app:
   frontend:
