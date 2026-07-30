@@ -173,6 +173,7 @@ public class AiChatServiceImpl implements AiChatService {
 
     private Session loadSession(UUID courseId, UUID lessonBlockId) {
         LessonBlock lessonBlock = lessonBlockRepository.findByIdAndCourseId(lessonBlockId, courseId)
+                .filter(block -> !block.isModerationHidden())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COMMON_NOT_FOUND,
                         "The requested lesson block was not found in this course.",

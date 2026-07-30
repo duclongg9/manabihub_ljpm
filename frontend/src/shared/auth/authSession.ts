@@ -24,6 +24,15 @@ const TOKEN_KEYS: Record<AuthSessionKind, string> = {
   admin: 'admin_token',
 };
 
+const ADMIN_CSRF_KEY = 'admin_csrf_token';
+const ADMIN_REFRESH_EXPECTED_KEY = 'admin_refresh_expected';
+const ADMIN_REMEMBERED_KEY = 'admin_remembered';
+const LEGACY_PUBLIC_TOKEN_KEYS = ['auth_session'];
+const AUTH_SESSION_CHANGED_EVENT = 'manabihub:auth-session-changed';
+const ADMIN_SESSION_CHANNEL = 'manabihub-admin-session';
+let adminAccessToken: string | null = null;
+let adminSessionRevision = 0;
+
 const RETURN_TO_KEYS: Record<AuthSessionKind, string> = {
   public: 'auth_return_to',
   admin: 'admin_return_to',
@@ -61,14 +70,20 @@ export function getAuthSession(kind: AuthSessionKind): AuthSession | null {
     return null;
   }
 
-  const token = window.localStorage.getItem(TOKEN_KEYS[kind]);
+  const token = kind === 'admin'
+    ? adminAccessToken
+    : window.localStorage.getItem(TOKEN_KEYS.public);
   if (!token) {
     return null;
   }
 
   const session = parseAuthToken(token, kind);
   if (!session) {
-    clearAuthSession(kind);
+    if (kind === 'admin') {
+      adminAccessToken = null;
+    } else {
+      window.localStorage.removeItem(TOKEN_KEYS.public);
+    }
   }
 
   return session;
@@ -80,14 +95,130 @@ export function storeAuthToken(kind: AuthSessionKind, token: string): AuthSessio
     return null;
   }
 
-  window.localStorage.setItem(TOKEN_KEYS[kind], token);
+  if (kind === 'admin') {
+    adminAccessToken = token;
+    window.sessionStorage.removeItem(TOKEN_KEYS.admin);
+  } else {
+    window.localStorage.setItem(TOKEN_KEYS.public, token);
+  }
+  notifySessionChanged(kind);
   return session;
 }
 
 export function clearAuthSession(kind: AuthSessionKind) {
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(TOKEN_KEYS[kind]);
+    if (kind === 'admin') {
+      adminAccessToken = null;
+      adminSessionRevision += 1;
+      window.sessionStorage.removeItem(TOKEN_KEYS.admin);
+      window.localStorage.removeItem(ADMIN_CSRF_KEY);
+      window.localStorage.removeItem(ADMIN_REFRESH_EXPECTED_KEY);
+      window.localStorage.removeItem(ADMIN_REMEMBERED_KEY);
+      broadcastAdminSession({ type: 'SIGNED_OUT' });
+    } else {
+      window.localStorage.removeItem(TOKEN_KEYS.public);
+      LEGACY_PUBLIC_TOKEN_KEYS.forEach((key) => window.localStorage.removeItem(key));
+      window.sessionStorage.removeItem(RETURN_TO_KEYS.public);
+    }
+    notifySessionChanged(kind);
   }
+}
+
+export interface AdminSessionCredentials {
+  token: string;
+  csrfToken: string;
+  remembered: boolean;
+}
+
+export function storeAdminSession(
+  credentials: AdminSessionCredentials,
+  broadcast = true,
+): AuthSession | null {
+  if (typeof window === 'undefined' || !credentials.csrfToken) {
+    return null;
+  }
+
+  const session = parseAuthToken(credentials.token, 'admin');
+  if (!session) {
+    return null;
+  }
+
+  adminAccessToken = credentials.token;
+  adminSessionRevision += 1;
+  window.sessionStorage.removeItem(TOKEN_KEYS.admin);
+  storeAdminRefreshMetadata(credentials);
+  notifySessionChanged('admin');
+
+  if (broadcast) {
+    broadcastAdminSession({
+      type: 'SESSION_UPDATED',
+      token: credentials.token,
+    });
+  }
+  return session;
+}
+
+export function synchronizeAdminAccessToken(token: string) {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const session = parseAuthToken(token, 'admin');
+  if (!session) {
+    return null;
+  }
+
+  adminAccessToken = token;
+  adminSessionRevision += 1;
+  window.sessionStorage.removeItem(TOKEN_KEYS.admin);
+  notifySessionChanged('admin');
+  return session;
+}
+
+export function storeAdminRefreshMetadata(
+  credentials: Pick<AdminSessionCredentials, 'csrfToken' | 'remembered'>,
+) {
+  if (typeof window === 'undefined' || !credentials.csrfToken) {
+    return;
+  }
+  window.localStorage.setItem(ADMIN_CSRF_KEY, credentials.csrfToken);
+  window.localStorage.setItem(ADMIN_REFRESH_EXPECTED_KEY, 'true');
+  window.localStorage.setItem(ADMIN_REMEMBERED_KEY, String(credentials.remembered));
+}
+
+export function getAdminSessionRevision() {
+  return adminSessionRevision;
+}
+
+export function hasAdminRefreshSession() {
+  return typeof window !== 'undefined'
+    && window.localStorage.getItem(ADMIN_REFRESH_EXPECTED_KEY) === 'true'
+    && Boolean(window.localStorage.getItem(ADMIN_CSRF_KEY));
+}
+
+export function getAdminCsrfToken() {
+  return typeof window === 'undefined'
+    ? null
+    : window.localStorage.getItem(ADMIN_CSRF_KEY);
+}
+
+export function subscribeToAuthSessionChanges(listener: () => void) {
+  if (typeof window === 'undefined') {
+    return () => undefined;
+  }
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === TOKEN_KEYS.public || LEGACY_PUBLIC_TOKEN_KEYS.includes(event.key ?? '')) {
+      listener();
+    }
+  };
+
+  window.addEventListener(AUTH_SESSION_CHANGED_EVENT, listener);
+  window.addEventListener('storage', handleStorage);
+  return () => {
+    window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, listener);
+    window.removeEventListener('storage', handleStorage);
+  };
 }
 
 export function hasAnyRole(session: AuthSession, allowedRoles: readonly string[]) {
@@ -197,3 +328,48 @@ function normalizeRoles(value: unknown) {
 function isSafeInternalPath(path: string) {
   return path.startsWith('/') && !path.startsWith('//');
 }
+
+function notifySessionChanged(kind: AuthSessionKind) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(AUTH_SESSION_CHANGED_EVENT, {
+      detail: { kind },
+    }));
+  }
+}
+
+type AdminSessionMessage =
+  | { type: 'SESSION_UPDATED'; token: string }
+  | { type: 'SIGNED_OUT' };
+
+let adminSessionChannel: BroadcastChannel | null = null;
+
+function getAdminSessionChannel() {
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') {
+    return null;
+  }
+  if (!adminSessionChannel) {
+    adminSessionChannel = new BroadcastChannel(ADMIN_SESSION_CHANNEL);
+    adminSessionChannel.addEventListener('message', (event: MessageEvent<AdminSessionMessage>) => {
+      if (event.data.type === 'SESSION_UPDATED') {
+        synchronizeAdminAccessToken(event.data.token);
+        return;
+      }
+      if (event.data.type === 'SIGNED_OUT') {
+        adminAccessToken = null;
+        adminSessionRevision += 1;
+        window.sessionStorage.removeItem(TOKEN_KEYS.admin);
+        window.localStorage.removeItem(ADMIN_CSRF_KEY);
+        window.localStorage.removeItem(ADMIN_REFRESH_EXPECTED_KEY);
+        window.localStorage.removeItem(ADMIN_REMEMBERED_KEY);
+        notifySessionChanged('admin');
+      }
+    });
+  }
+  return adminSessionChannel;
+}
+
+function broadcastAdminSession(message: AdminSessionMessage) {
+  getAdminSessionChannel()?.postMessage(message);
+}
+
+getAdminSessionChannel();

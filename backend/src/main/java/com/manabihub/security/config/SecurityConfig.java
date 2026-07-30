@@ -10,6 +10,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -27,6 +28,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -36,6 +38,7 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import javax.crypto.spec.SecretKeySpec;
 import java.util.List;
 import java.util.UUID;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -49,9 +52,20 @@ public class SecurityConfig {
     private List<String> allowedOrigins;
 
     private final TeacherEligibilityFilter teacherEligibilityFilter;
+    private final InternalAdminRoleFilter internalAdminRoleFilter;
+    private final AppUserStatusFilter appUserStatusFilter;
+    private final Environment environment;
 
-    public SecurityConfig(TeacherEligibilityFilter teacherEligibilityFilter) {
+    public SecurityConfig(
+            TeacherEligibilityFilter teacherEligibilityFilter,
+            InternalAdminRoleFilter internalAdminRoleFilter,
+            AppUserStatusFilter appUserStatusFilter,
+            Environment environment
+    ) {
         this.teacherEligibilityFilter = teacherEligibilityFilter;
+        this.internalAdminRoleFilter = internalAdminRoleFilter;
+        this.appUserStatusFilter = appUserStatusFilter;
+        this.environment = environment;
     }
 
     @Bean
@@ -85,19 +99,31 @@ public class SecurityConfig {
                                 "/api/v1/mock/**",
                                 "/api/v1/course-categories",
                                 "/api/v1/public/courses/**",
+                                "/api/v1/public/teachers/**",
                                 "/api/v1/payments/vnpay/ipn",
                                 "/api/v1/payments/vnpay/confirm-return",
                                 "/api/v1/payments/dev/ipn",
                                 "/api/v1/payments/dev/wallet-topup-ipn",
                                 "/uploads/course-thumbnails/**",
                                 "/uploads/user-avatars/**",
-                                "/api/admin/auth/login")
+                                "/api/admin/auth/login",
+                                "/api/admin/auth/setup-password",
+                                "/api/admin/auth/refresh",
+                                "/api/admin/auth/logout",
+                                "/api/admin/auth/password/forgot",
+                                "/api/admin/auth/password/reset")
+                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/public/commercial-policy/current")
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(
                         jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
         http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
+        http.addFilterAfter(internalAdminRoleFilter, BearerTokenAuthenticationFilter.class);
+        http.addFilterAfter(appUserStatusFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }
@@ -129,8 +155,15 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        boolean production = Arrays.stream(environment.getActiveProfiles())
+                .anyMatch("prod"::equalsIgnoreCase);
 
         if (allowedOrigins.size() == 1 && "*".equals(allowedOrigins.get(0))) {
+            if (production) {
+                throw new IllegalStateException(
+                        "CORS_ALLOWED_ORIGINS must list exact trusted origins in production"
+                );
+            }
             configuration.setAllowedOriginPatterns(List.of("*"));
         } else {
             configuration.setAllowedOrigins(allowedOrigins);
@@ -220,6 +253,26 @@ public class SecurityConfig {
             TeacherEligibilityFilter filter
     ) {
         FilterRegistrationBean<TeacherEligibilityFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<InternalAdminRoleFilter> internalAdminRoleFilterRegistration(
+            InternalAdminRoleFilter filter
+    ) {
+        FilterRegistrationBean<InternalAdminRoleFilter> registration =
+                new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<AppUserStatusFilter> appUserStatusFilterRegistration(
+            AppUserStatusFilter filter
+    ) {
+        FilterRegistrationBean<AppUserStatusFilter> registration =
+                new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

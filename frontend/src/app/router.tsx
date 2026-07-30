@@ -1,5 +1,4 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { Box, Typography } from '@mui/material';
 import { PublicLayout } from '../shared/layouts/PublicLayout';
 import { StudentLayout } from '../shared/layouts/StudentLayout';
 import { TeacherLayout } from '../shared/layouts/TeacherLayout';
@@ -17,6 +16,8 @@ import { CourseDraftPage } from '../features/course-builder/pages/CourseDraftPag
 import { TeacherCoursesPage } from '../features/course-builder/pages/TeacherCoursesPage';
 import { CourseApprovalQueuePage } from '../features/admin-course-approval/pages/CourseApprovalQueuePage';
 import { CourseApprovalDetailPage } from '../features/admin-course-approval/pages/CourseApprovalDetailPage';
+import { AdminRefundQueue } from '../features/admin-refund/components/AdminRefundQueue';
+import { AdminRefundDetail } from '../features/admin-refund/components/AdminRefundDetail';
 import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
 import { CourseDetailPage } from '../features/catalog/pages/CourseDetailPage';
 import { CourseLearningPage } from '../features/learning/pages/CourseLearningPage';
@@ -25,6 +26,12 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { StudentOnboardingPage } from './pages/StudentOnboardingPage';
 import { PublicLoginPage } from './pages/PublicLoginPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminSetupPasswordPage } from './pages/AdminSetupPasswordPage';
+import {
+  AdminChangePasswordPage,
+  AdminForgotPasswordPage,
+  AdminResetPasswordPage,
+} from './pages/AdminPasswordPages';
 import { PublicHomePage } from './pages/PublicHomePage/PublicHomePage';
 import { AboutUsPage } from './pages/PublicHomePage/AboutUsPage';
 import { TeacherDashboardPage } from '../features/teacher/pages/TeacherDashboardPage';
@@ -33,13 +40,41 @@ import { TeacherWritingReviewsPage } from '../features/writing-review/pages/Teac
 import { TeacherWritingReviewDetailPage } from '../features/writing-review/pages/TeacherWritingReviewDetailPage';
 import { StudentAiChatPage } from '../features/ai-chat/pages/StudentAiChatPage';
 import { StudentWishlistPage } from '../features/wishlist/pages/StudentWishlistPage';
+import { TeacherWalletPage } from '../features/my-wallet/pages/TeacherWalletPage';
+import { PayoutQueuePage } from '../features/admin-payout/pages/PayoutQueuePage';
+import { PayoutSettlementPage } from '../features/admin-payout/pages/PayoutSettlementPage';
+import { ViolationQueuePage } from '../features/admin-violation/pages/ViolationQueuePage';
+import { ViolationDetailPage } from '../features/admin-violation/pages/ViolationDetailPage';
 import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
-
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
 import { StudentWalletPage } from '../features/wallet/pages/StudentWalletPage';
 import { WalletTopUpReturnPage } from '../features/wallet/pages/WalletTopUpReturnPage';
-import { TeacherWalletPage } from '../features/wallet/pages/TeacherWalletPage';
+
+import { PublicTeacherProfilePage } from '../features/teacher-discovery/pages/PublicTeacherProfilePage';
+import { SystemSettingsPage } from '../features/system-administration/pages/SystemSettingsPage';
+import { InternalAdminAccountsPage } from '../features/system-administration/pages/InternalAdminAccountsPage';
+import { HelpCenterLayout } from '../features/help-center/layouts/HelpCenterLayout';
+import { HelpCenterIndexPage } from '../features/help-center/pages/HelpCenterIndexPage';
+import { InstructorRevenueSharePage } from '../features/help-center/pages/articles/InstructorRevenueSharePage';
+import { InstructorEscrowPayoutsPage } from '../features/help-center/pages/articles/InstructorEscrowPayoutsPage';
+import {
+  InstructorCourseReviewPage,
+  InstructorVerificationPage,
+} from '../features/help-center/pages/articles/InstructorArticles';
+import {
+  AiAndDataPage,
+  LearnerPaymentsRefundsPage,
+  TrustSafetyPage,
+} from '../features/help-center/pages/articles/GeneralArticles';
+import {
+  AiNoticePage,
+  InstructorTermsPage,
+  PrivacyPage,
+  RefundPolicyPage,
+  TermsPage,
+} from '../features/help-center/pages/legal/LegalPages';
+import { NotFoundPage } from '../shared/components/NotFoundPage/NotFoundPage';
 
 export const router = createBrowserRouter([
   {
@@ -56,8 +91,46 @@ export const router = createBrowserRouter([
     element: <AdminLoginPage />,
   },
   {
+    path: '/admin/setup-password',
+    element: <AdminSetupPasswordPage />,
+  },
+  {
+    path: '/admin/forgot-password',
+    element: <AdminForgotPasswordPage />,
+  },
+  {
+    path: '/admin/reset-password',
+    element: <AdminResetPasswordPage />,
+  },
+  {
     path: '/onboarding/student',
     element: <StudentOnboardingPage />,
+  },
+  {
+    path: '/help',
+    element: <HelpCenterLayout />,
+    children: [
+      { index: true, element: <HelpCenterIndexPage /> },
+      { path: 'instructors/verification', element: <InstructorVerificationPage /> },
+      { path: 'instructors/revenue-share', element: <InstructorRevenueSharePage /> },
+      { path: 'instructors/escrow-and-payouts', element: <InstructorEscrowPayoutsPage /> },
+      { path: 'instructors/course-review-and-unpublishing', element: <InstructorCourseReviewPage /> },
+      { path: 'learners/payments-refunds-access', element: <LearnerPaymentsRefundsPage /> },
+      { path: 'trust-safety/reporting-and-actions', element: <TrustSafetyPage /> },
+      { path: 'ai-and-data', element: <AiAndDataPage /> },
+    ],
+  },
+  {
+    path: '/legal',
+    element: <HelpCenterLayout />,
+    children: [
+      { index: true, element: <Navigate to="/help" replace /> },
+      { path: 'terms', element: <TermsPage /> },
+      { path: 'privacy', element: <PrivacyPage /> },
+      { path: 'instructor-terms', element: <InstructorTermsPage /> },
+      { path: 'refund-policy', element: <RefundPolicyPage /> },
+      { path: 'ai-notice', element: <AiNoticePage /> },
+    ],
   },
   {
     path: '/',
@@ -74,6 +147,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses/:id',
         element: <CourseDetailPage />,
+      },
+      {
+        path: 'teachers/:teacherId',
+        element: <PublicTeacherProfilePage />,
       },
       {
         path: 'register',
@@ -214,16 +291,20 @@ export const router = createBrowserRouter([
         element: <AdminDashboardPage />,
       },
       {
+        path: 'change-password',
+        element: <AdminChangePasswordPage />,
+      },
+      {
         path: 'notifications',
         element: <NotificationsPage />,
       },
       {
         path: 'settings',
-        element: <Navigate to="/admin/dashboard" replace />,
+        element: <SystemSettingsPage />,
       },
       {
         path: 'users',
-        element: <Navigate to="/admin/dashboard" replace />,
+        element: <InternalAdminAccountsPage />,
       },
       {
         path: 'kyc/review',
@@ -239,11 +320,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'tasks/queue',
-        element: <CourseApprovalQueuePage />,
+        element: <Navigate to="/admin/courses/approvals" replace />,
       },
       {
         path: 'courses/approvals',
-        element: <Box sx={{ p: 4, mt: 4, textAlign: 'center', color: 'text.secondary' }}><Typography variant="h5">Vui lòng chọn một khóa học từ Task Queue để tiến hành phê duyệt.</Typography></Box>,
+        element: <CourseApprovalQueuePage />,
       },
       {
         path: 'courses/approvals/:id',
@@ -253,6 +334,34 @@ export const router = createBrowserRouter([
         path: 'finance',
         element: <Navigate to="/admin/dashboard" replace />,
       },
+      {
+        path: 'refunds',
+        element: <AdminRefundQueue />,
+      },
+      {
+        path: 'refunds/:id',
+        element: <AdminRefundDetail />,
+      },
+      {
+        path: 'payouts',
+        element: <PayoutQueuePage />,
+      },
+      {
+        path: 'payouts/:id',
+        element: <PayoutSettlementPage />,
+      },
+      {
+        path: 'violations',
+        element: <ViolationQueuePage />,
+      },
+      {
+        path: 'violations/:id',
+        element: <ViolationDetailPage />,
+      },
     ],
+  },
+  {
+    path: '*',
+    element: <NotFoundPage />,
   },
 ]);

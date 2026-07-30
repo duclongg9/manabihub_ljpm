@@ -1,22 +1,28 @@
 package com.manabihub.wallet.controller;
 
+import com.manabihub.security.DummyFilterConfig;
 import com.manabihub.security.config.SecurityConfig;
 import com.manabihub.security.oauth2.CustomOAuth2UserService;
 import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
 import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.manabihub.wallet.dto.response.EscrowEntryResponse;
 import com.manabihub.wallet.dto.response.TeacherWalletSummaryResponse;
+import com.manabihub.wallet.dto.response.TeacherWalletResponse;
 import com.manabihub.wallet.dto.response.WalletActivityResponse;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.enums.PayoutStatus;
 import com.manabihub.wallet.enums.WalletTransactionSection;
 import com.manabihub.wallet.service.TeacherWalletService;
+import com.manabihub.wallet.service.WalletService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -34,7 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TeacherWalletController.class)
-@Import({SecurityConfig.class, com.manabihub.security.DummyFilterConfig.class})
+@Import({SecurityConfig.class, DummyFilterConfig.class})
+@ActiveProfiles("test")
 class TeacherWalletControllerTest {
 
     @Autowired
@@ -43,22 +50,43 @@ class TeacherWalletControllerTest {
     @MockBean
     private TeacherWalletService teacherWalletService;
     @MockBean
+    private WalletService walletService;
+    @MockBean
     private CustomOAuth2UserService customOAuth2UserService;
     @MockBean
     private OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     @MockBean
     private OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
+    @MockBean
+    private ClientRegistrationRepository clientRegistrationRepository;
 
     @Test
-    void getWallet_asTeacherReturnsSummary() throws Exception {
+    void getWalletSummary_asTeacherReturnsSummary() throws Exception {
         when(teacherWalletService.getWalletSummary()).thenReturn(new TeacherWalletSummaryResponse(
                 UUID.randomUUID(), "VND", new BigDecimal("70000.00"), new BigDecimal("150000.00"),
                 new BigDecimal("40000.00"), PayoutStatus.ESCROW_PENDING, Instant.now()));
 
-        mockMvc.perform(get("/api/v1/teacher/wallet").with(teacherJwt()))
+        mockMvc.perform(get("/api/v1/teacher/wallet/summary").with(teacherJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.payoutStatus", is("ESCROW_PENDING")))
                 .andExpect(jsonPath("$.data.pendingEscrowBalance", is(150000.00)));
+    }
+
+    @Test
+    @WithMockUser(username = "f1000000-0000-0000-0000-000000000001", roles = "TEACHER")
+    void teacherCanReadWallet() throws Exception {
+        UUID userId = UUID.fromString("f1000000-0000-0000-0000-000000000001");
+        when(walletService.getTeacherWalletByUserId(userId)).thenReturn(
+                TeacherWalletResponse.builder()
+                        .availableBalance(new BigDecimal("900000.00"))
+                        .pendingBalance(new BigDecimal("100000.00"))
+                        .reservedBalance(BigDecimal.ZERO)
+                        .build());
+
+        mockMvc.perform(get("/api/v1/teacher/wallet"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.availableBalance").value(900000.0))
+                .andExpect(jsonPath("$.data.pendingBalance").value(100000.0));
     }
 
     @Test
@@ -91,6 +119,7 @@ class TeacherWalletControllerTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(teacherWalletService);
+        verifyNoInteractions(walletService);
     }
 
     @Test

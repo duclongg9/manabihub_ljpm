@@ -1,5 +1,7 @@
-import type { PublicTeacherProfile } from '../types/courseDetailTypes';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../shared/constants/routes';
+import type { PublicTeacherProfile } from '../types/courseDetailTypes';
 
 interface TeacherProfileProps {
   teacher: PublicTeacherProfile;
@@ -21,23 +23,28 @@ export const TeacherProfile = ({ teacher }: TeacherProfileProps) => {
         </div>
         <div className="text-center sm:text-left flex-1">
           <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mb-3">
-            <h3 className="text-xl font-bold text-slate-900">{teacher.name}</h3>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">
-              <VerifiedIcon sx={{ fontSize: 14 }} />
-              Sensei 先生
-            </span>
-            <span className="text-slate-300">|</span>
-            <span className="flex items-center text-sm font-semibold text-slate-700">
-              ⭐ 4.8 <span className="text-slate-500 font-normal ml-1">(16 đánh giá)</span>
-            </span>
-            <span className="text-slate-300">|</span>
-            <span className="flex items-center text-sm font-semibold text-slate-700">
-              👥 12,345 <span className="text-slate-500 font-normal ml-1">Học viên</span>
-            </span>
+            <Link
+              to={ROUTES.PUBLIC.TEACHER_PROFILE(teacher.id)}
+              className="text-xl font-bold text-slate-900 hover:text-red-700 transition-colors"
+            >
+              {teacher.name}
+            </Link>
+            {teacher.verified && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-700">
+                <VerifiedIcon sx={{ fontSize: 14 }} />
+                Đã xác minh
+              </span>
+            )}
           </div>
           <div className="text-slate-600 text-sm leading-relaxed whitespace-pre-line mb-4">
             {teacher.bio || 'Giảng viên chưa cập nhật thông tin giới thiệu.'}
           </div>
+          <Link
+            to={ROUTES.PUBLIC.TEACHER_PROFILE(teacher.id)}
+            className="inline-flex text-sm font-bold text-red-700 hover:text-red-900"
+          >
+            Xem hồ sơ và các khóa học
+          </Link>
         </div>
       </div>
     </div>

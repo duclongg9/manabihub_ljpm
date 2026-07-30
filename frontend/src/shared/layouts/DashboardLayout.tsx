@@ -1,13 +1,26 @@
 import { useEffect, useState } from 'react';
-import { Box, Toolbar, useMediaQuery, useTheme, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Toolbar,
+  useMediaQuery,
+  useTheme,
+  Typography,
+} from '@mui/material';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import {
   getAuthSession,
   getDefaultRoute,
   getLoginRoute,
+  hasAdminRefreshSession,
   hasAnyRole,
+  subscribeToAuthSessionChanges,
+  type AuthSession,
   type AuthSessionKind,
 } from '../auth/authSession';
+import { refreshAdminSessionWithStatus } from '../auth/adminAuthApi';
 import { Header } from './Header';
 import {
   COLLAPSED_DRAWER_WIDTH,
@@ -33,7 +46,16 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
     typeof window !== 'undefined'
       && window.localStorage.getItem(SIDEBAR_PREFERENCE_KEY) === 'true',
   );
-  const session = getAuthSession(sessionKind);
+  const [session, setSession] = useState<AuthSession | null>(
+    () => getAuthSession(sessionKind),
+  );
+  const [restoringSession, setRestoringSession] = useState(
+    () => sessionKind === 'admin'
+      && !getAuthSession('admin')
+      && hasAdminRefreshSession(),
+  );
+  const [restoreFailed, setRestoreFailed] = useState(false);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -42,6 +64,96 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_PREFERENCE_KEY, String(desktopCollapsed));
   }, [desktopCollapsed]);
+
+  useEffect(() => {
+    let active = true;
+    let restoreInProgress = false;
+    const syncSession = () => {
+      const currentSession = getAuthSession(sessionKind);
+      if (currentSession || sessionKind !== 'admin' || !hasAdminRefreshSession()) {
+        if (active) {
+          setSession(currentSession);
+          setRestoreFailed(false);
+          setRestoringSession(false);
+        }
+        return;
+      }
+
+      if (restoreInProgress) {
+        return;
+      }
+      restoreInProgress = true;
+      setRestoreFailed(false);
+      setRestoringSession(true);
+      void refreshAdminSessionWithStatus()
+        .then((result) => {
+          if (active) {
+            setSession(result.session);
+            setRestoreFailed(result.status === 'transient-error');
+          }
+        })
+        .finally(() => {
+          restoreInProgress = false;
+          if (active) {
+            setRestoringSession(false);
+          }
+        });
+    };
+    const unsubscribe = subscribeToAuthSessionChanges(syncSession);
+    syncSession();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [restoreAttempt, sessionKind]);
+
+  if (restoringSession) {
+    return (
+      <Box
+        aria-label="Đang khôi phục phiên quản trị"
+        sx={{
+          alignItems: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          minHeight: '100vh',
+        }}
+      >
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
+
+  if (restoreFailed && !session) {
+    return (
+      <Box
+        sx={{
+          alignItems: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          p: 2,
+        }}
+      >
+        <Alert
+          action={(
+            <Button
+              color="inherit"
+              onClick={() => setRestoreAttempt((attempt) => attempt + 1)}
+              size="small"
+            >
+              Thử lại
+            </Button>
+          )}
+          severity="warning"
+          sx={{ maxWidth: 560 }}
+        >
+          Chưa thể xác minh phiên quản trị do kết nối tạm thời gián đoạn.
+          Phiên của bạn chưa bị đăng xuất.
+        </Alert>
+      </Box>
+    );
+  }
 
   if (!session) {
     return (
@@ -113,8 +225,9 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
         <Box sx={{ mt: 'auto', py: 3, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', color: 'text.secondary', fontSize: '0.85rem' }}>
           <Typography variant="body2">© 2026 ManabiHub. All rights reserved.</Typography>
           <Box sx={{ display: 'flex', gap: 3 }}>
-            <Box component="a" href="#" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Hỗ trợ</Box>
-            <Box component="a" href="#" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Điều khoản</Box>
+            <Box component="a" href="/help" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Hỗ trợ</Box>
+            <Box component="a" href="/legal/terms" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Điều khoản</Box>
+            <Box component="a" href="/legal/privacy" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Quyền riêng tư</Box>
           </Box>
         </Box>
       </Box>

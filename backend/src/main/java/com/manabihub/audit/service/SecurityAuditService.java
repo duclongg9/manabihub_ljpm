@@ -50,6 +50,40 @@ public class SecurityAuditService {
     }
 
     /**
+     * Persists the duplicate JLPT claim attempt even when the surrounding KYC
+     * submission is rolled back. Certificate codes are deliberately omitted.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logDuplicateCertificateAudit(
+            UUID teacherId,
+            UUID actorUserId,
+            String ipAddress,
+            String userAgent
+    ) {
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(actorUserId)
+                .actorRoleCode("TEACHER_CANDIDATE")
+                .action("KYC_DUPLICATE_JLPT_CERTIFICATE_DETECTED")
+                .targetType("TEACHER_PROFILE")
+                .targetId(teacherId)
+                .afterValue(Map.of(
+                        "reason", "Duplicate JLPT certificate claim detected across different teachers",
+                        "status", "BLOCKED"
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-28",
+                        "module", "CERTIFICATE_VERIFICATION",
+                        "msg", MessageCodes.KYC_CERTIFICATE_ALREADY_CLAIMED
+                ))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
+
+        auditLogRepository.save(auditLog);
+    }
+
+    /**
      * Logs security audit when historical duplicate identity claims are quarantined during backfill.
      * REQUIRES_NEW transaction ensures log persistence. No PII is logged.
      */
@@ -72,6 +106,27 @@ public class SecurityAuditService {
                 ))
                 .build();
 
+        auditLogRepository.save(auditLog);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logInternalAdminAuthenticationFailure(
+            UUID adminId,
+            String role,
+            String reason,
+            String ipAddress,
+            String userAgent
+    ) {
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("INTERNAL_ADMIN")
+                .actorAdminId(adminId)
+                .actorRoleCode(role)
+                .action("LOGIN_FAILED")
+                .targetType("ADMIN_AUTHENTICATION")
+                .metadata(Map.of("reason", reason))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
         auditLogRepository.save(auditLog);
     }
 }

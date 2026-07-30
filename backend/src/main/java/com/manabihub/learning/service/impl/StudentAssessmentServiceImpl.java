@@ -76,6 +76,7 @@ public class StudentAssessmentServiceImpl implements StudentAssessmentService {
     @Transactional
     public QuizSubmissionResponse submitQuiz(UUID lessonBlockId, QuizSubmissionRequest request) {
         LessonBlock block = lessonBlockRepository.findById(lessonBlockId)
+                .filter(value -> !value.isModerationHidden())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.CONTENT_NOT_FOUND,
                         "Quiz lesson block was not found.",
@@ -415,6 +416,7 @@ public class StudentAssessmentServiceImpl implements StudentAssessmentService {
     ) {
         List<LessonBlock> blocks = enrollment.getCourse().getModules().stream()
                 .flatMap(module -> module.getBlocks().stream())
+                .filter(block -> !block.isModerationHidden())
                 .toList();
         Set<UUID> completedBlockIds = lessonBlockProgressRepository
                 .findByEnrollmentId(enrollment.getId())

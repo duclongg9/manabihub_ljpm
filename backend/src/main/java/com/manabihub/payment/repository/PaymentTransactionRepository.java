@@ -1,7 +1,10 @@
 package com.manabihub.payment.repository;
 
 import com.manabihub.payment.entity.PaymentTransaction;
+import com.manabihub.payment.enums.PaymentStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -17,4 +20,10 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     boolean existsByProviderAndProviderTransactionId(String provider, String providerTransactionId);
 
     List<PaymentTransaction> findByOrder_IdOrderByCreatedAtDesc(UUID orderId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<PaymentTransaction> findFirstByOrder_IdAndStatusOrderByCreatedAtDesc(
+            UUID orderId,
+            PaymentStatus status
+    );
 }

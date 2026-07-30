@@ -1,15 +1,29 @@
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
 import LanguageIcon from '@mui/icons-material/Language';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
-import { Flame, Star } from 'lucide-react';
+import StarRoundedIcon from '@mui/icons-material/StarRounded';
 
-import DOMPurify from 'dompurify';
+import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
+import { useState, useEffect } from 'react';
+import { getAuthSession, type AuthSession } from '../../../shared/auth/authSession';
+import { ROLES } from '../../../shared/constants/roles';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
+import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
 
 interface CourseHeroProps {
   course: PublicCourseDetail;
 }
 
 export const CourseHero = ({ course }: CourseHeroProps) => {
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+
+  useEffect(() => {
+    setSession(getAuthSession('public'));
+  }, []);
+
+  const canReport = session && (session.roles.includes(ROLES.STUDENT) || session.roles.includes(ROLES.TEACHER));
+
   return (
     <div className="relative bg-slate-900 text-white pt-12 pb-12 sm:pt-16 sm:pb-16 overflow-hidden rounded-t-3xl rounded-b-[2.5rem] shadow-xl mt-4">
       {/* Background Gradient Meshes */}
@@ -28,7 +42,7 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
           <div className="flex items-center text-xs font-medium text-white/50 mb-3 tracking-wide">
             <span className="hover:text-white/80 cursor-pointer transition-colors">Khám phá khóa học</span>
             <span className="mx-2">/</span>
-            <span className="hover:text-white/80 cursor-pointer transition-colors">{course.jlptLevel || 'JLPT N3'}</span>
+            <span className="hover:text-white/80 transition-colors">{course.jlptLevel || 'Khóa học'}</span>
             <span className="mx-2">/</span>
             <span className="text-white/80 truncate max-w-[200px] sm:max-w-xs">{course.title.replace('--', '|')}</span>
           </div>
@@ -51,31 +65,56 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-2 leading-tight drop-shadow-md">
             {course.title.replace('--', '|')}
           </h1>
-          <div className="flex items-center gap-4 text-sm text-rose-100/90 mt-3 mb-6">
-            <span className="inline-flex items-center gap-1.5"><Flame className="w-4 h-4 text-amber-500 fill-amber-500" /> 51 học viên đã đăng ký</span>
-            <span className="inline-flex items-center gap-1.5"><Star className="w-4 h-4 text-amber-400 fill-amber-400" /> 4.8 (16 đánh giá)</span>
-          </div>
-
           {/* Description */}
           <div
-            className="text-base sm:text-lg text-slate-300 mb-6 max-w-3xl leading-relaxed prose prose-invert"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.description || course.introduction || '') }}
+            className="text-base sm:text-lg text-slate-300 my-6 max-w-3xl leading-relaxed prose prose-invert"
+            dangerouslySetInnerHTML={{ __html: sanitizeRichText(course.description || course.introduction) }}
           />
 
           {/* Meta Info */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-400">
+            {(course.reviewCount ?? 0) > 0 && course.averageRating != null && (
+              <span className="flex items-center text-amber-300 font-semibold">
+                <StarRoundedIcon fontSize="small" className="mr-1" />
+                {course.averageRating.toFixed(1)}
+                <span className="ml-1 text-slate-300 font-normal">
+                  ({course.reviewCount} đánh giá đã xác minh)
+                </span>
+              </span>
+            )}
             <span className="flex items-center">
-              Tạo bởi&nbsp;<span className="text-white font-medium hover:text-rose-200 transition-colors cursor-pointer border-b border-rose-200/50">{course.teacher.name}</span>
+              Tạo bởi&nbsp;<span className="text-white font-medium">{course.teacher.name}</span>
             </span>
-            <span className="flex items-center">
-              <NewReleasesIcon fontSize="small" className="mr-1.5 opacity-70" />
-              Cập nhật {course.publishedAt ? new Date(course.publishedAt).toLocaleDateString('vi-VN') : 'Gần đây'}
-            </span>
+            {course.publishedAt && (
+              <span className="flex items-center">
+                <NewReleasesIcon fontSize="small" className="mr-1.5 opacity-70" />
+                Xuất bản {new Date(course.publishedAt).toLocaleDateString('vi-VN')}
+              </span>
+            )}
             <span className="flex items-center">
               <LanguageIcon fontSize="small" className="mr-1.5 opacity-70" />
               Tiếng Việt
             </span>
           </div>
+
+          {canReport && (
+            <button
+              onClick={() => setReportModalOpen(true)}
+              className="flex items-center gap-1 mt-6 px-4 py-2 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:text-red-200 rounded-lg text-sm font-medium transition-colors border border-red-500/20 shadow-sm"
+              title="Báo cáo nội dung vi phạm"
+            >
+              <ReportProblemIcon fontSize="small" /> Báo cáo vi phạm
+            </button>
+          )}
+
+          {reportModalOpen && (
+            <ReportViolationModal
+              open={reportModalOpen}
+              onClose={() => setReportModalOpen(false)}
+              targetType="COURSE"
+              targetId={course.id}
+            />
+          )}
         </div>
       </div>
     </div>

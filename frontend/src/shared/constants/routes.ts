@@ -5,6 +5,7 @@ export const ROUTES = {
     REGISTER: '/register',
     COURSE_BROWSE: '/courses',
     COURSE_DETAIL: '/courses/:id',
+    TEACHER_PROFILE: (teacherId: string) => `/teachers/${teacherId}`,
     ABOUT: '/about',
   },
   STUDENT: {
@@ -34,6 +35,10 @@ export const ROUTES = {
     PROFILE: '/teacher/profile',
   },
   ADMIN: {
+    LOGIN: '/admin/login',
+    FORGOT_PASSWORD: '/admin/forgot-password',
+    RESET_PASSWORD: '/admin/reset-password',
+    CHANGE_PASSWORD: '/admin/change-password',
     DASHBOARD: '/admin/dashboard',
     SYSTEM_SETTINGS: '/admin/settings',
     USERS: '/admin/users',
@@ -41,6 +46,9 @@ export const ROUTES = {
     COURSE_APPROVAL: '/admin/courses/approvals',
     KYC_REVIEW: '/admin/kyc',
     FINANCE: '/admin/finance',
+    PAYOUTS: '/admin/payouts',
+    VIOLATIONS: '/admin/violations',
     NOTIFICATIONS: '/admin/notifications',
+    REFUND_REVIEW: '/admin/refunds',
   },
 };

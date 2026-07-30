@@ -2,6 +2,8 @@ package com.manabihub.order.repository;
 
 import com.manabihub.order.entity.Order;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +24,12 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     /** Used by the student "My Wallet" view to surface payment/refund history. */
     List<Order> findByStudent_IdOrderByCreatedAtDesc(UUID studentId);
 
+    Page<Order> findByStudent_Id(UUID studentId, Pageable pageable);
+
+    Page<Order> findByStudent_IdAndStatus(UUID studentId,
+                                          com.manabihub.order.enums.OrderStatus status,
+                                          Pageable pageable);
+
     /**
      * Loads an order by its code holding a pessimistic write lock.
      * Used by the payment webhook handler to serialize concurrent IPN callbacks
@@ -30,4 +38,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode")
     Optional<Order> findByOrderCodeForUpdate(@Param("orderCode") String orderCode);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM Order o WHERE o.id = :orderId")
+    Optional<Order> findByIdForUpdate(@Param("orderId") UUID orderId);
 }

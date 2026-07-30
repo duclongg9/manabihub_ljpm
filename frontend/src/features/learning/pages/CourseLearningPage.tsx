@@ -21,7 +21,9 @@ import {
   Stack,
   Typography,
   TextField,
-  ListItem
+  ListItem,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -33,9 +35,10 @@ import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import AssignmentTurnedInOutlinedIcon from '@mui/icons-material/AssignmentTurnedInOutlined';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import { isAxiosError } from 'axios';
 import ReactPlayer from 'react-player';
-import DOMPurify from 'dompurify';
+import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
 import { learningService } from '../services/learningService';
 import type {
   CourseLearning,
@@ -49,6 +52,9 @@ import type {
   QuizSubmissionResult,
 } from '../types';
 import { ROUTES } from '../../../shared/constants/routes';
+import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
+import { ROLES } from '../../../shared/constants/roles';
+import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
 
@@ -60,6 +66,10 @@ export function CourseLearningPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+
+  const session = getAuthSession('public');
+  const canReport = session ? hasAnyRole(session, [ROLES.STUDENT, ROLES.TEACHER]) : false;
 
   useEffect(() => {
     if (!courseId) return;
@@ -326,6 +336,17 @@ export function CourseLearningPage() {
                   <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }} noWrap>
                     {selectedBlock.title}
                   </Typography>
+                  {canReport && (
+                    <Tooltip title="Báo cáo nội dung này">
+                      <IconButton
+                        size="small"
+                        color="warning"
+                        onClick={() => setReportModalOpen(true)}
+                      >
+                        <ReportProblemOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                   {selectedBlock.progressStatus === 'COMPLETED' && (
                     <Chip size="small" icon={<CheckCircleIcon />} label="Đã hoàn thành" color="success" />
                   )}
@@ -380,6 +401,15 @@ export function CourseLearningPage() {
           ) : null}
         </Box>
       </Box>
+
+      {selectedBlock && (
+        <ReportViolationModal
+          open={reportModalOpen}
+          onClose={() => setReportModalOpen(false)}
+          targetType="LESSON_BLOCK"
+          targetId={selectedBlock.id}
+        />
+      )}
     </Box>
   );
 }
@@ -435,7 +465,7 @@ function BlockContent({
       return (
         <Box
           sx={{ whiteSpace: 'pre-wrap', typography: 'body1' }}
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(block.content || '') }}
+          dangerouslySetInnerHTML={{ __html: sanitizeRichText(block.content) }}
         />
       );
     case 'QUIZ':

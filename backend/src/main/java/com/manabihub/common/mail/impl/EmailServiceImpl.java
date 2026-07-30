@@ -21,6 +21,15 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public void sendEmail(String to, String subject, String body) {
         try {
+            sendEmailSynchronously(to, subject, body);
+        } catch (RuntimeException exception) {
+            log.error("Asynchronous email delivery failed", exception);
+        }
+    }
+
+    @Override
+    public void sendEmailSynchronously(String to, String subject, String body) {
+        try {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
@@ -29,11 +38,11 @@ public class EmailServiceImpl implements EmailService {
             helper.setText(body, true);
 
             javaMailSender.send(message);
-            log.info("Email sent successfully to {}", to);
-        } catch (MessagingException e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
-        } catch (Exception e) {
-            log.error("Unexpected error sending email to {}: {}", to, e.getMessage(), e);
+            log.info("Email sent successfully");
+        } catch (MessagingException exception) {
+            throw new IllegalStateException("Email delivery failed", exception);
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("Email delivery failed", exception);
         }
     }
 }

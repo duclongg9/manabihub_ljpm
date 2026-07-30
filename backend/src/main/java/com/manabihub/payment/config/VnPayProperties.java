@@ -46,5 +46,5 @@ public class VnPayProperties {
     private String currency = "VND";
 
     /** Enables the local dev endpoint that simulates a VNPay IPN callback without a tunnel. */
-    private boolean devSimulatorEnabled = true;
+    private boolean devSimulatorEnabled = false;
 }

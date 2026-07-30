@@ -37,6 +37,8 @@ public class PublicCourseDetailResponse {
     // Aggregation
     private Integer totalDurationMinutes;
     private Integer totalLessons;
+    private BigDecimal averageRating;
+    private Long reviewCount;
 
     private List<PublicModuleResponse> modules;
 
@@ -47,5 +49,6 @@ public class PublicCourseDetailResponse {
         private String name;
         private String avatarUrl;
         private String bio;
+        private boolean verified;
     }
 }

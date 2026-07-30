@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Paper, Avatar, TextField, Snackbar, Alert, Slide } from '@mui/material';
+import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { Box, Typography, Button, Paper, Avatar, TextField, Snackbar, Alert, Slide, Link } from '@mui/material';
 import { courseApprovalService } from '../services/courseApprovalService';
 import type { CourseApprovalDetail } from '../types';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import { ROUTES } from '../../../shared/constants/routes';
 
 function SlideTransition(props: any) {
   return <Slide {...props} direction="left" />;
@@ -44,7 +45,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
     try {
       await courseApprovalService.reviewCourse(id!, { action, reason });
       setFeedback({ message: "Xử lý thành công!", severity: 'success' });
-      setTimeout(() => navigate('/admin/courses/approvals'), 1000);
+      setTimeout(() => navigate(ROUTES.ADMIN.COURSE_APPROVAL), 1000);
     } catch (e: any) {
       const errorMessage = e.response?.data?.message || e.message || "Có lỗi xảy ra khi xử lý.";
       setFeedback({ message: `Lỗi: ${errorMessage}`, severity: 'error' });
@@ -134,9 +135,19 @@ export const CourseApprovalDetailPage: React.FC = () => {
               </Typography>
             </Box>
 
-            <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2, fontWeight: 'bold' }}>
-              Policy Evidence
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
+                Policy Evidence
+              </Typography>
+              <Link
+                component={RouterLink}
+                to="/help/instructors/course-review-and-unpublishing"
+                target="_blank"
+                sx={{ fontSize: '0.875rem', fontWeight: 500 }}
+              >
+                Xem quy định xuất bản
+              </Link>
+            </Box>
             <Box sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: '#f8fafc' }}>
               <Typography variant="body2" sx={{ color: 'text.primary', whiteSpace: 'pre-line' }}>
                 {detail.policyEvidence || "Không có minh chứng."}

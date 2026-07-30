@@ -4,6 +4,10 @@ import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,13 +21,41 @@ public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecif
 
     List<Course> findByTeacher_IdAndStatusOrderByCreatedAtDesc(UUID teacherId, CourseStatus status);
 
+    List<Course> findByTeacher_IdAndStatusOrderByPublishedAtDesc(UUID teacherId, CourseStatus status);
+
+    long countByTeacher_IdAndStatus(UUID teacherId, CourseStatus status);
+
     List<Course> findByTeacher_IdAndStatusNotOrderByCreatedAtDesc(UUID teacherId, CourseStatus status);
 
     Optional<Course> findByIdAndTeacher_IdAndStatus(UUID id, UUID teacherId, CourseStatus status);
 
+    Optional<Course> findByIdAndTeacher_IdAndStatusIn(
+            UUID id,
+            UUID teacherId,
+            java.util.Collection<CourseStatus> statuses
+    );
+
+    Optional<Course> findByIdAndTeacher_Id(UUID id, UUID teacherId);
+
+    Optional<Course> findByIdAndStatus(UUID id, CourseStatus status);
+
+    Optional<Course> findBySlugAndStatus(String slug, CourseStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT course
+            FROM Course course
+            JOIN FETCH course.teacher teacher
+            JOIN FETCH teacher.user
+            WHERE course.id = :courseId
+            """)
+    Optional<Course> findByIdForModeration(@Param("courseId") UUID courseId);
+
     List<Course> findAllByStatusInOrderBySubmittedAtDesc(java.util.Collection<CourseStatus> statuses);
 
-    @org.springframework.data.jpa.repository.Query(value = "SELECT CASE WHEN COUNT(e.id) > 0 THEN true ELSE false END FROM enrollments e JOIN student_profiles sp ON e.student_id = sp.id WHERE e.course_id = :courseId AND sp.user_id = :userId AND e.enrollment_status = 'ACTIVE'", nativeQuery = true)
+    List<Course> findAllByStatusOrderBySubmittedAtAsc(CourseStatus status);
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT CASE WHEN COUNT(e.id) > 0 THEN true ELSE false END FROM enrollments e JOIN student_profiles sp ON e.student_id = sp.id WHERE e.course_id = :courseId AND sp.user_id = :userId AND e.enrollment_status IN ('ACTIVE', 'COMPLETED')", nativeQuery = true)
     boolean checkEnrollmentExists(@org.springframework.data.repository.query.Param("courseId") UUID courseId, @org.springframework.data.repository.query.Param("userId") UUID userId);
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"teacher.user", "modules"})

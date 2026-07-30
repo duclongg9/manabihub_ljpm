@@ -10,10 +10,23 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
+
+    boolean existsByDedupeKey(String dedupeKey);
+
+    @Query(value = """
+            SELECT admin.id
+            FROM internal_admin_accounts admin
+            JOIN internal_admin_roles admin_role ON admin_role.admin_account_id = admin.id
+            JOIN roles role ON role.id = admin_role.role_id
+            WHERE role.code = :roleCode
+              AND admin.account_status = 'ACTIVE'
+            """, nativeQuery = true)
+    List<UUID> findActiveAdminIdsByRoleCode(@Param("roleCode") String roleCode);
 
     @Query("SELECT n FROM Notification n WHERE (n.recipientUserId = :userId OR n.recipientAdminId = :userId) ORDER BY n.createdAt DESC")
     Page<Notification> findAllByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId, Pageable pageable);

@@ -5,7 +5,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
 
 export const TEACHER_MENU = [
   {
@@ -27,17 +27,18 @@ export const TEACHER_MENU = [
     roles: [ROLES.TEACHER],
   },
   {
+    title: 'Ví của tôi',
+    path: ROUTES.TEACHER.WALLET,
+    icon: AccountBalanceWalletOutlinedIcon,
+    roles: [ROLES.TEACHER],
+  },
+  {
     title: 'Xác minh giáo viên',
     path: ROUTES.TEACHER.KYC,
     icon: VerifiedUserIcon,
     roles: [ROLES.STUDENT, ROLES.TEACHER],
   },
-  {
-    title: 'Ví của tôi',
-    path: ROUTES.TEACHER.WALLET,
-    icon: AccountBalanceWalletIcon,
-    roles: [ROLES.TEACHER],
-  },
+
   {
     title: 'Hồ sơ',
     path: ROUTES.TEACHER.PROFILE,

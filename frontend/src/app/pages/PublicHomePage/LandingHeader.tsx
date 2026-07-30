@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Badge, Avatar, Menu, MenuItem } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Avatar, Menu, MenuItem } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SearchIcon from '@mui/icons-material/Search';
-import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
-import { getAuthSession, getDefaultRoute } from '../../../shared/auth/authSession';
+import {
+  clearAuthSession,
+  getAuthSession,
+  getDefaultRoute,
+  subscribeToAuthSessionChanges,
+} from '../../../shared/auth/authSession';
+import { ROLES } from '../../../shared/constants/roles';
 
 export const LandingHeader: React.FC = () => {
   const navigate = useNavigate();
@@ -14,7 +19,7 @@ export const LandingHeader: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
-  const session = getAuthSession('public');
+  const [session, setSession] = useState(() => getAuthSession('public'));
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
   const username = session?.email?.split('@')[0] || 'User';
 
@@ -25,6 +30,13 @@ export const LandingHeader: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(
+    () => subscribeToAuthSessionChanges(
+      () => setSession(getAuthSession('public')),
+    ),
+    [],
+  );
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -38,6 +50,13 @@ export const LandingHeader: React.FC = () => {
     if (e.key === 'Enter') {
       handleSearch();
     }
+  };
+
+  const handleLogout = () => {
+    setProfileAnchorEl(null);
+    setSession(null);
+    clearAuthSession('public');
+    window.location.replace(ROUTES.PUBLIC.HOME);
   };
 
   return (
@@ -173,12 +192,6 @@ export const LandingHeader: React.FC = () => {
             </Typography>
           )}
 
-          <IconButton color="inherit" sx={{ display: { xs: 'none', sm: 'flex' } }}>
-            <Badge badgeContent={0} color="error">
-              <ShoppingCartOutlinedIcon />
-            </Badge>
-          </IconButton>
-
           {session ? (
             <>
               <IconButton 
@@ -210,14 +223,17 @@ export const LandingHeader: React.FC = () => {
                 <MenuItem onClick={() => { setProfileAnchorEl(null); navigate(getDefaultRoute(session)); }} sx={{ py: 1.5, fontWeight: 600, color: '#1A1A2E' }}>
                   Bảng điều khiển
                 </MenuItem>
-                <MenuItem onClick={() => { setProfileAnchorEl(null); navigate('/student/profile'); }} sx={{ py: 1.5, color: '#475569' }}>
+                <MenuItem onClick={() => {
+                  setProfileAnchorEl(null);
+                  navigate(
+                    session.roles.includes(ROLES.TEACHER)
+                      ? ROUTES.TEACHER.PROFILE
+                      : ROUTES.STUDENT.PROFILE,
+                  );
+                }} sx={{ py: 1.5, color: '#475569' }}>
                   Hồ sơ cá nhân
                 </MenuItem>
-                <MenuItem onClick={() => { 
-                  setProfileAnchorEl(null); 
-                  localStorage.removeItem('auth_session');
-                  window.location.reload(); 
-                }} sx={{ py: 1.5, color: '#C41E3A' }}>
+                <MenuItem onClick={handleLogout} sx={{ py: 1.5, color: '#C41E3A' }}>
                   Đăng xuất
                 </MenuItem>
               </Menu>

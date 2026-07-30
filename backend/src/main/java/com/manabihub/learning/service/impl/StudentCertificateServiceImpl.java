@@ -73,6 +73,7 @@ public class StudentCertificateServiceImpl implements StudentCertificateService 
 
         List<LessonBlock> blocks = enrollment.getCourse().getModules().stream()
                 .flatMap(module -> module.getBlocks().stream())
+                .filter(block -> !block.isModerationHidden())
                 .toList();
         Map<UUID, LessonBlockProgress> progressByBlockId = lessonBlockProgressRepository
                 .findByEnrollmentId(enrollment.getId())

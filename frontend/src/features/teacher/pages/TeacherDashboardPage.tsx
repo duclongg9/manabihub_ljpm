@@ -1,20 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, Paper, CircularProgress, Alert, Button, Stack, Chip, Card, CardContent, Divider } from '@mui/material';
+import { Box, Typography, Grid, Paper, Button, Stack, Chip, Card, CardContent, Divider } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import CreateIcon from '@mui/icons-material/Create';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import AddIcon from '@mui/icons-material/Add';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
 import type { TeacherDashboardResponse } from '../services/teacherDashboardService';
 import { fetchTeacherDashboardStats } from '../services/teacherDashboardService';
+import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
+import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
+import { ErrorState } from '../../../shared/components/ErrorState/ErrorState';
+import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
+import { getAuthSession } from '../../../shared/auth/authSession';
+import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
+import { courseStatusLabel, courseStatusColor } from '../../course-builder/utils/courseStatus';
 
 export const TeacherDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<TeacherDashboardResponse | null>(null);
+
+  const session = getAuthSession('public');
+  const teacherId = session?.subject;
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
@@ -35,28 +46,11 @@ export const TeacherDashboardPage: React.FC = () => {
 
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingState message="Đang tải tổng quan..." />;
   }
 
   if (error) {
-    return (
-      <Box sx={{ p: 2 }}>
-        <Alert
-          severity="error"
-          action={
-            <Button color="inherit" size="small" onClick={loadData}>
-              Thử lại
-            </Button>
-          }
-        >
-          {error}
-        </Alert>
-      </Box>
-    );
+    return <ErrorState message={error} onRetry={loadData} />;
   }
 
   const totalCourses = stats?.totalCourses || 0;
@@ -66,35 +60,49 @@ export const TeacherDashboardPage: React.FC = () => {
   const recentCourses = stats?.recentCourses || [];
 
   const renderStatusChip = (status: string) => {
-    switch (status) {
-      case 'PUBLISHED':
-        return <Chip label="Đã xuất bản" color="success" size="small" />;
-      case 'PENDING':
-        return <Chip label="Chờ duyệt" color="warning" size="small" />;
-      case 'DRAFT':
-      case 'FORCED_DRAFT':
-        return <Chip label="Bản nháp" color="default" size="small" />;
-      case 'APPROVED':
-        return <Chip label="Đã duyệt" color="info" size="small" />;
-      case 'REJECTED':
-        return <Chip label="Từ chối" color="error" size="small" />;
-      default:
-        return <Chip label={status} size="small" />;
-    }
+    return <Chip label={courseStatusLabel(status)} color={courseStatusColor(status)} size="small" />;
   };
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Tổng quan Giảng viên</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate(ROUTES.TEACHER.COURSE_CREATE)}
-        >
-          Tạo khóa học
-        </Button>
-      </Stack>
+    <Box sx={{ pb: 6 }}>
+      <PageHeader
+        title="Tổng quan Giảng viên"
+        subtitle="Quản lý khóa học, doanh thu và các hoạt động giảng dạy"
+        breadcrumbs={[
+          { label: 'Giảng viên' },
+          { label: 'Tổng quan' },
+        ]}
+        action={(
+          <Stack direction="row" spacing={1}>
+            {teacherId && (
+              <Button
+                variant="outlined"
+                startIcon={<AccountCircleOutlinedIcon />}
+                onClick={() => navigate(ROUTES.PUBLIC.TEACHER_PROFILE(teacherId))}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                Hồ sơ công khai
+              </Button>
+            )}
+            <Button
+              variant="outlined"
+              startIcon={<AccountBalanceWalletOutlinedIcon />}
+              onClick={() => navigate(ROUTES.TEACHER.WALLET)}
+              sx={{ textTransform: 'none', fontWeight: 700 }}
+            >
+              Ví của tôi
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate(ROUTES.TEACHER.COURSE_CREATE)}
+              sx={{ textTransform: 'none', fontWeight: 700 }}
+            >
+              Tạo khóa học
+            </Button>
+          </Stack>
+        )}
+      />
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -145,21 +153,14 @@ export const TeacherDashboardPage: React.FC = () => {
 
       <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>Khóa học gần đây</Typography>
       {recentCourses.length === 0 ? (
-        <Paper sx={{ p: 6, textAlign: 'center' }}>
-          <AutoStoriesIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            Bạn chưa có khóa học nào
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Hãy bắt đầu chia sẻ kiến thức của bạn bằng cách tạo khóa học đầu tiên.
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate(ROUTES.TEACHER.COURSE_CREATE)}
-          >
-            Tạo khóa học ngay
-          </Button>
+        <Paper sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+          <EmptyState
+            title="Bạn chưa có khóa học nào"
+            description="Hãy bắt đầu chia sẻ kiến thức của bạn bằng cách tạo khóa học đầu tiên."
+            actionLabel="Tạo khóa học ngay"
+            onAction={() => navigate(ROUTES.TEACHER.COURSE_CREATE)}
+            icon={<AutoStoriesIcon sx={{ fontSize: 64, color: 'text.disabled' }} />}
+          />
         </Paper>
       ) : (
         <Grid container spacing={3}>

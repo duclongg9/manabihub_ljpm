@@ -51,6 +51,26 @@ public class TeacherCourseController {
         ));
     }
 
+    @PostMapping("/{courseId}/publish")
+    public ResponseEntity<ApiResponse<Void>> publishCourse(@PathVariable UUID courseId) {
+        courseService.publishCourse(courseId);
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.MSG_COURSE_014,
+                "Sản phẩm đã được xuất bản và hiển thị trên danh mục.",
+                null
+        ));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<CourseDraftResponse>>> listCourses() {
+        List<CourseDraftResponse> response = courseService.listMyCourses();
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.COMMON_SUCCESS,
+                "Teacher courses loaded.",
+                response
+        ));
+    }
+
     @GetMapping("/drafts")
     public ResponseEntity<ApiResponse<List<CourseDraftResponse>>> listDrafts() {
         List<CourseDraftResponse> response = courseService.listMyDrafts();

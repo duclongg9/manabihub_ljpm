@@ -24,6 +24,8 @@ frontend/node_modules/
 tmp/
 .vscode/settings.json
 .mtj.tmp/
+.codex-deploy/
+ci_log.txt
 
 # Local environment and secret files
 .env

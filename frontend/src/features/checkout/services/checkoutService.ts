@@ -32,13 +32,3 @@ export async function simulatePayment(orderCode: string, success = true): Promis
   );
   return response.data;
 }
-
-/**
- * Forwards the signed VNPay return params to the backend so it can verify the checksum and
- * confirm the order immediately after the browser is redirected back — without waiting for
- * the server-to-server IPN (which cannot reach localhost).
- */
-export async function confirmVnPayReturn(params: Record<string, string>): Promise<IpnAck> {
-  const response = await axiosClient.get<IpnAck>(ENDPOINTS.payments.confirmReturn, { params });
-  return response.data;
-}

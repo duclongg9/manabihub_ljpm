@@ -15,4 +15,14 @@ public interface AuditLogService {
             Map<String, Object> afterValue,
             Map<String, Object> metadata
     );
+    void logAdminAction(
+            UUID adminId,
+            String roleCode,
+            String action,
+            String targetType,
+            UUID targetId,
+            Map<String, Object> beforeValue,
+            Map<String, Object> afterValue,
+            Map<String, Object> metadata
+    );
 }
