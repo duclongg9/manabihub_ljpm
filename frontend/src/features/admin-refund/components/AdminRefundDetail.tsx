@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
 import type { ApiResponse } from '../../../shared/types/api';
 import { adminRefundApi } from '../api/adminRefundApi';
 import type {
@@ -453,7 +453,16 @@ export function AdminRefundDetail() {
 
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="p-6">
-          <h3 className="mb-4 text-lg font-bold text-gray-900">Bản chụp điều kiện tại thời điểm yêu cầu</h3>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-gray-900">Bản chụp điều kiện tại thời điểm yêu cầu</h3>
+            <RouterLink 
+              to="/help/learners/payments-refunds-access"
+              className="text-sm font-medium text-blue-600 hover:underline"
+              target="_blank"
+            >
+              Xem chính sách hoàn tiền
+            </RouterLink>
+          </div>
           <EvidenceSnapshot snapshot={detail.eligibilitySnapshot} />
         </div>
       </section>

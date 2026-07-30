@@ -42,6 +42,12 @@ public final class MessageCodes {
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
 
     // ──────────────────────────────────────────────
+    // REPORT — report/violation errors
+    // ──────────────────────────────────────────────
+    public static final String MSG_REP_001 = "MSG-REP-001";
+    public static final String MSG_REP_002 = "MSG-REP-002";
+
+    // ──────────────────────────────────────────────
     // AUTH — authentication & authorization
     // ──────────────────────────────────────────────
     public static final String AUTH_UNAUTHORIZED = "AUTH_UNAUTHORIZED";

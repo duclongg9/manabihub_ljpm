@@ -33,6 +33,8 @@ import {
 } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
+import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
@@ -46,6 +48,7 @@ import {
   submitCourseForReview,
   validateCourseDraft
 } from '../services/courseDraftService';
+import { courseStatusColor, courseStatusLabel } from '../utils/courseStatus';
 
 interface CourseDraftSavedState {
   draftSaved?: boolean;
@@ -412,7 +415,7 @@ export function TeacherCoursesPage() {
             </Button>
           </Stack>
 
-          {isLoading && <DraftLoadingState />}
+          {isLoading && <LoadingState message="Đang tải danh sách bản nháp..." />}
 
           {!isLoading && loadError && (
             <Alert
@@ -428,7 +431,14 @@ export function TeacherCoursesPage() {
           )}
 
           {!isLoading && !loadError && drafts.length === 0 && (
-            <DraftEmptyState onCreate={() => navigate(ROUTES.TEACHER.COURSE_CREATE)} />
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+              <EmptyState
+                title="Chưa có khóa học nào"
+                description="Khóa học mới, đang chờ duyệt, đã duyệt và đã xuất bản sẽ xuất hiện tại đây."
+                actionLabel="Tạo bản nháp đầu tiên"
+                onAction={() => navigate(ROUTES.TEACHER.COURSE_CREATE)}
+              />
+            </Box>
           )}
 
           {!isLoading && !loadError && drafts.length > 0 && filteredDrafts.length === 0 && (
@@ -851,39 +861,7 @@ function CourseCoverPlaceholder() {
   );
 }
 
-function DraftLoadingState() {
-  return (
-    <Stack spacing={1.5} sx={{ alignItems: 'center', py: 6 }}>
-      <CircularProgress size={28} />
-      <Typography variant="body2" color="text.secondary">
-        Đang tải danh sách bản nháp...
-      </Typography>
-    </Stack>
-  );
-}
 
-interface DraftEmptyStateProps {
-  onCreate: () => void;
-}
-
-function DraftEmptyState({ onCreate }: DraftEmptyStateProps) {
-  return (
-    <Stack spacing={2} sx={{ alignItems: 'center', py: 6, textAlign: 'center' }}>
-      <CourseCoverPlaceholder />
-      <Box>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          Chưa có khóa học nào
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520 }}>
-          Khóa học mới, đang chờ duyệt, đã duyệt và đã xuất bản sẽ xuất hiện tại đây.
-        </Typography>
-      </Box>
-      <Button variant="contained" startIcon={<AddIcon />} onClick={onCreate} sx={{ textTransform: 'none', fontWeight: 700 }}>
-        Tạo bản nháp đầu tiên
-      </Button>
-    </Stack>
-  );
-}
 
 interface DraftNoResultsStateProps {
   onClear: () => void;
@@ -908,43 +886,6 @@ function DraftNoResultsState({ onClear }: DraftNoResultsStateProps) {
 
 function isEditableCourse(status: CourseDraftResponse['status']) {
   return status === 'DRAFT' || status === 'REJECTED' || status === 'FORCED_DRAFT';
-}
-
-function courseStatusLabel(status: CourseDraftResponse['status']) {
-  switch (status) {
-    case 'PENDING':
-      return 'Chờ duyệt';
-    case 'APPROVED':
-      return 'Đã duyệt';
-    case 'PUBLISHED':
-      return 'Đã xuất bản';
-    case 'REJECTED':
-      return 'Bị từ chối';
-    case 'FORCED_DRAFT':
-      return 'Cần chỉnh sửa';
-    case 'ARCHIVED':
-      return 'Đã lưu trữ';
-    default:
-      return 'Bản nháp';
-  }
-}
-
-function courseStatusColor(
-  status: CourseDraftResponse['status'],
-): 'default' | 'warning' | 'info' | 'success' | 'error' {
-  switch (status) {
-    case 'PENDING':
-    case 'FORCED_DRAFT':
-      return 'warning';
-    case 'APPROVED':
-      return 'info';
-    case 'PUBLISHED':
-      return 'success';
-    case 'REJECTED':
-      return 'error';
-    default:
-      return 'default';
-  }
 }
 
 function displayDraftTitle(course: CourseDraftResponse) {

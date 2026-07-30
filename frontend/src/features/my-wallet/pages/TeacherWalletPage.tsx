@@ -11,8 +11,10 @@ import {
   Stack,
   Tooltip,
   Typography,
+  Link,
 } from '@mui/material';
 import { useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { WalletBalanceCards } from '../components/WalletBalanceCards';
 import { WithdrawalHistoryTable } from '../components/WithdrawalHistoryTable';
@@ -161,7 +163,14 @@ export function TeacherWalletPage() {
         <strong>{formatCurrency(wallet.minimumPayoutAmount)}</strong>
         {wallet.nextPayoutDate
           ? `; kỳ thanh toán kế tiếp dự kiến ${formatDate(wallet.nextPayoutDate)}.`
-          : '.'}
+          : '.'}{' '}
+        <Link
+          component={RouterLink}
+          to="/help/instructors/escrow-and-payouts"
+          sx={{ fontWeight: 600, ml: 0.5 }}
+        >
+          Xem chi tiết chính sách
+        </Link>
       </Alert>
 
       <Paper
