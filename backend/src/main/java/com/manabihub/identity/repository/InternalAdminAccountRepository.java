@@ -71,4 +71,7 @@ public interface InternalAdminAccountRepository extends JpaRepository<InternalAd
             @Param("adminId") UUID adminId,
             @Param("permissionCode") String permissionCode
     );
+
+    @Query("SELECT a.id FROM IdentityInternalAdminAccount a WHERE lower(a.email) LIKE lower(concat('%', :search, '%')) OR lower(a.fullName) LIKE lower(concat('%', :search, '%'))")
+    List<UUID> searchAdminIds(@Param("search") String search, org.springframework.data.domain.Pageable pageable);
 }

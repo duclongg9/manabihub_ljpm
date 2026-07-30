@@ -19,6 +19,7 @@ import { CourseApprovalDetailPage } from '../features/admin-course-approval/page
 import { AdminRefundQueue } from '../features/admin-refund/components/AdminRefundQueue';
 import { AdminRefundDetail } from '../features/admin-refund/components/AdminRefundDetail';
 import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
+import { AdminAuditLogPage } from '../features/admin/pages/AdminAuditLogPage';
 import { CourseDetailPage } from '../features/catalog/pages/CourseDetailPage';
 import { CourseLearningPage } from '../features/learning/pages/CourseLearningPage';
 import { CourseCatalogPage } from '../features/catalog/pages/CourseCatalogPage';
@@ -294,6 +295,10 @@ export const router = createBrowserRouter([
       {
         path: 'users',
         element: <InternalAdminAccountsPage />,
+      },
+      {
+        path: 'audit-logs',
+        element: <AdminAuditLogPage />,
       },
       {
         path: 'kyc/review',
