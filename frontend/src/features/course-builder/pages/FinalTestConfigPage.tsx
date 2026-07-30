@@ -48,14 +48,15 @@ export const FinalTestConfigPage = () => {
     finalTestService.getFinalTest(courseId)
       .then((config) => {
         if (config) {
-          setForm({
+          const loadedForm: FinalTestFormState = {
             timeLimitMinutes: config.timeLimitMinutes || '',
-            passingScore: config.passingScore || '',
+            passingScore: config.passingScore ?? '',
             maxRetakes: config.maxRetakes || '',
             jlptLevel: config.jlptLevel || '',
             skillFocus: config.skillFocus || '',
             questions: config.questions || [],
-          });
+          };
+          setForm(loadedForm);
         }
       })
       .catch((err) => {
