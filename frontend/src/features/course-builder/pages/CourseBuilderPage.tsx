@@ -42,7 +42,7 @@ import {
 } from '@mui/material';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -673,6 +673,7 @@ export function CourseBuilderPage() {
                         index={index}
                         module={module}
                         total={builder.modules.length}
+                        disabled={savingModule || savingBlock}
                         onDelete={() => void removeModule(module)}
                         onMove={(direction) => void moveModule(module.id, direction)}
                         onSelect={() => selectModule(module)}
@@ -739,6 +740,7 @@ export function CourseBuilderPage() {
                             block={block}
                             dragging={draggingBlockId === block.id}
                             index={index}
+                            disabled={savingModule || savingBlock}
                             onDelete={() => void removeBlock(block)}
                             onDragEnd={() => setDraggingBlockId(null)}
                             onDragStart={() => setDraggingBlockId(block.id)}
@@ -796,12 +798,13 @@ interface ModuleListItemProps {
   index: number;
   module: CourseModuleResponse;
   total: number;
+  disabled?: boolean;
   onDelete: () => void;
   onMove: (direction: -1 | 1) => void;
   onSelect: () => void;
 }
 
-function ModuleListItem({ active, index, module, total, onDelete, onMove, onSelect }: ModuleListItemProps) {
+function ModuleListItem({ active, index, module, total, disabled, onDelete, onMove, onSelect }: ModuleListItemProps) {
   function handleActionClick(callback: () => void) {
     return (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
@@ -875,22 +878,24 @@ function ModuleListItem({ active, index, module, total, onDelete, onMove, onSele
       <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
         <Tooltip title="Đưa lên">
           <span>
-            <IconButton size="small" disabled={index === 0} onClick={handleActionClick(() => onMove(-1))}>
+            <IconButton size="small" disabled={disabled || index === 0} onClick={handleActionClick(() => onMove(-1))}>
               <ArrowUpwardIcon fontSize="small" />
             </IconButton>
           </span>
         </Tooltip>
         <Tooltip title="Đưa xuống">
           <span>
-            <IconButton size="small" disabled={index === total - 1} onClick={handleActionClick(() => onMove(1))}>
+            <IconButton size="small" disabled={disabled || index === total - 1} onClick={handleActionClick(() => onMove(1))}>
               <ArrowDownwardIcon fontSize="small" />
             </IconButton>
           </span>
         </Tooltip>
         <Tooltip title="Xóa học phần">
-          <IconButton color="error" size="small" onClick={handleActionClick(onDelete)}>
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+          <span>
+            <IconButton color="error" size="small" disabled={disabled} onClick={handleActionClick(onDelete)}>
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </span>
         </Tooltip>
         </Stack>
     </Box>
@@ -901,6 +906,7 @@ interface LessonBlockItemProps {
   block: LessonBlockResponse;
   dragging: boolean;
   index: number;
+  disabled?: boolean;
   onDelete: () => void;
   onDragEnd: () => void;
   onDragStart: () => void;
@@ -912,46 +918,46 @@ function LessonBlockItem({
   block,
   dragging,
   index,
+  disabled,
   onDelete,
   onDragEnd,
   onDragStart,
   onDropOnBlock,
   onEdit,
 }: LessonBlockItemProps) {
-  function handleDragStart(event: DragEvent<HTMLDivElement>) {
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', block.id);
-    onDragStart();
-  }
-
-  function handleDragOver(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }
-
-  function handleDrop(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    onDropOnBlock();
-  }
-
   return (
     <Box
-      draggable
+      draggable={!disabled}
+      onDragStart={(event) => {
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', block.id);
+        onDragStart();
+      }}
       onDragEnd={onDragEnd}
-      onDragOver={handleDragOver}
-      onDragStart={handleDragStart}
-      onDrop={handleDrop}
+      onDragOver={(event) => {
+        if (!disabled) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+        }
+      }}
+      onDrop={(event) => {
+        if (!disabled) {
+          event.preventDefault();
+          onDropOnBlock();
+        }
+      }}
       sx={{
         border: '1px solid',
         borderColor: block.validationMessage ? 'warning.main' : 'divider',
         borderRadius: 1,
-        cursor: 'grab',
+        cursor: disabled ? 'default' : (dragging ? 'grabbing' : 'grab'),
         opacity: dragging ? 0.58 : 1,
         p: 1.5,
         transition: 'border-color 120ms ease, opacity 120ms ease, transform 120ms ease',
-        '&:active': {
-          cursor: 'grabbing',
-        },
         '&:hover': {
           borderColor: block.validationMessage ? 'warning.main' : 'primary.light',
         },
@@ -982,14 +988,18 @@ function LessonBlockItem({
 
         <Stack direction="row" spacing={0.5} sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}>
           <Tooltip title="Sửa khối nội dung">
-            <IconButton size="small" onClick={onEdit}>
-              <EditOutlinedIcon fontSize="small" />
-            </IconButton>
+            <span>
+              <IconButton size="small" disabled={disabled} onClick={onEdit}>
+                <EditOutlinedIcon fontSize="small" />
+              </IconButton>
+            </span>
           </Tooltip>
           <Tooltip title="Xóa khối nội dung">
-            <IconButton color="error" size="small" onClick={onDelete}>
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+            <span>
+              <IconButton color="error" size="small" disabled={disabled} onClick={onDelete}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </span>
           </Tooltip>
         </Stack>
       </Stack>

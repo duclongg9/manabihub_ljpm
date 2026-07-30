@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Button, Stack, Typography, TextField, MenuItem, CircularProgress, Alert, Snackbar, InputAdornment, Paper } from '@mui/material';
+import { Box, Button, Stack, Typography, TextField, MenuItem, Alert, Snackbar, InputAdornment, Paper } from '@mui/material';
 import { finalTestService } from '../services/finalTestService';
 import type { UpdateFinalTestRequest } from '../services/finalTestService';
+import { ErrorState } from '../../../shared/components/ErrorState/ErrorState';
+import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { FinalTestQuestionsEditor } from './FinalTestQuestionsEditor';
 
@@ -21,7 +23,9 @@ export const FinalTestConfigPage = () => {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [initialForm, setInitialForm] = useState<FinalTestFormState | null>(null);
   const [expanded, setExpanded] = useState<number | false>(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -42,28 +46,41 @@ export const FinalTestConfigPage = () => {
     questions: [],
   });
 
-  useEffect(() => {
+  const loadData = () => {
     if (!courseId) return;
+
+    setLoading(true);
+    setLoadError(false);
 
     finalTestService.getFinalTest(courseId)
       .then((config) => {
         if (config) {
-          setForm({
+          const loadedForm = {
             timeLimitMinutes: config.timeLimitMinutes || '',
             passingScore: config.passingScore || '',
             maxRetakes: config.maxRetakes || '',
             jlptLevel: config.jlptLevel || '',
             skillFocus: config.skillFocus || '',
             questions: config.questions || [],
-          });
+          };
+          setForm(loadedForm);
+          setInitialForm(loadedForm);
+        } else {
+          setInitialForm(form); // Set current empty form as initial
         }
       })
       .catch((err) => {
         console.error(err);
+        setLoadError(true);
       })
       .finally(() => {
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
   const handleSave = async (shouldExit: boolean = false) => {
@@ -162,8 +179,27 @@ export const FinalTestConfigPage = () => {
   };
 
   if (loading) {
-    return <CircularProgress />;
+    return <LoadingState message="Đang tải cấu hình..." />;
   }
+
+  if (loadError) {
+    return (
+      <Box sx={{ pb: 10 }}>
+        <PageHeader
+          title="Cấu hình Bài thi cuối khóa"
+          breadcrumbs={[
+            { label: 'Khóa học của tôi', href: '/teacher/courses' },
+            { label: 'Bài thi cuối khóa' },
+          ]}
+        />
+        <Box sx={{ mt: 3 }}>
+          <ErrorState message="Không thể tải cấu hình bài thi cuối khóa." onRetry={loadData} />
+        </Box>
+      </Box>
+    );
+  }
+
+  const isDirty = initialForm && JSON.stringify(form) !== JSON.stringify(initialForm);
 
   return (
     <Box sx={{ pb: 10 }}>
@@ -266,7 +302,11 @@ export const FinalTestConfigPage = () => {
           variant="outlined"
           color="inherit"
           onClick={() => {
-            if (window.confirm("Bạn có những thay đổi chưa được lưu. Bạn có chắc chắn muốn rời đi không?")) {
+            if (isDirty) {
+              if (window.confirm("Bạn có những thay đổi chưa được lưu. Bạn có chắc chắn muốn rời đi không?")) {
+                navigate('/teacher/courses');
+              }
+            } else {
               navigate('/teacher/courses');
             }
           }}
