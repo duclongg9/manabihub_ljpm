@@ -13,6 +13,7 @@ import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.enums.PayoutStatus;
 import com.manabihub.wallet.enums.WalletTransactionSection;
 import com.manabihub.wallet.service.TeacherWalletService;
+import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.service.WalletService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +53,8 @@ class TeacherWalletControllerTest {
     @MockBean
     private WalletService walletService;
     @MockBean
+    private EscrowService escrowService;
+    @MockBean
     private CustomOAuth2UserService customOAuth2UserService;
     @MockBean
     private OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
@@ -89,17 +92,7 @@ class TeacherWalletControllerTest {
                 .andExpect(jsonPath("$.data.pendingBalance").value(100000.0));
     }
 
-    @Test
-    void getPendingEscrow_asTeacherReturnsEntries() throws Exception {
-        when(teacherWalletService.getPendingEscrow()).thenReturn(List.of(new EscrowEntryResponse(
-                UUID.randomUUID(), UUID.randomUUID(), "OD1", UUID.randomUUID(), "N3 Grammar",
-                new BigDecimal("150000.00"), "VND", EscrowStatus.HELD, Instant.now(), Instant.now())));
 
-        mockMvc.perform(get("/api/v1/teacher/wallet/escrow").with(teacherJwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data", hasSize(1)))
-                .andExpect(jsonPath("$.data[0].status", is("HELD")));
-    }
 
     @Test
     void getTransactions_asTeacherReturnsWithdrawalHistory() throws Exception {

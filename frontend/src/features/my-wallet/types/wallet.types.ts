@@ -16,6 +16,24 @@ export type WithdrawalStatus =
   | 'FAILED'
   | 'CANCELLED';
 
+export type EscrowStatus =
+  | 'HELD'
+  | 'RELEASED'
+  | 'REFUNDED'
+  | 'CANCELLED';
+
+export type EscrowLedgerItem = {
+  id: string;
+  orderId: string;
+  courseName: string;
+  grossAmount: number;
+  platformCommissionAmount: number;
+  teacherNetAmount: number;
+  status: EscrowStatus;
+  releaseAt: string;
+  createdAt: string;
+};
+
 export type WithdrawalRequest = {
   id: string;
   requestedAmount: number;

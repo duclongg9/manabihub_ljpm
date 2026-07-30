@@ -14,6 +14,13 @@ export const walletService = {
     return response.data;
   },
 
+  getTeacherEscrowLedger: async (params?: any): Promise<ApiResponse<PageResponse<import('../types/wallet.types').EscrowLedgerItem>>> => {
+    // The endpoint is /api/v1/teacher/wallet/escrow
+    // Wait, I should add it to ENDPOINTS or just hardcode it here.
+    const response = await axiosClient.get('/api/v1/teacher/wallet/escrow', { params });
+    return response.data;
+  },
+
   getWithdrawalDetail: async (id: string): Promise<ApiResponse<WithdrawalRequest>> => {
     const response = await axiosClient.get(ENDPOINTS.teacherWallet.withdrawalDetail(id));
     return response.data;

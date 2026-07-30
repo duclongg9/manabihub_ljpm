@@ -7,6 +7,7 @@ import com.manabihub.wallet.dto.response.TeacherWalletSummaryResponse;
 import com.manabihub.wallet.dto.response.WalletActivityResponse;
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
 import com.manabihub.wallet.service.TeacherWalletService;
+import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.service.WalletService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,6 +40,7 @@ public class TeacherWalletController {
 
     private final TeacherWalletService teacherWalletService;
     private final WalletService walletService;
+    private final EscrowService escrowService;
 
     @GetMapping("/summary")
     @Operation(summary = "Get detailed wallet summary")
@@ -58,16 +60,6 @@ public class TeacherWalletController {
         return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "Success", response);
     }
 
-    @GetMapping("/escrow")
-    @Operation(summary = "Get pending escrow")
-    public ApiResponse<List<EscrowEntryResponse>> getPendingEscrow() {
-        return ApiResponse.success(
-                MessageCodes.MSG_WALLET_001,
-                "Pending escrow loaded.",
-                teacherWalletService.getPendingEscrow()
-        );
-    }
-
     @GetMapping("/transactions")
     @Operation(summary = "Get withdrawal history")
     public ApiResponse<List<WalletActivityResponse>> getWithdrawalHistory() {
@@ -76,5 +68,16 @@ public class TeacherWalletController {
                 "Withdrawal history loaded.",
                 teacherWalletService.getWithdrawalHistory()
         );
+    }
+
+    @GetMapping("/escrow")
+    @PreAuthorize("hasRole('TEACHER')")
+    @Operation(summary = "Get teacher escrow ledger history")
+    public ApiResponse<org.springframework.data.domain.Page<com.manabihub.wallet.dto.response.EscrowLedgerResponse>> getEscrowLedger(
+            Authentication authentication,
+            org.springframework.data.domain.Pageable pageable) {
+        UUID userId = UUID.fromString(authentication.getName());
+        org.springframework.data.domain.Page<com.manabihub.wallet.dto.response.EscrowLedgerResponse> response = escrowService.getTeacherEscrowLedgerByUserId(userId, pageable);
+        return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "Success", response);
     }
 }

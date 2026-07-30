@@ -26,6 +26,10 @@ public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID
 
     /** Used by the teacher "My Wallet" view to list escrow entries in a set of statuses. */
     List<EscrowLedger> findByTeacher_IdAndStatusInOrderByCreatedAtDesc(UUID teacherId, Collection<EscrowStatus> statuses);
+
+    @Query(value = "SELECT e FROM EscrowLedger e JOIN FETCH e.orderItem oi JOIN FETCH e.course WHERE e.teacher.id = :teacherId",
+           countQuery = "SELECT count(e) FROM EscrowLedger e WHERE e.teacher.id = :teacherId")
+    org.springframework.data.domain.Page<EscrowLedger> findByTeacher_Id(@Param("teacherId") UUID teacherId, Pageable pageable);
     Optional<EscrowLedger> findByOrderItem_Id(UUID orderItemId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
