@@ -1,5 +1,6 @@
 import { PolicyBoundary } from '../../components/PolicyBoundary';
 import { ArticleLayout } from '../../components/ArticleLayout';
+import { Box } from '@mui/material';
 import { getHelpArticle } from '../../content/articleRegistry';
 import {
   formatPolicyCurrency,
@@ -37,7 +38,7 @@ export const InstructorRevenueSharePage = () => {
                 <strong>{formatPolicyPercent(1 - policy.commissionRate)}</strong>.
               </li>
             </ul>
-            <div className="border-l-4 border-blue-600 bg-blue-50 p-4">
+            <Box sx={{ borderLeft: 4, borderColor: 'primary.main', bgcolor: 'primary.50', p: 2, mt: 2 }}>
               <p><strong>Ví dụ minh họa</strong></p>
               <p>
                 Với doanh thu gộp {formatPolicyCurrency(exampleGrossAmount, policy.currency)},
@@ -49,7 +50,7 @@ export const InstructorRevenueSharePage = () => {
                 {' '}
                 {formatPolicyCurrency(instructorNetAmount, policy.currency)}.
               </p>
-            </div>
+            </Box>
               </section>
 
               <section>

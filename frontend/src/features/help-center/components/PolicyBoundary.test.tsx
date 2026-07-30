@@ -33,7 +33,7 @@ describe('PolicyBoundary', () => {
     );
 
     expect(screen.getByRole('status')).toHaveAccessibleName(
-      'Đang tải điều khoản hiện hành',
+      'Đang tải điều khoản hiện hành...',
     );
     expect(screen.queryByText('0.2')).not.toBeInTheDocument();
   });
