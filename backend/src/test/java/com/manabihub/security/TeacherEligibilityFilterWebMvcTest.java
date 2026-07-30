@@ -17,6 +17,7 @@ import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
 import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.manabihub.wallet.controller.TeacherWalletController;
 import com.manabihub.wallet.service.WalletService;
+import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.writing.controller.TeacherWritingReviewController;
 import com.manabihub.writing.dto.response.WritingSubmissionSummaryResponse;
 import com.manabihub.writing.service.TeacherWritingReviewService;
@@ -76,6 +77,9 @@ class TeacherEligibilityFilterWebMvcTest {
 
     @MockBean
     private WalletService walletService;
+
+    @MockBean
+    private EscrowService escrowService;
 
     @MockBean
     private WithdrawalService withdrawalService;

@@ -1,4 +1,4 @@
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { HelpCircle } from 'lucide-react';
 import {
   Box,
   Chip,
@@ -46,7 +46,9 @@ export function EscrowLedgerTable({ items }: EscrowLedgerTableProps) {
               <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                 Doanh thu gộp
                 <Tooltip title="Tổng số tiền học viên đã thanh toán.">
-                  <HelpOutlineIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                  <Box sx={{ color: 'text.secondary', display: 'flex' }}>
+                    <HelpCircle size={16} />
+                  </Box>
                 </Tooltip>
               </Box>
             </TableCell>
@@ -54,7 +56,9 @@ export function EscrowLedgerTable({ items }: EscrowLedgerTableProps) {
               <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                 Phí nền tảng
                 <Tooltip title="Phí duy trì và vận hành nền tảng ManabiHub. Chi tiết xem tại Trung tâm trợ giúp.">
-                  <HelpOutlineIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                  <Box sx={{ color: 'text.secondary', display: 'flex' }}>
+                    <HelpCircle size={16} />
+                  </Box>
                 </Tooltip>
               </Box>
             </TableCell>
@@ -62,7 +66,9 @@ export function EscrowLedgerTable({ items }: EscrowLedgerTableProps) {
               <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                 Thực nhận
                 <Tooltip title="Số tiền thực tế cộng vào ví doanh thu của bạn.">
-                  <HelpOutlineIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                  <Box sx={{ color: 'text.secondary', display: 'flex' }}>
+                    <HelpCircle size={16} />
+                  </Box>
                 </Tooltip>
               </Box>
             </TableCell>
