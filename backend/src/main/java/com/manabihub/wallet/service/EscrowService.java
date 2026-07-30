@@ -37,4 +37,9 @@ public interface EscrowService {
      * allocation after a provider-confirmed refund.
      */
     boolean reverseHeldAllocationForRefund(UUID orderItemId);
+
+    /**
+     * Gets the escrow ledger history for a specific teacher by their user ID.
+     */
+    org.springframework.data.domain.Page<com.manabihub.wallet.dto.response.EscrowLedgerResponse> getTeacherEscrowLedgerByUserId(UUID userId, org.springframework.data.domain.Pageable pageable);
 }

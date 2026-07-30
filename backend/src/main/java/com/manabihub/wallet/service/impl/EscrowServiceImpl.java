@@ -51,6 +51,34 @@ public class EscrowServiceImpl implements EscrowService {
     private final OrderItemSnapshotRepository orderItemSnapshotRepository;
     private final PlatformCommissionLedgerRepository platformCommissionLedgerRepository;
     private final CommercialPolicyService commercialPolicyService;
+    private final com.manabihub.kyc.repository.TeacherProfileRepository teacherProfileRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<com.manabihub.wallet.dto.response.EscrowLedgerResponse> getTeacherEscrowLedgerByUserId(UUID userId, org.springframework.data.domain.Pageable pageable) {
+        TeacherProfile teacherProfile = teacherProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.KYC_TEACHER_NOT_FOUND,
+                        "Teacher profile not found",
+                        HttpStatus.NOT_FOUND));
+        
+        return escrowLedgerRepository.findByTeacher_Id(teacherProfile.getId(), pageable)
+                .map(ledger -> {
+                    OrderItemSnapshot snapshot = orderItemSnapshotRepository.findByOrderItem_Id(ledger.getOrderItem().getId())
+                            .orElseThrow(() -> new BusinessException(MessageCodes.ORDER_NOT_FOUND, "Snapshot not found"));
+                    return com.manabihub.wallet.dto.response.EscrowLedgerResponse.builder()
+                            .id(ledger.getId())
+                            .orderId(ledger.getOrder().getId())
+                            .courseName(ledger.getCourse().getTitle())
+                            .grossAmount(snapshot.getGrossAmount())
+                            .platformCommissionAmount(snapshot.getCommissionAmount())
+                            .teacherNetAmount(snapshot.getTeacherNetAmount())
+                            .status(ledger.getStatus())
+                            .releaseAt(ledger.getReleaseAt())
+                            .createdAt(ledger.getCreatedAt())
+                            .build();
+                });
+    }
 
     @Override
     @Transactional

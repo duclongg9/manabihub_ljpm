@@ -19,13 +19,16 @@ import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { WalletBalanceCards } from '../components/WalletBalanceCards';
 import { WithdrawalHistoryTable } from '../components/WithdrawalHistoryTable';
 import { WithdrawalRequestModal } from '../components/WithdrawalRequestModal';
+import { EscrowLedgerTable } from '../components/EscrowLedgerTable';
 import { useTeacherWallet } from '../hooks/useTeacherWallet';
 import { useTeacherWithdrawals } from '../hooks/useTeacherWithdrawals';
+import { useTeacherEscrowLedger } from '../hooks/useTeacherEscrowLedger';
 
 export function TeacherWalletPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const walletQuery = useTeacherWallet();
   const withdrawalsQuery = useTeacherWithdrawals();
+  const escrowLedgerQuery = useTeacherEscrowLedger();
 
   if (walletQuery.isLoading) {
     return (
@@ -169,6 +172,71 @@ export function TeacherWalletPage() {
           Xem chi tiết chính sách
         </Link>
       </Alert>
+
+      <Paper
+        elevation={0}
+        sx={{
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          mb: 4,
+          overflow: 'hidden',
+        }}
+      >
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{
+            alignItems: { xs: 'stretch', sm: 'center' },
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            justifyContent: 'space-between',
+            p: { xs: 2, md: 3 },
+          }}
+        >
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              Sổ cái doanh thu
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Chi tiết các khoản doanh thu từ khóa học, phí nền tảng và thời gian đối soát.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            startIcon={escrowLedgerQuery.isFetching
+              ? <CircularProgress size={16} color="inherit" />
+              : <RefreshIcon />}
+            disabled={escrowLedgerQuery.isFetching}
+            onClick={() => void escrowLedgerQuery.refetch()}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            Tải lại
+          </Button>
+        </Stack>
+
+        {escrowLedgerQuery.isError ? (
+          <Alert
+            severity="error"
+            action={(
+              <Button color="inherit" onClick={() => void escrowLedgerQuery.refetch()}>
+                Thử lại
+              </Button>
+            )}
+            sx={{ m: 3 }}
+          >
+            Không thể tải lịch sử doanh thu.
+          </Alert>
+        ) : escrowLedgerQuery.isLoading ? (
+          <Box sx={{ p: 3 }}>
+            {[0, 1, 2].map((item) => (
+              <Skeleton key={item} height={58} sx={{ mb: 1 }} />
+            ))}
+          </Box>
+        ) : (
+          <EscrowLedgerTable items={escrowLedgerQuery.data?.content ?? []} />
+        )}
+      </Paper>
 
       <Paper
         elevation={0}
