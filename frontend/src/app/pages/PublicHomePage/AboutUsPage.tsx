@@ -78,7 +78,8 @@ export const AboutUsPage: React.FC = () => {
               fontSize: { xs: '1.1rem', md: '1.25rem' }
             }}
           >
-            Được xây dựng với sứ mệnh xóa bỏ rào cản ngôn ngữ, ManabiHub kết nối trực tiếp những chuyên gia tiếng Nhật hàng đầu với hàng ngàn học viên trên toàn quốc.
+            ManabiHub được xây dựng để kết nối người học với giảng viên tiếng Nhật và
+            nội dung học trực tuyến phù hợp với nhiều mục tiêu học tập.
           </Typography>
         </Container>
       </Box>

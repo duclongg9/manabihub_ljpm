@@ -44,11 +44,17 @@ describe('help article registry', () => {
     }
   });
 
-  it('searches discoverable content and keeps draft legal pages out of results', () => {
+  it('searches every discoverable help and legal article', () => {
     expect(filterHelpArticles('hoàn tiền').map((article) => article.id)).toContain(
       'learner-payments-refunds',
     );
-    expect(filterHelpArticles('', 'legal')).toEqual([]);
+    expect(filterHelpArticles('', 'legal').map((article) => article.id)).toEqual([
+      'terms',
+      'privacy',
+      'instructor-terms',
+      'refund-policy',
+      'ai-notice',
+    ]);
     expect(filterHelpArticles('').every((article) => article.discoverable)).toBe(true);
   });
 });

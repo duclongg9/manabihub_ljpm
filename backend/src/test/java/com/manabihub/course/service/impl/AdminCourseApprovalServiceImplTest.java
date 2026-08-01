@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.audit.entity.AuditLog;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.course.dto.request.CourseReviewRequest;
+import com.manabihub.course.dto.response.CourseApprovalDetailResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseApprovalDecision;
 import com.manabihub.course.enums.CourseApprovalDecisionEnum;
@@ -15,6 +16,7 @@ import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -29,8 +31,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -82,8 +83,30 @@ class AdminCourseApprovalServiceImplTest {
                 .status(CourseStatus.PENDING)
                 .build();
 
-        when(courseRepository.hasAdminRole(eq(adminId), anyList())).thenReturn(true);
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+    }
+
+    @Test
+    void getDetail_DoesNotFabricateCopyrightAgreementEvidence() {
+        mockCourseManagerAccess();
+
+        CourseApprovalDetailResponse detail = courseApprovalService.getDetail(adminId, courseId);
+
+        assertNull(detail.getPolicyEvidence());
+    }
+
+    @Test
+    void reviewCourse_RecordsSystemAdminRoleWhenSystemAdminMakesDecision() {
+        when(courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN"))).thenReturn(true);
+        CourseReviewRequest request = CourseReviewRequest.builder()
+                .action("APPROVE")
+                .build();
+
+        courseApprovalService.reviewCourse(adminId, courseId, request);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        assertEquals("SYSTEM_ADMIN", auditCaptor.getValue().getActorRoleCode());
     }
 
     @ParameterizedTest
@@ -99,6 +122,7 @@ class AdminCourseApprovalServiceImplTest {
             CourseApprovalDecisionEnum expectedDecision,
             String expectedAuditAction
     ) {
+        mockCourseManagerAccess();
         CourseReviewRequest request = CourseReviewRequest.builder()
                 .action(action)
                 .reason(reason)
@@ -129,6 +153,12 @@ class AdminCourseApprovalServiceImplTest {
         verify(notificationRepository).save(notificationCaptor.capture());
         assertEquals(teacherUserId, notificationCaptor.getValue().getRecipientUserId());
         assertNotNull(notificationCaptor.getValue().getMessage());
+        assertEquals("/teacher/courses", notificationCaptor.getValue().getActionUrl());
         assertEquals(expectedStatus, course.getStatus());
+    }
+
+    private void mockCourseManagerAccess() {
+        when(courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN"))).thenReturn(false);
+        when(courseRepository.hasAdminRole(adminId, List.of("COURSE_MANAGER"))).thenReturn(true);
     }
 }

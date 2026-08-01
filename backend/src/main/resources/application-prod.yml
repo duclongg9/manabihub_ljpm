@@ -60,6 +60,11 @@ management:
       enabled: false
 
 manabihub:
+  payment:
+    vnpay:
+      # Required in production. Startup also verifies HTTPS, the frontend
+      # origin, and the exact /checkout/return route.
+      return-url: ${VNPAY_RETURN_URL}
   bootstrap:
     admin:
       email: ${ADMIN_BOOTSTRAP_EMAIL:}

@@ -1,0 +1,58 @@
+import type { ReactNode } from 'react';
+import { cleanup, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { CommercialPolicy } from '../../types';
+import { InstructorTermsPage, RefundPolicyPage } from './LegalPages';
+
+vi.mock('../../components/ArticleLayout', () => ({
+  ArticleLayout: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('../../components/PolicyBoundary', () => {
+  const policy: CommercialPolicy = {
+    currency: 'VND',
+    commissionRate: 0.2,
+    refundWindowDays: 7,
+    refundProgressLimitPercent: 30,
+    escrowHoldingDays: 14,
+    payoutThreshold: 100_000,
+    withdrawalFee: 0,
+    kycTargetDaysMin: 1,
+    kycTargetDaysMax: 2,
+    policyVersion: 'test-policy',
+    effectiveAt: '2026-08-01T00:00:00Z',
+  };
+
+  return {
+    PolicyBoundary: ({ children }: { children: (value: CommercialPolicy) => ReactNode }) => (
+      <>{children(policy)}</>
+    ),
+  };
+});
+
+const renderPage = (page: ReactNode) => render(<MemoryRouter>{page}</MemoryRouter>);
+
+afterEach(cleanup);
+
+describe('legal policy pages', () => {
+  it('states the strict refund boundary and current MVP limitation', () => {
+    renderPage(<RefundPolicyPage />);
+
+    expect(screen.getByText(/tự gửi yêu cầu hoàn tiền chưa được phát hành/i)).toBeInTheDocument();
+    expect(screen.getByText(/7 ngày theo lịch/i)).toBeInTheDocument();
+    expect(screen.getByText(/thấp hơn 30%/i)).toBeInTheDocument();
+    expect(screen.getByText(/30% không đủ điều kiện tiêu chuẩn/i)).toBeInTheDocument();
+    expect(screen.getByText(/30% là ngưỡng tiến độ, không phải tỷ lệ tiền hoàn/i)).toBeInTheDocument();
+  });
+
+  it('renders the configured 20/80 split and payout boundaries', () => {
+    renderPage(<InstructorTermsPage />);
+
+    expect(screen.getByText('20%')).toBeInTheDocument();
+    expect(screen.getByText('80%')).toBeInTheDocument();
+    expect(screen.getByText(/14 ngày theo lịch/i)).toBeInTheDocument();
+    expect(screen.getByText(/100\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/test-policy/)).toBeInTheDocument();
+  });
+});

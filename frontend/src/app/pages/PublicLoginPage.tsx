@@ -1,4 +1,4 @@
-import { Alert, Box, Typography, Button, Stack, Avatar, AvatarGroup, keyframes } from '@mui/material';
+import { Alert, Box, Typography, Button, keyframes } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getAsset } from '../../shared/utils/assets';
@@ -7,6 +7,7 @@ import {
   getDefaultRoute,
   rememberPostLoginRoute,
 } from '../../shared/auth/authSession';
+import { ROUTES } from '../../shared/constants/routes';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(20px); }
@@ -66,7 +67,7 @@ export function PublicLoginPage() {
 
         <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', p: 8, height: '100%' }}>
           {/* Logo at top */}
-          <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none', flexShrink: 0 }}>
+          <Box component={Link} to={ROUTES.PUBLIC.HOME} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none', flexShrink: 0 }}>
             <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px 0 rgba(196, 30, 58, 0.39)' }}>
               <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
             </Box>
@@ -85,22 +86,13 @@ export function PublicLoginPage() {
                 Hành trình chinh phục <Box component="span" sx={{ color: '#FF6B6B' }}>tiếng Nhật</Box> bắt đầu từ đây
               </Typography>
               <Typography variant="h6" sx={{ color: '#cbd5e1', mb: 4, fontWeight: 400, lineHeight: 1.6 }}>
-                Học tập cùng các chuyên gia JLPT hàng đầu.
+                Học tiếng Nhật theo mục tiêu của bạn cùng giảng viên trên ManabiHub.
               </Typography>
 
-              <Box sx={{ display: 'inline-block' }}>
-                <Stack direction="row" sx={{ alignItems: 'center', background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50px', px: 3, py: 1.5 }} spacing={2}>
-                  <AvatarGroup total={500} sx={{ '& .MuiAvatar-root': { width: 44, height: 44, border: '2px solid', borderColor: 'grey.900' } }}>
-                    <Avatar alt="Student 1" src={getAsset('anh1.png')} />
-                    <Avatar alt="Student 2" src={getAsset('anh2.png')} />
-                    <Avatar alt="Student 3" src={getAsset('anh3.png')} />
-                    <Avatar alt="Student 4" src={getAsset('anh4.png')} />
-                  </AvatarGroup>
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', lineHeight: 1.4 }}>
-                    <Typography component="span" sx={{ color: '#FF6B6B', fontWeight: 800 }}>500+ học viên</Typography> <br />
-                    đã đồng hành
-                  </Typography>
-                </Stack>
+              <Box sx={{ display: 'inline-block', background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50px', px: 3, py: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'white' }}>
+                  Nội dung nhiều cấp độ • Theo dõi tiến độ • AI hỗ trợ
+                </Typography>
               </Box>
             </Box>
           </Box>
@@ -186,7 +178,22 @@ export function PublicLoginPage() {
           </Button>
 
           <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', textAlign: 'center', lineHeight: 1.6 }}>
-            Bằng việc đăng nhập, bạn đồng ý với <Box component="span" sx={{ color: '#C41E3A', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600, '&:hover': { color: '#E8432A' }}}>Điều khoản dịch vụ</Box> của chúng tôi.
+            Trước khi tiếp tục, vui lòng đọc{' '}
+            <Box
+              component={Link}
+              to={ROUTES.PUBLIC.TERMS}
+              sx={{ color: '#C41E3A', textDecoration: 'underline', fontWeight: 600, '&:hover': { color: '#E8432A' } }}
+            >
+              Điều khoản sử dụng
+            </Box>{' '}
+            và{' '}
+            <Box
+              component={Link}
+              to={ROUTES.PUBLIC.PRIVACY}
+              sx={{ color: '#C41E3A', textDecoration: 'underline', fontWeight: 600, '&:hover': { color: '#E8432A' } }}
+            >
+              Chính sách bảo mật
+            </Box>.
           </Typography>
 
         </Box>

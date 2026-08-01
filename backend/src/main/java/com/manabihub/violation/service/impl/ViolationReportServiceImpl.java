@@ -76,13 +76,13 @@ public class ViolationReportServiceImpl implements ViolationReportService {
 
         report = violationReportRepository.save(report);
 
-        // Notify admins (COURSE_MANAGER role or someone with VIOLATION_RESOLVE, here using COURSE_MANAGER as per seed data)
+        // Course Manager owns the standard moderation queue and VIOLATION_RESOLVE permission.
         notificationService.createNotificationForAdminRole(
-                "SYSTEM_ADMIN",
+                "COURSE_MANAGER",
                 "New Violation Report",
                 "A new report has been submitted against " + request.getTargetType() + " " + request.getTargetId(),
                 "VIOLATION_REPORT",
-                report.getId().toString()
+                "/admin/violations/" + report.getId()
         );
 
         return violationReportMapper.toResponse(report);

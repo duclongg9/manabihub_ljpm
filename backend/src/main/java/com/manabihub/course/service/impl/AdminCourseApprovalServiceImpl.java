@@ -37,18 +37,21 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     private final NotificationRepository notificationRepository;
     private final ObjectMapper objectMapper;
 
-    private void checkCourseManagerAccess(UUID adminId) {
-        boolean hasAccess = courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN", "COURSE_MANAGER"));
-        if (!hasAccess) {
-            throw new BusinessException(MessageCodes.ADMIN_PERMISSION_DENIED,
-                    "Access denied: Course Manager or Super Admin privileges required");
+    private String requireReviewerRole(UUID adminId) {
+        if (courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN"))) {
+            return "SYSTEM_ADMIN";
         }
+        if (courseRepository.hasAdminRole(adminId, List.of("COURSE_MANAGER"))) {
+            return "COURSE_MANAGER";
+        }
+        throw new BusinessException(MessageCodes.ADMIN_PERMISSION_DENIED,
+                "Access denied: Course Manager or System Admin privileges required");
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CourseApprovalQueueResponse> getQueue(UUID adminId) {
-        checkCourseManagerAccess(adminId);
+        requireReviewerRole(adminId);
         List<Course> courses = courseRepository.findAllByStatusOrderBySubmittedAtAsc(CourseStatus.PENDING);
         return courses.stream().map(this::mapToQueueResponse).collect(Collectors.toList());
     }
@@ -56,7 +59,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     @Override
     @Transactional(readOnly = true)
     public CourseApprovalDetailResponse getDetail(UUID adminId, UUID courseId) {
-        checkCourseManagerAccess(adminId);
+        requireReviewerRole(adminId);
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException("MSG-COM-001", "Course not found"));
 
@@ -73,14 +76,13 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
                 .curriculumSummary(course.getDescription())
                 .lessonBlocksCount(lessonBlocksCount)
                 .finalTestIncluded(finalTestIncluded)
-                .policyEvidence("Digital Copyright Liability Agreement accepted upon course submission at " + course.getSubmittedAt())
                 .build();
     }
 
     @Override
     @Transactional
     public void reviewCourse(UUID adminId, UUID courseId, CourseReviewRequest request) {
-        checkCourseManagerAccess(adminId);
+        String actorRoleCode = requireReviewerRole(adminId);
 
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException("MSG-COM-001", "Course not found"));
@@ -148,7 +150,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
                 .title("Course Review Update")
                 .message(notificationMessage)
                 .notificationType("COURSE_APPROVAL")
-                .actionUrl("/teacher/courses/" + course.getId())
+                .actionUrl("/teacher/courses")
                 .build();
         notificationRepository.save(notification);
 
@@ -161,7 +163,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
         AuditLog auditLog = AuditLog.builder()
                 .actorType("INTERNAL_ADMIN")
                 .actorAdminId(adminId)
-                .actorRoleCode("COURSE_MANAGER")
+                .actorRoleCode(actorRoleCode)
                 .action(actionLog)
                 .targetType("COURSE")
                 .targetId(course.getId())

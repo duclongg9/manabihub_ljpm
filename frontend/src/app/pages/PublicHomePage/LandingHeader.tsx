@@ -124,7 +124,7 @@ export const LandingHeader: React.FC = () => {
               <MenuItem onClick={() => { setAnchorEl(null); navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?jlptLevel=N5`); }} sx={{ py: 1.5, color: '#475569' }}>
                 Luyện thi JLPT
               </MenuItem>
-              <MenuItem onClick={() => { setAnchorEl(null); navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?category=vocabulary`); }} sx={{ py: 1.5, color: '#475569' }}>
+              <MenuItem onClick={() => { setAnchorEl(null); navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?category=VOCABULARY`); }} sx={{ py: 1.5, color: '#475569' }}>
                 Kỹ năng ứng dụng
               </MenuItem>
             </Menu>

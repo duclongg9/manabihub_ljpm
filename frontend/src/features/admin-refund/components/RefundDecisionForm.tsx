@@ -17,7 +17,7 @@ const APPROVAL_REASONS: ReasonOption[] = [
 
 const REJECTION_REASONS: ReasonOption[] = [
   { code: 'OUTSIDE_REFUND_WINDOW', label: 'Đã quá thời hạn hoàn tiền' },
-  { code: 'PROGRESS_LIMIT_REACHED', label: 'Tiến độ học vượt ngưỡng cho phép' },
+  { code: 'PROGRESS_LIMIT_REACHED', label: 'Tiến độ học đã đạt hoặc vượt ngưỡng cho phép' },
   { code: 'PROTECTED_CONTENT_CONSUMED', label: 'Đã sử dụng nội dung được bảo vệ' },
   { code: 'PAYMENT_NOT_CONFIRMED', label: 'Thanh toán chưa được xác nhận' },
   { code: 'DUPLICATE_REQUEST', label: 'Yêu cầu hoàn tiền bị trùng' },

@@ -34,6 +34,7 @@ import { X } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { storeAuthToken } from '../../shared/auth/authSession';
+import { ROUTES } from '../../shared/constants/routes';
 import { recognizeJlptCertificate } from './certificateOcr';
 import {
   getTeacherKycStatus,
@@ -81,6 +82,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const CERTIFICATE_TYPES = new Set(['image/jpeg', 'image/png']);
 const IDENTITY_LAUNCH_COOLDOWN_MS = 60 * 1000;
 const IDENTITY_LAUNCH_COOLDOWN_STORAGE_KEY = 'manabihub_kyc_identity_launch_cooldown_until';
+const INSTRUCTOR_VERIFICATION_PATH = `${ROUTES.PUBLIC.HELP}/instructors/verification`;
 
 class TeacherKycErrorBoundary extends React.Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -435,7 +437,7 @@ function TeacherKycPageContent() {
               Quá trình này giúp bảo vệ tài khoản và chứng thực chuyên môn của bạn trên hệ thống.{' '}
               <Link
                 component={RouterLink}
-                to="/help/instructors/verification"
+                to={INSTRUCTOR_VERIFICATION_PATH}
                 sx={{
                   color: 'primary.main',
                   textDecoration: 'none',
@@ -730,7 +732,27 @@ function TeacherKycPageContent() {
                       </Box>
                     </Stack>
                     <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
-                      Cam kết này áp dụng cho toàn bộ vai trò Giáo viên và các sản phẩm bạn tạo trên nền tảng.
+                      Cam kết này áp dụng cho toàn bộ nội dung bạn gửi hoặc xuất bản với vai trò Giáo viên.
+                      Trước khi xác nhận, vui lòng đọc{' '}
+                      <Link
+                        component={RouterLink}
+                        onClick={(event) => event.stopPropagation()}
+                        rel="noreferrer"
+                        target="_blank"
+                        to={ROUTES.PUBLIC.INSTRUCTOR_TERMS}
+                      >
+                        Điều khoản dành cho giảng viên
+                      </Link>{' '}
+                      và{' '}
+                      <Link
+                        component={RouterLink}
+                        onClick={(event) => event.stopPropagation()}
+                        rel="noreferrer"
+                        target="_blank"
+                        to={ROUTES.PUBLIC.TERMS}
+                      >
+                        Điều khoản sử dụng
+                      </Link>.
                     </Typography>
                     <FormControlLabel
                       control={
@@ -744,7 +766,7 @@ function TeacherKycPageContent() {
                           sx={{ '&.Mui-checked': { color: 'primary.main' } }}
                         />
                       }
-                      label="Tôi chấp nhận Thỏa thuận trách nhiệm bản quyền nội dung số và điều khoản dịch vụ của nền tảng."
+                      label="Tôi đã đọc Điều khoản dành cho giảng viên và chấp nhận cam kết trách nhiệm bản quyền: tôi có quyền sử dụng hợp lệ đối với nội dung số mình gửi lên ManabiHub."
                       sx={{ alignItems: 'flex-start' }}
                     />
                     {errors.agreement && <FieldError>{errors.agreement}</FieldError>}
@@ -1028,7 +1050,7 @@ function validateCertificateForm(
   }
 
   if (!agreementAccepted) {
-    nextErrors.agreement = 'Vui lòng đọc và chấp nhận Thỏa thuận bản quyền nội dung số.';
+    nextErrors.agreement = 'Vui lòng đọc và chấp nhận cam kết trách nhiệm bản quyền nội dung số.';
   }
 
   return nextErrors;
