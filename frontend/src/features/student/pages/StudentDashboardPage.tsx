@@ -252,7 +252,7 @@ export function StudentDashboardPage() {
                   size="small"
                   onClick={() => navigate(ROUTES.STUDENT.MY_COURSES)}
                   endIcon={<ArrowForwardIcon />}
-                  sx={{ color: BRAND_COLORS.red, fontWeight: 800 }}
+                  sx={{ color: 'common.white', fontWeight: 800 }}
                 >
                   Xem tất cả
                 </Button>

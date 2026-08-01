@@ -224,7 +224,7 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
         
         {/* Mini Footer */}
         <Box sx={{ mt: 'auto', py: 3, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', color: 'text.secondary', fontSize: '0.85rem' }}>
-          <Typography variant="body2">© 2026 ManabiHub. All rights reserved.</Typography>
+          <Typography variant="body2">© 2026 ManabiHub. Bảo lưu mọi quyền.</Typography>
           <Box sx={{ display: 'flex', gap: 3 }}>
             <Box component={Link} to={ROUTES.PUBLIC.HELP} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Hỗ trợ</Box>
             <Box component={Link} to={ROUTES.PUBLIC.TERMS} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Điều khoản</Box>

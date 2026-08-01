@@ -125,7 +125,7 @@ export function KycQueuePage() {
               startIcon={<RefreshIcon />}
               onClick={loadQueue}
               disabled={loading}
-              sx={{ textTransform: 'none', color: 'text.secondary' }}
+              sx={{ textTransform: 'none', color: 'common.white' }}
             >
               Làm mới
             </Button>

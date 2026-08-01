@@ -11,7 +11,7 @@ import { ROUTES } from '../constants/routes';
 
 export const ADMIN_MENU = [
   {
-    title: 'Dashboard',
+    title: 'Tổng quan',
     path: ROUTES.ADMIN.DASHBOARD,
     icon: SpaceDashboardIcon,
     roles: [ROLES.SYSTEM_ADMIN, ROLES.COURSE_MANAGER, ROLES.FINANCE_MANAGER],
@@ -29,13 +29,13 @@ export const ADMIN_MENU = [
     roles: [ROLES.SYSTEM_ADMIN],
   },
   {
-    title: 'Teacher KYC Review',
+    title: 'Duyệt xác minh giảng viên',
     path: ROUTES.ADMIN.KYC_REVIEW,
     icon: FactCheckIcon,
     roles: [ROLES.COURSE_MANAGER, ROLES.SYSTEM_ADMIN],
   },
   {
-    title: 'Course Approval',
+    title: 'Duyệt khóa học',
     path: ROUTES.ADMIN.COURSE_APPROVAL,
     icon: RuleIcon,
     roles: [ROLES.COURSE_MANAGER, ROLES.SYSTEM_ADMIN],
@@ -53,7 +53,7 @@ export const ADMIN_MENU = [
     roles: [ROLES.COURSE_MANAGER, ROLES.SYSTEM_ADMIN],
   },
   {
-    title: 'Payout Settlement',
+    title: 'Đối soát chi trả',
     path: ROUTES.ADMIN.PAYOUTS,
     icon: AccountBalanceOutlinedIcon,
     roles: [ROLES.FINANCE_MANAGER],

@@ -12,6 +12,12 @@ export const components: Components<Theme> = {
         padding: '8px 16px',
         minHeight: 40,
       },
+      contained: {
+        color: '#FFFFFF',
+        '& .MuiButton-startIcon, & .MuiButton-endIcon': {
+          color: 'inherit',
+        },
+      },
       sizeLarge: {
         padding: '12px 24px',
         minHeight: 48,

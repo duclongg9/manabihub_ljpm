@@ -3,7 +3,7 @@ import LanguageIcon from '@mui/icons-material/Language';
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
 
-import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
+import { RichTextContent } from '../../../shared/components/RichTextContent/RichTextContent';
 import { useState, useEffect } from 'react';
 import { getAuthSession, type AuthSession } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
@@ -73,9 +73,9 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
             {course.title.replace('--', '|')}
           </h1>
           {/* Description */}
-          <div
-            className="text-base sm:text-lg text-slate-300 my-6 max-w-3xl leading-relaxed prose prose-invert"
-            dangerouslySetInnerHTML={{ __html: sanitizeRichText(course.description || course.introduction) }}
+          <RichTextContent
+            value={course.description || course.introduction}
+            className="text-base sm:text-lg text-slate-300 my-6 max-w-3xl leading-relaxed"
           />
 
           {/* Meta Info */}
