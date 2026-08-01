@@ -9,6 +9,8 @@ import { getAuthSession, type AuthSession } from '../../../shared/auth/authSessi
 import { ROLES } from '../../../shared/constants/roles';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../shared/constants/routes';
 
 interface CourseHeroProps {
   course: PublicCourseDetail;
@@ -40,7 +42,12 @@ export const CourseHero = ({ course }: CourseHeroProps) => {
         <div className="lg:col-span-2 flex flex-col items-start">
           {/* Breadcrumb */}
           <div className="flex items-center text-xs font-medium text-white/50 mb-3 tracking-wide">
-            <span className="hover:text-white/80 cursor-pointer transition-colors">Khám phá khóa học</span>
+            <Link
+              to={ROUTES.PUBLIC.COURSE_BROWSE}
+              className="hover:text-white/80 transition-colors"
+            >
+              Khám phá khóa học
+            </Link>
             <span className="mx-2">/</span>
             <span className="hover:text-white/80 transition-colors">{course.jlptLevel || 'Khóa học'}</span>
             <span className="mx-2">/</span>

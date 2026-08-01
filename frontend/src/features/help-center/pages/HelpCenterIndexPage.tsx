@@ -18,7 +18,7 @@ export const HelpCenterIndexPage = () => {
   const matchingArticles = filterHelpArticles(query, category);
   const visibleCategories = category
     ? HELP_CATEGORIES.filter((item) => item.id === category)
-    : HELP_CATEGORIES.filter((item) => item.id !== 'legal');
+    : HELP_CATEGORIES;
 
   const selectCategory = (nextCategory?: HelpCategory) => {
     const next = new URLSearchParams(searchParams);
@@ -61,7 +61,7 @@ export const HelpCenterIndexPage = () => {
         >
           Tất cả
         </button>
-        {HELP_CATEGORIES.filter((item) => item.id !== 'legal').map((item) => (
+        {HELP_CATEGORIES.map((item) => (
           <button
             key={item.id}
             type="button"

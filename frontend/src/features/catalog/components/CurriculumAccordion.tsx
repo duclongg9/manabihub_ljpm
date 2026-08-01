@@ -100,8 +100,7 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
             </AccordionSummary>
             <AccordionDetails className="p-0 border-t border-slate-100 bg-white">
               <div className="flex flex-col">
-                {module.blocks.map((block, blockIndex) => {
-                  const isFirstLesson = index === 0 && blockIndex === 0;
+                {module.blocks.map((block) => {
                   return (
                     <div key={block.id} className="flex flex-col sm:flex-row sm:items-center justify-between py-4 px-6 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-b-0 group gap-3">
                       <div className="flex items-start sm:items-center">
@@ -109,11 +108,6 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
                         <span className="text-sm font-medium text-slate-700 group-hover:text-red-700 transition-colors">{block.title}</span>
                       </div>
                       <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:ml-3 pl-8 sm:pl-0">
-                        {isFirstLesson && (
-                          <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200 cursor-pointer hover:bg-emerald-200 transition-colors inline-flex items-center gap-1.5">
-                            <PlayCircle className="w-3.5 h-3.5 text-emerald-600" /> Học thử miễn phí
-                          </span>
-                        )}
                         {block.durationMinutes ? (
                           <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md inline-flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5 text-slate-400" /> {block.durationMinutes} phút

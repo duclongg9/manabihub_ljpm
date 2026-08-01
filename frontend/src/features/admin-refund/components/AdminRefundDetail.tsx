@@ -44,7 +44,7 @@ const EVIDENCE_LABELS: Record<string, string> = {
   refundWindowDays: 'Thời hạn hoàn tiền (ngày)',
   daysSincePurchase: 'Số ngày từ khi mua',
   progressPercent: 'Tiến độ học',
-  progressLimitPercent: 'Ngưỡng tiến độ',
+  progressLimitPercent: 'Ngưỡng tiến độ (yêu cầu phải thấp hơn)',
   protectedContentConsumed: 'Đã dùng nội dung được bảo vệ',
   manualReviewReason: 'Lý do chuyển duyệt thủ công',
   exceptionReasonCode: 'Mã ngoại lệ',

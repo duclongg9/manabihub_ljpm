@@ -9,7 +9,7 @@ import {
   useTheme,
   Typography,
 } from '@mui/material';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import {
   getAuthSession,
   getDefaultRoute,
@@ -22,6 +22,7 @@ import {
 } from '../auth/authSession';
 import { refreshAdminSessionWithStatus } from '../auth/adminAuthApi';
 import { Header } from './Header';
+import { ROUTES } from '../constants/routes';
 import {
   COLLAPSED_DRAWER_WIDTH,
   DRAWER_WIDTH,
@@ -225,9 +226,9 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
         <Box sx={{ mt: 'auto', py: 3, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', color: 'text.secondary', fontSize: '0.85rem' }}>
           <Typography variant="body2">© 2026 ManabiHub. All rights reserved.</Typography>
           <Box sx={{ display: 'flex', gap: 3 }}>
-            <Box component="a" href="/help" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Hỗ trợ</Box>
-            <Box component="a" href="/legal/terms" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Điều khoản</Box>
-            <Box component="a" href="/legal/privacy" sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Quyền riêng tư</Box>
+            <Box component={Link} to={ROUTES.PUBLIC.HELP} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Hỗ trợ</Box>
+            <Box component={Link} to={ROUTES.PUBLIC.TERMS} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Điều khoản</Box>
+            <Box component={Link} to={ROUTES.PUBLIC.PRIVACY} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Quyền riêng tư</Box>
           </Box>
         </Box>
       </Box>

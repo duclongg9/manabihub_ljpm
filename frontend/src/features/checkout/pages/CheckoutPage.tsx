@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
 import { getOrder, simulatePayment } from '../services/checkoutService';
 import type { OrderResponse } from '../types';
+import { ROUTES } from '../../../shared/constants/routes';
 
 interface CheckoutLocationState {
   paymentUrl?: string;
@@ -141,12 +142,12 @@ export const CheckoutPage = () => {
       </div>
 
       <p className="text-center text-xs text-slate-400 mt-6">
-        Bằng việc thanh toán, bạn đồng ý với{' '}
-        <RouterLink to="/legal/terms" target="_blank" className="text-indigo-600 hover:underline">
+        Trước khi thanh toán, vui lòng tham khảo{' '}
+        <RouterLink to={ROUTES.PUBLIC.TERMS} target="_blank" className="text-indigo-600 hover:underline">
           Điều khoản sử dụng
         </RouterLink>{' '}
         và{' '}
-        <RouterLink to="/legal/refund-policy" target="_blank" className="text-indigo-600 hover:underline">
+        <RouterLink to={ROUTES.PUBLIC.REFUND_POLICY} target="_blank" className="text-indigo-600 hover:underline">
           Chính sách hoàn tiền
         </RouterLink>.
         <br />

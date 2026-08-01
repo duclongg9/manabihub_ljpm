@@ -139,7 +139,8 @@ export const HeroSection: React.FC = () => {
                   maxWidth: 520,
                 }}
               >
-                Nền tảng học tiếng Nhật trực tuyến hàng đầu. Giáo trình chuẩn JLPT N5→N1, hỗ trợ AI thông minh và đội ngũ giảng viên được kiểm duyệt KYC nghiêm ngặt.
+                Nền tảng học tiếng Nhật trực tuyến với nội dung theo nhiều cấp độ JLPT,
+                công cụ AI hỗ trợ học tập và quy trình xác thực giảng viên trước khi xuất bản.
               </Typography>
 
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>

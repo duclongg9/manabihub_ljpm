@@ -1,6 +1,8 @@
 import { PolicyBoundary } from '../../components/PolicyBoundary';
 import { ArticleLayout } from '../../components/ArticleLayout';
 import { getHelpArticle } from '../../content/articleRegistry';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../../shared/constants/routes';
 
 const learnerPaymentsArticle = getHelpArticle('learner-payments-refunds');
 const trustSafetyArticle = getHelpArticle('trust-safety');
@@ -8,6 +10,12 @@ const aiAndDataArticle = getHelpArticle('ai-and-data');
 
 export const LearnerPaymentsRefundsPage = () => (
   <ArticleLayout article={learnerPaymentsArticle}>
+    <p>
+      <strong>Trạng thái bản MVP:</strong> luồng học viên tự gửi yêu cầu hoàn tiền chưa
+      được phát hành. Nếu cần hỗ trợ, hãy dùng{' '}
+      <Link to={ROUTES.PUBLIC.ABOUT}>kênh liên hệ của ManabiHub</Link> cho đến khi luồng
+      yêu cầu được triển khai.
+    </p>
     <PolicyBoundary>
       {(policy) => (
         <>
@@ -17,9 +25,16 @@ export const LearnerPaymentsRefundsPage = () => (
           {' '}
           <strong>{policy.refundWindowDays} ngày theo lịch</strong>
           {' '}
-          kể từ khi thanh toán và tiến độ học chưa vượt quá
+          kể từ khi thanh toán thành công và tiến độ học phải thấp hơn
           {' '}
           <strong>{policy.refundProgressLimitPercent}%</strong>.
+        </p>
+        <p>
+          Mốc tiến độ là điều kiện nghiêm ngặt: tiến độ đúng
+          {' '}
+          <strong>{policy.refundProgressLimitPercent}% không đủ điều kiện tiêu chuẩn</strong>.
+          Tỷ lệ này không phải số tiền hoàn; khi được duyệt, số tiền chuẩn là số tiền thực tế
+          đã thanh toán và phân bổ cho khóa học bị ảnh hưởng.
         </p>
         <p>
           Việc đủ điều kiện gửi yêu cầu không đồng nghĩa tiền đã được hoàn. Màn hình

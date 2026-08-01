@@ -12,6 +12,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import { getAsset } from '../../../shared/utils/assets';
+import { SKILL_CATEGORIES } from './courseCategoryLinks';
 
 /* ─── JLPT Levels with vivid progression colors ─── */
 const JLPT_LEVELS = [
@@ -23,15 +24,6 @@ const JLPT_LEVELS = [
 ];
 
 /* ─── Skill Categories with unique color accents ─── */
-const SKILL_CATEGORIES = [
-  { id: 'category=vocabulary', name: 'Từ vựng', kanji: '語彙' },
-  { id: 'category=grammar', name: 'Ngữ pháp', kanji: '文法' },
-  { id: 'category=kanji', name: 'Hán tự', kanji: '漢字' },
-  { id: 'category=conversation', name: 'Giao tiếp', kanji: '会話' },
-  { id: 'category=jlpt-prep', name: 'Luyện thi', kanji: '試験' },
-  { id: 'category=business-japanese', name: 'Thương mại', kanji: '商業' },
-];
-
 export const TopCategories: React.FC = () => {
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
@@ -348,10 +340,9 @@ export const TopCategories: React.FC = () => {
             </Typography>
 
             <Typography variant="body1" sx={{ color: '#475569', fontSize: '0.95rem', lineHeight: 1.9, mb: 4.5 }}>
-              Chúng tôi là một nền tảng học tiếng Nhật trực tuyến cung cấp một loạt các khóa học
-              đa dạng và chất lượng, từ JLPT N1-N5. Với đội ngũ giảng viên giàu kinh nghiệm và kiến thức
-              chuyên môn sâu rộng, chúng tôi cam kết mang đến cho bạn những khóa học chất lượng cao
-              và mang tính thực tiễn.
+              ManabiHub cung cấp các khóa học tiếng Nhật theo nhiều cấp độ JLPT và kỹ năng.
+              Nội dung do giảng viên xây dựng và đi qua quy trình xét duyệt trước khi được
+              xuất bản trên nền tảng.
             </Typography>
 
             {/* Checklist */}

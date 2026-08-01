@@ -48,6 +48,20 @@ FRONTEND_BASE_URL=https://develop.d1sbjmyazduh3v.amplifyapp.com
 CORS_ALLOWED_ORIGINS=https://develop.d1sbjmyazduh3v.amplifyapp.com
 ```
 
+For the `prod` profile, `VNPAY_RETURN_URL` is mandatory and the backend fails
+startup unless it is an absolute HTTPS URL on the same origin as
+`FRONTEND_BASE_URL`, with the exact path `/checkout/return` and no query string
+or fragment. Register that browser return URL in the VNPay merchant portal.
+Register the public server-to-server callback separately as:
+
+```text
+https://<api-domain>/api/v1/payments/vnpay/ipn
+```
+
+The browser return page only polls order status; the signed IPN remains the
+authoritative payment confirmation. A copy-safe non-secret variable template is
+available at `deploy/.env.production.example`.
+
 Never commit real passwords, JWT secrets, or OAuth secrets to Git.
 
 `PAYOUT_SECURITY_SECRET` is not supplied by VNPay, AWS, or a bank. Generate it

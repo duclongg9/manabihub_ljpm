@@ -14,7 +14,7 @@ const FEATURES = [
   {
     icon: <LaptopMacIcon sx={{ fontSize: 32, color: '#C41E3A' }} />,
     title: 'Đăng ký và học tập',
-    description: 'Đăng ký khóa học và xem video bài giảng chất lượng cao, linh hoạt học mọi lúc mọi nơi.',
+    description: 'Đăng ký khóa học và học qua video, tài liệu cùng các hoạt động được giảng viên thiết kế.',
   },
   {
     icon: <TaskAltIcon sx={{ fontSize: 32, color: '#C41E3A' }} />,
@@ -24,7 +24,7 @@ const FEATURES = [
   {
     icon: <SmartToyOutlinedIcon sx={{ fontSize: 32, color: '#C41E3A' }} />,
     title: 'Trợ lý AI hỗ trợ',
-    description: 'Nhận gợi ý và giải đáp nhanh từ AI trong suốt quá trình học tập của bạn.',
+    description: 'Ở khóa học và tính năng đủ điều kiện, AI có thể đưa ra gợi ý hỗ trợ học tập.',
   }
 ];
 
