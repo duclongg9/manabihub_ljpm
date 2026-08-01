@@ -6,6 +6,7 @@ import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleBu
 import { createCheckout } from '../../checkout/services/checkoutService';
 import { getAuthSession } from '../../../shared/auth/authSession';
 import { ROUTES } from '../../../shared/constants/routes';
+import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 
 interface CourseStickyCardProps {
   course: PublicCourseDetail;
@@ -14,7 +15,9 @@ interface CourseStickyCardProps {
 export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
   const [buying, setBuying] = useState(false);
   const [buyError, setBuyError] = useState<string | null>(null);
+  const [imageFailed, setImageFailed] = useState(false);
   const navigate = useNavigate();
+  const thumbnailUrl = resolvePublicAssetUrl(course.thumbnailUrl);
 
   const handleContinueLearning = () => navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
 
@@ -65,10 +68,19 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
       <div className="bg-white text-slate-800 shadow-2xl rounded-2xl overflow-hidden border border-slate-200/60 backdrop-blur-xl transform transition-all duration-300 hover:shadow-slate-500/10">
         {/* Thumbnail Image */}
         <div className="relative aspect-video bg-slate-100 flex items-center justify-center p-1">
-          {course.thumbnailUrl ? (
-            <img src={course.thumbnailUrl} alt={course.title} className="w-full h-full object-cover rounded-xl" />
+          {thumbnailUrl && !imageFailed ? (
+            <img
+              src={thumbnailUrl}
+              alt={`Ảnh bìa khóa học ${course.title}`}
+              className="w-full h-full object-cover rounded-xl"
+              onError={() => setImageFailed(true)}
+            />
           ) : (
-            <div className="flex flex-col items-center justify-center text-rose-200/40 w-full h-full bg-gradient-to-br from-rose-950 via-rose-900 to-slate-900 rounded-xl relative overflow-hidden">
+            <div
+              role="img"
+              aria-label={`Khóa học ${course.title} chưa có ảnh bìa`}
+              className="flex flex-col items-center justify-center text-rose-200/40 w-full h-full bg-gradient-to-br from-rose-950 via-rose-900 to-slate-900 rounded-xl relative overflow-hidden"
+            >
               <span className="text-8xl font-black absolute opacity-20 transform -rotate-12 translate-x-4 translate-y-4">作文</span>
               <span className="text-sm font-semibold uppercase tracking-wider opacity-90 z-10 text-rose-100">ManabiHub</span>
             </div>

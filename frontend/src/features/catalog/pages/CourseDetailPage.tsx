@@ -8,7 +8,8 @@ import { CourseStickyHeader } from '../components/CourseStickyHeader';
 import { Helmet } from 'react-helmet-async';
 import { Target, CheckCircle2 } from 'lucide-react';
 import { CourseReviewsSection } from '../../course-reviews/components/CourseReviewsSection';
-import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
+import { RichTextContent } from '../../../shared/components/RichTextContent/RichTextContent';
+import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 
 export const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -53,14 +54,9 @@ export const CourseDetailPage = () => {
     );
   }
 
-  // Parse outcomes if it's a newline-separated string
-  const outcomesList = course.outcomes
-    ? course.outcomes.split('\n').filter((item) => item.trim() !== '')
-    : [];
-
-  const prerequisitesList = course.prerequisites
-    ? course.prerequisites.split('\n').filter((item) => item.trim() !== '')
-    : [];
+  const hasOutcomes = Boolean(course.outcomes?.trim());
+  const hasPrerequisites = Boolean(course.prerequisites?.trim());
+  const thumbnailUrl = resolvePublicAssetUrl(course.thumbnailUrl);
 
   // Plain text fallback for meta description
   const metaDescription = course.introduction
@@ -77,11 +73,11 @@ export const CourseDetailPage = () => {
         <meta property="og:title" content={course.title} />
         <meta property="og:description" content={metaDescription} />
         <meta property="og:type" content="website" />
-        {course.thumbnailUrl && <meta property="og:image" content={course.thumbnailUrl} />}
+        {thumbnailUrl && <meta property="og:image" content={thumbnailUrl} />}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={course.title} />
         <meta name="twitter:description" content={metaDescription} />
-        {course.thumbnailUrl && <meta name="twitter:image" content={course.thumbnailUrl} />}
+        {thumbnailUrl && <meta name="twitter:image" content={thumbnailUrl} />}
       </Helmet>
 
       <CourseStickyHeader course={course} />
@@ -94,19 +90,15 @@ export const CourseDetailPage = () => {
           <div className="lg:col-span-2">
 
             {/* What you will learn */}
-            {outcomesList.length > 0 && (
+            {hasOutcomes && (
               <div className="bg-rose-50/50 border border-rose-100 p-6 rounded-2xl mb-12">
                 <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
                   <Target className="w-5 h-5 text-red-600 mr-2" />
                   Bạn sẽ học được gì trong khóa học này?
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {outcomesList.map((outcome, index) => (
-                    <div key={index} className="flex items-start text-sm text-slate-700 leading-relaxed font-medium gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 stroke-[2.5] mt-0.5" />
-                      <span>{outcome.trim()}</span>
-                    </div>
-                  ))}
+                <div className="flex items-start text-sm text-slate-700 leading-relaxed font-medium gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 stroke-[2.5] mt-0.5" />
+                  <RichTextContent value={course.outcomes} className="min-w-0 flex-1" />
                 </div>
               </div>
             )}
@@ -121,14 +113,10 @@ export const CourseDetailPage = () => {
             </div>
 
             {/* Prerequisites */}
-            {prerequisitesList.length > 0 && (
+            {hasPrerequisites && (
               <div className="mb-12">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">Yêu cầu đầu vào</h2>
-                <ul className="list-disc list-inside space-y-2 text-slate-700 text-sm">
-                  {prerequisitesList.map((req, index) => (
-                    <li key={index}>{req.trim()}</li>
-                  ))}
-                </ul>
+                <RichTextContent value={course.prerequisites} className="text-slate-700 text-sm" />
               </div>
             )}
 
@@ -136,10 +124,7 @@ export const CourseDetailPage = () => {
             {course.targetStudents && (
               <div className="mb-12">
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">Đối tượng phù hợp</h2>
-                <div
-                  className="prose prose-slate text-sm max-w-none text-slate-700 whitespace-pre-line"
-                  dangerouslySetInnerHTML={{ __html: sanitizeRichText(course.targetStudents) }}
-                />
+                <RichTextContent value={course.targetStudents} className="text-sm text-slate-700" />
               </div>
             )}
 

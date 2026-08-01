@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Avatar, Menu, MenuItem } from '@mui/material';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SearchIcon from '@mui/icons-material/Search';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Link, useNavigate } from 'react-router-dom';
@@ -77,19 +76,20 @@ export const LandingHeader: React.FC = () => {
           <Box component={Link} to={ROUTES.PUBLIC.HOME} sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
             <Box
               sx={{
-                width: 36,
-                height: 36,
-                background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)',
-                borderRadius: 2,
+                height: 54,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(196, 30, 58, 0.3)',
                 transition: 'transform 0.3s ease',
                 '&:hover': { transform: 'scale(1.08)' }
               }}
             >
-              <MenuBookIcon sx={{ fontSize: 20, color: 'white' }} />
+              <Box
+                component="img"
+                src="/manabihub-header-logo.svg"
+                alt="ManabiHub"
+                sx={{ display: 'block', height: 54, width: 'auto' }}
+              />
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.5px', display: { xs: 'none', sm: 'block' }, color: '#1A1A2E' }}>
               ManabiHub

@@ -30,6 +30,7 @@ import {
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 import { logoutAdminSession } from '../auth/adminAuthApi';
+import { getHeaderBrand } from './headerBrand';
 
 interface HeaderProps {
   menuExpanded?: boolean;
@@ -58,6 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   const profilePath = session ? getProfilePath(session) : null;
   const primaryRole = session?.roles[0];
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
+  const brandLabel = getHeaderBrand(session);
 
   const handleLogout = async () => {
     if (!session) return;
@@ -96,8 +98,14 @@ export const Header: React.FC<HeaderProps> = ({
           </Tooltip>
         )}
         
-        <Typography variant="h6" component={Link} to="/" sx={{ flexGrow: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
-          ManabiHub
+        <Typography variant="h6" component={Link} to={ROUTES.PUBLIC.HOME} sx={{ alignItems: 'center', display: 'flex', flexGrow: 1, gap: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
+          <Box
+            component="img"
+            src="/manabihub-header-logo.svg"
+            alt="ManabiHub"
+            sx={{ display: 'block', flexShrink: 0, height: 48, width: 'auto' }}
+          />
+          {brandLabel}
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 2 } }}>
@@ -147,7 +155,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Box sx={{ maxWidth: 260, minWidth: 220, px: 2, py: 1 }}>
             <Typography noWrap variant="body2" sx={{ fontWeight: 700 }}>
-              {session.email || 'Tài khoản ManabiHub'}
+              {session.email || `Tài khoản ${brandLabel}`}
             </Typography>
             <Typography color="text.secondary" variant="caption">
               {primaryRole ? ROLE_LABELS[primaryRole] || primaryRole : 'Tài khoản'}

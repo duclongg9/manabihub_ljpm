@@ -387,7 +387,7 @@ function OrderHistoryRow({
             size="small"
             endIcon={<ArrowForwardIcon />}
             onClick={() => navigate(ROUTES.STUDENT.COURSE_LEARN(course.courseId))}
-            sx={{ color: '#C41E3A', fontWeight: 800 }}
+            sx={{ color: 'common.white', fontWeight: 800 }}
           >
             Vào học
           </Button>
