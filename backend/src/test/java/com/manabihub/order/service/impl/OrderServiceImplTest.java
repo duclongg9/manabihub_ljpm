@@ -168,8 +168,10 @@ class OrderServiceImplTest {
                 orderId,
                 order.getOrderCode(),
                 order.getTotalAmount(),
+                order.getWalletAmount(),
                 order.getCurrency(),
                 order.getStatus().name(),
+                order.getType().name(),
                 order.getCreatedAt(),
                 List.of());
         PageRequest pageable = PageRequest.of(0, 10);
