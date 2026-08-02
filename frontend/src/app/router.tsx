@@ -318,20 +318,12 @@ export const router = createBrowserRouter([
         element: <KycDetailPage />,
       },
       {
-        path: 'tasks/queue',
-        element: <Navigate to="/admin/courses/approvals" replace />,
-      },
-      {
         path: 'courses/approvals',
         element: <CourseApprovalQueuePage />,
       },
       {
         path: 'courses/approvals/:id',
         element: <CourseApprovalDetailPage />,
-      },
-      {
-        path: 'finance',
-        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'refunds',
