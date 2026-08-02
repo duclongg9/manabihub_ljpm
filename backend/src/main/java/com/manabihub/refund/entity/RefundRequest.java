@@ -66,7 +66,7 @@ public class RefundRequest {
     private String reason;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "eligibility_snapshot", columnDefinition = "jsonb")
+    @Column(name = "eligibility_snapshot", columnDefinition = "jsonb", updatable = false)
     private RefundEligibilitySnapshot eligibilitySnapshot;
 
     @ManyToOne(fetch = FetchType.LAZY)

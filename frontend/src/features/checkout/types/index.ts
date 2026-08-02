@@ -9,6 +9,7 @@ export interface CheckoutResponse {
 }
 
 export interface OrderItemResponse {
+  id: string;
   courseId: string;
   courseTitle: string;
   courseThumbnailUrl?: string | null;
