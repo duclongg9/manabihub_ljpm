@@ -95,6 +95,7 @@ describe('StudentPaymentsPage', () => {
     expect(screen.getAllByText(/799\.000/).length).toBeGreaterThan(0);
     expect(screen.getByText('Đã thanh toán')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Vào học/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Yêu cầu hoàn tiền/i })).toBeInTheDocument();
   });
 
   it('renders the top-up amount instead of a missing-course fallback', () => {
@@ -134,7 +135,7 @@ describe('StudentPaymentsPage', () => {
     expect(screen.getByText(/Nạp.*100\.000.*vào ví/)).toBeInTheDocument();
     expect(screen.queryByText('Đơn hàng chưa có thông tin khóa học')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Vào học/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Vào học/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Yêu cầu hoàn tiền/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Yêu cầu hoàn tiền/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Xem hoàn tiền/i })).not.toBeInTheDocument();
   });
 });
