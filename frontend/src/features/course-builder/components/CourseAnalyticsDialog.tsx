@@ -15,6 +15,7 @@ import {
   Grid,
   Paper,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
@@ -36,6 +37,9 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
   const [analytics, setAnalytics] = useState<TeacherCourseAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   useEffect(() => {
     if (!courseId) {
@@ -48,7 +52,16 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
     setIsLoading(true);
     setError(null);
 
-    fetchCourseAnalytics(courseId)
+    const formattedStartDate = startDate ? new Date(startDate).toISOString() : undefined;
+    // Set endDate to the end of the day if provided
+    let formattedEndDate = undefined;
+    if (endDate) {
+      const d = new Date(endDate);
+      d.setHours(23, 59, 59, 999);
+      formattedEndDate = d.toISOString();
+    }
+
+    fetchCourseAnalytics(courseId, formattedStartDate, formattedEndDate)
       .then((data) => {
         if (active) setAnalytics(data);
       })
@@ -62,7 +75,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
     return () => {
       active = false;
     };
-  }, [courseId]);
+  }, [courseId, startDate, endDate]);
 
   return (
     <Dialog
@@ -104,6 +117,25 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
       </DialogTitle>
 
       <DialogContent sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+          <TextField
+            label="Từ ngày"
+            type="date"
+            InputLabelProps={{ shrink: true }}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            size="small"
+          />
+          <TextField
+            label="Đến ngày"
+            type="date"
+            InputLabelProps={{ shrink: true }}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            size="small"
+          />
+        </Box>
+
         {isLoading && (
           <Stack sx={{ alignItems: 'center', py: 5 }} spacing={2}>
             <CircularProgress />
@@ -136,10 +168,10 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
                   </Box>
                   <Box>
                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      Học viên đang học
+                      Tổng số lượt đăng ký
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {analytics.activeStudents}
+                      {analytics.totalEnrollment}
                     </Typography>
                   </Box>
                 </Stack>
@@ -161,10 +193,10 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
                   </Box>
                   <Box>
                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      Học viên hoàn thành
+                      Tỷ lệ hoàn thành
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {analytics.completedStudents}
+                      {analytics.completionRate.toFixed(1)}%
                     </Typography>
                   </Box>
                 </Stack>
@@ -186,10 +218,60 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
                   </Box>
                   <Box>
                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      Tổng doanh thu thực
+                      Doanh thu gộp (Gross)
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                      {priceFormatter.format(analytics.totalRevenue)}
+                      {priceFormatter.format(analytics.grossRevenue)}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      bgcolor: 'success.lighter',
+                      color: 'success.dark',
+                      p: 1.5,
+                      borderRadius: 2,
+                    }}
+                  >
+                    <PaymentsIcon />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Doanh thu ròng (Net)
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                      {priceFormatter.format(analytics.netRevenue)}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      bgcolor: 'error.lighter',
+                      color: 'error.main',
+                      p: 1.5,
+                      borderRadius: 2,
+                    }}
+                  >
+                    <AssessmentIcon />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Tỷ lệ hoàn tiền
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                      {analytics.refundRate.toFixed(1)}%
                     </Typography>
                   </Box>
                 </Stack>

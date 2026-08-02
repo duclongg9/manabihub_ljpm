@@ -1,14 +1,21 @@
-import { apiClient } from '../../../shared/api/client';
+import { axiosClient } from '../../../shared/api/axiosClient';
 
 export interface TeacherCourseAnalyticsResponse {
-  activeStudents: number;
-  completedStudents: number;
-  totalRevenue: number;
+  totalEnrollment: number;
+  completionRate: number;
+  grossRevenue: number;
+  netRevenue: number;
+  refundRate: number;
   averageRating: number | null;
   totalReviews: number;
 }
 
-export async function fetchCourseAnalytics(courseId: string): Promise<TeacherCourseAnalyticsResponse> {
-  const response = await apiClient.get<{ data: TeacherCourseAnalyticsResponse }>(`/api/v1/teacher/courses/${courseId}/analytics`);
+export async function fetchCourseAnalytics(courseId: string, startDate?: string, endDate?: string): Promise<TeacherCourseAnalyticsResponse> {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  
+  const url = `/api/v1/teacher/courses/${courseId}/analytics${params.toString() ? '?' + params.toString() : ''}`;
+  const response = await axiosClient.get<{ data: TeacherCourseAnalyticsResponse }>(url);
   return response.data.data;
 }

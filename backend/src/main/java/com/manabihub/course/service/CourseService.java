@@ -21,7 +21,7 @@ public interface CourseService {
 
     List<CourseDraftResponse> listMyCourses();
     
-    TeacherCourseAnalyticsResponse getCourseAnalytics(UUID courseId);
+    TeacherCourseAnalyticsResponse getCourseAnalytics(UUID courseId, java.time.Instant startDate, java.time.Instant endDate);
 
     com.manabihub.course.dto.response.TeacherDashboardResponse getTeacherDashboardStats();
 

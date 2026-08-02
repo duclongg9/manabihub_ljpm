@@ -177,7 +177,7 @@ public class CourseServiceImpl implements CourseService {
     
     @Override
     @Transactional(readOnly = true)
-    public TeacherCourseAnalyticsResponse getCourseAnalytics(UUID courseId) {
+    public TeacherCourseAnalyticsResponse getCourseAnalytics(UUID courseId, Instant startDate, Instant endDate) {
         UUID currentUserId = currentUserService.getCurrentUserId();
         TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         
@@ -188,17 +188,27 @@ public class CourseServiceImpl implements CourseService {
                         HttpStatus.NOT_FOUND
                 ));
 
-        long activeStudents = enrollmentRepository.countByCourse_IdAndStatus(courseId, EnrollmentStatus.ACTIVE);
-        long completedStudents = enrollmentRepository.countByCourse_IdAndStatus(courseId, EnrollmentStatus.COMPLETED);
+        Instant effectiveStartDate = startDate != null ? startDate : Instant.EPOCH;
+        Instant effectiveEndDate = endDate != null ? endDate : Instant.now();
+
+        long totalEnrollment = enrollmentRepository.countByCourseIdAndDateRange(courseId, effectiveStartDate, effectiveEndDate);
+        long completedStudents = enrollmentRepository.countByCourseIdAndStatusAndDateRange(courseId, EnrollmentStatus.COMPLETED, effectiveStartDate, effectiveEndDate);
+        long refundedStudents = enrollmentRepository.countByCourseIdAndStatusAndDateRange(courseId, EnrollmentStatus.REFUNDED, effectiveStartDate, effectiveEndDate);
         
-        BigDecimal totalRevenue = escrowLedgerRepository.sumAmountByCourseIdAndStatus(courseId, EscrowStatus.RELEASED);
+        double completionRate = totalEnrollment > 0 ? (double) completedStudents / totalEnrollment * 100 : 0.0;
+        double refundRate = totalEnrollment > 0 ? (double) refundedStudents / totalEnrollment * 100 : 0.0;
+        
+        BigDecimal grossRevenue = escrowLedgerRepository.sumGrossRevenueByCourseIdAndDateRange(courseId, effectiveStartDate, effectiveEndDate);
+        BigDecimal netRevenue = escrowLedgerRepository.sumNetRevenueByCourseIdAndDateRange(courseId, effectiveStartDate, effectiveEndDate);
         
         CourseReviewAggregateResponse reviewAggregate = courseReviewService.getAggregate(courseId);
 
         return TeacherCourseAnalyticsResponse.builder()
-                .activeStudents(activeStudents)
-                .completedStudents(completedStudents)
-                .totalRevenue(totalRevenue == null ? BigDecimal.ZERO : totalRevenue)
+                .totalEnrollment(totalEnrollment)
+                .completionRate(completionRate)
+                .grossRevenue(grossRevenue != null ? grossRevenue : BigDecimal.ZERO)
+                .netRevenue(netRevenue != null ? netRevenue : BigDecimal.ZERO)
+                .refundRate(refundRate)
                 .averageRating(reviewAggregate.averageRating())
                 .totalReviews(reviewAggregate.reviewCount())
                 .build();

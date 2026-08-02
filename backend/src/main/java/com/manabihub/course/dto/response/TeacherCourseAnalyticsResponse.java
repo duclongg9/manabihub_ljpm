@@ -8,9 +8,11 @@ import java.math.BigDecimal;
 @Data
 @Builder
 public class TeacherCourseAnalyticsResponse {
-    private long activeStudents;
-    private long completedStudents;
-    private BigDecimal totalRevenue;
+    private long totalEnrollment;
+    private double completionRate;
+    private BigDecimal grossRevenue;
+    private BigDecimal netRevenue;
+    private double refundRate;
     private BigDecimal averageRating;
     private long totalReviews;
 }

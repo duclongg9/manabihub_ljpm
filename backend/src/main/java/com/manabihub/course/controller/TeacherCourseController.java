@@ -43,8 +43,11 @@ public class TeacherCourseController {
     }
 
     @GetMapping("/{courseId}/analytics")
-    public ResponseEntity<ApiResponse<TeacherCourseAnalyticsResponse>> getCourseAnalytics(@PathVariable UUID courseId) {
-        TeacherCourseAnalyticsResponse response = courseService.getCourseAnalytics(courseId);
+    public ResponseEntity<ApiResponse<TeacherCourseAnalyticsResponse>> getCourseAnalytics(
+            @PathVariable UUID courseId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) java.time.Instant startDate,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) java.time.Instant endDate) {
+        TeacherCourseAnalyticsResponse response = courseService.getCourseAnalytics(courseId, startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success(
                 MessageCodes.COMMON_SUCCESS,
                 "Course analytics loaded.",
