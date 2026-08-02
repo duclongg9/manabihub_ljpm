@@ -2,6 +2,7 @@ package com.manabihub.payment.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
@@ -17,6 +18,7 @@ import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.dto.IpnAckResponse;
 import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.enums.PaymentStatus;
+import com.manabihub.payment.event.PaymentNotificationEvent;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
@@ -24,15 +26,17 @@ import com.manabihub.payment.service.PaymentService;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.service.StudentWalletService;
-import com.manabihub.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -49,7 +53,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final EnrollmentRepository enrollmentRepository;
     private final EscrowService escrowService;
     private final StudentWalletService studentWalletService;
-    private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -140,7 +144,25 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public void payWithWallet(Order order) {
+    public Order payWithWallet(UUID orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.ORDER_NOT_FOUND,
+                        "Order was not found",
+                        HttpStatus.NOT_FOUND));
+
+        if (order.getStatus() == OrderStatus.PAID) {
+            log.info("[{}] Ignored duplicate wallet payment for already-paid order {}",
+                    MessageCodes.MSG_PAY_005, order.getOrderCode());
+            return order;
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "Only a pending order can be paid with wallet",
+                    HttpStatus.CONFLICT);
+        }
+
         WalletTransaction debit = studentWalletService.debitBalance(
                 order.getStudent().getId(),
                 order.getTotalAmount(),
@@ -164,6 +186,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         log.info("[{}] Paid order {} with wallet — enrollment + escrow created",
                 MessageCodes.MSG_PAY_002, order.getOrderCode());
+        return order;
     }
 
     @Override
@@ -176,7 +199,8 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (balance.compareTo(total) >= 0) {
             // Wallet fully covers the order — pay entirely from wallet, no gateway.
-            payWithWallet(order);
+            Order paidOrder = payWithWallet(order.getId());
+            order.setStatus(paidOrder.getStatus());
             return null;
         }
         if (balance.signum() > 0) {
@@ -239,25 +263,27 @@ public class PaymentServiceImpl implements PaymentService {
     private void notifyStudent(Order order) {
         StudentProfile student = order.getStudent();
         AppUser user = student.getUser();
-        notificationService.createNotification(
+        eventPublisher.publishEvent(new PaymentNotificationEvent(
+                order.getId(),
                 user.getId(),
                 user.getEmail(),
                 "Mua khoá học thành công",
                 "Đơn hàng " + order.getOrderCode()
                         + " đã được thanh toán thành công. Bạn có thể bắt đầu học ngay bây giờ.",
-                NOTIFICATION_TYPE);
+                NOTIFICATION_TYPE));
     }
 
     private void notifyTopUp(Order order) {
         StudentProfile student = order.getStudent();
         AppUser user = student.getUser();
-        notificationService.createNotification(
+        eventPublisher.publishEvent(new PaymentNotificationEvent(
+                order.getId(),
                 user.getId(),
                 user.getEmail(),
                 "Nạp ví thành công",
                 "Đơn nạp ví " + order.getOrderCode() + " ("
                         + order.getTotalAmount().toPlainString() + "đ) đã được xử lý thành công. "
                         + "Số dư ví của bạn đã được cập nhật.",
-                "WALLET_TOPUP_SUCCESS");
+                "WALLET_TOPUP_SUCCESS"));
     }
 }

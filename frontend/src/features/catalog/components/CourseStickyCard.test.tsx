@@ -3,11 +3,27 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CourseStickyCard } from './CourseStickyCard';
 
+const mocks = vi.hoisted(() => ({
+  createCheckout: vi.fn(),
+  getAuthSession: vi.fn(),
+}));
+
+vi.mock('../../checkout/services/checkoutService', () => ({
+  createCheckout: mocks.createCheckout,
+}));
+
+vi.mock('../../../shared/auth/authSession', () => ({
+  getAuthSession: mocks.getAuthSession,
+}));
+
 vi.mock('../../wishlist/components/WishlistToggleButton', () => ({
   WishlistToggleButton: () => null,
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const course = {
   id: 'course-1',
@@ -47,5 +63,25 @@ describe('CourseStickyCard', () => {
 
     expect(screen.getByRole('img', { name: 'Khóa học Kanji N5 chưa có ảnh bìa' }))
       .toBeInTheDocument();
+  });
+
+  it('explains that an internal wallet-payment failure did not debit the balance', async () => {
+    mocks.getAuthSession.mockReturnValue({ token: 'student-token' });
+    mocks.createCheckout.mockRejectedValue({
+      response: { data: { messageCode: 'COMMON_INTERNAL_ERROR' } },
+    });
+
+    render(
+      <MemoryRouter>
+        <CourseStickyCard course={{ ...course, price: 250_000 }} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Thanh toán bằng ví' }));
+
+    expect(await screen.findByText(
+      'Thanh toán chưa hoàn tất và số dư ví chưa bị trừ. Vui lòng thử lại.',
+    )).toBeInTheDocument();
+    expect(mocks.createCheckout).toHaveBeenCalledWith('course-1', 'WALLET');
   });
 });

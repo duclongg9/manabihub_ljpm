@@ -4,6 +4,7 @@ import com.manabihub.order.entity.Order;
 import com.manabihub.payment.dto.IpnAckResponse;
 
 import java.util.Map;
+import java.util.UUID;
 
 public interface PaymentService {
 
@@ -16,12 +17,13 @@ public interface PaymentService {
     /**
      * Pays a course order instantly from the student's wallet balance — debits the wallet,
      * records a WALLET payment transaction, marks the order paid and fulfils it (enrollment +
-     * escrow + notification), all in one transaction and with no payment gateway.
+     * escrow), all in one transaction and with no payment gateway. The success
+     * notification is delivered only after that transaction commits.
      *
      * @throws com.manabihub.common.exception.BusinessException with
      *         {@code WALLET_INSUFFICIENT_BALANCE} if the wallet balance is not enough
      */
-    void payWithWallet(Order order);
+    Order payWithWallet(UUID orderId);
 
     /**
      * Combined payment: uses as much of the student's wallet balance as available and charges

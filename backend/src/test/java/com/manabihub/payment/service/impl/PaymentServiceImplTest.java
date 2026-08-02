@@ -6,7 +6,6 @@ import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.repository.EnrollmentRepository;
-import com.manabihub.notification.service.NotificationService;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
@@ -16,6 +15,7 @@ import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.dto.IpnAckResponse;
 import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.enums.PaymentStatus;
+import com.manabihub.payment.event.PaymentNotificationEvent;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
@@ -29,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -55,7 +56,7 @@ class PaymentServiceImplTest {
     @Mock private EnrollmentRepository enrollmentRepository;
     @Mock private EscrowService escrowService;
     @Mock private StudentWalletService studentWalletService;
-    @Mock private NotificationService notificationService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private PaymentServiceImpl service;
 
@@ -67,7 +68,7 @@ class PaymentServiceImplTest {
     void setUp() {
         service = new PaymentServiceImpl(
                 paymentGateway, orderRepository, orderItemRepository, paymentTransactionRepository,
-                enrollmentRepository, escrowService, studentWalletService, notificationService,
+                enrollmentRepository, escrowService, studentWalletService, eventPublisher,
                 new ObjectMapper());
 
         AppUser user = AppUser.builder().id(UUID.randomUUID()).email("student@test.dev").build();
@@ -112,7 +113,7 @@ class PaymentServiceImplTest {
 
         verify(enrollmentRepository).save(any(Enrollment.class));
         verify(escrowService).holdForOrder(order);
-        verify(notificationService).createNotification(any(), eq("student@test.dev"), anyString(), anyString(), anyString());
+        verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
     }
 
     @Test
@@ -159,7 +160,7 @@ class PaymentServiceImplTest {
         verify(paymentTransactionRepository, never()).save(any());
         verify(enrollmentRepository, never()).save(any());
         verify(escrowService, never()).holdForOrder(any());
-        verify(notificationService, never()).createNotification(any(), any(), anyString(), anyString(), anyString());
+        verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
     }
 
     @Test
@@ -175,7 +176,7 @@ class PaymentServiceImplTest {
         assertEquals(OrderStatus.FAILED, order.getStatus());
         verify(enrollmentRepository, never()).save(any());
         verify(escrowService, never()).holdForOrder(any());
-        verify(notificationService, never()).createNotification(any(), any(), anyString(), anyString(), anyString());
+        verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
     }
 
     @Test
@@ -204,19 +205,21 @@ class PaymentServiceImplTest {
         // A top-up must never create enrollment or escrow.
         verify(enrollmentRepository, never()).save(any());
         verify(escrowService, never()).holdForOrder(any());
-        verify(notificationService).createNotification(any(), eq("student@test.dev"), anyString(), anyString(), anyString());
+        verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
     }
 
     @Test
     void payWithWallet_debitsWalletAndFulfilsCourseOrder() {
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
         when(studentWalletService.debitBalance(any(), any(), any(), any(), any()))
                 .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
         when(orderItemRepository.findByOrder_Id(order.getId()))
                 .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
         when(enrollmentRepository.findByStudent_IdAndCourse_Id(any(), any())).thenReturn(Optional.empty());
 
-        service.payWithWallet(order);
+        Order paidOrder = service.payWithWallet(order.getId());
 
+        assertEquals(order, paidOrder);
         assertEquals(OrderStatus.PAID, order.getStatus());
         verify(studentWalletService).debitBalance(
                 eq(order.getStudent().getId()), eq(new BigDecimal("100.00")),
@@ -224,7 +227,25 @@ class PaymentServiceImplTest {
         verify(paymentTransactionRepository).save(any(PaymentTransaction.class));
         verify(enrollmentRepository).save(any(Enrollment.class));
         verify(escrowService).holdForOrder(order);
-        verify(notificationService).createNotification(any(), eq("student@test.dev"), anyString(), anyString(), anyString());
+        ArgumentCaptor<PaymentNotificationEvent> eventCaptor =
+                ArgumentCaptor.forClass(PaymentNotificationEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(order.getId(), eventCaptor.getValue().orderId());
+        assertEquals("student@test.dev", eventCaptor.getValue().recipientEmail());
+    }
+
+    @Test
+    void payWithWallet_alreadyPaidOrder_isIdempotent() {
+        order.setStatus(OrderStatus.PAID);
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        assertEquals(order, service.payWithWallet(order.getId()));
+
+        verify(studentWalletService, never()).debitBalance(any(), any(), any(), any(), any());
+        verify(paymentTransactionRepository, never()).save(any());
+        verify(enrollmentRepository, never()).save(any());
+        verify(escrowService, never()).holdForOrder(any());
+        verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
     }
 
     @Test

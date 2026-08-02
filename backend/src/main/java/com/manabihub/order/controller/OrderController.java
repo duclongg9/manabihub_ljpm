@@ -67,7 +67,7 @@ public class OrderController {
         // Pay from wallet balance: debit + fulfil instantly, no gateway (paymentUrl null).
         PaymentMethod method = request.paymentMethod() == null ? PaymentMethod.VNPAY : request.paymentMethod();
         if (method == PaymentMethod.WALLET) {
-            paymentService.payWithWallet(order); // throws WALLET_INSUFFICIENT_BALANCE if not enough
+            order = paymentService.payWithWallet(order.getId()); // throws WALLET_INSUFFICIENT_BALANCE if not enough
             CheckoutResponse walletCheckout = new CheckoutResponse(
                     order.getId(),
                     order.getOrderCode(),

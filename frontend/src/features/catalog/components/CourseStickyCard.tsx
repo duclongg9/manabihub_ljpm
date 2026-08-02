@@ -44,9 +44,12 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
         setShowPaymentOptions(true);
         setBuyError(null);
       } else {
-        setBuyError(code === 'ORDER_ALREADY_ENROLLED'
+        const message = code === 'ORDER_ALREADY_ENROLLED'
           ? 'Bạn đã sở hữu khóa học này.'
-          : 'Không thể tạo đơn hàng. Vui lòng thử lại.');
+          : code === 'COMMON_INTERNAL_ERROR'
+            ? 'Thanh toán chưa hoàn tất và số dư ví chưa bị trừ. Vui lòng thử lại.'
+            : 'Không thể tạo đơn hàng. Vui lòng thử lại.';
+        setBuyError(message);
       }
       setBuying(false);
     }
