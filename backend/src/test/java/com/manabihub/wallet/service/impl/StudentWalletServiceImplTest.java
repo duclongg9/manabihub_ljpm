@@ -1,5 +1,6 @@
 package com.manabihub.wallet.service.impl;
 
+import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.wallet.entity.StudentWallet;
 import com.manabihub.wallet.entity.WalletTransaction;
@@ -20,7 +21,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -70,6 +73,35 @@ class StudentWalletServiceImplTest {
         assertEquals(referenceId, saved.getReferenceId());
         assertEquals(wallet.getId(), saved.getWalletId());
         assertEquals(tx, saved);
+    }
+
+    @Test
+    void debitBalance_sufficientBalance_decreasesBalanceAndRecordsPurchase() {
+        wallet.setBalance(new BigDecimal("100000"));
+        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
+        when(studentWalletRepository.findByStudentIdForUpdate(studentId)).thenReturn(Optional.of(wallet));
+        when(walletTransactionRepository.save(any(WalletTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.debitBalance(studentId, new BigDecimal("30000"), "ORDER", UUID.randomUUID(), "Mua khoá học");
+
+        assertEquals(new BigDecimal("70000"), wallet.getBalance());
+        ArgumentCaptor<WalletTransaction> captor = ArgumentCaptor.forClass(WalletTransaction.class);
+        verify(walletTransactionRepository).save(captor.capture());
+        assertEquals(WalletTransactionType.PURCHASE, captor.getValue().getTransactionType());
+        assertEquals(WalletDirection.OUT, captor.getValue().getDirection());
+    }
+
+    @Test
+    void debitBalance_insufficientBalance_throwsAndDoesNotDeduct() {
+        wallet.setBalance(new BigDecimal("10000"));
+        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
+        when(studentWalletRepository.findByStudentIdForUpdate(studentId)).thenReturn(Optional.of(wallet));
+
+        assertThrows(BusinessException.class, () ->
+                service.debitBalance(studentId, new BigDecimal("50000"), "ORDER", UUID.randomUUID(), "Mua khoá học"));
+
+        assertEquals(new BigDecimal("10000"), wallet.getBalance());
+        verify(walletTransactionRepository, never()).save(any());
     }
 
     @Test

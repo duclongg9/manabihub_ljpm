@@ -24,4 +24,14 @@ public interface StudentWalletService {
      */
     WalletTransaction creditBalance(UUID studentId, BigDecimal amount,
                                     String referenceType, UUID referenceId, String note);
+
+    /**
+     * Debits {@code amount} from the student's spendable balance (e.g. paying for a course
+     * with wallet money) and records a {@code PURCHASE} ledger line. Locks the wallet row.
+     *
+     * @throws com.manabihub.common.exception.BusinessException with
+     *         {@code WALLET_INSUFFICIENT_BALANCE} if the balance is not enough
+     */
+    WalletTransaction debitBalance(UUID studentId, BigDecimal amount,
+                                   String referenceType, UUID referenceId, String note);
 }

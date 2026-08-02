@@ -15,13 +15,14 @@ interface CourseStickyCardProps {
 export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
   const [buying, setBuying] = useState(false);
   const [buyError, setBuyError] = useState<string | null>(null);
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const navigate = useNavigate();
   const thumbnailUrl = resolvePublicAssetUrl(course.thumbnailUrl);
 
   const handleContinueLearning = () => navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
 
-  const handleBuy = async () => {
+  const handleBuy = async (paymentMethod: 'VNPAY' | 'WALLET' | 'WALLET_VNPAY' = 'VNPAY') => {
     if (!getAuthSession('public')) {
       navigate(ROUTES.PUBLIC.LOGIN);
       return;
@@ -29,20 +30,24 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
     setBuying(true);
     setBuyError(null);
     try {
-      const checkout = await createCheckout(course.id);
+      const checkout = await createCheckout(course.id, paymentMethod);
       if (!checkout.paymentUrl) {
-        // Free course — the student was enrolled immediately, go straight to learning.
+        // Free course OR paid instantly from wallet — student is enrolled, go straight to learning.
         navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
         return;
       }
       navigate(`/checkout/${checkout.orderId}`, { state: { paymentUrl: checkout.paymentUrl } });
     } catch (err) {
       const code = (err as { response?: { data?: { messageCode?: string } } })?.response?.data?.messageCode;
-      setBuyError(
-        code === 'ORDER_ALREADY_ENROLLED'
+      if (code === 'WALLET_INSUFFICIENT_BALANCE') {
+        // Let the student choose how to proceed instead of failing outright.
+        setShowPaymentOptions(true);
+        setBuyError(null);
+      } else {
+        setBuyError(code === 'ORDER_ALREADY_ENROLLED'
           ? 'Bạn đã sở hữu khóa học này.'
-          : 'Không thể tạo đơn hàng. Vui lòng thử lại.',
-      );
+          : 'Không thể tạo đơn hàng. Vui lòng thử lại.');
+      }
       setBuying(false);
     }
   };
@@ -112,12 +117,42 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
         ) : (
           <>
             <button
-              onClick={handleBuy}
+              onClick={() => handleBuy('VNPAY')}
               disabled={buying}
               className="bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white w-full py-3 rounded-xl font-semibold mb-3 transition-colors"
             >
-              {buying ? 'Đang xử lý…' : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
+              {buying ? 'Đang xử lý…' : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay (VNPay)'}
             </button>
+            {course.price > 0 && (
+              <button
+                onClick={() => handleBuy('WALLET')}
+                disabled={buying}
+                className="border border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-60 w-full py-3 rounded-xl font-semibold mb-3 transition-colors"
+              >
+                Thanh toán bằng ví
+              </button>
+            )}
+            {showPaymentOptions && (
+              <div className="mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200">
+                <p className="text-xs text-amber-800 font-semibold mb-2">
+                  Số dư ví không đủ. Bạn muốn thanh toán bằng cách nào?
+                </p>
+                <button
+                  onClick={() => handleBuy('WALLET_VNPAY')}
+                  disabled={buying}
+                  className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg mb-2 transition-colors"
+                >
+                  Dùng số dư ví + VNPay phần còn lại
+                </button>
+                <button
+                  onClick={() => handleBuy('VNPAY')}
+                  disabled={buying}
+                  className="w-full border border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-60 font-semibold py-2.5 rounded-lg transition-colors"
+                >
+                  Thanh toán toàn bộ qua VNPay
+                </button>
+              </div>
+            )}
             {buyError && <p className="text-center text-xs text-red-600 font-medium mb-3">{buyError}</p>}
           </>
         )}

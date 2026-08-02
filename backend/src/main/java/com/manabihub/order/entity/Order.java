@@ -55,6 +55,11 @@ public class Order {
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
+    /** Portion of the total paid from the student's wallet (combined payment); 0 otherwise. */
+    @Builder.Default
+    @Column(name = "wallet_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal walletAmount = BigDecimal.ZERO;
+
     @Builder.Default
     @Column(nullable = false, length = 10)
     private String currency = "VND";
@@ -77,4 +82,10 @@ public class Order {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    /** Amount to charge via the payment gateway = total minus the wallet-paid portion. */
+    public BigDecimal getGatewayAmount() {
+        BigDecimal wallet = walletAmount == null ? BigDecimal.ZERO : walletAmount;
+        return totalAmount.subtract(wallet);
+    }
 }

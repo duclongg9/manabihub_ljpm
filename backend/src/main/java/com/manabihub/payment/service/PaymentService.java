@@ -14,6 +14,23 @@ public interface PaymentService {
     String initiatePayment(Order order, String clientIp);
 
     /**
+     * Pays a course order instantly from the student's wallet balance — debits the wallet,
+     * records a WALLET payment transaction, marks the order paid and fulfils it (enrollment +
+     * escrow + notification), all in one transaction and with no payment gateway.
+     *
+     * @throws com.manabihub.common.exception.BusinessException with
+     *         {@code WALLET_INSUFFICIENT_BALANCE} if the wallet balance is not enough
+     */
+    void payWithWallet(Order order);
+
+    /**
+     * Combined payment: uses as much of the student's wallet balance as available and charges
+     * the remainder via VNPay. Sets the order's wallet portion and returns the VNPay payment
+     * URL — or {@code null} if the wallet fully covered the order (already paid).
+     */
+    String initiateCombinedPayment(Order order, String clientIp);
+
+    /**
      * Processes a provider webhook (VNPay IPN). This is the ONLY path that confirms a
      * payment. It verifies the checksum, and on a valid successful callback creates the
      * enrollment, marks the payment/order paid, holds funds in escrow, and notifies the

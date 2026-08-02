@@ -82,4 +82,38 @@ public class StudentWalletServiceImpl implements StudentWalletService {
 
         return walletTransactionRepository.save(transaction);
     }
+
+    @Override
+    @Transactional
+    public WalletTransaction debitBalance(UUID studentId, BigDecimal amount,
+                                          String referenceType, UUID referenceId, String note) {
+        getOrCreateStudentWallet(studentId);
+        StudentWallet wallet = studentWalletRepository.findByStudentIdForUpdate(studentId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.WALLET_NOT_FOUND,
+                        "Student wallet was not found",
+                        HttpStatus.NOT_FOUND));
+
+        if (wallet.getBalance().compareTo(amount) < 0) {
+            throw new BusinessException(
+                    MessageCodes.WALLET_INSUFFICIENT_BALANCE,
+                    "Số dư ví không đủ để thanh toán",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        wallet.setBalance(wallet.getBalance().subtract(amount));
+        studentWalletRepository.save(wallet);
+
+        WalletTransaction transaction = WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .transactionType(WalletTransactionType.PURCHASE)
+                .amount(amount)
+                .direction(WalletDirection.OUT)
+                .referenceType(referenceType)
+                .referenceId(referenceId)
+                .note(note)
+                .build();
+
+        return walletTransactionRepository.save(transaction);
+    }
 }

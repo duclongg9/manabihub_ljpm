@@ -19,6 +19,8 @@ import com.manabihub.payment.enums.PaymentStatus;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
+import com.manabihub.wallet.entity.StudentWallet;
+import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.service.StudentWalletService;
 import org.junit.jupiter.api.BeforeEach;
@@ -203,6 +205,61 @@ class PaymentServiceImplTest {
         verify(enrollmentRepository, never()).save(any());
         verify(escrowService, never()).holdForOrder(any());
         verify(notificationService).createNotification(any(), eq("student@test.dev"), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void payWithWallet_debitsWalletAndFulfilsCourseOrder() {
+        when(studentWalletService.debitBalance(any(), any(), any(), any(), any()))
+                .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
+        when(orderItemRepository.findByOrder_Id(order.getId()))
+                .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(any(), any())).thenReturn(Optional.empty());
+
+        service.payWithWallet(order);
+
+        assertEquals(OrderStatus.PAID, order.getStatus());
+        verify(studentWalletService).debitBalance(
+                eq(order.getStudent().getId()), eq(new BigDecimal("100.00")),
+                eq("ORDER"), eq(order.getId()), anyString());
+        verify(paymentTransactionRepository).save(any(PaymentTransaction.class));
+        verify(enrollmentRepository).save(any(Enrollment.class));
+        verify(escrowService).holdForOrder(order);
+        verify(notificationService).createNotification(any(), eq("student@test.dev"), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void handleIpn_combinedPayment_debitsWalletPortionAndConfirms() {
+        order.setWalletAmount(new BigDecimal("30.00")); // 30 from wallet → gateway charges 70.00
+        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 7_000L)); // 70.00 × 100
+        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+        when(paymentTransactionRepository.findByOrder_IdOrderByCreatedAtDesc(order.getId()))
+                .thenReturn(List.of(PaymentTransaction.builder().order(order).status(PaymentStatus.PENDING).build()));
+        when(orderItemRepository.findByOrder_Id(order.getId()))
+                .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(any(), any())).thenReturn(Optional.empty());
+
+        IpnAckResponse ack = service.handleIpn(params);
+
+        assertEquals("00", ack.rspCode());
+        verify(studentWalletService).debitBalance(
+                eq(order.getStudent().getId()), eq(new BigDecimal("30.00")),
+                eq("ORDER"), eq(order.getId()), anyString());
+        verify(enrollmentRepository).save(any(Enrollment.class));
+        verify(escrowService).holdForOrder(order);
+    }
+
+    @Test
+    void initiateCombinedPayment_partialBalance_setsWalletPortionAndChargesRemainder() {
+        when(studentWalletService.getOrCreateStudentWallet(any()))
+                .thenReturn(StudentWallet.builder().id(UUID.randomUUID()).balance(new BigDecimal("40.00")).build());
+        when(paymentGateway.buildPaymentUrl(eq(order), anyString())).thenReturn("https://vnpay/pay");
+
+        String url = service.initiateCombinedPayment(order, "1.2.3.4");
+
+        assertEquals("https://vnpay/pay", url);
+        assertEquals(new BigDecimal("40.00"), order.getWalletAmount());
+        assertEquals(new BigDecimal("60.00"), order.getGatewayAmount());
+        verify(orderRepository).save(order);
     }
 
     @Test
