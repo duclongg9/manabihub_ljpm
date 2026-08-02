@@ -16,6 +16,7 @@ import java.util.UUID;
 public interface LessonBlockProgressRepository extends JpaRepository<LessonBlockProgress, UUID> {
     Optional<LessonBlockProgress> findByEnrollmentIdAndLessonBlockId(UUID enrollmentId, UUID lessonBlockId);
     List<LessonBlockProgress> findByEnrollmentId(UUID enrollmentId);
+    int countByEnrollmentIdAndStatus(UUID enrollmentId, LessonProgressStatus status);
 
     @Query("""
             SELECT progress.enrollmentId AS enrollmentId, COUNT(progress) AS completedCount

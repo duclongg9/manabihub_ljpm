@@ -21,6 +21,8 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
 
     List<PaymentTransaction> findByOrder_IdOrderByCreatedAtDesc(UUID orderId);
 
+    Optional<PaymentTransaction> findFirstByOrder_IdAndStatusInOrderByUpdatedAtDesc(UUID orderId, List<PaymentStatus> statuses);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<PaymentTransaction> findFirstByOrder_IdAndStatusOrderByCreatedAtDesc(
             UUID orderId,

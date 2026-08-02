@@ -56,4 +56,12 @@ public interface LessonBlockRepository extends JpaRepository<LessonBlock, UUID> 
         UUID getCourseId();
         long getTotalCount();
     }
+
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT COUNT(block)
+            FROM LessonBlock block
+            WHERE block.module.course.id = :courseId
+              AND block.moderationHidden = false
+            """)
+    int countByCourse_Id(@org.springframework.data.repository.query.Param("courseId") UUID courseId);
 }
