@@ -175,9 +175,9 @@ export const InstructorTermsPage = () => (
 export const RefundPolicyPage = () => (
   <ArticleLayout article={getHelpArticle('refund-policy')}>
     <DraftScopeNotice>
-      Luồng học viên tự gửi yêu cầu hoàn tiền chưa được phát hành trong bản MVP hiện tại.
-      Trang này công bố quy tắc chuẩn để không diễn giải sai; trường hợp cần hỗ trợ phải dùng
-      <Link to={ROUTES.PUBLIC.ABOUT}> kênh liên hệ</Link> cho đến khi luồng yêu cầu được triển khai.
+      Học viên gửi yêu cầu cho từng khóa học tại{' '}
+      <Link to={ROUTES.STUDENT.PAYMENTS}>Lịch sử thanh toán</Link>. Finance xem xét trước khi
+      hệ thống thực hiện hoàn tiền; việc tạo yêu cầu không phải xác nhận tiền đã được hoàn.
     </DraftScopeNotice>
 
     <PolicyBoundary>

@@ -71,6 +71,10 @@ public class PaymentTransaction {
     @Column(name = "raw_response", columnDefinition = "jsonb")
     private JsonNode rawResponse;
 
+    /** Immutable business timestamp captured when the provider first confirms payment. */
+    @Column(name = "succeeded_at")
+    private Instant succeededAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

@@ -121,6 +121,12 @@ export const ENDPOINTS = {
     list: '/v1/orders',
     detail: (orderId: string) => `/v1/orders/${orderId}`,
   },
+  studentRefunds: {
+    create: '/v1/student/refunds',
+    list: '/v1/student/refunds',
+    detail: (id: string) => `/v1/student/refunds/${id}`,
+    cancel: (id: string) => `/v1/student/refunds/${id}/cancel`,
+  },
   payments: {
     // Local dev simulator for the VNPay IPN callback (no tunnel needed).
     devIpn: '/v1/payments/dev/ipn',

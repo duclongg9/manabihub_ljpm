@@ -5,7 +5,9 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import java.util.Collection;
 import java.util.List;
@@ -13,6 +15,10 @@ import java.util.UUID;
 
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT item FROM OrderItem item JOIN FETCH item.order JOIN FETCH item.course WHERE item.id = :id")
+    java.util.Optional<OrderItem> findByIdForRefundUpdate(@Param("id") UUID id);
 
     @EntityGraph(attributePaths = {"course", "course.teacher"})
     List<OrderItem> findByOrder_Id(UUID orderId);

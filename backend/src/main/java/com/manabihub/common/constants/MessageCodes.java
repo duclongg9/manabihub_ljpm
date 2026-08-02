@@ -266,6 +266,12 @@ public final class MessageCodes {
     // REFUND — refund processing
     // ──────────────────────────────────────────────
     public static final String REFUND_NOT_ELIGIBLE = "REFUND_NOT_ELIGIBLE";
+    public static final String REFUND_WINDOW_EXPIRED = "REFUND_WINDOW_EXPIRED";
+    public static final String REFUND_PROGRESS_LIMIT_REACHED = "REFUND_PROGRESS_LIMIT_REACHED";
+    public static final String REFUND_ENROLLMENT_MISSING = "REFUND_ENROLLMENT_MISSING";
+    public static final String REFUND_ACTIVE_REQUEST_EXISTS = "REFUND_ACTIVE_REQUEST_EXISTS";
+    public static final String REFUND_REQUEST_NOT_FOUND = "REFUND_REQUEST_NOT_FOUND";
+    public static final String REFUND_CANCELLATION_NOT_ALLOWED = "REFUND_CANCELLATION_NOT_ALLOWED";
     public static final String REFUND_REQUESTED = "REFUND_REQUESTED";
     public static final String REFUND_PROCESSED = "REFUND_PROCESSED";
     public static final String FINANCIAL_INTEGRITY_VIOLATION = "FINANCIAL_INTEGRITY_VIOLATION";

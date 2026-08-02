@@ -412,36 +412,40 @@ public class RefundDecisionTransactionService {
             OrderItemSnapshot financialSnapshot,
             RefundDecisionReason decisionReason
     ) {
-        Map<String, Object> snapshot = refund.getEligibilitySnapshot();
-        if (snapshot == null || snapshot.isEmpty()) {
+        com.manabihub.refund.dto.RefundEligibilitySnapshot snapshot = refund.getEligibilitySnapshot();
+        if (snapshot == null) {
             return "ELIGIBILITY_SNAPSHOT_MISSING";
         }
-        if (!matchesUuid(snapshot.get("orderId"), refund.getOrder().getId())
-                || !matchesUuid(snapshot.get("orderItemId"), item.getId())) {
+        if (!java.util.Objects.equals(snapshot.getOrderId(), refund.getOrder().getId())
+                || !java.util.Objects.equals(snapshot.getOrderItemId(), item.getId())) {
             return "ELIGIBILITY_REFERENCE_MISMATCH";
         }
-        BigDecimal paidAmount = decimal(snapshot.get("paidAmount"));
+        BigDecimal paidAmount = snapshot.getActuallyPaidAmount();
         if (paidAmount == null
                 || paidAmount.compareTo(financialSnapshot.getGrossAmount()) != 0) {
             return "ELIGIBILITY_PAID_AMOUNT_MISMATCH";
         }
-        if (blank(snapshot.get("policyVersion"))
-                || blank(snapshot.get("paymentTime"))
-                || blank(snapshot.get("requestTime"))
-                || decimal(snapshot.get("progressPercent")) == null) {
+        if (snapshot.getPolicyVersion() == null || snapshot.getPolicyVersion().isBlank()
+                || snapshot.getPaymentSucceededAt() == null
+                || snapshot.getRequestedAt() == null
+                || snapshot.getMeasuredProgressPercent() == null) {
             return "ELIGIBILITY_EVIDENCE_INCOMPLETE";
         }
 
-        boolean standardEligible = booleanValue(snapshot.get("eligible"))
-                || "ELIGIBLE".equals(string(snapshot.get("result")))
-                || "STANDARD_ELIGIBLE".equals(string(snapshot.get("result")));
+        boolean standardEligible = (snapshot.getEligible() != null && snapshot.getEligible())
+                || "ELIGIBLE".equals(snapshot.getResult())
+                || "STANDARD_ELIGIBLE".equals(snapshot.getResult())
+                || snapshot.getEligibilityResult() == com.manabihub.refund.enums.EligibilityResult.STANDARD_ELIGIBLE;
+        
         if (decisionReason == RefundDecisionReason.STANDARD_ELIGIBLE) {
             return standardEligible ? null : "STANDARD_ELIGIBILITY_NOT_CONFIRMED";
         }
 
-        boolean manualReview = booleanValue(snapshot.get("manualReview"))
-                || "MANUAL_REVIEW".equals(string(snapshot.get("result")))
-                || "EXCEPTION_REVIEW".equals(string(snapshot.get("result")));
+        boolean manualReview = (snapshot.getEligible() != null && !snapshot.getEligible())
+                || "MANUAL_REVIEW".equals(snapshot.getResult())
+                || "EXCEPTION_REVIEW".equals(snapshot.getResult())
+                || snapshot.getEligibilityResult() == com.manabihub.refund.enums.EligibilityResult.MANUAL_REVIEW_REQUIRED;
+                
         return decisionReason.isManualException() && manualReview
                 ? null
                 : "MANUAL_EXCEPTION_NOT_DOCUMENTED";
