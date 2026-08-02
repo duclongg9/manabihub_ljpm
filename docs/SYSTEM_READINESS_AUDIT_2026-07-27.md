@@ -68,10 +68,8 @@ Supporting product gaps:
 
 * MHB-67: public teacher profile and instructor discovery.
 * MHB-68: verified ratings and reviews.
-* No unified operational task queue exists; the route currently aliases the
-  course approval queue.
-* System settings, user administration, finance overview, audit viewer,
-  refunds, and violations are redirects or absent.
+* Unified operational task queue and general finance overview are out of scope for the current demo phase.
+  System settings, user administration, refunds, and violations are redirects or absent.
 
 ## Visible surface review
 
@@ -80,7 +78,7 @@ Supporting product gaps:
 | Public | Landing, catalog search/filter, course detail, cart and Google sign-in have real routes | Teacher names are not yet navigable; rating/review values must stay hidden until MHB-67/68; no dead violation control |
 | Student | Dashboard, My Learning, lesson blocks, progress, quiz, flashcards, writing, final test, certificate, profile, wishlist, purchase history and notifications are represented | Refund, review, violation report and Student wallet claims are missing or out of scope; session/redirect behavior requires deployed MHB-54 evidence |
 | Teacher | Dashboard, course list/builder, KYC, writing feedback, profile and revenue-wallet paths exist | UC-24 analytics is missing; student-question/review counters are unsupported; suspension/reinstatement needs the linked trust lifecycle |
-| Course Manager | Course approval and KYC APIs/screens exist | KYC queue semantics were wrong; violation workflow and a real multi-domain task queue are absent |
+| Course Manager | Course approval and KYC APIs/screens exist | KYC queue semantics were wrong; unified task queue is out of scope |
 | Finance Manager | Withdrawal/payout components and RBAC paths exist | Refund queue/decision and a coherent finance overview remain incomplete |
 | System Admin | Authentication shell and role model exist | Settings, user/role management and audit viewer are incomplete; visible routes currently redirect |
 
@@ -138,8 +136,7 @@ Report 3 currently overclaims or contradicts the product:
   implemented dashboard reports course statuses and recent courses.
 * Course Builder is described as a student-submission review screen.
 * Writing Submission still says AI-assisted grading.
-* Task Queue is described as a unified queue although only course approval is
-  routed there.
+* Task Queue is out of scope for the demo. Operational tasks are handled directly via their specific domain routes.
 * Cloudinary, email delivery, WebSocket/STOMP, long-polling fallback, placement
   test, deferral, AI content generation, coupon/referral attribution, and
   Student AI-credit top-up are not supported by current code.
@@ -226,8 +223,7 @@ informal findings:
 
 * MHB-13 was rewritten as KYC exception and trust-case handling and returned to
   Rework.
-* MHB-66 was returned to Rework because settings, users, finance, and unified
-  task-queue routes do not yet satisfy its acceptance criteria.
+* MHB-66 was returned to Rework to resolve dead aliases and explicitly remove out-of-scope unified task-queue and finance overview routes from the navigation menu.
 * MHB-69 was created for the missing UC-24 Teacher Course Analytics.
 * MHB-70 was created for SRS and context-diagram reconciliation.
 * MHB-71 was created for Flyway/JPA ownership and legacy learning-schema work.

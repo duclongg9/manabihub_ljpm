@@ -317,7 +317,6 @@ export const router = createBrowserRouter([
         path: 'kyc/:id',
         element: <KycDetailPage />,
       },
-
       {
         path: 'courses/approvals',
         element: <CourseApprovalQueuePage />,
@@ -326,7 +325,6 @@ export const router = createBrowserRouter([
         path: 'courses/approvals/:id',
         element: <CourseApprovalDetailPage />,
       },
-
       {
         path: 'refunds',
         element: <AdminRefundQueue />,
