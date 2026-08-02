@@ -60,6 +60,7 @@ export const CheckoutReturnPage = () => {
   }, [orderId, searchParams]);
 
   const firstCourseId = order?.items[0]?.courseId;
+  const isTopUp = order?.type === 'WALLET_TOPUP';
 
   return (
     <div className="max-w-xl mx-auto px-4 py-16 text-center">
@@ -76,25 +77,40 @@ export const CheckoutReturnPage = () => {
       {state === 'paid' && (
         <>
           <StatusIcon variant="success" />
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-6">Thanh toán thành công!</h1>
+          <h1 className="text-2xl font-extrabold text-slate-900 mt-6">
+            {isTopUp ? 'Nạp ví thành công!' : 'Thanh toán thành công!'}
+          </h1>
           <p className="text-sm text-slate-500 mt-2">
-            Thanh toán thành công. Sản phẩm đã được mở. Chúc bạn học tốt!
+            {isTopUp
+              ? 'Nạp ví thành công. Số dư của bạn đã được cập nhật.'
+              : 'Thanh toán thành công. Sản phẩm đã được mở. Chúc bạn học tốt!'}
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            {firstCourseId && (
+            {isTopUp ? (
               <button
-                onClick={() => navigate(ROUTES.STUDENT.COURSE_LEARN(firstCourseId))}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/30"
+                onClick={() => navigate(ROUTES.STUDENT.WALLET)}
+                className="bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg"
               >
-                Vào học ngay
+                Về ví của tôi
               </button>
+            ) : (
+              <>
+                {firstCourseId && (
+                  <button
+                    onClick={() => navigate(ROUTES.STUDENT.COURSE_LEARN(firstCourseId))}
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/30"
+                  >
+                    Vào học ngay
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate(ROUTES.STUDENT.MY_COURSES)}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 px-6 rounded-xl"
+                >
+                  Khóa học của tôi
+                </button>
+              </>
             )}
-            <button
-              onClick={() => navigate(ROUTES.STUDENT.MY_COURSES)}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 px-6 rounded-xl"
-            >
-              Khóa học của tôi
-            </button>
           </div>
         </>
       )}

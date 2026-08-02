@@ -11,6 +11,7 @@ public record OrderResponse(
         BigDecimal totalAmount,
         String currency,
         String status,
+        String type,
         Instant createdAt,
         List<OrderItemResponse> items
 ) {

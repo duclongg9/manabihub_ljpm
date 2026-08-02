@@ -10,6 +10,7 @@ import com.manabihub.notification.service.NotificationService;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.dto.IpnAckResponse;
@@ -19,6 +20,7 @@ import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
 import com.manabihub.wallet.service.EscrowService;
+import com.manabihub.wallet.service.StudentWalletService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +52,7 @@ class PaymentServiceImplTest {
     @Mock private PaymentTransactionRepository paymentTransactionRepository;
     @Mock private EnrollmentRepository enrollmentRepository;
     @Mock private EscrowService escrowService;
+    @Mock private StudentWalletService studentWalletService;
     @Mock private NotificationService notificationService;
 
     private PaymentServiceImpl service;
@@ -62,7 +65,8 @@ class PaymentServiceImplTest {
     void setUp() {
         service = new PaymentServiceImpl(
                 paymentGateway, orderRepository, orderItemRepository, paymentTransactionRepository,
-                enrollmentRepository, escrowService, notificationService, new ObjectMapper());
+                enrollmentRepository, escrowService, studentWalletService, notificationService,
+                new ObjectMapper());
 
         AppUser user = AppUser.builder().id(UUID.randomUUID()).email("student@test.dev").build();
         StudentProfile student = StudentProfile.builder().id(UUID.randomUUID()).user(user).build();
@@ -170,6 +174,35 @@ class PaymentServiceImplTest {
         verify(enrollmentRepository, never()).save(any());
         verify(escrowService, never()).holdForOrder(any());
         verify(notificationService, never()).createNotification(any(), any(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void handleIpn_walletTopUp_creditsStudentWalletNotEnrollment() {
+        Order topUp = Order.builder()
+                .id(UUID.randomUUID())
+                .orderCode("OD1")
+                .totalAmount(new BigDecimal("100.00"))
+                .currency("VND")
+                .status(OrderStatus.PENDING)
+                .student(order.getStudent())
+                .type(OrderType.WALLET_TOPUP)
+                .build();
+        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(topUp));
+        when(paymentTransactionRepository.findByOrder_IdOrderByCreatedAtDesc(topUp.getId()))
+                .thenReturn(List.of(PaymentTransaction.builder().order(topUp).status(PaymentStatus.PENDING).build()));
+
+        IpnAckResponse ack = service.handleIpn(params);
+
+        assertEquals("00", ack.rspCode());
+        assertEquals(OrderStatus.PAID, topUp.getStatus());
+        verify(studentWalletService).creditBalance(
+                eq(topUp.getStudent().getId()), eq(new BigDecimal("100.00")),
+                eq("WALLET_TOPUP"), eq(topUp.getId()), anyString());
+        // A top-up must never create enrollment or escrow.
+        verify(enrollmentRepository, never()).save(any());
+        verify(escrowService, never()).holdForOrder(any());
+        verify(notificationService).createNotification(any(), eq("student@test.dev"), anyString(), anyString(), anyString());
     }
 
     @Test

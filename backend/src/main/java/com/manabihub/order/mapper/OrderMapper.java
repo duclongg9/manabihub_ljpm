@@ -23,6 +23,7 @@ public class OrderMapper {
                 order.getTotalAmount(),
                 order.getCurrency(),
                 order.getStatus().name(),
+                order.getType().name(),
                 order.getCreatedAt(),
                 itemResponses);
     }

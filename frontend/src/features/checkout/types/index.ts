@@ -21,6 +21,7 @@ export interface OrderResponse {
   totalAmount: number;
   currency: string;
   status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+  type?: 'COURSE' | 'WALLET_TOPUP';
   createdAt: string;
   items: OrderItemResponse[];
 }

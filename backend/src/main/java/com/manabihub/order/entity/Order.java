@@ -2,6 +2,7 @@ package com.manabihub.order.entity;
 
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.enums.OrderType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -62,6 +63,12 @@ public class Order {
     @Column(name = "order_status", nullable = false, length = 30)
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
+
+    /** Whether this order is a course purchase (UC-08) or a wallet top-up (MHB-37). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type", nullable = false, length = 20)
+    @Builder.Default
+    private OrderType type = OrderType.COURSE;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

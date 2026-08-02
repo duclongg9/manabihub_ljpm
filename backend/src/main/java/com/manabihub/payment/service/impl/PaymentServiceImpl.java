@@ -11,6 +11,7 @@ import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.dto.IpnAckResponse;
@@ -21,6 +22,7 @@ import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
 import com.manabihub.payment.service.PaymentService;
 import com.manabihub.wallet.service.EscrowService;
+import com.manabihub.wallet.service.StudentWalletService;
 import com.manabihub.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +47,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final EscrowService escrowService;
+    private final StudentWalletService studentWalletService;
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
@@ -112,13 +115,30 @@ public class PaymentServiceImpl implements PaymentService {
         order.setStatus(OrderStatus.PAID);
         orderRepository.save(order);
 
-        createEnrollments(order);
-        escrowService.holdForOrder(order);
-        notifyStudent(order);
-
-        log.info("[{}] Confirmed payment for order {} — enrollment + escrow created",
-                MessageCodes.MSG_PAY_002, order.getOrderCode());
+        // Fulfilment depends on what the order is for (no longer hardcoded to course purchase).
+        if (order.getType() == OrderType.WALLET_TOPUP) {
+            fulfillWalletTopUp(order);
+            log.info("[{}] Confirmed wallet top-up for order {} — balance credited",
+                    MessageCodes.MSG_PAY_002, order.getOrderCode());
+        } else {
+            createEnrollments(order);
+            escrowService.holdForOrder(order);
+            notifyStudent(order);
+            log.info("[{}] Confirmed payment for order {} — enrollment + escrow created",
+                    MessageCodes.MSG_PAY_002, order.getOrderCode());
+        }
         return IpnAckResponse.of("00", "Confirm Success");
+    }
+
+    private void fulfillWalletTopUp(Order order) {
+        StudentProfile student = order.getStudent();
+        studentWalletService.creditBalance(
+                student.getId(),
+                order.getTotalAmount(),
+                "WALLET_TOPUP",
+                order.getId(),
+                "Nạp ví qua đơn " + order.getOrderCode());
+        notifyTopUp(order);
     }
 
     private PaymentTransaction latestOrNewTransaction(Order order) {
@@ -162,5 +182,18 @@ public class PaymentServiceImpl implements PaymentService {
                 "Đơn hàng " + order.getOrderCode()
                         + " đã được thanh toán thành công. Bạn có thể bắt đầu học ngay bây giờ.",
                 NOTIFICATION_TYPE);
+    }
+
+    private void notifyTopUp(Order order) {
+        StudentProfile student = order.getStudent();
+        AppUser user = student.getUser();
+        notificationService.createNotification(
+                user.getId(),
+                user.getEmail(),
+                "Nạp ví thành công",
+                "Đơn nạp ví " + order.getOrderCode() + " ("
+                        + order.getTotalAmount().toPlainString() + "đ) đã được xử lý thành công. "
+                        + "Số dư ví của bạn đã được cập nhật.",
+                "WALLET_TOPUP_SUCCESS");
     }
 }
