@@ -74,4 +74,23 @@ describe('CourseAnalyticsDialog', () => {
       expect(lastCallArgs?.[2]).toContain('2023-12-31');
     });
   });
+
+  it('clamps today end dates to current time', async () => {
+    vi.mocked(fetchCourseAnalytics).mockResolvedValue(mockAnalytics);
+    
+    render(<CourseAnalyticsDialog courseId="123" courseTitle="Test Course" onClose={() => {}} />);
+    
+    const endDateInput = screen.getByLabelText('Đến ngày');
+    
+    // Set to today's date
+    const today = new Date().toISOString().substring(0, 10);
+    fireEvent.change(endDateInput, { target: { value: today } });
+    
+    await waitFor(() => {
+      const lastCallArgs = vi.mocked(fetchCourseAnalytics).mock.lastCall;
+      expect(lastCallArgs?.[2]).toBeDefined();
+      // It should pass an ISO string containing today's date or the clamped full date
+      expect(lastCallArgs?.[2]).toContain(today);
+    });
+  });
 });

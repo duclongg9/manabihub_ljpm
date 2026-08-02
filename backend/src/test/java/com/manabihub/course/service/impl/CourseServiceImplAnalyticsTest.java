@@ -176,4 +176,14 @@ class CourseServiceImplAnalyticsTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> courseService.getCourseAnalytics(course.getId(), startDate, endDate));
         assertEquals("Date range cannot exceed 366 days", exception.getMessage());
     }
+
+    @Test
+    void getCourseAnalytics_ShouldThrowWhenUserDoesNotOwnCourse() {
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(teacherProfile));
+        when(courseRepository.findByIdAndTeacher_Id(course.getId(), teacherProfile.getId())).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> courseService.getCourseAnalytics(course.getId(), null, null));
+        assertEquals("Course not found", exception.getMessage());
+    }
 }

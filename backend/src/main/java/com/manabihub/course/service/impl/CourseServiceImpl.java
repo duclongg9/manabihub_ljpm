@@ -201,8 +201,7 @@ public class CourseServiceImpl implements CourseService {
             throw new BusinessException(MessageCodes.VALIDATION_FAILED, "End date cannot be in the future", HttpStatus.BAD_REQUEST);
         }
 
-        long daysBetween = ChronoUnit.DAYS.between(effectiveStartDate, effectiveEndDate);
-        if (daysBetween > 366) {
+        if (effectiveStartDate.plus(366, ChronoUnit.DAYS).isBefore(effectiveEndDate)) {
             throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Date range cannot exceed 366 days", HttpStatus.BAD_REQUEST);
         }
 
