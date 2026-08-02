@@ -9,8 +9,10 @@ public record OrderResponse(
         UUID id,
         String orderCode,
         BigDecimal totalAmount,
+        BigDecimal walletAmount,
         String currency,
         String status,
+        String type,
         Instant createdAt,
         List<OrderItemResponse> items
 ) {

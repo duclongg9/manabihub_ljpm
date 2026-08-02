@@ -2,6 +2,7 @@ package com.manabihub.payment.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
@@ -11,19 +12,24 @@ import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.dto.IpnAckResponse;
 import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.enums.PaymentStatus;
+import com.manabihub.payment.event.PaymentNotificationEvent;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
 import com.manabihub.payment.service.PaymentService;
+import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.service.EscrowService;
-import com.manabihub.notification.service.NotificationService;
+import com.manabihub.wallet.service.StudentWalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +37,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +53,8 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final EscrowService escrowService;
-    private final NotificationService notificationService;
+    private final StudentWalletService studentWalletService;
+    private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -55,7 +63,7 @@ public class PaymentServiceImpl implements PaymentService {
         paymentTransactionRepository.save(PaymentTransaction.builder()
                 .order(order)
                 .provider(paymentGateway.getProvider())
-                .amount(order.getTotalAmount())
+                .amount(order.getGatewayAmount())
                 .status(PaymentStatus.PENDING)
                 .build());
 
@@ -79,7 +87,7 @@ public class PaymentServiceImpl implements PaymentService {
             return IpnAckResponse.of("01", "Order not Found");
         }
 
-        long expectedMinor = order.getTotalAmount().multiply(MINOR_UNIT_FACTOR).longValue();
+        long expectedMinor = order.getGatewayAmount().multiply(MINOR_UNIT_FACTOR).longValue();
         if (result.amount() != expectedMinor) {
             log.warn("[{}] Payment IPN amount mismatch for order {}: expected {}, got {}",
                     MessageCodes.MSG_PAY_004, order.getOrderCode(), expectedMinor, result.amount());
@@ -116,13 +124,113 @@ public class PaymentServiceImpl implements PaymentService {
         order.setStatus(OrderStatus.PAID);
         orderRepository.save(order);
 
+        // Fulfilment depends on what the order is for (no longer hardcoded to course purchase).
+        if (order.getType() == OrderType.WALLET_TOPUP) {
+            fulfillWalletTopUp(order);
+            log.info("[{}] Confirmed wallet top-up for order {} — balance credited",
+                    MessageCodes.MSG_PAY_002, order.getOrderCode());
+        } else {
+            // Combined payment: also deduct the wallet portion now that the gateway part succeeded.
+            if (order.getWalletAmount() != null && order.getWalletAmount().signum() > 0) {
+                studentWalletService.debitBalance(
+                        order.getStudent().getId(),
+                        order.getWalletAmount(),
+                        "ORDER",
+                        order.getId(),
+                        "Phần thanh toán từ ví cho đơn " + order.getOrderCode());
+            }
+            fulfillCourseOrder(order);
+            log.info("[{}] Confirmed payment for order {} — enrollment + escrow created",
+                    MessageCodes.MSG_PAY_002, order.getOrderCode());
+        }
+        return IpnAckResponse.of("00", "Confirm Success");
+    }
+
+    @Override
+    @Transactional
+    public Order payWithWallet(UUID orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.ORDER_NOT_FOUND,
+                        "Order was not found",
+                        HttpStatus.NOT_FOUND));
+
+        if (order.getStatus() == OrderStatus.PAID) {
+            log.info("[{}] Ignored duplicate wallet payment for already-paid order {}",
+                    MessageCodes.MSG_PAY_005, order.getOrderCode());
+            return order;
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "Only a pending order can be paid with wallet",
+                    HttpStatus.CONFLICT);
+        }
+
+        WalletTransaction debit = studentWalletService.debitBalance(
+                order.getStudent().getId(),
+                order.getTotalAmount(),
+                "ORDER",
+                order.getId(),
+                "Thanh toán khoá học đơn " + order.getOrderCode());
+
+        PaymentTransaction transaction = PaymentTransaction.builder()
+                .order(order)
+                .provider("WALLET")
+                .providerTransactionId(debit.getId().toString())
+                .amount(order.getTotalAmount())
+                .status(PaymentStatus.SUCCESS)
+                .build();
+        paymentTransactionRepository.save(transaction);
+
+        order.setStatus(OrderStatus.PAID);
+        orderRepository.save(order);
+
+        fulfillCourseOrder(order);
+
+        log.info("[{}] Paid order {} with wallet — enrollment + escrow created",
+                MessageCodes.MSG_PAY_002, order.getOrderCode());
+        return order;
+    }
+
+    @Override
+    @Transactional
+    public String initiateCombinedPayment(Order order, String clientIp) {
+        BigDecimal balance = studentWalletService
+                .getOrCreateStudentWallet(order.getStudent().getId())
+                .getBalance();
+        BigDecimal total = order.getTotalAmount();
+
+        if (balance.compareTo(total) >= 0) {
+            // Wallet fully covers the order — pay entirely from wallet, no gateway.
+            Order paidOrder = payWithWallet(order.getId());
+            order.setStatus(paidOrder.getStatus());
+            return null;
+        }
+        if (balance.signum() > 0) {
+            // Use all available wallet balance; charge the remainder via VNPay.
+            order.setWalletAmount(balance);
+            orderRepository.save(order);
+        }
+        return initiatePayment(order, clientIp);
+    }
+
+    /** Fulfils a paid COURSE order: enrollment(s) + teacher escrow hold + student notification. */
+    private void fulfillCourseOrder(Order order) {
         createEnrollments(order);
         escrowService.holdForOrder(order);
         notifyStudent(order);
+    }
 
-        log.info("[{}] Confirmed payment for order {} — enrollment + escrow created",
-                MessageCodes.MSG_PAY_002, order.getOrderCode());
-        return IpnAckResponse.of("00", "Confirm Success");
+    private void fulfillWalletTopUp(Order order) {
+        StudentProfile student = order.getStudent();
+        studentWalletService.creditBalance(
+                student.getId(),
+                order.getTotalAmount(),
+                "WALLET_TOPUP",
+                order.getId(),
+                "Nạp ví qua đơn " + order.getOrderCode());
+        notifyTopUp(order);
     }
 
     private PaymentTransaction latestOrNewTransaction(Order order) {
@@ -134,7 +242,7 @@ public class PaymentServiceImpl implements PaymentService {
         return PaymentTransaction.builder()
                 .order(order)
                 .provider(paymentGateway.getProvider())
-                .amount(order.getTotalAmount())
+                .amount(order.getGatewayAmount())
                 .status(PaymentStatus.PENDING)
                 .build();
     }
@@ -159,12 +267,27 @@ public class PaymentServiceImpl implements PaymentService {
     private void notifyStudent(Order order) {
         StudentProfile student = order.getStudent();
         AppUser user = student.getUser();
-        notificationService.createNotification(
+        eventPublisher.publishEvent(new PaymentNotificationEvent(
+                order.getId(),
                 user.getId(),
                 user.getEmail(),
                 "Mua khoá học thành công",
                 "Đơn hàng " + order.getOrderCode()
                         + " đã được thanh toán thành công. Bạn có thể bắt đầu học ngay bây giờ.",
-                NOTIFICATION_TYPE);
+                NOTIFICATION_TYPE));
+    }
+
+    private void notifyTopUp(Order order) {
+        StudentProfile student = order.getStudent();
+        AppUser user = student.getUser();
+        eventPublisher.publishEvent(new PaymentNotificationEvent(
+                order.getId(),
+                user.getId(),
+                user.getEmail(),
+                "Nạp ví thành công",
+                "Đơn nạp ví " + order.getOrderCode() + " ("
+                        + order.getTotalAmount().toPlainString() + "đ) đã được xử lý thành công. "
+                        + "Số dư ví của bạn đã được cập nhật.",
+                "WALLET_TOPUP_SUCCESS"));
     }
 }

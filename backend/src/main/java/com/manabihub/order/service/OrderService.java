@@ -20,6 +20,15 @@ public interface OrderService {
     Order createOrder(UUID courseId);
 
     /**
+     * Creates a PENDING wallet top-up order (type {@code WALLET_TOPUP}, no course items) for
+     * the given amount, on behalf of the current student (MHB-37).
+     *
+     * @throws com.manabihub.common.exception.BusinessException if the amount is below the
+     *         minimum or not a whole number
+     */
+    Order createTopUpOrder(java.math.BigDecimal amount);
+
+    /**
      * Completes a free (zero-amount) order by enrolling the student immediately and marking
      * the order paid — no payment provider or escrow is involved. Idempotent on enrollment.
      */
