@@ -9,7 +9,6 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
@@ -210,7 +209,7 @@ export function StudentPaymentsPage() {
                   }}
                 >
                   <Typography sx={headerCellSx}>Mã đơn hàng</Typography>
-                  <Typography sx={headerCellSx}>Khóa học</Typography>
+                  <Typography sx={headerCellSx}>Nội dung</Typography>
                   <Typography sx={headerCellSx}>Ngày tạo</Typography>
                   <Typography sx={{ ...headerCellSx, textAlign: 'right' }}>Số tiền</Typography>
                   <Typography sx={{ ...headerCellSx, textAlign: 'right' }}>Trạng thái</Typography>
@@ -297,10 +296,13 @@ function OrderHistoryRow({
   order: OrderResponse;
   showDivider: boolean;
 }) {
-  const navigate = useNavigate();
   const status = STATUS_PRESENTATION[order.status];
   const course = order.items[0];
+  const isWalletTopUp = order.type === 'WALLET_TOPUP';
   const additionalCourses = Math.max(0, order.items.length - 1);
+  const orderDescription = isWalletTopUp
+    ? `Nạp ${formatMoney(order.totalAmount, order.currency)} vào ví`
+    : course?.courseTitle ?? 'Đơn hàng chưa có thông tin khóa học';
 
   return (
     <Box
@@ -333,10 +335,10 @@ function OrderHistoryRow({
         }}
       >
         <Typography variant="caption" sx={{ display: { md: 'none' }, color: '#7A8391' }}>
-          Khóa học
+          Nội dung
         </Typography>
         <Typography variant="body2" sx={{ color: '#172033', fontWeight: 800 }} noWrap>
-          {course?.courseTitle ?? 'Đơn hàng chưa có thông tin khóa học'}
+          {orderDescription}
         </Typography>
         {additionalCourses > 0 && (
           <Typography variant="caption" sx={{ color: '#7A8391' }}>
@@ -382,16 +384,6 @@ function OrderHistoryRow({
             fontWeight: 800,
           }}
         />
-        {course && order.status === 'PAID' && (
-          <Button
-            size="small"
-            endIcon={<ArrowForwardIcon />}
-            onClick={() => navigate(ROUTES.STUDENT.COURSE_LEARN(course.courseId))}
-            sx={{ color: 'common.white', fontWeight: 800 }}
-          >
-            Vào học
-          </Button>
-        )}
       </Stack>
     </Box>
   );

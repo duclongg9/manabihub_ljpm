@@ -83,7 +83,7 @@ export const CheckoutReturnPage = () => {
           <p className="text-sm text-slate-500 mt-2">
             {isTopUp
               ? 'Nạp ví thành công. Số dư của bạn đã được cập nhật.'
-              : 'Thanh toán thành công. Sản phẩm đã được mở. Chúc bạn học tốt!'}
+              : 'Bạn đã sở hữu khóa học này. Bạn có muốn bắt đầu học ngay không?'}
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             {isTopUp ? (
@@ -100,14 +100,14 @@ export const CheckoutReturnPage = () => {
                     onClick={() => navigate(ROUTES.STUDENT.COURSE_LEARN(firstCourseId))}
                     className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/30"
                   >
-                    Vào học ngay
+                    Học ngay
                   </button>
                 )}
                 <button
                   onClick={() => navigate(ROUTES.STUDENT.MY_COURSES)}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 px-6 rounded-xl"
                 >
-                  Khóa học của tôi
+                  Để sau
                 </button>
               </>
             )}

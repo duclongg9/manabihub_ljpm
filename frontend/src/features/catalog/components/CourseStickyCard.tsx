@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
-import { PlayCircle, Target, BookOpen, Infinity as InfinityIcon } from 'lucide-react';
+import { CheckCircle2, PlayCircle, Target, BookOpen, Infinity as InfinityIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 import { createCheckout } from '../../checkout/services/checkoutService';
@@ -12,10 +12,14 @@ interface CourseStickyCardProps {
   course: PublicCourseDetail;
 }
 
+type EnrollmentSuccess = 'FREE' | 'PAID';
+
 export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
   const [buying, setBuying] = useState(false);
   const [buyError, setBuyError] = useState<string | null>(null);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  const [enrollmentSuccess, setEnrollmentSuccess] = useState<EnrollmentSuccess | null>(null);
+  const [locallyEnrolled, setLocallyEnrolled] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const navigate = useNavigate();
   const thumbnailUrl = resolvePublicAssetUrl(course.thumbnailUrl);
@@ -32,8 +36,11 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
     try {
       const checkout = await createCheckout(course.id, paymentMethod);
       if (!checkout.paymentUrl) {
-        // Free course OR paid instantly from wallet — student is enrolled, go straight to learning.
-        navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
+        // Free course OR paid instantly from wallet — enrollment is complete, let the student choose when to learn.
+        setLocallyEnrolled(true);
+        setEnrollmentSuccess(course.price === 0 ? 'FREE' : 'PAID');
+        setShowPaymentOptions(false);
+        setBuying(false);
         return;
       }
       navigate(`/checkout/${checkout.orderId}`, { state: { paymentUrl: checkout.paymentUrl } });
@@ -110,7 +117,7 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
           </span>
         </div>
 
-        {course.isEnrolled ? (
+        {course.isEnrolled || locallyEnrolled ? (
           <button
             onClick={handleContinueLearning}
             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md hover:shadow-xl hover:-translate-y-0.5 mb-4"
@@ -189,6 +196,46 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
         </div>
       </div>
       </div>
+
+      {enrollmentSuccess && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="course-access-success-title"
+          aria-describedby="course-access-success-description"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white p-7 text-center shadow-2xl">
+            <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-500" aria-hidden="true" />
+            <h2 id="course-access-success-title" className="mt-5 text-2xl font-extrabold text-slate-900">
+              {enrollmentSuccess === 'FREE'
+                ? 'Đăng ký khóa học thành công'
+                : 'Thanh toán thành công'}
+            </h2>
+            <p id="course-access-success-description" className="mt-3 text-sm leading-6 text-slate-600">
+              {enrollmentSuccess === 'FREE'
+                ? 'Bạn đã tham gia khóa học này. Bạn có muốn bắt đầu học ngay không?'
+                : 'Bạn đã sở hữu khóa học này. Bạn có muốn bắt đầu học ngay không?'}
+            </p>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleContinueLearning}
+                className="flex-1 rounded-xl bg-slate-900 px-5 py-3 font-bold text-white transition-colors hover:bg-slate-800"
+              >
+                Học ngay
+              </button>
+              <button
+                type="button"
+                onClick={() => setEnrollmentSuccess(null)}
+                className="flex-1 rounded-xl bg-slate-100 px-5 py-3 font-bold text-slate-700 transition-colors hover:bg-slate-200"
+              >
+                Để sau
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </>
   );
