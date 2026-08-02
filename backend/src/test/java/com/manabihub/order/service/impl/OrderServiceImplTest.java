@@ -168,6 +168,7 @@ class OrderServiceImplTest {
                 orderId,
                 order.getOrderCode(),
                 order.getTotalAmount(),
+                order.getWalletAmount(),
                 order.getCurrency(),
                 order.getStatus().name(),
                 order.getType().name(),

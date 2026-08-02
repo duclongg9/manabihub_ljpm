@@ -19,6 +19,7 @@ export interface OrderResponse {
   id: string;
   orderCode: string;
   totalAmount: number;
+  walletAmount?: number;
   currency: string;
   status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
   type?: 'COURSE' | 'WALLET_TOPUP';

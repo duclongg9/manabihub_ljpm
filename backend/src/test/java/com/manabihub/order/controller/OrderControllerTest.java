@@ -55,6 +55,7 @@ class OrderControllerTest {
                 UUID.randomUUID(),
                 "OD202607270001",
                 new BigDecimal("150000.00"),
+                BigDecimal.ZERO,
                 "VND",
                 "PAID",
                 "COURSE",
