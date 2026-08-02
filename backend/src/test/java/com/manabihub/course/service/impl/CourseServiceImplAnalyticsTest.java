@@ -79,6 +79,8 @@ class CourseServiceImplAnalyticsTest {
         when(enrollmentRepository.countByCourseIdAndDateRange(course.getId(), startDate, endDate)).thenReturn(200L);
         when(enrollmentRepository.countByCourseIdAndStatusAndDateRange(course.getId(), EnrollmentStatus.COMPLETED, startDate, endDate)).thenReturn(150L);
         when(enrollmentRepository.countByCourseIdAndStatusAndDateRange(course.getId(), EnrollmentStatus.REFUNDED, startDate, endDate)).thenReturn(10L);
+        when(enrollmentRepository.countByCourseIdAndStatusAndDateRange(course.getId(), EnrollmentStatus.REVOKED, startDate, endDate)).thenReturn(5L);
+        when(enrollmentRepository.countByCourseIdAndStatusAndDateRange(course.getId(), EnrollmentStatus.ACTIVE, startDate, endDate)).thenReturn(35L);
 
         when(escrowLedgerRepository.sumGrossRevenueByCourseIdAndDateRange(course.getId(), startDate, endDate)).thenReturn(BigDecimal.valueOf(2000000));
         when(escrowLedgerRepository.sumNetRevenueByCourseIdAndDateRange(course.getId(), startDate, endDate)).thenReturn(BigDecimal.valueOf(1600000));
@@ -88,7 +90,12 @@ class CourseServiceImplAnalyticsTest {
         TeacherCourseAnalyticsResponse response = courseService.getCourseAnalytics(course.getId(), startDate, endDate);
 
         assertEquals(200L, response.getTotalEnrollment());
-        assertEquals(75.0, response.getCompletionRate());
+        assertEquals(35L, response.getActiveLearners());
+        assertEquals(150L, response.getCompletedLearners());
+
+        // 200 - 10 (refunded) - 5 (revoked) = 185 valid enrollments
+        // 150 / 185 * 100 = 81.081081...
+        assertEquals(81.08108108108108, response.getCompletionRate());
         assertEquals(5.0, response.getRefundRate());
         assertEquals(BigDecimal.valueOf(2000000), response.getGrossRevenue());
         assertEquals(BigDecimal.valueOf(1600000), response.getNetRevenue());
@@ -97,5 +104,76 @@ class CourseServiceImplAnalyticsTest {
 
         verify(enrollmentRepository).countByCourseIdAndDateRange(course.getId(), startDate, endDate);
         verify(escrowLedgerRepository).sumGrossRevenueByCourseIdAndDateRange(course.getId(), startDate, endDate);
+    }
+
+    @Test
+    void getCourseAnalytics_ShouldReturnZeroWhenNoData() {
+        Instant startDate = Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant endDate = Instant.now();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(teacherProfile));
+        when(courseRepository.findByIdAndTeacher_Id(course.getId(), teacherProfile.getId())).thenReturn(Optional.of(course));
+
+        when(enrollmentRepository.countByCourseIdAndDateRange(course.getId(), startDate, endDate)).thenReturn(0L);
+        when(enrollmentRepository.countByCourseIdAndStatusAndDateRange(course.getId(), EnrollmentStatus.COMPLETED, startDate, endDate)).thenReturn(0L);
+        when(enrollmentRepository.countByCourseIdAndStatusAndDateRange(course.getId(), EnrollmentStatus.REFUNDED, startDate, endDate)).thenReturn(0L);
+        when(enrollmentRepository.countByCourseIdAndStatusAndDateRange(course.getId(), EnrollmentStatus.REVOKED, startDate, endDate)).thenReturn(0L);
+        when(enrollmentRepository.countByCourseIdAndStatusAndDateRange(course.getId(), EnrollmentStatus.ACTIVE, startDate, endDate)).thenReturn(0L);
+
+        when(escrowLedgerRepository.sumGrossRevenueByCourseIdAndDateRange(course.getId(), startDate, endDate)).thenReturn(null);
+        when(escrowLedgerRepository.sumNetRevenueByCourseIdAndDateRange(course.getId(), startDate, endDate)).thenReturn(null);
+        when(courseReviewService.getAggregate(course.getId())).thenReturn(new CourseReviewAggregateResponse(BigDecimal.valueOf(0), 0));
+
+        TeacherCourseAnalyticsResponse response = courseService.getCourseAnalytics(course.getId(), startDate, endDate);
+
+        assertEquals(0L, response.getTotalEnrollment());
+        assertEquals(0L, response.getActiveLearners());
+        assertEquals(0L, response.getCompletedLearners());
+        assertEquals(0.0, response.getCompletionRate());
+        assertEquals(0.0, response.getRefundRate());
+        assertEquals(BigDecimal.ZERO, response.getGrossRevenue());
+        assertEquals(BigDecimal.ZERO, response.getNetRevenue());
+        assertEquals(BigDecimal.ZERO, response.getAverageRating());
+        assertEquals(0L, response.getTotalReviews());
+    }
+
+    @Test
+    void getCourseAnalytics_ShouldThrowWhenStartDateAfterEndDate() {
+        Instant startDate = Instant.now();
+        Instant endDate = Instant.now().minus(1, ChronoUnit.DAYS);
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(teacherProfile));
+        when(courseRepository.findByIdAndTeacher_Id(course.getId(), teacherProfile.getId())).thenReturn(Optional.of(course));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> courseService.getCourseAnalytics(course.getId(), startDate, endDate));
+        assertEquals("Start date must be before or equal to end date", exception.getMessage());
+    }
+
+    @Test
+    void getCourseAnalytics_ShouldThrowWhenEndDateInFuture() {
+        Instant startDate = Instant.now();
+        Instant endDate = Instant.now().plus(2, ChronoUnit.HOURS); // More than 1 hour buffer
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(teacherProfile));
+        when(courseRepository.findByIdAndTeacher_Id(course.getId(), teacherProfile.getId())).thenReturn(Optional.of(course));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> courseService.getCourseAnalytics(course.getId(), startDate, endDate));
+        assertEquals("End date cannot be in the future", exception.getMessage());
+    }
+
+    @Test
+    void getCourseAnalytics_ShouldThrowWhenRangeExceeds366Days() {
+        Instant endDate = Instant.now();
+        Instant startDate = endDate.minus(367, ChronoUnit.DAYS);
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(teacherProfile));
+        when(courseRepository.findByIdAndTeacher_Id(course.getId(), teacherProfile.getId())).thenReturn(Optional.of(course));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> courseService.getCourseAnalytics(course.getId(), startDate, endDate));
+        assertEquals("Date range cannot exceed 366 days", exception.getMessage());
     }
 }

@@ -2,6 +2,8 @@ import { axiosClient } from '../../../shared/api/axiosClient';
 
 export interface TeacherCourseAnalyticsResponse {
   totalEnrollment: number;
+  activeLearners: number;
+  completedLearners: number;
   completionRate: number;
   grossRevenue: number;
   netRevenue: number;

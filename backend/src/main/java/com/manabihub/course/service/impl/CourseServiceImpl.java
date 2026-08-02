@@ -45,6 +45,7 @@ import com.manabihub.systemconfig.service.SystemSettingValueService;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.text.Normalizer;
@@ -174,13 +175,13 @@ public class CourseServiceImpl implements CourseService {
                 .recentCourses(recentCourses)
                 .build();
     }
-    
+
     @Override
     @Transactional(readOnly = true)
     public TeacherCourseAnalyticsResponse getCourseAnalytics(UUID courseId, Instant startDate, Instant endDate) {
         UUID currentUserId = currentUserService.getCurrentUserId();
         TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
-        
+
         Course course = courseRepository.findByIdAndTeacher_Id(courseId, teacherProfile.getId())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COURSE_NOT_FOUND,
@@ -188,23 +189,42 @@ public class CourseServiceImpl implements CourseService {
                         HttpStatus.NOT_FOUND
                 ));
 
-        Instant effectiveStartDate = startDate != null ? startDate : Instant.EPOCH;
         Instant effectiveEndDate = endDate != null ? endDate : Instant.now();
+        Instant effectiveStartDate = startDate != null ? startDate : effectiveEndDate.minus(30, ChronoUnit.DAYS);
+
+        if (effectiveStartDate.isAfter(effectiveEndDate)) {
+            throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Start date must be before or equal to end date", HttpStatus.BAD_REQUEST);
+        }
+
+        Instant maxAllowedEnd = Instant.now().plus(1, ChronoUnit.HOURS); // Buffer for timezone/clock sync
+        if (effectiveEndDate.isAfter(maxAllowedEnd)) {
+            throw new BusinessException(MessageCodes.VALIDATION_FAILED, "End date cannot be in the future", HttpStatus.BAD_REQUEST);
+        }
+
+        long daysBetween = ChronoUnit.DAYS.between(effectiveStartDate, effectiveEndDate);
+        if (daysBetween > 366) {
+            throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Date range cannot exceed 366 days", HttpStatus.BAD_REQUEST);
+        }
 
         long totalEnrollment = enrollmentRepository.countByCourseIdAndDateRange(courseId, effectiveStartDate, effectiveEndDate);
         long completedStudents = enrollmentRepository.countByCourseIdAndStatusAndDateRange(courseId, EnrollmentStatus.COMPLETED, effectiveStartDate, effectiveEndDate);
         long refundedStudents = enrollmentRepository.countByCourseIdAndStatusAndDateRange(courseId, EnrollmentStatus.REFUNDED, effectiveStartDate, effectiveEndDate);
-        
-        double completionRate = totalEnrollment > 0 ? (double) completedStudents / totalEnrollment * 100 : 0.0;
+        long revokedStudents = enrollmentRepository.countByCourseIdAndStatusAndDateRange(courseId, EnrollmentStatus.REVOKED, effectiveStartDate, effectiveEndDate);
+        long activeLearners = enrollmentRepository.countByCourseIdAndStatusAndDateRange(courseId, EnrollmentStatus.ACTIVE, effectiveStartDate, effectiveEndDate);
+
+        long validEnrollmentForCompletion = totalEnrollment - refundedStudents - revokedStudents;
+        double completionRate = validEnrollmentForCompletion > 0 ? (double) completedStudents / validEnrollmentForCompletion * 100 : 0.0;
         double refundRate = totalEnrollment > 0 ? (double) refundedStudents / totalEnrollment * 100 : 0.0;
-        
+
         BigDecimal grossRevenue = escrowLedgerRepository.sumGrossRevenueByCourseIdAndDateRange(courseId, effectiveStartDate, effectiveEndDate);
         BigDecimal netRevenue = escrowLedgerRepository.sumNetRevenueByCourseIdAndDateRange(courseId, effectiveStartDate, effectiveEndDate);
-        
+
         CourseReviewAggregateResponse reviewAggregate = courseReviewService.getAggregate(courseId);
 
         return TeacherCourseAnalyticsResponse.builder()
                 .totalEnrollment(totalEnrollment)
+                .activeLearners(activeLearners)
+                .completedLearners(completedStudents)
                 .completionRate(completionRate)
                 .grossRevenue(grossRevenue != null ? grossRevenue : BigDecimal.ZERO)
                 .netRevenue(netRevenue != null ? netRevenue : BigDecimal.ZERO)

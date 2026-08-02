@@ -9,6 +9,8 @@ vi.mock('../services/courseAnalyticsService', () => ({
 
 const mockAnalytics = {
   totalEnrollment: 100,
+  activeLearners: 50,
+  completedLearners: 45,
   completionRate: 75.5,
   grossRevenue: 10000000,
   netRevenue: 8000000,

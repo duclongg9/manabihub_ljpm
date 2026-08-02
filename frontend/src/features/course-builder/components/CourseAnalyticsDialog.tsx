@@ -121,7 +121,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
           <TextField
             label="Từ ngày"
             type="date"
-            InputLabelProps={{ shrink: true }}
+            slotProps={{ inputLabel: { shrink: true } }}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             size="small"
@@ -129,7 +129,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
           <TextField
             label="Đến ngày"
             type="date"
-            InputLabelProps={{ shrink: true }}
+            slotProps={{ inputLabel: { shrink: true } }}
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             size="small"
@@ -153,7 +153,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
 
         {!isLoading && !error && analytics && (
           <Grid container spacing={3}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
                   <Box
@@ -178,7 +178,57 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      bgcolor: 'info.lighter',
+                      color: 'info.main',
+                      p: 1.5,
+                      borderRadius: 2,
+                    }}
+                  >
+                    <GroupIcon />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Học viên đang học
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                      {analytics.activeLearners}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      bgcolor: 'success.lighter',
+                      color: 'success.main',
+                      p: 1.5,
+                      borderRadius: 2,
+                    }}
+                  >
+                    <EmojiEventsIcon />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Học viên hoàn thành
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                      {analytics.completedLearners}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
                   <Box
@@ -203,7 +253,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
                   <Box
@@ -228,7 +278,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
                   <Box
@@ -253,7 +303,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
               </Paper>
             </Grid>
             
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
                   <Box
@@ -278,7 +328,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
               </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
                   <Box
@@ -293,7 +343,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
                   </Box>
                   <Box>
                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      Đánh giá trung bình
+                      Đánh giá trung bình (Lifetime)
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 800 }}>
                       {analytics.averageRating ? analytics.averageRating.toFixed(1) : '—'} 
