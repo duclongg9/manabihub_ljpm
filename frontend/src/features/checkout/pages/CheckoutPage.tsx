@@ -92,11 +92,33 @@ export const CheckoutPage = () => {
           ))}
         </div>
 
-        <div className="p-6 flex items-center justify-between">
-          <span className="text-slate-600 font-medium">Tổng cộng</span>
-          <span className="text-2xl font-extrabold text-slate-900">
-            {order.totalAmount.toLocaleString('vi-VN')} {order.currency}
-          </span>
+        <div className="p-6 space-y-2">
+          <div className="flex items-center justify-between text-slate-600">
+            <span>Tổng cộng</span>
+            <span className="font-semibold">{order.totalAmount.toLocaleString('vi-VN')} {order.currency}</span>
+          </div>
+          {(order.walletAmount ?? 0) > 0 && (
+            <>
+              <div className="flex items-center justify-between text-emerald-600">
+                <span>Thanh toán từ ví</span>
+                <span className="font-semibold">− {(order.walletAmount ?? 0).toLocaleString('vi-VN')} {order.currency}</span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <span className="text-slate-800 font-medium">Còn phải trả qua VNPay</span>
+                <span className="text-2xl font-extrabold text-red-600">
+                  {(order.totalAmount - (order.walletAmount ?? 0)).toLocaleString('vi-VN')} {order.currency}
+                </span>
+              </div>
+            </>
+          )}
+          {(order.walletAmount ?? 0) === 0 && (
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <span className="text-slate-800 font-medium">Cần thanh toán</span>
+              <span className="text-2xl font-extrabold text-slate-900">
+                {order.totalAmount.toLocaleString('vi-VN')} {order.currency}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

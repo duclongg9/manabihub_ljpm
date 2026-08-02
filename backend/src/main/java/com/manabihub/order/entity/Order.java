@@ -2,6 +2,7 @@ package com.manabihub.order.entity;
 
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.enums.OrderType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -54,6 +55,11 @@ public class Order {
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
+    /** Portion of the total paid from the student's wallet (combined payment); 0 otherwise. */
+    @Builder.Default
+    @Column(name = "wallet_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal walletAmount = BigDecimal.ZERO;
+
     @Builder.Default
     @Column(nullable = false, length = 10)
     private String currency = "VND";
@@ -63,6 +69,12 @@ public class Order {
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
 
+    /** Whether this order is a course purchase (UC-08) or a wallet top-up (MHB-37). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type", nullable = false, length = 20)
+    @Builder.Default
+    private OrderType type = OrderType.COURSE;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -70,4 +82,10 @@ public class Order {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    /** Amount to charge via the payment gateway = total minus the wallet-paid portion. */
+    public BigDecimal getGatewayAmount() {
+        BigDecimal wallet = walletAmount == null ? BigDecimal.ZERO : walletAmount;
+        return totalAmount.subtract(wallet);
+    }
 }

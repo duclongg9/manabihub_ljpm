@@ -1,6 +1,6 @@
 package com.manabihub.payment.service.impl;
 
-import com.manabihub.notification.service.NotificationService;
+import com.manabihub.common.mail.EmailService;
 import com.manabihub.payment.dto.IpnAckResponse;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
@@ -72,7 +72,84 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
     private PaymentGateway paymentGateway;
 
     @MockBean
-    private NotificationService notificationService;
+    private EmailService emailService;
+
+    @Test
+    void walletPaymentCommitsDebitEnrollmentEscrowAndNotificationEvent() {
+        UUID courseId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        UUID orderItemId = UUID.randomUUID();
+        UUID walletId = UUID.randomUUID();
+        String orderCode = "WALLET-" + orderId;
+        BigDecimal gross = new BigDecimal("250000.00");
+
+        jdbcTemplate.update("""
+                INSERT INTO courses (
+                    id, teacher_id, title, slug, price, currency, status, ai_supported, published_at
+                )
+                VALUES (?, ?, 'Wallet integration course', ?, ?, 'VND', 'PUBLISHED', FALSE, NOW())
+                """, courseId, TEACHER_ID, "wallet-integration-" + courseId, gross);
+        jdbcTemplate.update("""
+                INSERT INTO wallets (
+                    id, owner_type, student_id, balance, frozen_balance, currency, frozen
+                )
+                VALUES (?, 'STUDENT', ?, 300000.00, 0, 'VND', FALSE)
+                """, walletId, STUDENT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO orders (
+                    id, student_id, order_code, total_amount, currency, order_status
+                )
+                VALUES (?, ?, ?, ?, 'VND', 'PENDING')
+                """, orderId, STUDENT_ID, orderCode, gross);
+        jdbcTemplate.update("""
+                INSERT INTO order_items (id, order_id, course_id, price)
+                VALUES (?, ?, ?, ?)
+                """, orderItemId, orderId, courseId, gross);
+
+        paymentService.payWithWallet(orderId);
+
+        assertEquals("PAID", jdbcTemplate.queryForObject(
+                "SELECT order_status FROM orders WHERE id = ?",
+                String.class,
+                orderId));
+        assertEquals(0, new BigDecimal("50000.00").compareTo(jdbcTemplate.queryForObject(
+                "SELECT balance FROM wallets WHERE id = ?",
+                BigDecimal.class,
+                walletId)));
+        assertEquals(1, count("""
+                SELECT COUNT(*)
+                FROM payment_transactions
+                WHERE order_id = ?
+                  AND provider = 'WALLET'
+                  AND status = 'SUCCESS'
+                """, orderId));
+        assertEquals(1, count(
+                "SELECT COUNT(*) FROM enrollments WHERE student_id = ? AND course_id = ?",
+                STUDENT_ID,
+                courseId));
+        assertEquals(1, count("""
+                SELECT COUNT(*)
+                FROM order_item_snapshots
+                WHERE order_item_id = ?
+                  AND commission_amount = 50000.00
+                  AND teacher_net_amount = 200000.00
+                """, orderItemId));
+        assertEquals(1, count("""
+                SELECT COUNT(*)
+                FROM escrow_ledger
+                WHERE order_item_id = ?
+                  AND amount = 200000.00
+                  AND status = 'HELD'
+                """, orderItemId));
+        assertEquals(1, count("""
+                SELECT COUNT(*)
+                FROM notifications
+                WHERE dedupe_key = ?
+                  AND recipient_user_id = 'd0000000-0000-0000-0000-000000000001'
+                  AND notification_type = 'PURCHASE_SUCCESS'
+                  AND title = 'Mua khoá học thành công'
+                """, "payment:" + orderId + ":PURCHASE_SUCCESS"));
+    }
 
     @Test
     void concurrentSuccessfulCallbacksCreateOneImmutableAllocationSet() throws Exception {
@@ -189,8 +266,8 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
                 """, orderItemId));
     }
 
-    private int count(String sql, UUID id) {
-        return jdbcTemplate.queryForObject(sql, Integer.class, id);
+    private int count(String sql, Object... arguments) {
+        return jdbcTemplate.queryForObject(sql, Integer.class, arguments);
     }
 
     private BigDecimal teacherFrozenBalance() {

@@ -10,7 +10,6 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
@@ -102,7 +101,7 @@ export function StudentPaymentsPage() {
             <Box>
               <Typography sx={{ fontWeight: 900 }}>Đơn hàng của bạn</Typography>
               <Typography variant="body2" color="text.secondary">
-                Theo dõi từng khóa học đã mua và gửi yêu cầu hoàn tiền khi cần.
+                Theo dõi giao dịch mua khóa học, nạp ví và gửi yêu cầu hoàn tiền khi cần.
               </Typography>
             </Box>
             <Stack direction="row" spacing={0.5} sx={{ overflowX: 'auto' }}>
@@ -195,8 +194,9 @@ function OrderCard({
   onRequestRefund: (item: OrderItemResponse) => void;
   onOpenRefund: (refund: StudentRefundResponse) => void;
 }) {
-  const navigate = useNavigate();
   const presentation = ORDER_STATUS[order.status];
+  const isWalletTopUp = order.type === 'WALLET_TOPUP';
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', mb: 2 }}>
@@ -210,40 +210,45 @@ function OrderCard({
       </Stack>
 
       <Stack spacing={1.25}>
-        {order.items.map((item) => {
-          const refund = latestRefundByItem.get(item.id);
-          const canSubmitAgain = refund?.status === 'REJECTED' || refund?.status === 'CANCELLED';
-          return (
-            <Stack
-              key={item.id}
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={1}
-              sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1.5, justifyContent: 'space-between', alignItems: { md: 'center' } }}
-            >
-              <Box>
-                <Typography sx={{ fontWeight: 800 }}>{item.courseTitle}</Typography>
-                <Typography variant="body2" color="text.secondary">{formatMoney(item.price, order.currency)}</Typography>
-              </Box>
-              {order.status === 'PAID' && (
-                <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap' }}>
-                  <Button size="small" endIcon={<ArrowForwardIcon />} onClick={() => navigate(ROUTES.STUDENT.COURSE_LEARN(item.courseId))}>
-                    Vào học
-                  </Button>
-                  {refund && (
-                    <Button size="small" variant="outlined" onClick={() => onOpenRefund(refund)}>
-                      Xem hoàn tiền
-                    </Button>
-                  )}
-                  {(!refund || canSubmitAgain) && (
-                    <Button size="small" variant="outlined" onClick={() => onRequestRefund(item)}>
-                      {canSubmitAgain ? 'Yêu cầu lại' : 'Yêu cầu hoàn tiền'}
-                    </Button>
-                  )}
-                </Stack>
-              )}
-            </Stack>
-          );
-        })}
+        {isWalletTopUp ? (
+          <Stack sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1.5 }}>
+            <Typography sx={{ fontWeight: 800 }}>
+              Nạp {formatMoney(order.totalAmount, order.currency)} vào ví
+            </Typography>
+          </Stack>
+        ) : (
+          order.items.map((item) => {
+            const refund = latestRefundByItem.get(item.id);
+            const canSubmitAgain = refund?.status === 'REJECTED' || refund?.status === 'CANCELLED';
+            return (
+              <Stack
+                key={item.id}
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={1}
+                sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1.5, justifyContent: 'space-between', alignItems: { md: 'center' } }}
+              >
+                <Box>
+                  <Typography sx={{ fontWeight: 800 }}>{item.courseTitle}</Typography>
+                  <Typography variant="body2" color="text.secondary">{formatMoney(item.price, order.currency)}</Typography>
+                </Box>
+                {order.status === 'PAID' && (
+                  <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap' }}>
+                    {refund && (
+                      <Button size="small" variant="outlined" onClick={() => onOpenRefund(refund)}>
+                        Xem hoàn tiền
+                      </Button>
+                    )}
+                    {(!refund || canSubmitAgain) && (
+                      <Button size="small" variant="outlined" onClick={() => onRequestRefund(item)}>
+                        {canSubmitAgain ? 'Yêu cầu lại' : 'Yêu cầu hoàn tiền'}
+                      </Button>
+                    )}
+                  </Stack>
+                )}
+              </Stack>
+            );
+          })
+        )}
       </Stack>
     </Box>
   );

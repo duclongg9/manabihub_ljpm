@@ -16,6 +16,7 @@ import com.manabihub.order.dto.response.OrderResponse;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.mapper.OrderMapper;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
@@ -27,6 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -46,6 +48,8 @@ public class OrderServiceImpl implements OrderService {
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Set<EnrollmentStatus> OWNED_STATUSES =
             EnumSet.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED);
+    /** Minimum wallet top-up amount (VND); must be a whole number ≥ this. */
+    private static final BigDecimal MIN_TOPUP_AMOUNT = new BigDecimal("10000");
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -100,6 +104,31 @@ public class OrderServiceImpl implements OrderService {
                 .build());
 
         return order;
+    }
+
+    @Override
+    @Transactional
+    public Order createTopUpOrder(BigDecimal amount) {
+        StudentProfile student = resolveCurrentStudent();
+
+        boolean invalid = amount == null
+                || amount.compareTo(MIN_TOPUP_AMOUNT) < 0
+                || amount.stripTrailingZeros().scale() > 0; // must be a whole number of VND
+        if (invalid) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Số tiền nạp phải là số nguyên và tối thiểu 10.000đ",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        return orderRepository.save(Order.builder()
+                .student(student)
+                .orderCode(generateOrderCode())
+                .totalAmount(amount)
+                .currency("VND")
+                .status(OrderStatus.PENDING)
+                .type(OrderType.WALLET_TOPUP)
+                .build());
     }
 
     @Override

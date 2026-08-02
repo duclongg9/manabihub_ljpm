@@ -6,25 +6,30 @@ import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.repository.EnrollmentRepository;
-import com.manabihub.notification.service.NotificationService;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.dto.IpnAckResponse;
 import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.enums.PaymentStatus;
+import com.manabihub.payment.event.PaymentNotificationEvent;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
+import com.manabihub.wallet.entity.StudentWallet;
+import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.service.EscrowService;
+import com.manabihub.wallet.service.StudentWalletService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -50,7 +55,8 @@ class PaymentServiceImplTest {
     @Mock private PaymentTransactionRepository paymentTransactionRepository;
     @Mock private EnrollmentRepository enrollmentRepository;
     @Mock private EscrowService escrowService;
-    @Mock private NotificationService notificationService;
+    @Mock private StudentWalletService studentWalletService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private PaymentServiceImpl service;
 
@@ -62,7 +68,8 @@ class PaymentServiceImplTest {
     void setUp() {
         service = new PaymentServiceImpl(
                 paymentGateway, orderRepository, orderItemRepository, paymentTransactionRepository,
-                enrollmentRepository, escrowService, notificationService, new ObjectMapper());
+                enrollmentRepository, escrowService, studentWalletService, eventPublisher,
+                new ObjectMapper());
 
         AppUser user = AppUser.builder().id(UUID.randomUUID()).email("student@test.dev").build();
         StudentProfile student = StudentProfile.builder().id(UUID.randomUUID()).user(user).build();
@@ -106,7 +113,7 @@ class PaymentServiceImplTest {
 
         verify(enrollmentRepository).save(any(Enrollment.class));
         verify(escrowService).holdForOrder(order);
-        verify(notificationService).createNotification(any(), eq("student@test.dev"), anyString(), anyString(), anyString());
+        verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
     }
 
     @Test
@@ -153,7 +160,7 @@ class PaymentServiceImplTest {
         verify(paymentTransactionRepository, never()).save(any());
         verify(enrollmentRepository, never()).save(any());
         verify(escrowService, never()).holdForOrder(any());
-        verify(notificationService, never()).createNotification(any(), any(), anyString(), anyString(), anyString());
+        verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
     }
 
     @Test
@@ -169,7 +176,111 @@ class PaymentServiceImplTest {
         assertEquals(OrderStatus.FAILED, order.getStatus());
         verify(enrollmentRepository, never()).save(any());
         verify(escrowService, never()).holdForOrder(any());
-        verify(notificationService, never()).createNotification(any(), any(), anyString(), anyString(), anyString());
+        verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
+    }
+
+    @Test
+    void handleIpn_walletTopUp_creditsStudentWalletNotEnrollment() {
+        Order topUp = Order.builder()
+                .id(UUID.randomUUID())
+                .orderCode("OD1")
+                .totalAmount(new BigDecimal("100.00"))
+                .currency("VND")
+                .status(OrderStatus.PENDING)
+                .student(order.getStudent())
+                .type(OrderType.WALLET_TOPUP)
+                .build();
+        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(topUp));
+        when(paymentTransactionRepository.findByOrder_IdOrderByCreatedAtDesc(topUp.getId()))
+                .thenReturn(List.of(PaymentTransaction.builder().order(topUp).status(PaymentStatus.PENDING).build()));
+
+        IpnAckResponse ack = service.handleIpn(params);
+
+        assertEquals("00", ack.rspCode());
+        assertEquals(OrderStatus.PAID, topUp.getStatus());
+        verify(studentWalletService).creditBalance(
+                eq(topUp.getStudent().getId()), eq(new BigDecimal("100.00")),
+                eq("WALLET_TOPUP"), eq(topUp.getId()), anyString());
+        // A top-up must never create enrollment or escrow.
+        verify(enrollmentRepository, never()).save(any());
+        verify(escrowService, never()).holdForOrder(any());
+        verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
+    }
+
+    @Test
+    void payWithWallet_debitsWalletAndFulfilsCourseOrder() {
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(studentWalletService.debitBalance(any(), any(), any(), any(), any()))
+                .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
+        when(orderItemRepository.findByOrder_Id(order.getId()))
+                .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(any(), any())).thenReturn(Optional.empty());
+
+        Order paidOrder = service.payWithWallet(order.getId());
+
+        assertEquals(order, paidOrder);
+        assertEquals(OrderStatus.PAID, order.getStatus());
+        verify(studentWalletService).debitBalance(
+                eq(order.getStudent().getId()), eq(new BigDecimal("100.00")),
+                eq("ORDER"), eq(order.getId()), anyString());
+        verify(paymentTransactionRepository).save(any(PaymentTransaction.class));
+        verify(enrollmentRepository).save(any(Enrollment.class));
+        verify(escrowService).holdForOrder(order);
+        ArgumentCaptor<PaymentNotificationEvent> eventCaptor =
+                ArgumentCaptor.forClass(PaymentNotificationEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(order.getId(), eventCaptor.getValue().orderId());
+        assertEquals("student@test.dev", eventCaptor.getValue().recipientEmail());
+    }
+
+    @Test
+    void payWithWallet_alreadyPaidOrder_isIdempotent() {
+        order.setStatus(OrderStatus.PAID);
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        assertEquals(order, service.payWithWallet(order.getId()));
+
+        verify(studentWalletService, never()).debitBalance(any(), any(), any(), any(), any());
+        verify(paymentTransactionRepository, never()).save(any());
+        verify(enrollmentRepository, never()).save(any());
+        verify(escrowService, never()).holdForOrder(any());
+        verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
+    }
+
+    @Test
+    void handleIpn_combinedPayment_debitsWalletPortionAndConfirms() {
+        order.setWalletAmount(new BigDecimal("30.00")); // 30 from wallet → gateway charges 70.00
+        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 7_000L)); // 70.00 × 100
+        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+        when(paymentTransactionRepository.findByOrder_IdOrderByCreatedAtDesc(order.getId()))
+                .thenReturn(List.of(PaymentTransaction.builder().order(order).status(PaymentStatus.PENDING).build()));
+        when(orderItemRepository.findByOrder_Id(order.getId()))
+                .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(any(), any())).thenReturn(Optional.empty());
+
+        IpnAckResponse ack = service.handleIpn(params);
+
+        assertEquals("00", ack.rspCode());
+        verify(studentWalletService).debitBalance(
+                eq(order.getStudent().getId()), eq(new BigDecimal("30.00")),
+                eq("ORDER"), eq(order.getId()), anyString());
+        verify(enrollmentRepository).save(any(Enrollment.class));
+        verify(escrowService).holdForOrder(order);
+    }
+
+    @Test
+    void initiateCombinedPayment_partialBalance_setsWalletPortionAndChargesRemainder() {
+        when(studentWalletService.getOrCreateStudentWallet(any()))
+                .thenReturn(StudentWallet.builder().id(UUID.randomUUID()).balance(new BigDecimal("40.00")).build());
+        when(paymentGateway.buildPaymentUrl(eq(order), anyString())).thenReturn("https://vnpay/pay");
+
+        String url = service.initiateCombinedPayment(order, "1.2.3.4");
+
+        assertEquals("https://vnpay/pay", url);
+        assertEquals(new BigDecimal("40.00"), order.getWalletAmount());
+        assertEquals(new BigDecimal("60.00"), order.getGatewayAmount());
+        verify(orderRepository).save(order);
     }
 
     @Test
