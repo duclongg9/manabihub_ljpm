@@ -100,6 +100,15 @@ public class KycRequest {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @Column(name = "server_verified_at")
+    private Instant serverVerifiedAt;
+
+    @Column(name = "server_verification_attempt_count", nullable = false)
+    private int serverVerificationAttemptCount = 0;
+
+    @Column(name = "server_verification_expires_at")
+    private Instant serverVerificationExpiresAt;
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();

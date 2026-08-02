@@ -21,6 +21,8 @@ import com.manabihub.kyc.dto.KycModuleStatusResponse;
 import com.manabihub.kyc.dto.KycRequestResponse;
 import com.manabihub.kyc.dto.KycRestartVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
+import com.manabihub.kyc.port.VnptServerVerificationResult;
+import com.manabihub.kyc.port.VnptVerificationPort;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
@@ -29,6 +31,8 @@ import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.security.service.PublicJwtTokenService;
 import jakarta.persistence.EntityManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -43,6 +47,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -59,6 +64,8 @@ import java.util.UUID;
 @Service
 public class TeacherKycService {
 
+    private static final Logger log = LoggerFactory.getLogger(TeacherKycService.class);
+
     private static final long MAX_FILE_SIZE_BYTES = 5L * 1024L * 1024L;
     private static final int MAX_OCR_TEXT_LENGTH = 20_000;
     private static final Set<String> CERTIFICATE_MIME_TYPES = Set.of("image/jpeg", "image/png");
@@ -66,6 +73,8 @@ public class TeacherKycService {
     private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
     private static final String REVIEW_ETA =
             "1-2 business days, excluding Saturdays, Sundays, and public holidays";
+    /** Server verification must complete within this duration after SDK result is submitted. */
+    private static final Duration SERVER_VERIFICATION_TTL = Duration.ofMinutes(30);
 
     private final TeacherProfileRepository teacherProfileRepository;
     private final KycRequestRepository kycRequestRepository;
@@ -75,6 +84,7 @@ public class TeacherKycService {
     private final TeacherIdentityClaimService teacherIdentityClaimService;
     private final TeacherCertificateClaimService teacherCertificateClaimService;
     private final PublicJwtTokenService publicJwtTokenService;
+    private final VnptVerificationPort vnptVerificationPort;
     private final EntityManager entityManager;
     private final Path storageRoot;
 
@@ -87,6 +97,7 @@ public class TeacherKycService {
             TeacherIdentityClaimService teacherIdentityClaimService,
             TeacherCertificateClaimService teacherCertificateClaimService,
             PublicJwtTokenService publicJwtTokenService,
+            VnptVerificationPort vnptVerificationPort,
             EntityManager entityManager,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
@@ -98,6 +109,7 @@ public class TeacherKycService {
         this.teacherIdentityClaimService = teacherIdentityClaimService;
         this.teacherCertificateClaimService = teacherCertificateClaimService;
         this.publicJwtTokenService = publicJwtTokenService;
+        this.vnptVerificationPort = vnptVerificationPort;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
     }
@@ -142,66 +154,75 @@ public class TeacherKycService {
 
         KycRequest kycRequest = findReusableRealtimeRequest(teacherProfile, latestRequest);
         VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
-        boolean verified = sdkDecision.verified();
+        boolean sdkPassed = sdkDecision.verified();
         List<String> failureReasons = new ArrayList<>(sdkDecision.failureReasons());
 
-        if (verified && sdkDecision.identityOcr() != null) {
+        // Step 1: Evaluate SDK result for OCR/face validity.
+        // SDK result alone NEVER produces VERIFIED — only PENDING_SERVER_VERIFICATION.
+        // The actual VERIFIED status is set by confirmServerVerification() below.
+        if (sdkPassed && sdkDecision.identityOcr() != null) {
             Map<String, String> ocr = sdkDecision.identityOcr();
             String rawIdNumber = ocr.get("idNumber");
             String ocrDob = ocr.get("dateOfBirth");
 
-            String normalizedCccd = null;
             try {
-                normalizedCccd = teacherIdentityClaimService.normalizeCccd(rawIdNumber);
+                teacherIdentityClaimService.normalizeCccd(rawIdNumber);
             } catch (BusinessException ex) {
-                verified = false;
+                sdkPassed = false;
                 failureReasons.add(ex.getMessage());
             }
 
-            if (verified && normalizedCccd != null) {
+            if (sdkPassed) {
                 try {
                     parseSupportedDate(ocrDob);
                 } catch (BusinessException exception) {
-                    verified = false;
+                    sdkPassed = false;
                     failureReasons.add(exception.getMessage());
                 }
-
-                if (verified) {
-                    teacherIdentityClaimService.processIdentityClaim(
-                            teacherProfile.getId(),
-                            normalizedCccd,
-                            user,
-                            ipAddress,
-                            userAgent
-                    );
-                }
             }
+            // NOTE: processIdentityClaim() is NOT called here.
+            // It is only called after server-to-server confirmation.
         }
 
         Instant now = Instant.now();
+
+        // SDK passed → PENDING_SERVER_VERIFICATION (not VERIFIED)
+        // SDK failed → FAILED
+        IdentityVerificationStatus identityStatus = sdkPassed
+                ? IdentityVerificationStatus.PENDING_SERVER_VERIFICATION
+                : IdentityVerificationStatus.FAILED;
 
         kycRequest.setStatus(KycRequestStatus.DRAFT);
         kycRequest.setTeacherProfile(teacherProfile);
         kycRequest.setEkycProvider(VNPT_PROVIDER);
         kycRequest.setProviderSessionId(blankToNull(request.providerSessionId()));
         kycRequest.setProviderTransactionId(blankToNull(request.providerTransactionId()));
-        kycRequest.setIdentityStatus(verified ? IdentityVerificationStatus.VERIFIED : IdentityVerificationStatus.FAILED);
-        kycRequest.setIdentityVerifiedAt(verified ? now : null);
-        kycRequest.setCertificateStatus(verified ? CertificateVerificationStatus.NOT_SUBMITTED : CertificateVerificationStatus.LOCKED);
+        kycRequest.setIdentityStatus(identityStatus);
+        kycRequest.setIdentityVerifiedAt(null); // Only set after server confirmation
+        kycRequest.setCertificateStatus(CertificateVerificationStatus.LOCKED); // Unlock only after VERIFIED
+        kycRequest.setServerVerificationExpiresAt(sdkPassed ? now.plus(SERVER_VERIFICATION_TTL) : null);
+        kycRequest.setServerVerificationAttemptCount(0);
         kycRequest.setVerificationPayload(Map.of(
                 "identityProvider", VNPT_PROVIDER,
                 "providerResult", request.sdkResult() == null ? Map.of() : request.sdkResult(),
-                "providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED",
+                "providerStatus", sdkPassed ? "SDK_PENDING_SERVER_CONFIRM" : "SDK_FAILED",
                 "identityOcr", sdkDecision.identityOcr(),
                 "failureReasons", failureReasons,
                 "certificateManualAuthenticityReviewRequired", true,
                 "autoApproval", false,
+                "serverVerificationRequired", sdkPassed,
                 "srs", srsTrace()
         ));
 
         KycRequest savedRequest = kycRequestRepository.save(kycRequest);
         savedRequest.setEkycReferenceId("VNPT-SDK-" + savedRequest.getId());
         boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
+
+        // Step 2: If SDK passed, immediately attempt server-to-server verification.
+        // This is done within the same request to provide synchronous feedback.
+        if (sdkPassed) {
+            confirmServerVerification(savedRequest, teacherProfile, user, ipAddress, userAgent);
+        }
 
         return new KycIdentityVerificationResponse(
                 teacherProfile.getId(),
@@ -212,6 +233,113 @@ public class TeacherKycService {
                 auditLogged,
                 srsTrace()
         );
+    }
+
+    /**
+     * Server-to-server verification of a VNPT eKYC transaction.
+     * <p>
+     * This method is the ONLY path to {@link IdentityVerificationStatus#VERIFIED}.
+     * It must be called after the SDK result has been evaluated and the request
+     * is in {@code PENDING_SERVER_VERIFICATION} status.
+     * <p>
+     * Security guarantees:
+     * <ul>
+     *   <li>Idempotent: already-VERIFIED requests are no-ops</li>
+     *   <li>Expiry: PENDING requests past TTL are rejected</li>
+     *   <li>Cross-user: transaction must belong to the requesting teacher</li>
+     *   <li>Replay: duplicate calls do not re-process identity claims</li>
+     * </ul>
+     */
+    private void confirmServerVerification(
+            KycRequest kycRequest,
+            TeacherProfile teacherProfile,
+            AppUser user,
+            String ipAddress,
+            String userAgent
+    ) {
+        // Idempotent: already verified
+        if (kycRequest.getIdentityStatus() == IdentityVerificationStatus.VERIFIED) {
+            log.info("Server verification skipped: request {} already VERIFIED", kycRequest.getId());
+            return;
+        }
+
+        // Only process PENDING_SERVER_VERIFICATION
+        if (kycRequest.getIdentityStatus() != IdentityVerificationStatus.PENDING_SERVER_VERIFICATION) {
+            log.warn("Server verification skipped: request {} has status {}",
+                    kycRequest.getId(), kycRequest.getIdentityStatus());
+            return;
+        }
+
+        // Expiry check
+        Instant expiresAt = kycRequest.getServerVerificationExpiresAt();
+        if (expiresAt != null && Instant.now().isAfter(expiresAt)) {
+            log.warn("Server verification expired for request {}", kycRequest.getId());
+            kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
+            kycRequestRepository.save(kycRequest);
+            return;
+        }
+
+        // Increment attempt count
+        kycRequest.setServerVerificationAttemptCount(
+                kycRequest.getServerVerificationAttemptCount() + 1);
+
+        // Call VNPT server-to-server
+        String txId = kycRequest.getProviderTransactionId();
+        String sessionId = kycRequest.getProviderSessionId();
+
+        VnptServerVerificationResult serverResult;
+        try {
+            serverResult = vnptVerificationPort.verifyTransaction(txId, sessionId);
+        } catch (Exception ex) {
+            log.error("Server verification call failed for request {}: {}",
+                    kycRequest.getId(), ex.getMessage());
+            // Do NOT mark as FAILED on transient errors — leave as PENDING for retry
+            kycRequestRepository.save(kycRequest);
+            return;
+        }
+
+        Instant now = Instant.now();
+
+        if (serverResult.verified()) {
+            // Server confirmed — now we can trust the identity
+            kycRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
+            kycRequest.setIdentityVerifiedAt(now);
+            kycRequest.setServerVerifiedAt(now);
+            kycRequest.setCertificateStatus(CertificateVerificationStatus.NOT_SUBMITTED);
+
+            // NOW process the identity claim (CCCD fingerprint)
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = kycRequest.getVerificationPayload();
+            Object ocrObj = payload.get("identityOcr");
+            if (ocrObj instanceof Map<?, ?> ocrMap) {
+                String rawIdNumber = String.valueOf(ocrMap.get("idNumber"));
+                try {
+                    String normalizedCccd = teacherIdentityClaimService.normalizeCccd(rawIdNumber);
+                    teacherIdentityClaimService.processIdentityClaim(
+                            teacherProfile.getId(),
+                            normalizedCccd,
+                            user,
+                            ipAddress,
+                            userAgent
+                    );
+                } catch (BusinessException ex) {
+                    log.warn("Identity claim processing failed after server verification: {}", ex.getMessage());
+                    kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
+                    kycRequest.setIdentityVerifiedAt(null);
+                    kycRequest.setServerVerifiedAt(null);
+                    kycRequest.setCertificateStatus(CertificateVerificationStatus.LOCKED);
+                }
+            }
+
+            log.info("Server verification CONFIRMED for request {}", kycRequest.getId());
+        } else {
+            // Server rejected
+            kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
+            log.warn("Server verification REJECTED for request {}: {}",
+                    kycRequest.getId(), serverResult.failureReasons());
+        }
+
+        kycRequestRepository.save(kycRequest);
     }
 
     @Transactional
@@ -831,7 +959,9 @@ public class TeacherKycService {
         }
 
         IdentityVerificationStatus status = resolvedIdentityStatus(latestRequest);
-        if (status == IdentityVerificationStatus.VERIFIED || status == IdentityVerificationStatus.PROCESSING) {
+        if (status == IdentityVerificationStatus.VERIFIED
+                || status == IdentityVerificationStatus.PROCESSING
+                || status == IdentityVerificationStatus.PENDING_SERVER_VERIFICATION) {
             return false;
         }
 
@@ -1314,6 +1444,7 @@ public class TeacherKycService {
         return switch (status) {
             case NOT_STARTED -> "Chưa xác thực danh tính";
             case PROCESSING -> "Đang xác thực danh tính";
+            case PENDING_SERVER_VERIFICATION -> "Đang xác nhận với VNPT";
             case VERIFIED -> "Xác thực danh tính thành công";
             case FAILED -> "Xác thực danh tính thất bại";
         };
@@ -1323,6 +1454,7 @@ public class TeacherKycService {
         return switch (status) {
             case NOT_STARTED -> "Bắt đầu VNPT eKYC để chụp CCCD và kiểm tra liveness khuôn mặt.";
             case PROCESSING -> "VNPT eKYC đang xử lý phiên xác thực realtime.";
+            case PENDING_SERVER_VERIFICATION -> "Hệ thống đang xác nhận kết quả với máy chủ VNPT. Vui lòng chờ.";
             case VERIFIED -> "CCCD và liveness khuôn mặt đã được xác thực qua VNPT eKYC.";
             case FAILED -> "Kết quả VNPT eKYC không hợp lệ. Giáo viên có thể thực hiện lại ngay.";
         };

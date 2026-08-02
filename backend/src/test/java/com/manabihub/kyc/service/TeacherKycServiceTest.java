@@ -14,6 +14,8 @@ import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.kyc.dto.KycCertificateSubmissionResponse;
 import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
 import com.manabihub.kyc.dto.KycStatusResponse;
+import com.manabihub.kyc.port.VnptServerVerificationResult;
+import com.manabihub.kyc.port.VnptVerificationPort;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
@@ -76,6 +78,8 @@ class TeacherKycServiceTest {
     private Query countQuery;
     @Mock
     private Query insertQuery;
+    @Mock
+    private VnptVerificationPort vnptVerificationPort;
 
     @TempDir
     private Path storageRoot;
@@ -96,6 +100,7 @@ class TeacherKycServiceTest {
                 teacherIdentityClaimService,
                 teacherCertificateClaimService,
                 publicJwtTokenService,
+                vnptVerificationPort,
                 entityManager,
                 storageRoot.toString()
         );
@@ -178,11 +183,13 @@ class TeacherKycServiceTest {
         when(kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(any()))
                 .thenReturn(List.of());
         Map<String, Object> sdkResult = Map.of(
-                "idNumber", "012345678901",
-                "fullName", "Nguyen Van A",
-                "dateOfBirth", "1990-01-02",
-                "faceMatch", "MATCHED"
+                "object", Map.of("idNumber", "012345678901", "name", "Nguyen Van A", "dateOfBirth", "01/01/1990"),
+                "compare", Map.of("result", true, "msg", "Khuôn mặt hợp lệ", "prob", 99),
+                "liveness", Map.of("liveness_result", true, "liveness_msg", "Thành công")
         );
+
+        when(vnptVerificationPort.verifyTransaction(any(), any()))
+                .thenReturn(VnptServerVerificationResult.success("transaction", Map.of("mock", true)));
 
         var response = teacherKycService.verifyIdentity(
                 user.getId(),
