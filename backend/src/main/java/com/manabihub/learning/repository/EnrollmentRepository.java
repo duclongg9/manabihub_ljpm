@@ -19,6 +19,9 @@ import java.util.UUID;
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     int countByStudentIdAndStatus(UUID studentId, EnrollmentStatus status);
+    
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.course.id = :courseId AND e.status = :status")
+    long countByCourse_IdAndStatus(@Param("courseId") UUID courseId, @Param("status") EnrollmentStatus status);
 
     @EntityGraph(attributePaths = {"course", "course.teacher", "course.teacher.user"})
     Page<Enrollment> findByStudentIdAndStatusIn(

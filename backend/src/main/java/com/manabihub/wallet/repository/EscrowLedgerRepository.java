@@ -92,4 +92,15 @@ public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID
             @Param("teacherId") UUID teacherId,
             @Param("status") EscrowStatus status
     );
+
+    @Query("""
+            select coalesce(sum(escrow.amount), 0)
+            from EscrowLedger escrow
+            where escrow.course.id = :courseId
+              and escrow.status = :status
+            """)
+    java.math.BigDecimal sumAmountByCourseIdAndStatus(
+            @Param("courseId") UUID courseId,
+            @Param("status") EscrowStatus status
+    );
 }

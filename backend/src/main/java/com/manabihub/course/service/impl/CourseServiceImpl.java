@@ -24,6 +24,12 @@ import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.learning.enums.EnrollmentStatus;
+import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.wallet.enums.EscrowStatus;
+import com.manabihub.wallet.repository.EscrowLedgerRepository;
+import com.manabihub.course.dto.response.TeacherCourseAnalyticsResponse;
+import com.manabihub.kyc.repository.TeacherProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -68,6 +74,8 @@ public class CourseServiceImpl implements CourseService {
     private final NotificationService notificationService;
     private final CourseReviewService courseReviewService;
     private final SystemSettingValueService settingValueService;
+    private final EnrollmentRepository enrollmentRepository;
+    private final EscrowLedgerRepository escrowLedgerRepository;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -164,6 +172,35 @@ public class CourseServiceImpl implements CourseService {
                 .pendingApproval(pendingApproval)
                 .published(published)
                 .recentCourses(recentCourses)
+                .build();
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public TeacherCourseAnalyticsResponse getCourseAnalytics(UUID courseId) {
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
+        
+        Course course = courseRepository.findByIdAndTeacher_Id(courseId, teacherProfile.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COURSE_NOT_FOUND,
+                        "Course was not found or does not belong to you",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        long activeStudents = enrollmentRepository.countByCourse_IdAndStatus(courseId, EnrollmentStatus.ACTIVE);
+        long completedStudents = enrollmentRepository.countByCourse_IdAndStatus(courseId, EnrollmentStatus.COMPLETED);
+        
+        BigDecimal totalRevenue = escrowLedgerRepository.sumAmountByCourseIdAndStatus(courseId, EscrowStatus.RELEASED);
+        
+        CourseReviewAggregateResponse reviewAggregate = courseReviewService.getAggregate(courseId);
+
+        return TeacherCourseAnalyticsResponse.builder()
+                .activeStudents(activeStudents)
+                .completedStudents(completedStudents)
+                .totalRevenue(totalRevenue == null ? BigDecimal.ZERO : totalRevenue)
+                .averageRating(reviewAggregate.averageRating())
+                .totalReviews(reviewAggregate.reviewCount())
                 .build();
     }
 
