@@ -30,6 +30,7 @@ public class OrderMapper {
     private OrderItemResponse toItemResponse(OrderItem item) {
         Course course = item.getCourse();
         return new OrderItemResponse(
+                item.getId(),
                 course.getId(),
                 course.getTitle(),
                 course.getThumbnailUrl(),

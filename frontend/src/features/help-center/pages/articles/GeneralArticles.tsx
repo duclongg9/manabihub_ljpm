@@ -11,10 +11,10 @@ const aiAndDataArticle = getHelpArticle('ai-and-data');
 export const LearnerPaymentsRefundsPage = () => (
   <ArticleLayout article={learnerPaymentsArticle}>
     <p>
-      <strong>Trạng thái bản MVP:</strong> luồng học viên tự gửi yêu cầu hoàn tiền chưa
-      được phát hành. Nếu cần hỗ trợ, hãy dùng{' '}
-      <Link to={ROUTES.PUBLIC.ABOUT}>kênh liên hệ của ManabiHub</Link> cho đến khi luồng
-      yêu cầu được triển khai.
+      Học viên có thể mở <Link to={ROUTES.STUDENT.PAYMENTS}>Lịch sử thanh toán</Link>,
+      chọn đúng khóa học trong đơn hàng và gửi yêu cầu hoàn tiền. Yêu cầu đủ điều kiện
+      hoặc ngoại lệ đều được chuyển tới Finance để xem xét; việc gửi yêu cầu không đồng
+      nghĩa tiền đã được hoàn.
     </p>
     <PolicyBoundary>
       {(policy) => (
@@ -39,6 +39,13 @@ export const LearnerPaymentsRefundsPage = () => (
         <p>
           Việc đủ điều kiện gửi yêu cầu không đồng nghĩa tiền đã được hoàn. Màn hình
           thanh toán phải hiển thị trạng thái xử lý và kết quả cuối cùng.
+        </p>
+
+        <h2>Trường hợp ngoại lệ</h2>
+        <p>
+          Nếu bị tính phí trùng, gặp lỗi thanh toán hoặc lỗi nền tảng khiến không thể truy
+          cập nội dung đã mua, hãy chọn đúng loại ngoại lệ và mô tả rõ sự việc. Finance sẽ
+          xem xét thủ công; hệ thống không tự động chấp thuận.
         </p>
 
         <h2>Quyền truy cập khóa học</h2>

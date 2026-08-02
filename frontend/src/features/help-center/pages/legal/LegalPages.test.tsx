@@ -36,10 +36,10 @@ const renderPage = (page: ReactNode) => render(<MemoryRouter>{page}</MemoryRoute
 afterEach(cleanup);
 
 describe('legal policy pages', () => {
-  it('states the strict refund boundary and current MVP limitation', () => {
+  it('states the strict refund boundary and self-service entry point', () => {
     renderPage(<RefundPolicyPage />);
 
-    expect(screen.getByText(/tự gửi yêu cầu hoàn tiền chưa được phát hành/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Lịch sử thanh toán/i })).toHaveAttribute('href', '/student/payments');
     expect(screen.getByText(/7 ngày theo lịch/i)).toBeInTheDocument();
     expect(screen.getByText(/thấp hơn 30%/i)).toBeInTheDocument();
     expect(screen.getByText(/30% không đủ điều kiện tiêu chuẩn/i)).toBeInTheDocument();

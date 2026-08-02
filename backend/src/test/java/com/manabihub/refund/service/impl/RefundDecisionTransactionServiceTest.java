@@ -143,16 +143,16 @@ class RefundDecisionTransactionServiceTest {
                 .status(RefundStatus.PENDING)
                 .providerStatus(RefundProviderStatus.NOT_REQUESTED)
                 .reason("Platform access failure")
-                .eligibilitySnapshot(Map.of(
-                        "orderId", order.getId().toString(),
-                        "orderItemId", refundedItem.getId().toString(),
-                        "paidAmount", money("1000000"),
-                        "policyVersion", "refund-policy-v1",
-                        "paymentTime", "2026-07-20T00:00:00Z",
-                        "requestTime", "2026-07-21T00:00:00Z",
-                        "progressPercent", 10,
-                        "eligible", true
-                ))
+                .eligibilitySnapshot(com.manabihub.refund.dto.RefundEligibilitySnapshot.builder()
+                        .orderId(order.getId())
+                        .orderItemId(refundedItem.getId())
+                        .actuallyPaidAmount(money("1000000"))
+                        .policyVersion("refund-policy-v1")
+                        .paymentSucceededAt(java.time.Instant.parse("2026-07-20T00:00:00Z"))
+                        .requestedAt(java.time.Instant.parse("2026-07-21T00:00:00Z"))
+                        .measuredProgressPercent(10.0)
+                        .eligibilityResult(com.manabihub.refund.enums.EligibilityResult.STANDARD_ELIGIBLE)
+                        .build())
                 .build();
         payment = PaymentTransaction.builder()
                 .id(UUID.randomUUID())
