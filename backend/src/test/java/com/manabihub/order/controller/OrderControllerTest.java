@@ -57,6 +57,7 @@ class OrderControllerTest {
                 new BigDecimal("150000.00"),
                 "VND",
                 "PAID",
+                "COURSE",
                 Instant.parse("2026-07-27T00:00:00Z"),
                 List.of());
         PageResponse<OrderResponse> page = PageResponse.<OrderResponse>builder()
