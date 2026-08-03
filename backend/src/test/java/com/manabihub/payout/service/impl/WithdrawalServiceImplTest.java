@@ -18,8 +18,9 @@ import com.manabihub.payout.service.WithdrawalOtpService;
 import com.manabihub.payout.service.WithdrawalNotificationService;
 import com.manabihub.systemconfig.model.CommercialPolicy;
 import com.manabihub.systemconfig.service.CommercialPolicyService;
-import com.manabihub.wallet.entity.TeacherWallet;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.service.WalletService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ import static org.mockito.Mockito.when;
 class WithdrawalServiceImplTest {
 
     @Mock private WithdrawalRequestRepository withdrawalRepository;
-    @Mock private TeacherWalletRepository teacherWalletRepository;
+    @Mock private WalletRepository walletRepository;
     @Mock private TeacherBankAccountRepository bankAccountRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
     @Mock private WalletService walletService;
@@ -66,7 +67,7 @@ class WithdrawalServiceImplTest {
     private final UUID teacherProfileId =
             UUID.fromString("b82e8ebf-9997-45a6-bdbe-3fbe6ad25b04");
     private final BigDecimal minimumPayout = new BigDecimal("500000");
-    private TeacherWallet wallet;
+    private Wallet wallet;
 
     @BeforeEach
     void setUp() {
@@ -79,9 +80,9 @@ class WithdrawalServiceImplTest {
         org.mockito.Mockito.lenient().when(teacherProfileRepository.findByUserId(userId))
                 .thenReturn(Optional.of(teacherProfile));
 
-        wallet = TeacherWallet.builder()
+        wallet = Wallet.builder()
                 .id(UUID.randomUUID())
-                .teacherId(teacherProfileId)
+                .teacher(teacherProfile)
                 .balance(new BigDecimal("2000000"))
                 .frozenBalance(BigDecimal.ZERO)
                 .build();
@@ -96,7 +97,7 @@ class WithdrawalServiceImplTest {
                 .status(WithdrawalStatus.PENDING)
                 .build();
 
-        when(teacherWalletRepository.findByTeacherIdForUpdate(teacherProfileId))
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherProfileId))
                 .thenReturn(Optional.of(wallet));
         when(withdrawalRepository.countByTeacherIdAndStatus(
                 teacherProfileId,
@@ -122,7 +123,7 @@ class WithdrawalServiceImplTest {
 
         assertNotNull(result);
         assertEquals(WithdrawalStatus.PENDING, result.getStatus());
-        verify(teacherWalletRepository).findByTeacherIdForUpdate(teacherProfileId);
+        verify(walletRepository).findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherProfileId);
         verify(otpService).consumeOtp(userIdString, "123456");
         verify(walletService).reserveBalance(
                 teacherProfileId.toString(),
@@ -152,7 +153,7 @@ class WithdrawalServiceImplTest {
         request.setSaveAccount(false);
         UUID withdrawalId = UUID.randomUUID();
 
-        when(teacherWalletRepository.findByTeacherIdForUpdate(teacherProfileId))
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherProfileId))
                 .thenReturn(Optional.of(wallet));
         when(withdrawalRepository.countByTeacherIdAndStatus(
                 teacherProfileId,
@@ -212,13 +213,13 @@ class WithdrawalServiceImplTest {
         assertEquals(MessageCodes.PAYOUT_AMOUNT_BELOW_MINIMUM, exception.getMessageCode());
         verify(commercialPolicyService).getCurrentPolicy();
         verifyNoInteractions(otpService, walletService);
-        verify(teacherWalletRepository, never()).findByTeacherIdForUpdate(any());
+        verify(walletRepository, never()).findByOwnerTypeAndTeacher_IdForUpdate(eq(com.manabihub.wallet.enums.WalletOwnerType.TEACHER), any());
     }
 
     @Test
     void createWithdrawalRequest_WalletNotFound_DoesNotConsumeOtp() {
         CreateWithdrawalRequest request = newRequest();
-        when(teacherWalletRepository.findByTeacherIdForUpdate(teacherProfileId))
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherProfileId))
                 .thenReturn(Optional.empty());
 
         BusinessException exception = assertThrows(

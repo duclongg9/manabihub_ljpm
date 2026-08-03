@@ -80,4 +80,8 @@ public class Wallet {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    public BigDecimal getAvailableBalance() {
+        return balance.subtract(frozenBalance);
+    }
 }
