@@ -212,3 +212,4 @@ public class FlywayMigrationIntegrationTest {
         assertThat(uqPt).as("uq_payment_transactions_provider_txn exists").isEqualTo(1);
     }
 }
+// trigger CI
