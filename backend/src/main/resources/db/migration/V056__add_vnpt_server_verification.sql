@@ -31,3 +31,7 @@ CREATE INDEX IF NOT EXISTS idx_kyc_requests_pending_server_verification
 CREATE UNIQUE INDEX IF NOT EXISTS uq_kyc_requests_provider_tx
     ON kyc_requests (ekyc_provider, provider_transaction_id)
     WHERE provider_transaction_id IS NOT NULL AND provider_transaction_id != '';
+
+-- MHB-73: Update check constraint to allow PENDING_SERVER_VERIFICATION
+ALTER TABLE kyc_requests DROP CONSTRAINT IF EXISTS chk_kyc_identity_status;
+ALTER TABLE kyc_requests ADD CONSTRAINT chk_kyc_identity_status CHECK (identity_status IN ('NOT_STARTED', 'PROCESSING', 'VERIFIED', 'FAILED', 'PENDING_SERVER_VERIFICATION'));

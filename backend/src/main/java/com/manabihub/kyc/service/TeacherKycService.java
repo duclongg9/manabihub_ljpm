@@ -204,9 +204,7 @@ public class TeacherKycService {
         kycRequest.setServerVerificationAttemptCount(0);
         kycRequest.setVerificationPayload(Map.of(
                 "identityProvider", VNPT_PROVIDER,
-                "providerResult", request.sdkResult() == null ? Map.of() : request.sdkResult(),
                 "providerStatus", sdkPassed ? "SDK_PENDING_SERVER_CONFIRM" : "SDK_FAILED",
-                "identityOcr", sdkDecision.identityOcr(),
                 "failureReasons", failureReasons,
                 "certificateManualAuthenticityReviewRequired", true,
                 "autoApproval", false,
@@ -214,7 +212,17 @@ public class TeacherKycService {
                 "srs", srsTrace()
         ));
 
-        KycRequest savedRequest = kycRequestRepository.save(kycRequest);
+        KycRequest savedRequest;
+        try {
+            savedRequest = kycRequestRepository.save(kycRequest);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.error("Concurrent VNPT transaction replay or cross-user violation: provider_transaction_id={}", request.providerTransactionId());
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_008,
+                    "Invalid or duplicate verification transaction",
+                    org.springframework.http.HttpStatus.CONFLICT
+            );
+        }
         savedRequest.setEkycReferenceId("VNPT-SDK-" + savedRequest.getId());
         boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
 
