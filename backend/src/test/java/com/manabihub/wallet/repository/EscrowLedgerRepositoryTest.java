@@ -23,6 +23,11 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
+import com.manabihub.kyc.domain.AppUser;
+import com.manabihub.kyc.domain.TeacherKycStatus;
+import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.domain.UserStatus;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @DataJpaTest
@@ -55,33 +60,71 @@ class EscrowLedgerRepositoryTest {
     @Autowired
     private OrderItemRepository orderItemRepository;
 
+    @Autowired
+    private TestEntityManager entityManager;
+
     @Test
     void testGrossRevenueExcludesRefundedEscrow() {
+        AppUser user = new AppUser();
+        user.setId(UUID.randomUUID());
+        user.setEmail("teacher@test.com");
+        user.setFullName("Test Teacher");
+        user.setUserStatus(UserStatus.ACTIVE);
+        user = entityManager.merge(user);
+
+        TeacherProfile profile = new TeacherProfile();
+        profile.setId(UUID.randomUUID());
+        profile.setUser(user);
+        profile.setDisplayName("Test Teacher Display");
+        profile.setKycStatus(TeacherKycStatus.APPROVED);
+        profile = entityManager.merge(profile);
+
         Course course = new Course();
         course.setId(UUID.randomUUID());
         course.setTitle("Revenue Analytics Course");
+        course.setSlug("revenue-analytics-course");
+        course.setTeacher(profile);
+        course.setPrice(new BigDecimal("1000"));
         course = courseRepository.save(course);
 
-        Instant now = Instant.now().minus(5, ChronoUnit.DAYS);
+        Instant now = Instant.now();
+
+        com.manabihub.identity.entity.AppUser studentUser = new com.manabihub.identity.entity.AppUser();
+        studentUser.setId(UUID.randomUUID());
+        studentUser.setEmail("student@test.com");
+        studentUser.setFullName("Test Student");
+        studentUser.setUserStatus(com.manabihub.identity.enums.AccountStatus.ACTIVE);
+        studentUser = entityManager.merge(studentUser);
+
+        com.manabihub.identity.entity.StudentProfile studentProfile = new com.manabihub.identity.entity.StudentProfile();
+        studentProfile.setId(UUID.randomUUID());
+        studentProfile.setUser(studentUser);
+        studentProfile.setDisplayName("Student Display");
+        studentProfile = entityManager.merge(studentProfile);
 
         // Order 1 (Held/PAID)
         Order o1 = new Order();
         o1.setId(UUID.randomUUID());
         o1.setStatus(OrderStatus.PAID);
+        o1.setStudent(studentProfile);
+        o1.setOrderCode("ORD-1");
+        o1.setTotalAmount(new BigDecimal("1000"));
         o1 = orderRepository.save(o1);
 
         OrderItem oi1 = new OrderItem();
         oi1.setId(UUID.randomUUID());
         oi1.setOrder(o1);
-        oi1.setCourseId(course.getId().toString());
+        oi1.setCourse(course);
         oi1.setPrice(new BigDecimal("1000"));
         oi1 = orderItemRepository.save(oi1);
 
         EscrowLedger l1 = new EscrowLedger();
         l1.setId(UUID.randomUUID());
         l1.setCourse(course);
+        l1.setTeacher(profile);
         l1.setOrder(o1);
         l1.setOrderItem(oi1);
+        l1.setAmount(new BigDecimal("1000"));
         l1.setStatus(EscrowStatus.HELD);
         l1.setCreatedAt(now);
         escrowLedgerRepository.save(l1);
@@ -90,20 +133,25 @@ class EscrowLedgerRepositoryTest {
         Order o2 = new Order();
         o2.setId(UUID.randomUUID());
         o2.setStatus(OrderStatus.PAID);
+        o2.setStudent(studentProfile);
+        o2.setOrderCode("ORD-2");
+        o2.setTotalAmount(new BigDecimal("1000"));
         o2 = orderRepository.save(o2);
 
         OrderItem oi2 = new OrderItem();
         oi2.setId(UUID.randomUUID());
         oi2.setOrder(o2);
-        oi2.setCourseId(course.getId().toString());
+        oi2.setCourse(course);
         oi2.setPrice(new BigDecimal("1000"));
         oi2 = orderItemRepository.save(oi2);
 
         EscrowLedger l2 = new EscrowLedger();
         l2.setId(UUID.randomUUID());
         l2.setCourse(course);
+        l2.setTeacher(profile);
         l2.setOrder(o2);
         l2.setOrderItem(oi2);
+        l2.setAmount(new BigDecimal("1000"));
         l2.setStatus(EscrowStatus.REFUNDED);
         l2.setCreatedAt(now);
         escrowLedgerRepository.save(l2);
