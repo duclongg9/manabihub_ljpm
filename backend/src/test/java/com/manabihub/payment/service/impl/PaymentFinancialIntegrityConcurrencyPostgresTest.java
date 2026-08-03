@@ -1,10 +1,16 @@
 package com.manabihub.payment.service.impl;
 
 import com.manabihub.common.mail.EmailService;
+import com.manabihub.common.exception.BusinessException;
+import com.manabihub.identity.entity.AppUser;
+import com.manabihub.identity.entity.StudentProfile;
+import com.manabihub.order.entity.Order;
+import com.manabihub.order.enums.OrderStatus;
 import com.manabihub.payment.dto.IpnAckResponse;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.service.PaymentService;
+import com.manabihub.wallet.service.StudentWalletService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -68,6 +74,9 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private StudentWalletService studentWalletService;
+
     @MockBean
     private PaymentGateway paymentGateway;
 
@@ -122,7 +131,18 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
                 WHERE order_id = ?
                   AND provider = 'WALLET'
                   AND status = 'SUCCESS'
+                  AND succeeded_at IS NOT NULL
                 """, orderId));
+        assertEquals(1, count("""
+                SELECT COUNT(*)
+                FROM wallet_payment_reservations
+                WHERE order_id = ?
+                  AND status = 'CAPTURED'
+                """, orderId));
+        assertEquals(0, BigDecimal.ZERO.compareTo(jdbcTemplate.queryForObject(
+                "SELECT frozen_balance FROM wallets WHERE id = ?",
+                BigDecimal.class,
+                walletId)));
         assertEquals(1, count(
                 "SELECT COUNT(*) FROM enrollments WHERE student_id = ? AND course_id = ?",
                 STUDENT_ID,
@@ -266,8 +286,197 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
                 """, orderItemId));
     }
 
+    @Test
+    void combinedPaymentReservationPreventsWalletDoubleSpendBeforeGatewayCallback() {
+        UUID studentId = createStudentProfile("combined-race");
+        UUID walletId = UUID.randomUUID();
+        UUID firstOrderId = UUID.randomUUID();
+        UUID secondOrderId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO wallets (
+                    id, owner_type, student_id, balance, frozen_balance, currency, frozen
+                ) VALUES (?, 'STUDENT', ?, 100000.00, 0, 'VND', FALSE)
+                """, walletId, studentId);
+        insertPendingOrder(firstOrderId, studentId, "COMBINED-" + firstOrderId,
+                new BigDecimal("250000.00"));
+        insertPendingOrder(secondOrderId, studentId, "WALLET-" + secondOrderId,
+                new BigDecimal("100000.00"));
+
+        StudentProfile student = StudentProfile.builder().id(studentId).build();
+        Order firstOrder = Order.builder()
+                .id(firstOrderId)
+                .student(student)
+                .orderCode("COMBINED-" + firstOrderId)
+                .totalAmount(new BigDecimal("250000.00"))
+                .currency("VND")
+                .status(OrderStatus.PENDING)
+                .build();
+        when(paymentGateway.getProvider()).thenReturn("TEST");
+        when(paymentGateway.buildPaymentUrl(org.mockito.ArgumentMatchers.any(Order.class),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn("https://gateway.test/pay");
+
+        assertEquals("https://gateway.test/pay",
+                paymentService.initiateCombinedPayment(firstOrder, "127.0.0.1"));
+
+        assertEquals(0, new BigDecimal("100000.00").compareTo(jdbcTemplate.queryForObject(
+                "SELECT frozen_balance FROM wallets WHERE id = ?", BigDecimal.class, walletId)));
+        assertEquals(1, count("""
+                SELECT COUNT(*) FROM wallet_payment_reservations
+                WHERE order_id = ? AND amount = 100000.00 AND status = 'RESERVED'
+                """, firstOrderId));
+        assertEquals(2, count("""
+                SELECT COUNT(*) FROM payment_transactions
+                WHERE order_id = ? AND status = 'PENDING'
+                """, firstOrderId));
+        assertThrows(BusinessException.class,
+                () -> paymentService.payWithWallet(secondOrderId));
+        assertEquals("PENDING", jdbcTemplate.queryForObject(
+                "SELECT order_status FROM orders WHERE id = ?", String.class, secondOrderId));
+
+        UUID orderItemId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO order_items (id, order_id, course_id, price)
+                VALUES (?, ?, ?, 250000.00)
+                """, orderItemId, firstOrderId, COURSE_ID);
+        when(paymentGateway.parseCallback(anyMap())).thenReturn(new PaymentCallbackResult(
+                true,
+                firstOrder.getOrderCode(),
+                "COMBINED-TX-" + firstOrderId,
+                15_000_000L,
+                "00",
+                "00",
+                true));
+
+        assertEquals("00", paymentService.handleIpn(
+                Map.of("vnp_TxnRef", firstOrder.getOrderCode())).rspCode());
+        assertEquals("PAID", jdbcTemplate.queryForObject(
+                "SELECT order_status FROM orders WHERE id = ?", String.class, firstOrderId));
+        assertEquals(2, count("""
+                SELECT COUNT(*) FROM payment_transactions
+                WHERE order_id = ? AND status = 'SUCCESS' AND succeeded_at IS NOT NULL
+                """, firstOrderId));
+        assertEquals(0, new BigDecimal("250000.00").compareTo(jdbcTemplate.queryForObject("""
+                SELECT SUM(amount) FROM payment_transactions
+                WHERE order_id = ? AND status = 'SUCCESS'
+                """, BigDecimal.class, firstOrderId)));
+    }
+
+    @Test
+    void concurrentFirstWalletCreationCreatesExactlyOneCanonicalWallet() throws Exception {
+        UUID studentId = createStudentProfile("wallet-create-race");
+        int workers = 8;
+        ExecutorService executor = Executors.newFixedThreadPool(workers);
+        CountDownLatch ready = new CountDownLatch(workers);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<UUID>> futures = new ArrayList<>();
+
+        try {
+            for (int index = 0; index < workers; index++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return studentWalletService.getOrCreateStudentWallet(studentId).getId();
+                }));
+            }
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            List<UUID> walletIds = new ArrayList<>();
+            for (Future<UUID> future : futures) {
+                walletIds.add(future.get(30, TimeUnit.SECONDS));
+            }
+            assertEquals(1, walletIds.stream().distinct().count());
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+        }
+
+        assertEquals(1, count("""
+                SELECT COUNT(*) FROM wallets
+                WHERE owner_type = 'STUDENT' AND student_id = ?
+                """, studentId));
+    }
+
+    @Test
+    void concurrentRefundCreditReturnsFullAmountToWalletExactlyOnce() throws Exception {
+        UUID studentId = createStudentProfile("refund-wallet-race");
+        UUID refundRequestId = UUID.randomUUID();
+        BigDecimal refundAmount = new BigDecimal("250000.00");
+        int workers = 8;
+        ExecutorService executor = Executors.newFixedThreadPool(workers);
+        CountDownLatch ready = new CountDownLatch(workers);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<UUID>> futures = new ArrayList<>();
+
+        try {
+            for (int index = 0; index < workers; index++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return studentWalletService.creditRefund(
+                            studentId,
+                            refundAmount,
+                            refundRequestId,
+                            "Refund concurrency test").getId();
+                }));
+            }
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            List<UUID> ledgerIds = new ArrayList<>();
+            for (Future<UUID> future : futures) {
+                ledgerIds.add(future.get(30, TimeUnit.SECONDS));
+            }
+            assertEquals(1, ledgerIds.stream().distinct().count());
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+        }
+
+        assertEquals(0, refundAmount.compareTo(jdbcTemplate.queryForObject("""
+                SELECT balance FROM wallets
+                WHERE owner_type = 'STUDENT' AND student_id = ?
+                """, BigDecimal.class, studentId)));
+        assertEquals(1, count("""
+                SELECT COUNT(*) FROM wallet_transactions
+                WHERE idempotency_key = ?
+                  AND transaction_type = 'REFUND'
+                  AND direction = 'IN'
+                  AND amount = 250000.00
+                """, "wallet-refund:" + refundRequestId));
+    }
+
     private int count(String sql, Object... arguments) {
         return jdbcTemplate.queryForObject(sql, Integer.class, arguments);
+    }
+
+    private UUID createStudentProfile(String prefix) {
+        UUID userId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO app_users (id, email, full_name, provider, user_status)
+                VALUES (?, ?, 'Race Test Student', 'GOOGLE', 'ACTIVE')
+                """, userId, prefix + "+" + userId + "@test.local");
+        jdbcTemplate.update("""
+                INSERT INTO student_profiles (id, user_id, display_name)
+                VALUES (?, ?, 'Race Test Student')
+                """, studentId, userId);
+        return studentId;
+    }
+
+    private void insertPendingOrder(
+            UUID orderId,
+            UUID studentId,
+            String orderCode,
+            BigDecimal total
+    ) {
+        jdbcTemplate.update("""
+                INSERT INTO orders (
+                    id, student_id, order_code, total_amount, currency, order_status
+                ) VALUES (?, ?, ?, ?, 'VND', 'PENDING')
+                """, orderId, studentId, orderCode, total);
     }
 
     private BigDecimal teacherFrozenBalance() {

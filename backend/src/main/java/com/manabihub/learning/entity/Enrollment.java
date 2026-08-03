@@ -55,4 +55,12 @@ public class Enrollment {
 
     @Column(name = "completed_at")
     private Instant completedAt;
+
+    /**
+     * Set when the learner has downloaded every protected material belonging to
+     * this enrollment. BR-REF-01 uses this immutable evidence to block automatic
+     * approval while still allowing a dispute/manual-review request.
+     */
+    @Column(name = "protected_materials_fully_downloaded_at")
+    private Instant protectedMaterialsFullyDownloadedAt;
 }

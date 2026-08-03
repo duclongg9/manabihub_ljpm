@@ -52,15 +52,15 @@ public class CommercialPolicyService implements ApplicationRunner {
     private static final Map<String, String> SAFE_DEFAULTS = Map.ofEntries(
             Map.entry(CURRENCY, "VND"),
             Map.entry(COMMISSION_RATE, "0.20"),
-            Map.entry(REFUND_WINDOW_DAYS, "7"),
-            Map.entry(REFUND_PROGRESS_LIMIT_PERCENT, "30"),
+            Map.entry(REFUND_WINDOW_DAYS, "14"),
+            Map.entry(REFUND_PROGRESS_LIMIT_PERCENT, "20"),
             Map.entry(ESCROW_HOLDING_DAYS, "14"),
             Map.entry(PAYOUT_THRESHOLD, "100000"),
             Map.entry(WITHDRAWAL_FEE, "0"),
             Map.entry(KYC_TARGET_DAYS_MIN, "1"),
             Map.entry(KYC_TARGET_DAYS_MAX, "2"),
-            Map.entry(POLICY_VERSION, "provisional-2026-07-28"),
-            Map.entry(POLICY_EFFECTIVE_AT, "2026-07-28T00:00:00Z"));
+            Map.entry(POLICY_VERSION, "br-ref-01-2026-08-03"),
+            Map.entry(POLICY_EFFECTIVE_AT, "2026-08-03T00:00:00Z"));
 
     private final SystemSettingRepository systemSettingRepository;
 

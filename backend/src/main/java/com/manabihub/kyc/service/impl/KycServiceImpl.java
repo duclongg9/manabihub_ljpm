@@ -28,8 +28,9 @@ import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.service.KycService;
 import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
-import com.manabihub.wallet.entity.TeacherWallet;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,7 +63,7 @@ public class KycServiceImpl implements KycService {
     private final AuditLogRepository auditLogRepository;
     private final NotificationRepository notificationRepository;
     private final CourseRepository courseRepository;
-    private final TeacherWalletRepository teacherWalletRepository;
+    private final WalletRepository walletRepository;
     private final ObjectMapper objectMapper;
     private final EntityManager entityManager;
 
@@ -501,15 +502,15 @@ public class KycServiceImpl implements KycService {
             courseRepository.saveAll(coursesToRemove);
         }
 
-        boolean walletFrozen = teacherWalletRepository.findByTeacherIdForUpdate(teacher.getId())
+        boolean walletFrozen = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, teacher.getId())
                 .map(this::freezeWallet)
                 .orElse(false);
         return new SuspensionImpact(coursesToRemove.size(), walletFrozen);
     }
 
-    private boolean freezeWallet(TeacherWallet wallet) {
+    private boolean freezeWallet(Wallet wallet) {
         wallet.setFrozen(true);
-        teacherWalletRepository.save(wallet);
+        walletRepository.save(wallet);
         return true;
     }
 

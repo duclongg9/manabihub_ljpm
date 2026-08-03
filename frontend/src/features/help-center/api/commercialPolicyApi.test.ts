@@ -9,13 +9,13 @@ describe('provisional commercial policy', () => {
     expect(PROVISIONAL_COMMERCIAL_POLICY).toMatchObject({
       currency: 'VND',
       commissionRate: 0.2,
-      refundWindowDays: 7,
-      refundProgressLimitPercent: 30,
+      refundWindowDays: 14,
+      refundProgressLimitPercent: 20,
       escrowHoldingDays: 14,
       payoutThreshold: 100_000,
       withdrawalFee: 0,
-      policyVersion: 'provisional-2026-07-28',
-      effectiveAt: '2026-07-28T00:00:00Z',
+      policyVersion: 'br-ref-01-2026-08-03',
+      effectiveAt: '2026-08-03T00:00:00Z',
     });
   });
 

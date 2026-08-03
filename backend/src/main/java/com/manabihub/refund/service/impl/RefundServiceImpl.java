@@ -16,8 +16,6 @@ import com.manabihub.refund.dto.response.RefundQueueResponse;
 import com.manabihub.refund.entity.RefundProviderAttempt;
 import com.manabihub.refund.entity.RefundRequest;
 import com.manabihub.refund.enums.RefundStatus;
-import com.manabihub.refund.gateway.RefundGateway;
-import com.manabihub.refund.gateway.RefundGatewayResult;
 import com.manabihub.refund.mapper.RefundMapper;
 import com.manabihub.refund.repository.RefundProviderAttemptRepository;
 import com.manabihub.refund.repository.RefundRequestRepository;
@@ -41,7 +39,6 @@ public class RefundServiceImpl implements RefundService {
     private final RefundRequestRepository refundRequestRepository;
     private final RefundMapper refundMapper;
     private final CurrentUserService currentUserService;
-    private final RefundGateway refundGateway;
     private final RefundDecisionTransactionService decisionTransactionService;
     private final OrderItemSnapshotRepository snapshotRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
@@ -81,32 +78,11 @@ public class RefundServiceImpl implements RefundService {
 
     @Override
     public void approveRefund(UUID refundId, RefundDecisionRequest request) {
-        RefundDecisionTransactionService.PreparedApproval prepared =
-                decisionTransactionService.prepareApproval(
-                        refundId,
-                        request,
-                        currentUserService.getCurrentUserId(),
-                        refundGateway.provider()
-                );
-        if (!prepared.gatewayRequired()) {
-            if (prepared.reconciliationRequired()) {
-                throw reconciliationRequired();
-            }
-            return;
-        }
-        RefundGatewayResult result;
-        try {
-            result = refundGateway.refund(prepared.command());
-        } catch (RuntimeException exception) {
-            result = RefundGatewayResult.failed("REFUND_GATEWAY_EXCEPTION");
-        }
-        RefundStatus outcome;
-        try {
-            outcome = decisionTransactionService.completeApproval(prepared, result);
-        } catch (RuntimeException exception) {
-            decisionTransactionService.recordFinalizationFailure(prepared, result);
-            throw reconciliationRequired();
-        }
+        RefundStatus outcome = decisionTransactionService.approveToStudentWallet(
+                refundId,
+                request,
+                currentUserService.getCurrentUserId()
+        );
         if (outcome == RefundStatus.RECONCILIATION_REQUIRED) {
             throw reconciliationRequired();
         }

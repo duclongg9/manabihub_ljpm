@@ -3,7 +3,7 @@ package com.manabihub.payout.service;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.payout.entity.WithdrawalRequest;
 import com.manabihub.payout.enums.ReconciliationStatus;
-import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.entity.Wallet;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -12,7 +12,7 @@ public interface PayoutReconciliationService {
 
     ReconciliationResult reconcile(
             WithdrawalRequest request,
-            TeacherWallet wallet,
+            Wallet wallet,
             TeacherProfile teacher
     );
 

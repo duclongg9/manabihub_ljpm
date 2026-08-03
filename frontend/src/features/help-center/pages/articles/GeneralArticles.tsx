@@ -12,9 +12,8 @@ export const LearnerPaymentsRefundsPage = () => (
   <ArticleLayout article={learnerPaymentsArticle}>
     <p>
       Học viên có thể mở <Link to={ROUTES.STUDENT.PAYMENTS}>Lịch sử thanh toán</Link>,
-      chọn đúng khóa học trong đơn hàng và gửi yêu cầu hoàn tiền. Yêu cầu đủ điều kiện
-      hoặc ngoại lệ đều được chuyển tới Finance để xem xét; việc gửi yêu cầu không đồng
-      nghĩa tiền đã được hoàn.
+      chọn đúng khóa học trong đơn hàng và gửi yêu cầu hoàn tiền. Yêu cầu đủ BR-REF-01 được tự động
+      hoàn vào ví; yêu cầu ngoài điều kiện được chuyển thành tranh chấp hoặc chờ Finance xét duyệt.
     </p>
     <PolicyBoundary>
       {(policy) => (
@@ -25,20 +24,20 @@ export const LearnerPaymentsRefundsPage = () => (
           {' '}
           <strong>{policy.refundWindowDays} ngày theo lịch</strong>
           {' '}
-          kể từ khi thanh toán thành công và tiến độ học phải thấp hơn
+          kể từ khi thanh toán thành công và tiến độ học phải không vượt quá
           {' '}
           <strong>{policy.refundProgressLimitPercent}%</strong>.
         </p>
         <p>
-          Mốc tiến độ là điều kiện nghiêm ngặt: tiến độ đúng
+          Tiến độ đúng
           {' '}
-          <strong>{policy.refundProgressLimitPercent}% không đủ điều kiện tiêu chuẩn</strong>.
-          Tỷ lệ này không phải số tiền hoàn; khi được duyệt, số tiền chuẩn là số tiền thực tế
-          đã thanh toán và phân bổ cho khóa học bị ảnh hưởng.
+          <strong>{policy.refundProgressLimitPercent}% vẫn đủ điều kiện tiêu chuẩn</strong>, miễn là học viên
+          chưa tải toàn bộ tài liệu được bảo vệ. Khi đủ điều kiện, toàn bộ số tiền thực tế đã thanh toán
+          được tự động hoàn vào ví.
         </p>
         <p>
-          Việc đủ điều kiện gửi yêu cầu không đồng nghĩa tiền đã được hoàn. Màn hình
-          thanh toán phải hiển thị trạng thái xử lý và kết quả cuối cùng.
+          Yêu cầu chỉ hiển thị đã hoàn khi giao dịch ghi có vào ví và các bản ghi tài chính liên quan
+          đã hoàn tất nhất quán.
         </p>
 
         <h2>Trường hợp ngoại lệ</h2>
