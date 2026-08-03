@@ -71,10 +71,9 @@ public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecif
             "WHERE cm.course_id = :courseId", nativeQuery = true)
     int countLessonBlocksByCourseId(@org.springframework.data.repository.query.Param("courseId") UUID courseId);
 
-    @org.springframework.data.jpa.repository.Query(value = "SELECT CASE WHEN COUNT(clb.id) > 0 THEN true ELSE false END " +
-            "FROM course_lesson_blocks clb " +
-            "JOIN course_modules cm ON clb.module_id = cm.id " +
-            "WHERE cm.course_id = :courseId AND clb.block_type = 'QUIZ'", nativeQuery = true)
+    @org.springframework.data.jpa.repository.Query(value = "SELECT EXISTS (" +
+            "SELECT 1 FROM final_tests " +
+            "WHERE course_id = :courseId)", nativeQuery = true)
     boolean hasFinalTestByCourseId(@org.springframework.data.repository.query.Param("courseId") UUID courseId);
 
     @org.springframework.data.jpa.repository.Query(value = "SELECT EXISTS (" +
