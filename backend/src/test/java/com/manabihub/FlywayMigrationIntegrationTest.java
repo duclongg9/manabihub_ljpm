@@ -5,7 +5,10 @@ import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.MigrationState;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -21,8 +24,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace.NONE;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = NONE)
+@Import(FlywayAutoConfiguration.class)
 @Testcontainers
 @ActiveProfiles("it")
 public class FlywayMigrationIntegrationTest {
@@ -40,12 +46,6 @@ public class FlywayMigrationIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-        registry.add("spring.mail.host", () -> "localhost");
-        registry.add("spring.mail.port", () -> "25");
-        registry.add("manabihub.kyc.identity-secret",
-                () -> "this-is-a-very-long-and-secure-secret-for-testing-only-12345");
-        registry.add("manabihub.payout.security-secret",
-                () -> "test-only-payout-security-secret-at-least-32-bytes");
     }
 
     @Autowired
@@ -120,7 +120,7 @@ public class FlywayMigrationIntegrationTest {
         lj.update("INSERT INTO " + s + ".student_profiles (id, user_id, created_at) VALUES (?, ?, now())", studentProfId, studentUserId);
         lj.update("INSERT INTO " + s + ".teacher_profiles (id, user_id, created_at) VALUES (?, ?, now())", teacherProfId, teacherUserId);
 
-        // Course → module → legacy lesson → legacy lesson_block
+        // Course -> module -> legacy lesson -> legacy lesson_block
         lj.update("INSERT INTO " + s + ".courses (id, teacher_id, title, description, slug, status, created_at) VALUES (?, ?, 'C', 'D', 'slug-upgrade', 'DRAFT', now())", courseId, teacherProfId);
         lj.update("INSERT INTO " + s + ".course_modules (id, course_id, title, order_index, created_at) VALUES (?, ?, 'M', 1, now())", moduleId, courseId);
         lj.update("INSERT INTO " + s + ".lessons (id, module_id, title, lesson_type, order_index, created_at) VALUES (?, ?, 'L', 'VIDEO', 1, now())", lessonId, moduleId);
