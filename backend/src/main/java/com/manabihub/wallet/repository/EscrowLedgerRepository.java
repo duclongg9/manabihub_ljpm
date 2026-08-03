@@ -92,4 +92,33 @@ public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID
             @Param("teacherId") UUID teacherId,
             @Param("status") EscrowStatus status
     );
+
+    @Query("""
+            select coalesce(sum(escrow.amount), 0)
+            from EscrowLedger escrow
+            where escrow.course.id = :courseId
+              and escrow.status != 'REFUNDED'
+              and escrow.createdAt >= :startDate
+              and escrow.createdAt <= :endDate
+            """)
+    java.math.BigDecimal sumNetRevenueByCourseIdAndDateRange(
+            @Param("courseId") UUID courseId,
+            @Param("startDate") Instant startDate,
+            @Param("endDate") Instant endDate
+    );
+
+    @Query("""
+            select coalesce(sum(oi.price), 0)
+            from EscrowLedger escrow
+            join escrow.orderItem oi
+            where escrow.course.id = :courseId
+              and escrow.status != 'REFUNDED'
+              and escrow.createdAt >= :startDate
+              and escrow.createdAt <= :endDate
+            """)
+    java.math.BigDecimal sumGrossRevenueByCourseIdAndDateRange(
+            @Param("courseId") UUID courseId,
+            @Param("startDate") Instant startDate,
+            @Param("endDate") Instant endDate
+    );
 }

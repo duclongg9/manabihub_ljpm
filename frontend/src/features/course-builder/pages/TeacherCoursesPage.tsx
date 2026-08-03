@@ -9,6 +9,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import {
   Alert,
   Box,
@@ -37,6 +38,7 @@ import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
 import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
+import { CourseAnalyticsDialog } from '../components/CourseAnalyticsDialog';
 import {
   deleteCourseDraft,
   fetchCourseCategories,
@@ -98,6 +100,7 @@ export function TeacherCoursesPage() {
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishCandidate, setPublishCandidate] = useState<CourseDraftResponse | null>(null);
+  const [analyticsCourse, setAnalyticsCourse] = useState<{ id: string; title: string } | null>(null);
 
   const categoryNames = useMemo(
     () => new Map(categories.map((category) => [category.code, category.name])),
@@ -464,6 +467,7 @@ export function TeacherCoursesPage() {
                     onPublish={() => setPublishCandidate(course)}
                     onSubmit={() => void submitDraft(course)}
                     onView={() => navigate(ROUTES.PUBLIC.COURSE_DETAIL.replace(':id', course.slug || course.id))}
+                    onAnalytics={() => setAnalyticsCourse({ id: course.id, title: displayDraftTitle(course) })}
                   />
                 ))}
               </Stack>
@@ -582,6 +586,12 @@ export function TeacherCoursesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      
+      <CourseAnalyticsDialog
+        courseId={analyticsCourse?.id ?? null}
+        courseTitle={analyticsCourse?.title ?? null}
+        onClose={() => setAnalyticsCourse(null)}
+      />
     </Box>
   );
 }
@@ -610,6 +620,7 @@ interface CourseDraftRowProps {
   onEdit: () => void;
   onPublish: () => void;
   onView: () => void;
+  onAnalytics: () => void;
   publishing: boolean;
   submitting: boolean;
   onSubmit: () => void;
@@ -629,6 +640,7 @@ function CourseDraftRow({
   onPublish,
   onSubmit,
   onView,
+  onAnalytics,
 }: CourseDraftRowProps) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const thumbnailSrc = resolveAssetUrl(course.thumbnailUrl);
@@ -807,15 +819,27 @@ function CourseDraftRow({
             </Button>
           )}
           {course.status === 'PUBLISHED' && (
-            <Button
-              variant="outlined"
-              color="success"
-              size="small"
-              onClick={onView}
-              sx={{ textTransform: 'none', fontWeight: 700 }}
-            >
-              Xem trên danh mục
-            </Button>
+            <>
+              <Button
+                variant="outlined"
+                color="info"
+                size="small"
+                onClick={onAnalytics}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+                startIcon={<AssessmentIcon />}
+              >
+                Xem Analytics
+              </Button>
+              <Button
+                variant="outlined"
+                color="success"
+                size="small"
+                onClick={onView}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                Xem trên danh mục
+              </Button>
+            </>
           )}
           <Menu
             id={`course-draft-${course.id}-menu`}
