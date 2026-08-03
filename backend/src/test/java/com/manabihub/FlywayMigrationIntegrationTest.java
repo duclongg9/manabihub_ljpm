@@ -37,6 +37,11 @@ public class FlywayMigrationIntegrationTest {
         public org.springframework.web.servlet.handler.HandlerMappingIntrospector mvcHandlerMappingIntrospector() {
             return org.mockito.Mockito.mock(org.springframework.web.servlet.handler.HandlerMappingIntrospector.class);
         }
+
+        @org.springframework.context.annotation.Bean
+        public org.springframework.security.oauth2.client.registration.ClientRegistrationRepository clientRegistrationRepository() {
+            return org.mockito.Mockito.mock(org.springframework.security.oauth2.client.registration.ClientRegistrationRepository.class);
+        }
     }
 
     @Container
