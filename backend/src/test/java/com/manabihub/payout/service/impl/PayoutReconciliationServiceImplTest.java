@@ -49,6 +49,7 @@ class PayoutReconciliationServiceImplTest {
                 .requestedAmount(new BigDecimal("500000.00"))
                 .bankAccountSnapshot(validBank())
                 .build();
+
         AppUser user = new AppUser();
         user.setId(UUID.randomUUID());
         user.setUserStatus(UserStatus.ACTIVE);
@@ -58,6 +59,7 @@ class PayoutReconciliationServiceImplTest {
         wallet = Wallet.builder()
                 .id(walletId)
                 .teacher(teacher)
+                .ownerType(com.manabihub.wallet.enums.WalletOwnerType.TEACHER)
                 .balance(new BigDecimal("1000000.00"))
                 .frozenBalance(new BigDecimal("500000.00"))
                 .currency("VND")

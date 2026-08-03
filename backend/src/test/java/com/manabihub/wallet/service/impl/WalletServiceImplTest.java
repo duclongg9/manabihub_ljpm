@@ -8,13 +8,11 @@ import com.manabihub.systemconfig.model.CommercialPolicy;
 import com.manabihub.systemconfig.service.CommercialPolicyService;
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
 import com.manabihub.wallet.entity.Wallet;
-import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.enums.WalletTransactionType;
 import com.manabihub.wallet.mapper.WalletMapper;
-import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +42,6 @@ import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class WalletServiceImplTest {
-
 
     @Mock private TeacherProfileRepository teacherProfileRepository;
     @Mock private WalletRepository walletRepository;
@@ -76,8 +73,9 @@ class WalletServiceImplTest {
     @Test
     void getTeacherWallet_resolvesTeacherProfileBeforeWalletLookup() {
         UUID userId = UUID.randomUUID();
-        Wallet wallet = Wallet.builder()
+        Wallet teacherWallet = Wallet.builder()
                 .id(UUID.randomUUID())
+                .ownerType(WalletOwnerType.TEACHER)
                 .teacher(teacher)
                 .balance(new BigDecimal("5000000.00"))
                 .frozenBalance(BigDecimal.ZERO)
@@ -85,7 +83,8 @@ class WalletServiceImplTest {
         TeacherWalletResponse expected = new TeacherWalletResponse();
 
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(teacher));
-        when(walletRepository.findByOwnerTypeAndTeacher_Id(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacher.getId())).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId()))
+                .thenReturn(Optional.of(teacherWallet));
         when(walletMapper.toResponse(
                 eq(wallet),
                 any(BigDecimal.class),
@@ -97,7 +96,7 @@ class WalletServiceImplTest {
 
         assertSame(expected, actual);
         verify(teacherProfileRepository).findByUserId(userId);
-        verify(walletRepository).findByOwnerTypeAndTeacher_Id(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacher.getId());
+        verify(walletRepository).findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId());
         verify(walletMapper).toResponse(
                 wallet,
                 new BigDecimal("500000.00"),
@@ -148,15 +147,16 @@ class WalletServiceImplTest {
     @Test
     void reserveBalance_whenWalletIsFrozen_rejectsWithdrawalBeforeMutation() {
         UUID withdrawalId = UUID.randomUUID();
-        Wallet wallet = Wallet.builder()
+        Wallet teacherWallet = Wallet.builder()
                 .id(UUID.randomUUID())
+                .ownerType(WalletOwnerType.TEACHER)
                 .teacher(teacher)
                 .balance(new BigDecimal("2000000.00"))
                 .frozenBalance(BigDecimal.ZERO)
                 .frozen(true)
                 .build();
-        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacher.getId()))
-                .thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, teacher.getId()))
+                .thenReturn(Optional.of(teacherWallet));
 
         BusinessException exception = assertThrows(
                 BusinessException.class,

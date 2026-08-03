@@ -11,6 +11,7 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.service.EnrollmentProgressResetService;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.dto.response.OrderResponse;
@@ -18,6 +19,7 @@ import com.manabihub.order.enums.OrderStatus;
 import com.manabihub.order.mapper.OrderMapper;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
+import com.manabihub.wallet.config.WalletPaymentProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,9 +52,11 @@ class OrderServiceImplTest {
     @Mock private OrderItemRepository orderItemRepository;
     @Mock private CourseRepository courseRepository;
     @Mock private EnrollmentRepository enrollmentRepository;
+    @Mock private EnrollmentProgressResetService enrollmentProgressResetService;
     @Mock private StudentProfileRepository studentProfileRepository;
     @Mock private CurrentUserService currentUserService;
     @Mock private OrderMapper orderMapper;
+    @Mock private WalletPaymentProperties walletPaymentProperties;
 
     @InjectMocks
     private OrderServiceImpl service;
@@ -75,6 +79,10 @@ class OrderServiceImplTest {
 
         lenient().when(currentUserService.getCurrentUserId()).thenReturn(userId);
         lenient().when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+        lenient().when(walletPaymentProperties.getTopUpMinAmount())
+                .thenReturn(new BigDecimal("10000"));
+        lenient().when(walletPaymentProperties.getTopUpMaxAmount())
+                .thenReturn(new BigDecimal("100000000"));
     }
 
     @Test
@@ -118,6 +126,32 @@ class OrderServiceImplTest {
     }
 
     @Test
+    void createOrder_refundedEnrollment_allowsRepurchase() {
+        when(courseRepository.findById(course.getId())).thenReturn(Optional.of(course));
+        Enrollment refunded = Enrollment.builder().status(EnrollmentStatus.REFUNDED).build();
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId()))
+                .thenReturn(Optional.of(refunded));
+        when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order created = service.createOrder(course.getId());
+
+        assertEquals(OrderStatus.PENDING, created.getStatus());
+        verify(orderItemRepository).save(any(OrderItem.class));
+    }
+
+    @Test
+    void createOrder_revokedEnrollment_doesNotBypassModeration() {
+        when(courseRepository.findById(course.getId())).thenReturn(Optional.of(course));
+        Enrollment revoked = Enrollment.builder().status(EnrollmentStatus.REVOKED).build();
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId()))
+                .thenReturn(Optional.of(revoked));
+
+        assertThrows(BusinessException.class, () -> service.createOrder(course.getId()));
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
     void createOrder_courseNotFound_throws() {
         when(courseRepository.findById(course.getId())).thenReturn(Optional.empty());
 
@@ -137,7 +171,7 @@ class OrderServiceImplTest {
                 .build();
         when(orderItemRepository.findByOrder_Id(order.getId())).thenReturn(java.util.List.of(
                 OrderItem.builder().order(order).course(course).price(BigDecimal.ZERO).build()));
-        when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId()))
+        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(student.getId(), course.getId()))
                 .thenReturn(Optional.empty());
 
         service.enrollFreeOrder(order);
@@ -145,6 +179,53 @@ class OrderServiceImplTest {
         assertEquals(OrderStatus.PAID, order.getStatus());
         verify(enrollmentRepository).save(any(Enrollment.class));
         verify(orderRepository).save(order);
+    }
+
+    @Test
+    void enrollFreeOrder_resetsRefundedEnrollmentWithoutReplacingIt() {
+        Order order = Order.builder()
+                .id(UUID.randomUUID())
+                .orderCode("OD-FREE-REPURCHASE")
+                .totalAmount(BigDecimal.ZERO)
+                .currency("VND")
+                .status(OrderStatus.PENDING)
+                .student(student)
+                .build();
+        Enrollment refunded = Enrollment.builder()
+                .id(UUID.randomUUID())
+                .student(student)
+                .course(course)
+                .status(EnrollmentStatus.REFUNDED)
+                .build();
+        UUID originalEnrollmentId = refunded.getId();
+        when(orderItemRepository.findByOrder_Id(order.getId())).thenReturn(List.of(
+                OrderItem.builder().order(order).course(course).price(BigDecimal.ZERO).build()));
+        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(student.getId(), course.getId()))
+                .thenReturn(Optional.of(refunded));
+
+        service.enrollFreeOrder(order);
+
+        assertEquals(originalEnrollmentId, refunded.getId());
+        verify(enrollmentProgressResetService).resetForRepurchase(refunded);
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void createTopUpOrder_acceptsConfiguredMaximum() {
+        when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order created = service.createTopUpOrder(new BigDecimal("100000000"));
+
+        assertEquals(new BigDecimal("100000000"), created.getTotalAmount());
+    }
+
+    @Test
+    void createTopUpOrder_rejectsAmountAboveConfiguredMaximum() {
+        assertThrows(BusinessException.class,
+                () -> service.createTopUpOrder(new BigDecimal("100000001")));
+
+        verify(orderRepository, never()).save(any());
     }
 
     @Test

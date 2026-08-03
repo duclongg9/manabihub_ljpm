@@ -218,6 +218,9 @@ class ManabiHubApplicationTests {
     private com.manabihub.wallet.repository.WalletTransactionRepository walletTransactionRepository;
 
     @MockBean
+    private com.manabihub.wallet.repository.WalletPaymentReservationRepository walletPaymentReservationRepository;
+
+    @MockBean
     private com.manabihub.wallet.repository.EscrowLedgerRepository escrowLedgerRepository;
 
     @MockBean

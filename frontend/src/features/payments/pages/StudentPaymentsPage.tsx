@@ -231,7 +231,7 @@ function OrderCard({
                   <Typography sx={{ fontWeight: 800 }}>{item.courseTitle}</Typography>
                   <Typography variant="body2" color="text.secondary">{formatMoney(item.price, order.currency)}</Typography>
                 </Box>
-                {order.status === 'PAID' && (
+                {order.status === 'PAID' && item.price > 0 && (
                   <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap' }}>
                     {refund && (
                       <Button size="small" variant="outlined" onClick={() => onOpenRefund(refund)}>

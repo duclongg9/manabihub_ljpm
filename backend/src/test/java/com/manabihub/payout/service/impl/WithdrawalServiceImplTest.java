@@ -68,6 +68,7 @@ class WithdrawalServiceImplTest {
             UUID.fromString("b82e8ebf-9997-45a6-bdbe-3fbe6ad25b04");
     private final BigDecimal minimumPayout = new BigDecimal("500000");
     private Wallet wallet;
+    private TeacherProfile teacherProfile;
 
     @BeforeEach
     void setUp() {
@@ -75,7 +76,7 @@ class WithdrawalServiceImplTest {
                 .when(commercialPolicyService.getCurrentPolicy())
                 .thenReturn(policy(minimumPayout));
 
-        TeacherProfile teacherProfile = new TeacherProfile();
+        teacherProfile = new TeacherProfile();
         teacherProfile.setId(teacherProfileId);
         org.mockito.Mockito.lenient().when(teacherProfileRepository.findByUserId(userId))
                 .thenReturn(Optional.of(teacherProfile));

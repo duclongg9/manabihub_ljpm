@@ -41,6 +41,8 @@ public class RefundEligibilitySnapshot {
     private Double measuredProgressPercent;
     
     private Integer progressThresholdPercent;
+    private Boolean protectedMaterialsFullyDownloaded;
+    private Instant protectedMaterialsFullyDownloadedAt;
     
     @JsonAlias("paidAmount")
     private BigDecimal actuallyPaidAmount;

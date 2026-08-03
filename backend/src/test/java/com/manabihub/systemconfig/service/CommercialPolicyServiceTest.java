@@ -36,15 +36,15 @@ class CommercialPolicyServiceTest {
 
         assertEquals("VND", policy.currency());
         assertEquals(new BigDecimal("0.20"), policy.commissionRate());
-        assertEquals(7, policy.refundWindowDays());
-        assertEquals(30, policy.refundProgressLimitPercent());
+        assertEquals(14, policy.refundWindowDays());
+        assertEquals(20, policy.refundProgressLimitPercent());
         assertEquals(14, policy.escrowHoldingDays());
         assertEquals(new BigDecimal("100000"), policy.payoutThreshold());
         assertEquals(BigDecimal.ZERO, policy.withdrawalFee());
         assertEquals(1, policy.kycTargetDaysMin());
         assertEquals(2, policy.kycTargetDaysMax());
-        assertEquals("provisional-2026-07-28", policy.policyVersion());
-        assertEquals(Instant.parse("2026-07-28T00:00:00Z"), policy.effectiveAt());
+        assertEquals("br-ref-01-2026-08-03", policy.policyVersion());
+        assertEquals(Instant.parse("2026-08-03T00:00:00Z"), policy.effectiveAt());
     }
 
     @Test

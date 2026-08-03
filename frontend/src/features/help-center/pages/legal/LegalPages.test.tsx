@@ -13,8 +13,8 @@ vi.mock('../../components/PolicyBoundary', () => {
   const policy: CommercialPolicy = {
     currency: 'VND',
     commissionRate: 0.2,
-    refundWindowDays: 7,
-    refundProgressLimitPercent: 30,
+    refundWindowDays: 14,
+    refundProgressLimitPercent: 20,
     escrowHoldingDays: 14,
     payoutThreshold: 100_000,
     withdrawalFee: 0,
@@ -36,14 +36,14 @@ const renderPage = (page: ReactNode) => render(<MemoryRouter>{page}</MemoryRoute
 afterEach(cleanup);
 
 describe('legal policy pages', () => {
-  it('states the strict refund boundary and self-service entry point', () => {
+  it('states the inclusive BR-REF-01 boundary and self-service entry point', () => {
     renderPage(<RefundPolicyPage />);
 
     expect(screen.getByRole('link', { name: /Lịch sử thanh toán/i })).toHaveAttribute('href', '/student/payments');
-    expect(screen.getByText(/7 ngày theo lịch/i)).toBeInTheDocument();
-    expect(screen.getByText(/thấp hơn 30%/i)).toBeInTheDocument();
-    expect(screen.getByText(/30% không đủ điều kiện tiêu chuẩn/i)).toBeInTheDocument();
-    expect(screen.getByText(/30% là ngưỡng tiến độ, không phải tỷ lệ tiền hoàn/i)).toBeInTheDocument();
+    expect(screen.getByText(/14 ngày theo lịch/i)).toBeInTheDocument();
+    expect(screen.getByText(/không vượt quá 20%/i)).toBeInTheDocument();
+    expect(screen.getByText(/chưa tải toàn bộ tài liệu/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/tranh chấp.*xét duyệt thủ công/i)).not.toHaveLength(0);
   });
 
   it('renders the configured 20/80 split and payout boundaries', () => {

@@ -15,6 +15,6 @@ public interface WalletMapper {
     @Mapping(target = "walletFrozen", source = "wallet.frozen")
     @Mapping(target = "pendingBalance", constant = "0")
     @Mapping(target = "reservedBalance", source = "wallet.frozenBalance")
-    @Mapping(target = "availableBalance", expression = "java(wallet.getBalance().subtract(wallet.getFrozenBalance()))")
+    @Mapping(target = "availableBalance", expression = "java(wallet.getAvailableBalance())")
     TeacherWalletResponse toResponse(Wallet wallet, BigDecimal minimumPayoutAmount, int clearingPeriodDays, LocalDate nextPayoutDate);
 }

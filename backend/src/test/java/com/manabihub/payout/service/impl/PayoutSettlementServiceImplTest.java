@@ -74,7 +74,7 @@ class PayoutSettlementServiceImplTest {
     @Mock private WithdrawalRequestRepository withdrawalRequestRepository;
     @Mock private PayoutSettlementRepository payoutSettlementRepository;
     @Mock private PayoutReconciliationLogRepository reconciliationLogRepository;
-    @Mock private WalletRepository WalletRepository;
+    @Mock private WalletRepository walletRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
     @Mock private InternalAdminAccountRepository internalAdminAccountRepository;
@@ -159,7 +159,7 @@ class PayoutSettlementServiceImplTest {
         when(internalAdminAccountRepository.findById(adminId)).thenReturn(Optional.of(admin));
         when(withdrawalRequestRepository.findByIdWithLock(requestId)).thenReturn(Optional.of(request));
         when(teacherProfileRepository.findById(teacherId)).thenReturn(Optional.of(teacher));
-        when(WalletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherId)).thenReturn(Optional.of(wallet));
         when(payoutSettlementRepository.findByWithdrawalRequestIdWithLock(requestId))
                 .thenAnswer(ignored -> Optional.ofNullable(settlementRef.get()));
         when(payoutSettlementRepository.findByIdWithLock(any()))
@@ -191,7 +191,7 @@ class PayoutSettlementServiceImplTest {
                 withdrawalRequestRepository,
                 payoutSettlementRepository,
                 reconciliationLogRepository,
-                WalletRepository,
+                walletRepository,
                 walletTransactionRepository,
                 teacherProfileRepository,
                 internalAdminAccountRepository,

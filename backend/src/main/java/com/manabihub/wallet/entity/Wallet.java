@@ -84,4 +84,12 @@ public class Wallet {
     public BigDecimal getAvailableBalance() {
         return balance.subtract(frozenBalance);
     }
+
+    public UUID getStudentId() {
+        return student == null ? null : student.getId();
+    }
+
+    public UUID getTeacherId() {
+        return teacher == null ? null : teacher.getId();
+    }
 }

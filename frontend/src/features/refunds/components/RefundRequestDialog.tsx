@@ -27,6 +27,7 @@ import type { StudentRefundResponse, StudentRefundType } from '../types';
 
 const REFUND_TYPE_OPTIONS: Array<{ value: StudentRefundType; label: string }> = [
   { value: 'STANDARD', label: 'Yêu cầu theo chính sách tiêu chuẩn' },
+  { value: 'DISPUTE', label: 'Tranh chấp / yêu cầu xét duyệt thủ công' },
   { value: 'DUPLICATE_CHARGE', label: 'Bị tính phí trùng' },
   { value: 'PAYMENT_ERROR', label: 'Có lỗi thanh toán' },
   { value: 'PLATFORM_ACCESS_FAILURE', label: 'Lỗi nền tảng khiến tôi không thể học' },
@@ -134,8 +135,9 @@ export function RefundRequestDialog({
                 <Alert severity="info">
                   Điều kiện tiêu chuẩn: gửi trong vòng{' '}
                   <strong>{policyQuery.data.refundWindowDays} ngày theo lịch</strong> và tiến độ{' '}
-                  <strong>nhỏ hơn {policyQuery.data.refundProgressLimitPercent}%</strong>.{' '}
-                  {policyQuery.data.refundProgressLimitPercent}% là ngưỡng tiến độ, không phải tỷ lệ tiền hoàn.
+                  <strong>không vượt quá {policyQuery.data.refundProgressLimitPercent}%</strong> và chưa tải{' '}
+                  <strong>toàn bộ tài liệu học tập được bảo vệ</strong>. Nếu đáp ứng đủ, tiền sẽ được tự động
+                  hoàn toàn bộ vào ví.
                 </Alert>
               )}
 
@@ -177,7 +179,7 @@ export function RefundRequestDialog({
                     onChange={(event) => setConfirmed(event.target.checked)}
                   />
                 )}
-                label="Tôi xác nhận thông tin trên là đúng và đồng ý để Finance xem xét."
+                label="Tôi xác nhận thông tin trên là đúng và đồng ý áp dụng chính sách hoàn tiền."
               />
             </>
           )}
@@ -185,7 +187,11 @@ export function RefundRequestDialog({
           {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
           {submitted && !error && (
             <Alert severity="success">
-              {existingRefund ? 'Yêu cầu đã được hủy.' : 'Yêu cầu đã được gửi và đang chờ Finance xem xét.'}
+              {existingRefund
+                ? 'Yêu cầu đã được hủy.'
+                : createMutation.data?.status === 'APPROVED'
+                  ? 'Yêu cầu đủ điều kiện và đã được tự động hoàn toàn bộ tiền vào ví.'
+                  : 'Yêu cầu đã được chuyển sang tranh chấp/xét duyệt thủ công.'}
             </Alert>
           )}
         </Stack>
@@ -234,8 +240,9 @@ function RefundDetail({ refund }: { refund: StudentRefundResponse }) {
       {snapshot && (
         <Alert severity="info">
           Snapshot khi gửi: ngày thứ {snapshot.elapsedCalendarDays}/{snapshot.refundWindowDays},{' '}
-          tiến độ {snapshot.measuredProgressPercent}% (ngưỡng phải nhỏ hơn{' '}
-          {snapshot.progressThresholdPercent}%), số tiền đã trả{' '}
+          tiến độ {snapshot.measuredProgressPercent}% (ngưỡng không vượt quá{' '}
+          {snapshot.progressThresholdPercent}%), tài liệu bảo vệ{' '}
+          {snapshot.protectedMaterialsFullyDownloaded ? 'đã tải toàn bộ' : 'chưa tải toàn bộ'}, số tiền đã trả{' '}
           {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: snapshot.currency })
             .format(snapshot.actuallyPaidAmount)}.
         </Alert>
@@ -255,6 +262,7 @@ function refundErrorMessage(code?: string): string {
   const messages: Record<string, string> = {
     REFUND_WINDOW_EXPIRED: 'Đã quá thời hạn hoàn tiền tiêu chuẩn. Nếu có lỗi thanh toán hoặc lỗi nền tảng, hãy chọn đúng loại ngoại lệ để Finance xem xét.',
     REFUND_PROGRESS_LIMIT_REACHED: 'Tiến độ đã đạt ngưỡng nên không đủ điều kiện tiêu chuẩn. Chỉ chọn ngoại lệ khi thực sự có lỗi thanh toán hoặc lỗi nền tảng.',
+    REFUND_PROTECTED_MATERIALS_DOWNLOADED: 'Bạn đã tải toàn bộ tài liệu được bảo vệ nên yêu cầu cần được chuyển sang tranh chấp/xét duyệt thủ công.',
     REFUND_ENROLLMENT_MISSING: 'Hệ thống không tìm thấy quyền học. Hãy chọn “Lỗi nền tảng khiến tôi không thể học” để Finance xem xét thủ công.',
     REFUND_ACTIVE_REQUEST_EXISTS: 'Khóa học này đã có yêu cầu hoàn tiền đang hoạt động hoặc đã được chấp thuận.',
     REFUND_CANCELLATION_NOT_ALLOWED: 'Finance đã bắt đầu xử lý hoặc yêu cầu không còn ở trạng thái có thể hủy.',
