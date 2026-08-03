@@ -169,6 +169,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         // 2. Teacher A registers identity with formatted CCCD
         tx1.executeWithoutResult(status -> {
             KycIdentityVerificationRequest reqA = createMockSdkRequest(cccdRawWithSpaces, "Nguyen Van A");
+            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqA.providerTransactionId(), cccdNormalized);
             KycIdentityVerificationResponse respA = teacherKycService.verifyIdentity(userAId, reqA, "127.0.0.1", "TestAgent");
 
             assertNotNull(respA);
@@ -179,6 +180,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         // 3. Teacher A retries with same CCCD -> Idempotent success
         tx1.executeWithoutResult(status -> {
             KycIdentityVerificationRequest reqA = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
+            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqA.providerTransactionId(), cccdNormalized);
             KycIdentityVerificationResponse retryRespA = teacherKycService.verifyIdentity(userAId, reqA, "127.0.0.1", "TestAgent");
             assertNotNull(retryRespA);
         });
@@ -198,6 +200,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             TeacherProfile profileB = teacherProfileRepository.findByUserId(userBId).orElseThrow();
 
             KycIdentityVerificationRequest reqB = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
+            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqB.providerTransactionId(), cccdNormalized);
 
             BusinessException ex = assertThrows(
                     BusinessException.class,
@@ -262,6 +265,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             try {
                 startLatch.await();
                 KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
+                com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(req.providerTransactionId(), cccdNormalized);
                 KycIdentityVerificationResponse resp = teacherKycService.verifyIdentity(userAId, req, "127.0.0.1", "Thread-1");
                 outcomeA.set(resp);
             } catch (Throwable t) {
@@ -273,6 +277,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             try {
                 startLatch.await();
                 KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
+                com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(req.providerTransactionId(), cccdNormalized);
                 KycIdentityVerificationResponse resp = teacherKycService.verifyIdentity(userBId, req, "127.0.0.1", "Thread-2");
                 outcomeB.set(resp);
             } catch (Throwable t) {
@@ -443,13 +448,14 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
-        String cccd = generateUniqueCccdDigits();
+        String cccdNormalized = generateUniqueCccdDigits();
 
         tx.executeWithoutResult(status -> {
             AppUser user = createTestUser("pii", "Nguyen Van A");
             TeacherProfile profile = createTestProfile(user);
 
-            KycIdentityVerificationRequest req = createMockSdkRequest(cccd, "Nguyen Van A");
+            KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
+            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(req.providerTransactionId(), cccdNormalized);
             teacherKycService.verifyIdentity(user.getId(), req, "127.0.0.1", "TestAgent");
 
             KycStatusResponse statusResp = teacherKycService.getStatus(user.getId());
@@ -460,13 +466,8 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             // Assert providerResult removed
             assertFalse(payload.containsKey("providerResult"), "Teacher response must NOT contain providerResult");
 
-            // Assert idNumber redacted
-            @SuppressWarnings("unchecked")
-            Map<String, Object> ocr = (Map<String, Object>) payload.get("identityOcr");
-            assertNotNull(ocr);
-            String idNum = String.valueOf(ocr.get("idNumber"));
-            assertFalse(idNum.contains(cccd), "Teacher response must NOT contain raw CCCD");
-            assertTrue(idNum.contains("*"), "idNumber must be masked in teacher response");
+            // Assert idNumber and identityOcr completely redacted/removed
+            assertFalse(payload.containsKey("identityOcr"), "Teacher response must NOT contain OCR data");
 
             status.setRollbackOnly();
         });
