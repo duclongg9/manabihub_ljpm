@@ -30,6 +30,9 @@ import static org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTest
 @ActiveProfiles("it")
 public class FlywayMigrationIntegrationTest {
 
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.web.servlet.handler.HandlerMappingIntrospector mvcHandlerMappingIntrospector;
+
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine")
             .withDatabaseName("manabihub_test")
