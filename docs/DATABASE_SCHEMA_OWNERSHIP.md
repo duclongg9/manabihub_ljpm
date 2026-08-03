@@ -20,23 +20,25 @@ The purpose of this document is to clarify physical table ownership by JPA entit
 
 ### Learning Tables Inventory
 - **`lessons`**
-  - **Writable Owner**: `com.manabihub.course.entity.Lesson`
-  - **State**: Active.
+  - **Writable Owner**: None (No active JPA owner).
+  - **State**: DB-only legacy/retained.
+  - **Retirement Policy**: Retained for historical queries. Do not create synthetic JPA classes for it.
 - **`lesson_blocks`**
-  - **Writable Owner**: `com.manabihub.course.entity.LessonBlock`
-  - **State**: Active.
+  - **Writable Owner**: None (No active JPA owner).
+  - **State**: DB-only legacy/retained.
+  - **Retirement Policy**: Retained for historical queries. Do not create synthetic JPA classes for it.
 - **`lesson_progress`**
   - **Writable Owner**: `com.manabihub.learning.entity.LessonProgress`
   - **State**: Legacy.
   - **Retirement Policy**: Retained for historical reporting, but no new writes are permitted for new courses. Read-only fallback.
 - **`course_lesson_blocks`**
-  - **Writable Owner**: `com.manabihub.course.entity.CourseLessonBlock`
+  - **Writable Owner**: `com.manabihub.course.entity.LessonBlock`
   - **State**: Active.
 - **`lesson_block_progress`**
   - **Writable Owner**: `com.manabihub.learning.entity.LessonBlockProgress`
   - **State**: Active. Replaces older progress tracking models.
 - **`final_tests`**
-  - **Writable Owner**: `com.manabihub.course.entity.FinalTest`
+  - **Writable Owner**: `com.manabihub.finaltest.entity.FinalTest`
   - **State**: Active. Represents the definitive test structure for a course.
 
 ## Migration History and Upgrade Path
