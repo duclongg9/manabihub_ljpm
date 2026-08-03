@@ -2,19 +2,7 @@
 -- Adds PENDING_SERVER_VERIFICATION enum value and server verification tracking columns
 
 -- Add new enum value for identity_status
--- PostgreSQL enum ALTER TYPE ... ADD VALUE is safe (IF NOT EXISTS prevents re-run errors)
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_enum
-        WHERE enumlabel = 'PENDING_SERVER_VERIFICATION'
-        AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'identity_verification_status')
-    ) THEN
-        -- The column uses VARCHAR/TEXT with @Enumerated(STRING), so no ALTER TYPE needed.
-        -- This block is a no-op safety check.
-        NULL;
-    END IF;
-END $$;
+
 
 -- Add server verification tracking columns to kyc_requests
 ALTER TABLE kyc_requests

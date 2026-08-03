@@ -16,32 +16,47 @@ import java.util.concurrent.ConcurrentHashMap;
 @Profile("test")
 public class TestVnptVerificationAdapter implements VnptVerificationPort {
 
-    private static final Map<String, String> allowedTxIds = new ConcurrentHashMap<>();
+    private static final Map<String, TestBinding> allowedBindings = new ConcurrentHashMap<>();
 
-    public static void allowTransaction(String txId, String serverIdNumber) {
-        allowedTxIds.put(txId, serverIdNumber);
+    private record TestBinding(String sessionId, String serverIdNumber) {}
+
+    public static void allowTransaction(String txId, String sessionId, String serverIdNumber) {
+        allowedBindings.put(txId, new TestBinding(sessionId, serverIdNumber));
     }
 
     public static void clear() {
-        allowedTxIds.clear();
+        allowedBindings.clear();
     }
-    
+
     @Override
     public VnptServerVerificationResult verifyTransaction(String providerTransactionId, String providerSessionId) {
-        if (providerTransactionId != null && allowedTxIds.containsKey(providerTransactionId)) {
+        if (providerTransactionId == null || providerSessionId == null) {
+            return VnptServerVerificationResult.failure(
+                    providerTransactionId,
+                    providerSessionId,
+                    "BAD_REQUEST",
+                    "MISSING_PARAMS",
+                    List.of("Missing tx or session")
+            );
+        }
+
+        TestBinding binding = allowedBindings.get(providerTransactionId);
+        if (binding != null && providerSessionId.equals(binding.sessionId())) {
             return VnptServerVerificationResult.success(
                     providerTransactionId,
+                    providerSessionId,
                     "SUCCESS",
-                    Instant.now().toString(),
-                    allowedTxIds.get(providerTransactionId),
+                    Instant.now(),
+                    binding.serverIdNumber(),
                     "ref-" + providerTransactionId
             );
         }
         return VnptServerVerificationResult.failure(
                 providerTransactionId,
+                providerSessionId,
                 "NOT_FOUND",
                 "TX_NOT_FOUND",
-                List.of("Transaction ID is not in the allowed test list.")
+                List.of("Transaction ID or Session ID mismatch.")
         );
     }
 }

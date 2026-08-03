@@ -169,7 +169,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         // 2. Teacher A registers identity with formatted CCCD
         tx1.executeWithoutResult(status -> {
             KycIdentityVerificationRequest reqA = createMockSdkRequest(cccdRawWithSpaces, "Nguyen Van A");
-            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqA.providerTransactionId(), cccdNormalized);
+            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqA.providerTransactionId(), reqA.providerSessionId(), cccdNormalized);
             KycIdentityVerificationResponse respA = teacherKycService.verifyIdentity(userAId, reqA, "127.0.0.1", "TestAgent");
 
             assertNotNull(respA);
@@ -180,7 +180,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         // 3. Teacher A retries with same CCCD -> Idempotent success
         tx1.executeWithoutResult(status -> {
             KycIdentityVerificationRequest reqA = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
-            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqA.providerTransactionId(), cccdNormalized);
+            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqA.providerTransactionId(), reqA.providerSessionId(), cccdNormalized);
             KycIdentityVerificationResponse retryRespA = teacherKycService.verifyIdentity(userAId, reqA, "127.0.0.1", "TestAgent");
             assertNotNull(retryRespA);
         });
@@ -200,7 +200,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             TeacherProfile profileB = teacherProfileRepository.findByUserId(userBId).orElseThrow();
 
             KycIdentityVerificationRequest reqB = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
-            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqB.providerTransactionId(), cccdNormalized);
+            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqB.providerTransactionId(), reqB.providerSessionId(), cccdNormalized);
 
             BusinessException ex = assertThrows(
                     BusinessException.class,
@@ -265,7 +265,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             try {
                 startLatch.await();
                 KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
-                com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(req.providerTransactionId(), cccdNormalized);
+                com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(req.providerTransactionId(), req.providerSessionId(), cccdNormalized);
                 KycIdentityVerificationResponse resp = teacherKycService.verifyIdentity(userAId, req, "127.0.0.1", "Thread-1");
                 outcomeA.set(resp);
             } catch (Throwable t) {
@@ -277,7 +277,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             try {
                 startLatch.await();
                 KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
-                com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(req.providerTransactionId(), cccdNormalized);
+                com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(req.providerTransactionId(), req.providerSessionId(), cccdNormalized);
                 KycIdentityVerificationResponse resp = teacherKycService.verifyIdentity(userBId, req, "127.0.0.1", "Thread-2");
                 outcomeB.set(resp);
             } catch (Throwable t) {
@@ -455,7 +455,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             TeacherProfile profile = createTestProfile(user);
 
             KycIdentityVerificationRequest req = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
-            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(req.providerTransactionId(), cccdNormalized);
+            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(req.providerTransactionId(), req.providerSessionId(), cccdNormalized);
             teacherKycService.verifyIdentity(user.getId(), req, "127.0.0.1", "TestAgent");
 
             KycStatusResponse statusResp = teacherKycService.getStatus(user.getId());

@@ -16,6 +16,7 @@ public class FailClosedVnptVerificationAdapter implements VnptVerificationPort {
         log.warn("Using FailClosedVnptVerificationAdapter. VNPT server verification is NOT CONFIGURED.");
         return VnptServerVerificationResult.failure(
                 providerTransactionId,
+                providerSessionId,
                 "NOT_CONFIGURED",
                 "PROVIDER_NOT_CONFIGURED",
                 List.of("VNPT verification provider is not configured.")

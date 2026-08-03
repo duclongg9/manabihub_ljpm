@@ -1,40 +1,46 @@
 package com.manabihub.kyc.port;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
  * Result of a VNPT server-to-server verification call.
  */
 public record VnptServerVerificationResult(
+        String confirmedTransactionId,
+        String confirmedSessionId,
         boolean verified,
-        String transactionId,
         String providerStatus,
+        Instant providerVerifiedAt,
         String reasonCode,
-        String verifiedAt,
+        List<String> failureReasons,
         String serverIdNumber,
-        String maskedReference,
-        List<String> failureReasons
+        String maskedReference
 ) {
     public static VnptServerVerificationResult success(
-            String transactionId,
+            String txId,
+            String sessionId,
             String providerStatus,
-            String verifiedAt,
-            String serverIdNumber,
+            Instant verifiedAt,
+            String idNumber,
             String maskedReference
     ) {
         return new VnptServerVerificationResult(
-                true, transactionId, providerStatus, null, verifiedAt, serverIdNumber, maskedReference, List.of()
+                txId, sessionId, true, providerStatus, verifiedAt,
+                null, List.of(), idNumber, maskedReference
         );
     }
 
     public static VnptServerVerificationResult failure(
-            String transactionId,
+            String txId,
+            String sessionId,
             String providerStatus,
             String reasonCode,
             List<String> reasons
     ) {
         return new VnptServerVerificationResult(
-                false, transactionId, providerStatus, reasonCode, null, null, null, reasons
+                txId, sessionId, false, providerStatus, null,
+                reasonCode, reasons, null, null
         );
     }
 }

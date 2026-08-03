@@ -78,8 +78,8 @@ class TeacherKycServiceTest {
     private Query countQuery;
     @Mock
     private Query insertQuery;
-    @Mock
-    private VnptVerificationPort vnptVerificationPort;
+    @Mock private VnptVerificationPort vnptVerificationPort;
+    @Mock private com.manabihub.audit.service.SecurityAuditService securityAuditService;
 
     @TempDir
     private Path storageRoot;
@@ -101,6 +101,7 @@ class TeacherKycServiceTest {
                 teacherCertificateClaimService,
                 publicJwtTokenService,
                 vnptVerificationPort,
+                securityAuditService,
                 entityManager,
                 storageRoot.toString()
         );
@@ -175,11 +176,14 @@ class TeacherKycServiceTest {
                 .thenReturn(Optional.empty());
         when(teacherIdentityClaimService.normalizeCccd("012345678901"))
                 .thenReturn("012345678901");
-        when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(invocation -> {
+        org.mockito.stubbing.Answer<KycRequest> saveAns = invocation -> {
             KycRequest request = invocation.getArgument(0);
-            request.setId(UUID.randomUUID());
+            if (request.getId() == null) request.setId(UUID.randomUUID());
+            if (request.getSubmittedAt() == null) request.setSubmittedAt(java.time.Instant.now().minusSeconds(10));
             return request;
-        });
+        };
+        lenient().when(kycRequestRepository.save(any())).thenAnswer(saveAns);
+        lenient().when(kycRequestRepository.saveAndFlush(any())).thenAnswer(saveAns);
         when(kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(any()))
                 .thenReturn(List.of());
         Map<String, Object> sdkResult = Map.of(
@@ -189,7 +193,7 @@ class TeacherKycServiceTest {
         );
 
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.success("transaction", "SUCCESS", "2023-01-01T00:00:00Z", "012345678901", "ref"));
+                .thenReturn(VnptServerVerificationResult.success("transaction", "session", "SUCCESS", java.time.Instant.now(), "012345678901", "ref"));
 
         var response = teacherKycService.verifyIdentity(
                 user.getId(),

@@ -50,6 +50,35 @@ public class SecurityAuditService {
     }
 
     /**
+     * Logs security event when an invalid or mismatched transaction binding is detected.
+     * Uses REQUIRES_NEW propagation to ensure audit log is saved even if outer transaction rolls back.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logMismatchBindingAudit(UUID teacherId, UUID actorUserId, String ipAddress, String userAgent) {
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(actorUserId)
+                .actorRoleCode("TEACHER")
+                .action("KYC_MISMATCH_TRANSACTION_BINDING_DETECTED")
+                .targetType("TEACHER_PROFILE")
+                .targetId(teacherId)
+                .afterValue(Map.of(
+                        "reason", "Transaction or session mismatch detected. Replay or cross-user attempt.",
+                        "status", "BLOCKED"
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-22",
+                        "module", "IDENTITY_VERIFICATION",
+                        "msg", MessageCodes.MSG_KYC_008
+                ))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
+
+        auditLogRepository.save(auditLog);
+    }
+
+    /**
      * Persists the duplicate JLPT claim attempt even when the surrounding KYC
      * submission is rolled back. Certificate codes are deliberately omitted.
      */

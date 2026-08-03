@@ -60,6 +60,7 @@ class VnptServerVerificationTest {
     @Mock private TeacherCertificateClaimService teacherCertificateClaimService;
     @Mock private PublicJwtTokenService publicJwtTokenService;
     @Mock private VnptVerificationPort vnptVerificationPort;
+    @Mock private com.manabihub.audit.service.SecurityAuditService securityAuditService;
     @Mock private EntityManager entityManager;
 
     private TeacherKycService service;
@@ -80,6 +81,7 @@ class VnptServerVerificationTest {
                 teacherCertificateClaimService,
                 publicJwtTokenService,
                 vnptVerificationPort,
+                securityAuditService,
                 entityManager,
                 "storage/kyc"
         );
@@ -135,10 +137,10 @@ class VnptServerVerificationTest {
 
         // Server verification succeeds (mock adapter)
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.success("tx-123", "SUCCESS", "2023-01-01T00:00:00Z", "012345678901", "ref"));
+                .thenReturn(VnptServerVerificationResult.success("tx-123", "session-123", "SUCCESS", Instant.now(), "012345678901", "ref"));
 
         ArgumentCaptor<KycRequest> requestCaptor = ArgumentCaptor.forClass(KycRequest.class);
-        when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(inv -> {
+        org.mockito.stubbing.Answer<KycRequest> saveAnswer = inv -> {
             KycRequest req = inv.getArgument(0);
             if (req.getId() == null) {
                 // Assert the status before server confirmation mutates it
@@ -147,8 +149,16 @@ class VnptServerVerificationTest {
                         .isEqualTo(IdentityVerificationStatus.PENDING_SERVER_VERIFICATION);
                 req.setId(UUID.randomUUID());
             }
+            if (req.getSubmittedAt() == null) {
+                req.setSubmittedAt(java.time.Instant.now().minusSeconds(10));
+            }
+            if (req.getSubmittedAt() == null) {
+                req.setSubmittedAt(Instant.now().minusSeconds(10));
+            }
             return req;
-        });
+        };
+        lenient().when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(saveAnswer);
+        lenient().when(kycRequestRepository.saveAndFlush(any(KycRequest.class))).thenAnswer(saveAnswer);
 
         KycIdentityVerificationRequest request = new KycIdentityVerificationRequest(
                 "session-123", "tx-123", validSdkResult()
@@ -160,7 +170,7 @@ class VnptServerVerificationTest {
         );
 
         // Assert - verify the KycRequest was saved
-        verify(kycRequestRepository, atLeastOnce()).save(requestCaptor.capture());
+        verify(kycRequestRepository, atLeastOnce()).saveAndFlush(requestCaptor.capture());
         List<KycRequest> savedRequests = requestCaptor.getAllValues();
 
         // The first save assertion is now handled inside the mock above.
@@ -180,16 +190,24 @@ class VnptServerVerificationTest {
 
         // Server verification fails
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.failure("tx-123", "FAILED", "TX_NOT_FOUND", List.of("Transaction not found")));
+                .thenReturn(VnptServerVerificationResult.failure("tx-123", "session-123", "FAILED", "TX_NOT_FOUND", List.of("Transaction not found")));
 
         ArgumentCaptor<KycRequest> requestCaptor = ArgumentCaptor.forClass(KycRequest.class);
-        when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(inv -> {
+        org.mockito.stubbing.Answer<KycRequest> saveAnswer = inv -> {
             KycRequest req = inv.getArgument(0);
             if (req.getId() == null) {
                 req.setId(UUID.randomUUID());
             }
+            if (req.getSubmittedAt() == null) {
+                req.setSubmittedAt(java.time.Instant.now().minusSeconds(10));
+            }
+            if (req.getSubmittedAt() == null) {
+                req.setSubmittedAt(Instant.now().minusSeconds(10));
+            }
             return req;
-        });
+        };
+        lenient().when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(saveAnswer);
+        lenient().when(kycRequestRepository.saveAndFlush(any(KycRequest.class))).thenAnswer(saveAnswer);
 
         KycIdentityVerificationRequest request = new KycIdentityVerificationRequest(
                 "session-123", "tx-123", validSdkResult()
@@ -199,7 +217,7 @@ class VnptServerVerificationTest {
         service.verifyIdentity(userId, request, "127.0.0.1", "Test-Agent");
 
         // Assert
-        verify(kycRequestRepository, atLeastOnce()).save(requestCaptor.capture());
+        verify(kycRequestRepository, atLeastOnce()).saveAndFlush(requestCaptor.capture());
         List<KycRequest> saves = requestCaptor.getAllValues();
         KycRequest finalSave = saves.get(saves.size() - 1);
 
@@ -221,16 +239,21 @@ class VnptServerVerificationTest {
         when(teacherIdentityClaimService.normalizeCccd("012345678901")).thenReturn("012345678901");
 
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.success("tx-123", "SUCCESS", "2023-01-01T00:00:00Z", "012345678901", "ref"));
+                .thenReturn(VnptServerVerificationResult.success("tx-123", "session-123", "SUCCESS", Instant.now(), "012345678901", "ref"));
 
         ArgumentCaptor<KycRequest> requestCaptor = ArgumentCaptor.forClass(KycRequest.class);
-        when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(inv -> {
+        org.mockito.stubbing.Answer<KycRequest> saveAnswer = inv -> {
             KycRequest req = inv.getArgument(0);
             if (req.getId() == null) {
                 req.setId(UUID.randomUUID());
             }
+            if (req.getSubmittedAt() == null) {
+                req.setSubmittedAt(java.time.Instant.now().minusSeconds(10));
+            }
             return req;
-        });
+        };
+        lenient().when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(saveAnswer);
+        lenient().when(kycRequestRepository.saveAndFlush(any(KycRequest.class))).thenAnswer(saveAnswer);
 
         KycIdentityVerificationRequest request = new KycIdentityVerificationRequest(
                 "session-123", "tx-123", validSdkResult()
@@ -240,7 +263,7 @@ class VnptServerVerificationTest {
         service.verifyIdentity(userId, request, "127.0.0.1", "Test-Agent");
 
         // Assert
-        verify(kycRequestRepository, atLeastOnce()).save(requestCaptor.capture());
+        verify(kycRequestRepository, atLeastOnce()).saveAndFlush(requestCaptor.capture());
         List<KycRequest> saves = requestCaptor.getAllValues();
         KycRequest finalSave = saves.get(saves.size() - 1);
 
@@ -268,13 +291,18 @@ class VnptServerVerificationTest {
                 .thenThrow(new RuntimeException("Connection timeout"));
 
         ArgumentCaptor<KycRequest> requestCaptor = ArgumentCaptor.forClass(KycRequest.class);
-        when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(inv -> {
+        org.mockito.stubbing.Answer<KycRequest> saveAnswer = inv -> {
             KycRequest req = inv.getArgument(0);
             if (req.getId() == null) {
                 req.setId(UUID.randomUUID());
             }
+            if (req.getSubmittedAt() == null) {
+                req.setSubmittedAt(java.time.Instant.now().minusSeconds(10));
+            }
             return req;
-        });
+        };
+        lenient().when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(saveAnswer);
+        lenient().when(kycRequestRepository.saveAndFlush(any(KycRequest.class))).thenAnswer(saveAnswer);
 
         KycIdentityVerificationRequest request = new KycIdentityVerificationRequest(
                 "session-123", "tx-123", validSdkResult()
@@ -284,7 +312,7 @@ class VnptServerVerificationTest {
         service.verifyIdentity(userId, request, "127.0.0.1", "Test-Agent");
 
         // Assert - should remain PENDING for retry
-        verify(kycRequestRepository, atLeastOnce()).save(requestCaptor.capture());
+        verify(kycRequestRepository, atLeastOnce()).saveAndFlush(requestCaptor.capture());
         List<KycRequest> saves = requestCaptor.getAllValues();
         KycRequest finalSave = saves.get(saves.size() - 1);
 
@@ -303,12 +331,15 @@ class VnptServerVerificationTest {
         when(teacherIdentityClaimService.normalizeCccd("012345678901")).thenReturn("012345678901");
 
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.success("tx-123", "SUCCESS", "2023-01-01T00:00:00Z", "012345678901", "ref"));
+                .thenReturn(VnptServerVerificationResult.success("tx-123", "session-123", "SUCCESS", Instant.now(), "012345678901", "ref"));
 
-        when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(inv -> {
+        lenient().when(kycRequestRepository.saveAndFlush(any(KycRequest.class))).thenAnswer(inv -> {
             KycRequest req = inv.getArgument(0);
             if (req.getId() == null) {
                 req.setId(UUID.randomUUID());
+            }
+            if (req.getSubmittedAt() == null) {
+                req.setSubmittedAt(java.time.Instant.now().minusSeconds(10));
             }
             return req;
         });

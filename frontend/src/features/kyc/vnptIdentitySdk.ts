@@ -52,7 +52,7 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
 
   const handleDocumentResult: VnptSdkCallback = (sdkResult) => {
     const normalizedResult = normalizeSdkResult(sdkResult);
-    saveDebugResult('vnpt_ekyc_last_document_result', normalizedResult);
+
   };
 
   let finalResultHandled = false;
@@ -63,7 +63,7 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
 
     finalResultHandled = true;
     const normalizedResult = normalizeSdkResult(sdkResult);
-    saveDebugResult('vnpt_ekyc_last_result', normalizedResult);
+
 
     await onResult({
       providerSessionId: findFirstValue(normalizedResult, ['session', 'sessionid', 'session_id']),
