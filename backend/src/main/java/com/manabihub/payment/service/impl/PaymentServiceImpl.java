@@ -9,6 +9,7 @@ import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.service.EnrollmentProgressResetService;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
@@ -55,6 +56,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final OrderItemRepository orderItemRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final EnrollmentProgressResetService enrollmentProgressResetService;
     private final EscrowService escrowService;
     private final StudentWalletService studentWalletService;
     private final ApplicationEventPublisher eventPublisher;
@@ -319,15 +321,17 @@ public class PaymentServiceImpl implements PaymentService {
         StudentProfile student = order.getStudent();
         for (OrderItem item : orderItemRepository.findByOrder_Id(order.getId())) {
             Course course = item.getCourse();
-            boolean alreadyEnrolled = enrollmentRepository
-                    .findByStudent_IdAndCourse_Id(student.getId(), course.getId())
-                    .isPresent();
-            if (!alreadyEnrolled) {
+            Enrollment existing = enrollmentRepository
+                    .findByStudentIdAndCourseIdForUpdate(student.getId(), course.getId())
+                    .orElse(null);
+            if (existing == null) {
                 enrollmentRepository.save(Enrollment.builder()
                         .student(student)
                         .course(course)
                         .status(EnrollmentStatus.ACTIVE)
                         .build());
+            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED) {
+                enrollmentProgressResetService.resetForRepurchase(existing);
             }
         }
     }

@@ -44,6 +44,18 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     // UC-10: study course lessons — resolve the current student's enrollment for a course.
     Optional<Enrollment> findByStudent_IdAndCourse_Id(UUID studentId, UUID courseId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT enrollment
+            FROM Enrollment enrollment
+            WHERE enrollment.student.id = :studentId
+              AND enrollment.course.id = :courseId
+            """)
+    Optional<Enrollment> findByStudentIdAndCourseIdForUpdate(
+            @Param("studentId") UUID studentId,
+            @Param("courseId") UUID courseId
+    );
+
     /**
      * Serializes review upserts for the same enrollment. The database unique
      * constraint remains the final guarantee, while this lock makes concurrent

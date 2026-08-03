@@ -5,7 +5,9 @@ import com.manabihub.course.entity.Course;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.learning.entity.Enrollment;
+import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.service.EnrollmentProgressResetService;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
@@ -57,6 +59,7 @@ class PaymentServiceImplTest {
     @Mock private OrderItemRepository orderItemRepository;
     @Mock private PaymentTransactionRepository paymentTransactionRepository;
     @Mock private EnrollmentRepository enrollmentRepository;
+    @Mock private EnrollmentProgressResetService enrollmentProgressResetService;
     @Mock private EscrowService escrowService;
     @Mock private StudentWalletService studentWalletService;
     @Mock private ApplicationEventPublisher eventPublisher;
@@ -71,7 +74,8 @@ class PaymentServiceImplTest {
     void setUp() {
         service = new PaymentServiceImpl(
                 paymentGateway, orderRepository, orderItemRepository, paymentTransactionRepository,
-                enrollmentRepository, escrowService, studentWalletService, eventPublisher,
+                enrollmentRepository, enrollmentProgressResetService, escrowService,
+                studentWalletService, eventPublisher,
                 new ObjectMapper());
 
         AppUser user = AppUser.builder().id(UUID.randomUUID()).email("student@test.dev").build();
@@ -104,7 +108,7 @@ class PaymentServiceImplTest {
                         .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build()));
         when(orderItemRepository.findByOrder_Id(order.getId()))
                 .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
-        when(enrollmentRepository.findByStudent_IdAndCourse_Id(any(), any())).thenReturn(Optional.empty());
+        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any())).thenReturn(Optional.empty());
 
         IpnAckResponse ack = service.handleIpn(params);
 
@@ -231,7 +235,7 @@ class PaymentServiceImplTest {
                 .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
         when(orderItemRepository.findByOrder_Id(order.getId()))
                 .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
-        when(enrollmentRepository.findByStudent_IdAndCourse_Id(any(), any())).thenReturn(Optional.empty());
+        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any())).thenReturn(Optional.empty());
 
         Order paidOrder = service.payWithWallet(order.getId());
 
@@ -272,6 +276,45 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    void payWithWallet_repurchaseResetsRefundedEnrollmentWithoutReplacingIt() {
+        Instant protectedMaterialsDownloadedAt = Instant.parse("2026-07-20T00:00:00Z");
+        Enrollment refundedEnrollment = Enrollment.builder()
+                .id(UUID.randomUUID())
+                .student(order.getStudent())
+                .course(course)
+                .status(EnrollmentStatus.REFUNDED)
+                .protectedMaterialsFullyDownloadedAt(protectedMaterialsDownloadedAt)
+                .build();
+        UUID originalEnrollmentId = refundedEnrollment.getId();
+
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
+                .thenReturn(WalletPaymentReservation.builder()
+                        .id(UUID.randomUUID())
+                        .orderId(order.getId())
+                        .amount(order.getTotalAmount())
+                        .status(WalletReservationStatus.RESERVED)
+                        .build());
+        when(studentWalletService.captureForOrder(eq(order.getId()), any(Instant.class)))
+                .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
+        when(orderItemRepository.findByOrder_Id(order.getId()))
+                .thenReturn(List.of(OrderItem.builder()
+                        .order(order)
+                        .course(course)
+                        .price(order.getTotalAmount())
+                        .build()));
+        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(
+                order.getStudent().getId(), course.getId()))
+                .thenReturn(Optional.of(refundedEnrollment));
+
+        service.payWithWallet(order.getId());
+
+        assertEquals(originalEnrollmentId, refundedEnrollment.getId());
+        verify(enrollmentProgressResetService).resetForRepurchase(refundedEnrollment);
+        verify(escrowService).holdForOrder(order);
+    }
+
+    @Test
     void handleIpn_combinedPayment_debitsWalletPortionAndConfirms() {
         order.setWalletAmount(new BigDecimal("30.00")); // 30 from wallet → gateway charges 70.00
         when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 7_000L)); // 70.00 × 100
@@ -289,7 +332,7 @@ class PaymentServiceImplTest {
                 .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
         when(orderItemRepository.findByOrder_Id(order.getId()))
                 .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
-        when(enrollmentRepository.findByStudent_IdAndCourse_Id(any(), any())).thenReturn(Optional.empty());
+        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any())).thenReturn(Optional.empty());
 
         IpnAckResponse ack = service.handleIpn(params);
 

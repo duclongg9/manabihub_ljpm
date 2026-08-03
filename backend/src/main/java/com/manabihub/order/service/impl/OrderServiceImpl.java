@@ -12,6 +12,7 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.service.EnrollmentProgressResetService;
 import com.manabihub.order.dto.response.OrderResponse;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
@@ -48,11 +49,15 @@ public class OrderServiceImpl implements OrderService {
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Set<EnrollmentStatus> OWNED_STATUSES =
-            EnumSet.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED);
+            EnumSet.of(
+                    EnrollmentStatus.ACTIVE,
+                    EnrollmentStatus.COMPLETED,
+                    EnrollmentStatus.REVOKED);
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final EnrollmentProgressResetService enrollmentProgressResetService;
     private final StudentProfileRepository studentProfileRepository;
     private final CurrentUserService currentUserService;
     private final OrderMapper orderMapper;
@@ -141,15 +146,17 @@ public class OrderServiceImpl implements OrderService {
         StudentProfile student = order.getStudent();
         for (OrderItem item : orderItemRepository.findByOrder_Id(order.getId())) {
             Course course = item.getCourse();
-            boolean alreadyEnrolled = enrollmentRepository
-                    .findByStudent_IdAndCourse_Id(student.getId(), course.getId())
-                    .isPresent();
-            if (!alreadyEnrolled) {
+            Enrollment existing = enrollmentRepository
+                    .findByStudentIdAndCourseIdForUpdate(student.getId(), course.getId())
+                    .orElse(null);
+            if (existing == null) {
                 enrollmentRepository.save(Enrollment.builder()
                         .student(student)
                         .course(course)
                         .status(EnrollmentStatus.ACTIVE)
                         .build());
+            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED) {
+                enrollmentProgressResetService.resetForRepurchase(existing);
             }
         }
         order.setStatus(com.manabihub.order.enums.OrderStatus.PAID);
