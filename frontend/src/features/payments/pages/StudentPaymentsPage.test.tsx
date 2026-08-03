@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useOrderHistory } from '../hooks/useOrderHistory';
@@ -26,8 +26,8 @@ vi.mock('../../refunds/hooks/useStudentRefunds', () => ({
 vi.mock('../../help-center/hooks/useCommercialPolicy', () => ({
   useCommercialPolicy: vi.fn(() => ({
     data: {
-      refundWindowDays: 7,
-      refundProgressLimitPercent: 30,
+      refundWindowDays: 14,
+      refundProgressLimitPercent: 20,
     },
     isLoading: false,
     isError: false,
@@ -137,5 +137,54 @@ describe('StudentPaymentsPage', () => {
     expect(screen.queryByRole('button', { name: /Vào học/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Yêu cầu hoàn tiền/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Xem hoàn tiền/i })).not.toBeInTheDocument();
+  });
+
+  it('does not offer refund actions for a free course', () => {
+    vi.mocked(useOrderHistory).mockReturnValue({
+      data: {
+        content: [
+          {
+            id: 'free-order-1',
+            orderCode: 'MHB-FREE-001',
+            totalAmount: 0,
+            currency: 'VND',
+            status: 'PAID',
+            type: 'COURSE',
+            createdAt: '2026-08-03T08:00:00Z',
+            items: [
+              {
+                id: 'free-order-item-1',
+                courseId: 'free-course-1',
+                courseTitle: 'Free Japanese Course',
+                price: 0,
+              },
+            ],
+          },
+        ],
+        page: 0,
+        size: 10,
+        totalElements: 1,
+        totalPages: 1,
+        first: true,
+        last: true,
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useOrderHistory>);
+
+    render(
+      <MemoryRouter>
+        <StudentPaymentsPage />
+      </MemoryRouter>,
+    );
+
+    const courseTitle = screen.getByText('Free Japanese Course');
+    const freeCourseRow = courseTitle.closest('.MuiStack-root');
+
+    expect(screen.getByText('MHB-FREE-001')).toBeInTheDocument();
+    expect(freeCourseRow).not.toBeNull();
+    expect(within(freeCourseRow as HTMLElement).queryByRole('button')).not.toBeInTheDocument();
   });
 });

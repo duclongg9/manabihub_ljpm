@@ -9,6 +9,7 @@ import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.service.EnrollmentProgressResetService;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
@@ -35,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -46,12 +48,15 @@ public class PaymentServiceImpl implements PaymentService {
 
     private static final BigDecimal MINOR_UNIT_FACTOR = BigDecimal.valueOf(100);
     private static final String NOTIFICATION_TYPE = "PURCHASE_SUCCESS";
+    private static final Duration WALLET_RESERVATION_TTL = Duration.ofMinutes(15);
+    private static final String WALLET_PROVIDER = "WALLET";
 
     private final PaymentGateway paymentGateway;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final EnrollmentProgressResetService enrollmentProgressResetService;
     private final EscrowService escrowService;
     private final StudentWalletService studentWalletService;
     private final ApplicationEventPublisher eventPublisher;
@@ -101,13 +106,15 @@ public class PaymentServiceImpl implements PaymentService {
             return IpnAckResponse.of("02", "Order already confirmed");
         }
 
-        PaymentTransaction transaction = latestOrNewTransaction(order);
+        PaymentTransaction transaction = latestOrNewGatewayTransaction(order);
         transaction.setProviderTransactionId(result.providerTransactionId());
         transaction.setRawResponse(objectMapper.valueToTree(params));
 
         if (!result.paymentSuccessful()) {
             transaction.setStatus(PaymentStatus.FAILED);
             paymentTransactionRepository.save(transaction);
+            failWalletComponent(order);
+            studentWalletService.releaseForOrder(order.getId(), Instant.now());
             order.setStatus(OrderStatus.FAILED);
             orderRepository.save(order);
             log.info("[{}] Recorded FAILED payment for order {} (responseCode={})",
@@ -115,14 +122,12 @@ public class PaymentServiceImpl implements PaymentService {
             return IpnAckResponse.of("00", "Confirm Success");
         }
 
+        Instant succeededAt = transaction.getSucceededAt() == null
+                ? Instant.now()
+                : transaction.getSucceededAt();
         transaction.setStatus(PaymentStatus.SUCCESS);
-        if (transaction.getSucceededAt() == null) {
-            transaction.setSucceededAt(Instant.now());
-        }
+        transaction.setSucceededAt(succeededAt);
         paymentTransactionRepository.save(transaction);
-
-        order.setStatus(OrderStatus.PAID);
-        orderRepository.save(order);
 
         // Fulfilment depends on what the order is for (no longer hardcoded to course purchase).
         if (order.getType() == OrderType.WALLET_TOPUP) {
@@ -130,19 +135,34 @@ public class PaymentServiceImpl implements PaymentService {
             log.info("[{}] Confirmed wallet top-up for order {} — balance credited",
                     MessageCodes.MSG_PAY_002, order.getOrderCode());
         } else {
-            // Combined payment: also deduct the wallet portion now that the gateway part succeeded.
+            // The wallet share was frozen before redirecting to VNPay. Capture that
+            // reservation now; it can no longer be spent by a concurrent order.
             if (order.getWalletAmount() != null && order.getWalletAmount().signum() > 0) {
-                studentWalletService.debitBalance(
-                        order.getStudent().getId(),
-                        order.getWalletAmount(),
-                        "ORDER",
-                        order.getId(),
-                        "Phần thanh toán từ ví cho đơn " + order.getOrderCode());
+                try {
+                    WalletTransaction walletDebit = studentWalletService
+                            .captureForOrder(order.getId(), succeededAt);
+                    succeedWalletComponent(order, walletDebit, succeededAt);
+                } catch (BusinessException captureFailure) {
+                    order.setStatus(OrderStatus.FAILED);
+                    orderRepository.save(order);
+                    log.error(
+                            "[{}] Gateway payment succeeded but wallet reservation capture requires reconciliation for order {}",
+                            MessageCodes.MSG_PAY_004,
+                            order.getOrderCode(),
+                            captureFailure);
+                    return IpnAckResponse.of("00", "Confirm Success");
+                }
             }
+            // Escrow allocation requires a persisted PAID order. This write remains
+            // in the same transaction, so a fulfilment error rolls everything back.
+            order.setStatus(OrderStatus.PAID);
+            orderRepository.save(order);
             fulfillCourseOrder(order);
             log.info("[{}] Confirmed payment for order {} — enrollment + escrow created",
                     MessageCodes.MSG_PAY_002, order.getOrderCode());
         }
+        order.setStatus(OrderStatus.PAID);
+        orderRepository.save(order);
         return IpnAckResponse.of("00", "Confirm Success");
     }
 
@@ -167,19 +187,23 @@ public class PaymentServiceImpl implements PaymentService {
                     HttpStatus.CONFLICT);
         }
 
-        WalletTransaction debit = studentWalletService.debitBalance(
+        Instant succeededAt = Instant.now();
+        order.setWalletAmount(order.getTotalAmount());
+        orderRepository.save(order);
+        studentWalletService.reserveForOrder(
                 order.getStudent().getId(),
-                order.getTotalAmount(),
-                "ORDER",
                 order.getId(),
-                "Thanh toán khoá học đơn " + order.getOrderCode());
+                order.getTotalAmount(),
+                succeededAt.plus(WALLET_RESERVATION_TTL));
+        WalletTransaction debit = studentWalletService.captureForOrder(order.getId(), succeededAt);
 
         PaymentTransaction transaction = PaymentTransaction.builder()
                 .order(order)
-                .provider("WALLET")
+                .provider(WALLET_PROVIDER)
                 .providerTransactionId(debit.getId().toString())
                 .amount(order.getTotalAmount())
                 .status(PaymentStatus.SUCCESS)
+                .succeededAt(succeededAt)
                 .build();
         paymentTransactionRepository.save(transaction);
 
@@ -198,7 +222,7 @@ public class PaymentServiceImpl implements PaymentService {
     public String initiateCombinedPayment(Order order, String clientIp) {
         BigDecimal balance = studentWalletService
                 .getOrCreateStudentWallet(order.getStudent().getId())
-                .getBalance();
+                .getAvailableBalance();
         BigDecimal total = order.getTotalAmount();
 
         if (balance.compareTo(total) >= 0) {
@@ -208,9 +232,23 @@ public class PaymentServiceImpl implements PaymentService {
             return null;
         }
         if (balance.signum() > 0) {
-            // Use all available wallet balance; charge the remainder via VNPay.
-            order.setWalletAmount(balance);
+            // Freeze the wallet share before constructing the gateway request. If a
+            // concurrent order reserved it first, this fails before VNPay can charge.
+            BigDecimal walletAmount = balance.min(total);
+            var reservation = studentWalletService.reserveForOrder(
+                    order.getStudent().getId(),
+                    order.getId(),
+                    walletAmount,
+                    Instant.now().plus(WALLET_RESERVATION_TTL));
+            order.setWalletAmount(reservation.getAmount());
             orderRepository.save(order);
+            paymentTransactionRepository.save(PaymentTransaction.builder()
+                    .order(order)
+                    .provider(WALLET_PROVIDER)
+                    .providerTransactionId(reservation.getId().toString())
+                    .amount(reservation.getAmount())
+                    .status(PaymentStatus.PENDING)
+                    .build());
         }
         return initiatePayment(order, clientIp);
     }
@@ -224,20 +262,22 @@ public class PaymentServiceImpl implements PaymentService {
 
     private void fulfillWalletTopUp(Order order) {
         StudentProfile student = order.getStudent();
-        studentWalletService.creditBalance(
+        studentWalletService.creditTopUp(
                 student.getId(),
                 order.getTotalAmount(),
-                "WALLET_TOPUP",
                 order.getId(),
                 "Nạp ví qua đơn " + order.getOrderCode());
         notifyTopUp(order);
     }
 
-    private PaymentTransaction latestOrNewTransaction(Order order) {
-        List<PaymentTransaction> existing =
-                paymentTransactionRepository.findByOrder_IdOrderByCreatedAtDesc(order.getId());
-        if (!existing.isEmpty()) {
-            return existing.get(0);
+    private PaymentTransaction latestOrNewGatewayTransaction(Order order) {
+        PaymentTransaction existing = paymentTransactionRepository
+                .findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                        order.getId(),
+                        paymentGateway.getProvider())
+                .orElse(null);
+        if (existing != null) {
+            return existing;
         }
         return PaymentTransaction.builder()
                 .order(order)
@@ -247,19 +287,51 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+    private void succeedWalletComponent(
+            Order order,
+            WalletTransaction debit,
+            Instant succeededAt
+    ) {
+        PaymentTransaction walletPayment = paymentTransactionRepository
+                .findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(order.getId(), WALLET_PROVIDER)
+                .orElseGet(() -> PaymentTransaction.builder()
+                        .order(order)
+                        .provider(WALLET_PROVIDER)
+                        .amount(order.getWalletAmount())
+                        .build());
+        walletPayment.setProviderTransactionId(debit.getId().toString());
+        walletPayment.setAmount(order.getWalletAmount());
+        walletPayment.setStatus(PaymentStatus.SUCCESS);
+        walletPayment.setSucceededAt(succeededAt);
+        paymentTransactionRepository.save(walletPayment);
+    }
+
+    private void failWalletComponent(Order order) {
+        paymentTransactionRepository
+                .findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(order.getId(), WALLET_PROVIDER)
+                .ifPresent(walletPayment -> {
+                    if (walletPayment.getStatus() == PaymentStatus.PENDING) {
+                        walletPayment.setStatus(PaymentStatus.FAILED);
+                        paymentTransactionRepository.save(walletPayment);
+                    }
+                });
+    }
+
     private void createEnrollments(Order order) {
         StudentProfile student = order.getStudent();
         for (OrderItem item : orderItemRepository.findByOrder_Id(order.getId())) {
             Course course = item.getCourse();
-            boolean alreadyEnrolled = enrollmentRepository
-                    .findByStudent_IdAndCourse_Id(student.getId(), course.getId())
-                    .isPresent();
-            if (!alreadyEnrolled) {
+            Enrollment existing = enrollmentRepository
+                    .findByStudentIdAndCourseIdForUpdate(student.getId(), course.getId())
+                    .orElse(null);
+            if (existing == null) {
                 enrollmentRepository.save(Enrollment.builder()
                         .student(student)
                         .course(course)
                         .status(EnrollmentStatus.ACTIVE)
                         .build());
+            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED) {
+                enrollmentProgressResetService.resetForRepurchase(existing);
             }
         }
     }

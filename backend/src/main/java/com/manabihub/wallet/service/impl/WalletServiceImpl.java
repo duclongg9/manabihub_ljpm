@@ -7,14 +7,12 @@ import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.systemconfig.model.CommercialPolicy;
 import com.manabihub.systemconfig.service.CommercialPolicyService;
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
-import com.manabihub.wallet.entity.TeacherWallet;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.enums.WalletTransactionType;
 import com.manabihub.wallet.mapper.WalletMapper;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
 import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import com.manabihub.wallet.service.WalletService;
@@ -31,7 +29,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WalletServiceImpl implements WalletService {
 
-    private final TeacherWalletRepository teacherWalletRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository transactionRepository;
@@ -47,7 +44,8 @@ public class WalletServiceImpl implements WalletService {
                         "Teacher profile not found",
                         HttpStatus.NOT_FOUND));
 
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherId(teacherProfile.getId())
+        Wallet wallet = walletRepository
+                .findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacherProfile.getId())
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         CommercialPolicy policy = commercialPolicyService.getCurrentPolicy();
@@ -115,7 +113,7 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void reserveBalance(String teacherId, BigDecimal amount, String withdrawalId) {
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherIdForUpdate(UUID.fromString(teacherId))
+        Wallet wallet = walletRepository.findTeacherWalletForUpdate(UUID.fromString(teacherId))
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         if (wallet.isFrozen()) {
@@ -134,7 +132,7 @@ public class WalletServiceImpl implements WalletService {
         // To reserve money, we just increase frozenBalance. The total balance remains unchanged until actual payout.
         wallet.setFrozenBalance(wallet.getFrozenBalance().add(amount));
         
-        teacherWalletRepository.save(wallet);
+        walletRepository.save(wallet);
 
         // Create Transaction
         WalletTransaction transaction = WalletTransaction.builder()
@@ -152,7 +150,7 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void releaseBalance(String teacherId, BigDecimal amount, String withdrawalId) {
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherIdForUpdate(UUID.fromString(teacherId))
+        Wallet wallet = walletRepository.findTeacherWalletForUpdate(UUID.fromString(teacherId))
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         if (wallet.getFrozenBalance().compareTo(amount) < 0) {
@@ -162,7 +160,7 @@ public class WalletServiceImpl implements WalletService {
         // Update balances: decrease frozen, which inherently increases available balance
         wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(amount));
         
-        teacherWalletRepository.save(wallet);
+        walletRepository.save(wallet);
 
         // Create Transaction
         WalletTransaction transaction = WalletTransaction.builder()

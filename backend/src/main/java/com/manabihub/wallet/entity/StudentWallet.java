@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.Immutable;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -12,12 +13,11 @@ import java.time.LocalDateTime;
 /**
  * A student's money wallet (MHB-37 top-up).
  * <p>
- * Maps the shared {@code wallets} table with {@code owner_type = 'STUDENT'} — kept as a
- * separate entity from {@link TeacherWallet} so student and teacher wallet logic stay
- * independent (rows are distinguished by {@code student_id} / {@code teacher_id}).
+ * Legacy read-only projection. All balance writes are owned by {@link Wallet}.
  */
 @Entity
 @Table(name = "wallets")
+@Immutable
 @Getter
 @Setter
 @NoArgsConstructor

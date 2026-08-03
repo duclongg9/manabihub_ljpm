@@ -37,8 +37,8 @@ import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.review.entity.CourseReview;
 import com.manabihub.review.enums.CourseReviewStatus;
 import com.manabihub.review.repository.CourseReviewRepository;
-import com.manabihub.wallet.entity.TeacherWallet;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -88,7 +88,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
     private final CourseReviewRepository courseReviewRepository;
     private final AppUserRepository appUserRepository;
     private final IdentityTeacherProfileRepository teacherProfileRepository;
-    private final TeacherWalletRepository teacherWalletRepository;
+    private final WalletRepository walletRepository;
     private final OrderItemRepository orderItemRepository;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
@@ -476,8 +476,8 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             throw invalidAction("FREEZE_BALANCE requires an affected teacher wallet");
         }
 
-        TeacherWallet wallet = teacherWalletRepository
-                .findByTeacherIdForUpdate(context.affectedTeacherProfileId())
+        Wallet wallet = walletRepository
+                .findTeacherWalletForUpdate(context.affectedTeacherProfileId())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.MODERATION_TARGET_NOT_FOUND,
                         "The affected teacher wallet does not exist",
@@ -486,7 +486,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
 
         boolean before = wallet.isFrozen();
         wallet.setFrozen(true);
-        teacherWalletRepository.save(wallet);
+        walletRepository.save(wallet);
 
         Map<String, Object> beforeValue = walletSnapshot(wallet, before);
         Map<String, Object> afterValue = walletSnapshot(wallet, true);
@@ -1077,7 +1077,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
                 .build();
     }
 
-    private Map<String, Object> walletSnapshot(TeacherWallet wallet, boolean frozen) {
+    private Map<String, Object> walletSnapshot(Wallet wallet, boolean frozen) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("frozen", frozen);
         snapshot.put("balance", wallet.getBalance());

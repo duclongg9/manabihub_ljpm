@@ -35,6 +35,11 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, UU
             Collection<RefundStatus> statuses
     );
 
+    Optional<RefundRequest> findFirstByOrder_IdAndStatusInOrderByCreatedAtDesc(
+            UUID orderId,
+            Collection<RefundStatus> statuses
+    );
+
     Page<RefundRequest> findByStudent_Id(UUID studentId, Pageable pageable);
 
     Optional<RefundRequest> findByIdAndStudent_Id(UUID id, UUID studentId);

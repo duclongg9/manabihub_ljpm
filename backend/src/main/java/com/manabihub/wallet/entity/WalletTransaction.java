@@ -49,6 +49,9 @@ public class WalletTransaction {
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
+    @Column(name = "idempotency_key", length = 160, unique = true)
+    private String idempotencyKey;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

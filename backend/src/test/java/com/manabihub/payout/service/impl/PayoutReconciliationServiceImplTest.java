@@ -6,7 +6,7 @@ import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.payout.entity.BankAccountSnapshot;
 import com.manabihub.payout.entity.WithdrawalRequest;
 import com.manabihub.payout.enums.ReconciliationStatus;
-import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.enums.WalletDirection;
@@ -35,7 +35,7 @@ class PayoutReconciliationServiceImplTest {
 
     private PayoutReconciliationServiceImpl service;
     private WithdrawalRequest request;
-    private TeacherWallet wallet;
+    private Wallet wallet;
     private TeacherProfile teacher;
     private WalletTransaction reservation;
 
@@ -49,9 +49,8 @@ class PayoutReconciliationServiceImplTest {
                 .requestedAmount(new BigDecimal("500000.00"))
                 .bankAccountSnapshot(validBank())
                 .build();
-        wallet = TeacherWallet.builder()
+        wallet = Wallet.builder()
                 .id(walletId)
-                .teacherId(teacherId)
                 .balance(new BigDecimal("1000000.00"))
                 .frozenBalance(new BigDecimal("500000.00"))
                 .currency("VND")
@@ -62,6 +61,7 @@ class PayoutReconciliationServiceImplTest {
         teacher = new TeacherProfile();
         teacher.setId(teacherId);
         teacher.setUser(user);
+        wallet.setTeacher(teacher);
         reservation = WalletTransaction.builder()
                 .walletId(walletId)
                 .amount(new BigDecimal("-500000.00"))
