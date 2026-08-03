@@ -85,6 +85,12 @@ public class StudentRefundServiceImpl implements StudentRefundService {
                     "Only a paid purchase can be submitted for refund"
             );
         }
+        if (orderItem.getPrice() == null || orderItem.getPrice().signum() <= 0) {
+            throw new BusinessException(
+                    MessageCodes.REFUND_NOT_ELIGIBLE,
+                    "Free courses are not eligible for refunds"
+            );
+        }
 
         RefundRequest active = refundRequestRepository
                 .findFirstByOrder_IdAndStatusInOrderByCreatedAtDesc(

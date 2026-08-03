@@ -98,6 +98,7 @@ class StudentRefundServiceImplTest {
         orderItem.setId(UUID.randomUUID());
         orderItem.setOrder(order);
         orderItem.setCourse(course);
+        orderItem.setPrice(new BigDecimal("799000"));
 
         enrollment = new Enrollment();
         enrollment.setId(UUID.randomUUID());
@@ -105,6 +106,27 @@ class StudentRefundServiceImplTest {
                 .order(order)
                 .succeededAt(Instant.now().minus(2, ChronoUnit.DAYS))
                 .build();
+    }
+
+    @Test
+    void freeCourse_cannotCreateRefundRequest() {
+        orderItem.setPrice(BigDecimal.ZERO);
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+        when(orderItemRepository.findByIdForRefundUpdate(orderItem.getId()))
+                .thenReturn(Optional.of(orderItem));
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.createRefundRequest(userId, request(StudentRefundType.STANDARD))
+        );
+
+        assertEquals(MessageCodes.REFUND_NOT_ELIGIBLE, error.getMessageCode());
+        verify(refundRequestRepository, never())
+                .findFirstByOrder_IdAndStatusInOrderByCreatedAtDesc(any(), anyList());
+        verify(paymentTransactionRepository, never())
+                .findFirstByOrder_IdAndSucceededAtIsNotNullOrderBySucceededAtDesc(any());
+        verify(refundRequestRepository, never()).saveAndFlush(any());
     }
 
     @Test
