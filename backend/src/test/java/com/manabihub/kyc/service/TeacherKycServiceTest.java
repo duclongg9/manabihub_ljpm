@@ -189,7 +189,7 @@ class TeacherKycServiceTest {
         );
 
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.success("transaction", Map.of("mock", true)));
+                .thenReturn(VnptServerVerificationResult.success("transaction", "SUCCESS", "2023-01-01T00:00:00Z", "012345678901", "ref"));
 
         var response = teacherKycService.verifyIdentity(
                 user.getId(),

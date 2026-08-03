@@ -135,7 +135,7 @@ class VnptServerVerificationTest {
 
         // Server verification succeeds (mock adapter)
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.success("tx-123", Map.of()));
+                .thenReturn(VnptServerVerificationResult.success("tx-123", "SUCCESS", "2023-01-01T00:00:00Z", "012345678901", "ref"));
 
         ArgumentCaptor<KycRequest> requestCaptor = ArgumentCaptor.forClass(KycRequest.class);
         when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(inv -> {
@@ -180,7 +180,7 @@ class VnptServerVerificationTest {
 
         // Server verification fails
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.failure("tx-123", List.of("Transaction not found")));
+                .thenReturn(VnptServerVerificationResult.failure("tx-123", "FAILED", "TX_NOT_FOUND", List.of("Transaction not found")));
 
         ArgumentCaptor<KycRequest> requestCaptor = ArgumentCaptor.forClass(KycRequest.class);
         when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(inv -> {
@@ -221,7 +221,7 @@ class VnptServerVerificationTest {
         when(teacherIdentityClaimService.normalizeCccd("012345678901")).thenReturn("012345678901");
 
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.success("tx-123", Map.of("mock", true)));
+                .thenReturn(VnptServerVerificationResult.success("tx-123", "SUCCESS", "2023-01-01T00:00:00Z", "012345678901", "ref"));
 
         ArgumentCaptor<KycRequest> requestCaptor = ArgumentCaptor.forClass(KycRequest.class);
         when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(inv -> {
@@ -303,7 +303,7 @@ class VnptServerVerificationTest {
         when(teacherIdentityClaimService.normalizeCccd("012345678901")).thenReturn("012345678901");
 
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.success("tx-123", Map.of()));
+                .thenReturn(VnptServerVerificationResult.success("tx-123", "SUCCESS", "2023-01-01T00:00:00Z", "012345678901", "ref"));
 
         when(kycRequestRepository.save(any(KycRequest.class))).thenAnswer(inv -> {
             KycRequest req = inv.getArgument(0);

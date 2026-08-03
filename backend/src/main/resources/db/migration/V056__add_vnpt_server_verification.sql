@@ -26,3 +26,8 @@ ALTER TABLE kyc_requests
 CREATE INDEX IF NOT EXISTS idx_kyc_requests_pending_server_verification
     ON kyc_requests (identity_status, server_verification_expires_at)
     WHERE identity_status = 'PENDING_SERVER_VERIFICATION';
+
+-- MHB-73: Unique constraint to prevent cross-user and concurrent replay of VNPT transactions
+CREATE UNIQUE INDEX IF NOT EXISTS uq_kyc_requests_provider_tx
+    ON kyc_requests (ekyc_provider, provider_transaction_id)
+    WHERE provider_transaction_id IS NOT NULL AND provider_transaction_id != '';

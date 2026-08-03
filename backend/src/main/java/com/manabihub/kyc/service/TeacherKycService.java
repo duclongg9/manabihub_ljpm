@@ -301,20 +301,30 @@ public class TeacherKycService {
         Instant now = Instant.now();
 
         if (serverResult.verified()) {
-            // Server confirmed — now we can trust the identity
-            kycRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
-            kycRequest.setIdentityVerifiedAt(now);
-            kycRequest.setServerVerifiedAt(now);
-            kycRequest.setCertificateStatus(CertificateVerificationStatus.NOT_SUBMITTED);
+            if (!txId.equals(serverResult.transactionId())) {
+                log.warn("Server verification mismatch: expected txId {} but got {}", txId, serverResult.transactionId());
+                kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
+            } else if (!org.springframework.util.StringUtils.hasText(serverResult.serverIdNumber())) {
+                log.warn("Server verified but no identity data provided for request {}", kycRequest.getId());
+                kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
+            } else {
+                // Server confirmed — now we can trust the identity
+                kycRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
+                kycRequest.setIdentityVerifiedAt(now);
+                kycRequest.setServerVerifiedAt(now);
+                kycRequest.setCertificateStatus(CertificateVerificationStatus.LOCKED);
 
-            // NOW process the identity claim (CCCD fingerprint)
-            @SuppressWarnings("unchecked")
-            Map<String, Object> payload = kycRequest.getVerificationPayload();
-            Object ocrObj = payload.get("identityOcr");
-            if (ocrObj instanceof Map<?, ?> ocrMap) {
-                String rawIdNumber = String.valueOf(ocrMap.get("idNumber"));
+                // Add server payload to verification payload
+                java.util.Map<String, Object> currentPayload = new java.util.HashMap<>(kycRequest.getVerificationPayload());
+                currentPayload.put("providerStatus", serverResult.providerStatus());
+                if (serverResult.maskedReference() != null) {
+                    currentPayload.put("serverReference", serverResult.maskedReference());
+                }
+                kycRequest.setVerificationPayload(currentPayload);
+
+                // NOW process the identity claim (CCCD fingerprint) using SERVER data
                 try {
-                    String normalizedCccd = teacherIdentityClaimService.normalizeCccd(rawIdNumber);
+                    String normalizedCccd = teacherIdentityClaimService.normalizeCccd(serverResult.serverIdNumber());
                     teacherIdentityClaimService.processIdentityClaim(
                             teacherProfile.getId(),
                             normalizedCccd,
@@ -322,19 +332,23 @@ public class TeacherKycService {
                             ipAddress,
                             userAgent
                     );
+                    // Unlock certificate only if claim processing is successful
+                    kycRequest.setCertificateStatus(CertificateVerificationStatus.NOT_SUBMITTED);
                 } catch (BusinessException ex) {
                     log.warn("Identity claim processing failed after server verification: {}", ex.getMessage());
                     kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
                     kycRequest.setIdentityVerifiedAt(null);
                     kycRequest.setServerVerifiedAt(null);
-                    kycRequest.setCertificateStatus(CertificateVerificationStatus.LOCKED);
                 }
             }
-
-            log.info("Server verification CONFIRMED for request {}", kycRequest.getId());
         } else {
             // Server rejected
             kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
+            java.util.Map<String, Object> currentPayload = new java.util.HashMap<>(kycRequest.getVerificationPayload());
+            currentPayload.put("providerStatus", serverResult.providerStatus());
+            currentPayload.put("reasonCode", serverResult.reasonCode());
+            currentPayload.put("failureReasons", serverResult.failureReasons());
+            kycRequest.setVerificationPayload(currentPayload);
             log.warn("Server verification REJECTED for request {}: {}",
                     kycRequest.getId(), serverResult.failureReasons());
         }
