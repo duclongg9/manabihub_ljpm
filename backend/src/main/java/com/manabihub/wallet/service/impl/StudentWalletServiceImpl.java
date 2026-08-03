@@ -5,11 +5,12 @@ import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.wallet.dto.response.StudentWalletResponse;
-import com.manabihub.wallet.entity.StudentWallet;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletTransactionType;
-import com.manabihub.wallet.repository.StudentWalletRepository;
+import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import com.manabihub.wallet.service.StudentWalletService;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StudentWalletServiceImpl implements StudentWalletService {
 
-    private final StudentWalletRepository studentWalletRepository;
+    private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final StudentProfileRepository studentProfileRepository;
 
@@ -36,8 +37,8 @@ public class StudentWalletServiceImpl implements StudentWalletService {
                         MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND,
                         "Student profile was not found",
                         HttpStatus.NOT_FOUND));
-        StudentWallet wallet = studentWalletRepository.findByStudentId(student.getId())
-                .orElse(StudentWallet.builder().studentId(student.getId()).build());
+        Wallet wallet = walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, student.getId())
+                .orElse(Wallet.builder().student(student).ownerType(WalletOwnerType.STUDENT).build());
         return new StudentWalletResponse(
                 wallet.getBalance(),
                 wallet.getFrozenBalance(),
@@ -47,11 +48,11 @@ public class StudentWalletServiceImpl implements StudentWalletService {
 
     @Override
     @Transactional
-    public StudentWallet getOrCreateStudentWallet(UUID studentId) {
-        return studentWalletRepository.findByStudentId(studentId)
-                .orElseGet(() -> studentWalletRepository.save(StudentWallet.builder()
-                        .ownerType("STUDENT")
-                        .studentId(studentId)
+    public Wallet getOrCreateStudentWallet(UUID studentId) {
+        return walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)
+                .orElseGet(() -> walletRepository.save(Wallet.builder()
+                        .ownerType(WalletOwnerType.STUDENT)
+                        .student(studentProfileRepository.getReferenceById(studentId))
                         .build()));
     }
 
@@ -61,14 +62,14 @@ public class StudentWalletServiceImpl implements StudentWalletService {
                                            String referenceType, UUID referenceId, String note) {
         // Ensure the wallet exists, then re-load under a pessimistic lock before mutating.
         getOrCreateStudentWallet(studentId);
-        StudentWallet wallet = studentWalletRepository.findByStudentIdForUpdate(studentId)
+        Wallet wallet = walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.WALLET_NOT_FOUND,
                         "Student wallet was not found",
                         HttpStatus.NOT_FOUND));
 
         wallet.setBalance(wallet.getBalance().add(amount));
-        studentWalletRepository.save(wallet);
+        walletRepository.save(wallet);
 
         WalletTransaction transaction = WalletTransaction.builder()
                 .walletId(wallet.getId())
@@ -88,7 +89,7 @@ public class StudentWalletServiceImpl implements StudentWalletService {
     public WalletTransaction debitBalance(UUID studentId, BigDecimal amount,
                                           String referenceType, UUID referenceId, String note) {
         getOrCreateStudentWallet(studentId);
-        StudentWallet wallet = studentWalletRepository.findByStudentIdForUpdate(studentId)
+        Wallet wallet = walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.WALLET_NOT_FOUND,
                         "Student wallet was not found",
@@ -102,7 +103,7 @@ public class StudentWalletServiceImpl implements StudentWalletService {
         }
 
         wallet.setBalance(wallet.getBalance().subtract(amount));
-        studentWalletRepository.save(wallet);
+        walletRepository.save(wallet);
 
         WalletTransaction transaction = WalletTransaction.builder()
                 .walletId(wallet.getId())

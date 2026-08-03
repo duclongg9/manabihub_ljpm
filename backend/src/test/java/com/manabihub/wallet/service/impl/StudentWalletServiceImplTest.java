@@ -2,11 +2,13 @@ package com.manabihub.wallet.service.impl;
 
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.repository.StudentProfileRepository;
-import com.manabihub.wallet.entity.StudentWallet;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.enums.WalletOwnerType;
+import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletTransactionType;
-import com.manabihub.wallet.repository.StudentWalletRepository;
+import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +32,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class StudentWalletServiceImplTest {
 
-    @Mock private StudentWalletRepository studentWalletRepository;
+    @Mock private WalletRepository walletRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private StudentProfileRepository studentProfileRepository;
 
@@ -38,14 +40,18 @@ class StudentWalletServiceImplTest {
     private StudentWalletServiceImpl service;
 
     private UUID studentId;
-    private StudentWallet wallet;
+    private Wallet wallet;
+    private StudentProfile studentProfile;
 
     @BeforeEach
     void setUp() {
         studentId = UUID.randomUUID();
-        wallet = StudentWallet.builder()
+        studentProfile = new StudentProfile();
+        studentProfile.setId(studentId);
+        wallet = Wallet.builder()
                 .id(UUID.randomUUID())
-                .studentId(studentId)
+                .student(studentProfile)
+                .ownerType(WalletOwnerType.STUDENT)
                 .balance(BigDecimal.ZERO)
                 .frozenBalance(BigDecimal.ZERO)
                 .build();
@@ -54,8 +60,8 @@ class StudentWalletServiceImplTest {
     @Test
     void creditBalance_increasesBalanceAndRecordsTopUpTransaction() {
         UUID referenceId = UUID.randomUUID();
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
-        when(studentWalletRepository.findByStudentIdForUpdate(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
         when(walletTransactionRepository.save(any(WalletTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
 
         WalletTransaction tx = service.creditBalance(
@@ -78,8 +84,8 @@ class StudentWalletServiceImplTest {
     @Test
     void debitBalance_sufficientBalance_decreasesBalanceAndRecordsPurchase() {
         wallet.setBalance(new BigDecimal("100000"));
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
-        when(studentWalletRepository.findByStudentIdForUpdate(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
         when(walletTransactionRepository.save(any(WalletTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.debitBalance(studentId, new BigDecimal("30000"), "ORDER", UUID.randomUUID(), "Mua khoá học");
@@ -94,8 +100,8 @@ class StudentWalletServiceImplTest {
     @Test
     void debitBalance_insufficientBalance_throwsAndDoesNotDeduct() {
         wallet.setBalance(new BigDecimal("10000"));
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
-        when(studentWalletRepository.findByStudentIdForUpdate(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
 
         assertThrows(BusinessException.class, () ->
                 service.debitBalance(studentId, new BigDecimal("50000"), "ORDER", UUID.randomUUID(), "Mua khoá học"));
@@ -106,12 +112,13 @@ class StudentWalletServiceImplTest {
 
     @Test
     void getOrCreateStudentWallet_whenMissing_createsNewStudentWallet() {
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.empty());
-        when(studentWalletRepository.save(any(StudentWallet.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.empty());
+        when(studentProfileRepository.getReferenceById(studentId)).thenReturn(studentProfile);
+        when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        StudentWallet created = service.getOrCreateStudentWallet(studentId);
+        Wallet created = service.getOrCreateStudentWallet(studentId);
 
-        assertEquals("STUDENT", created.getOwnerType());
-        assertEquals(studentId, created.getStudentId());
+        assertEquals("STUDENT", created.getOwnerType().name());
+        assertEquals(studentId, created.getStudent().getId());
     }
 }

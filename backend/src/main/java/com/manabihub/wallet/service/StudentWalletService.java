@@ -1,7 +1,7 @@
 package com.manabihub.wallet.service;
 
 import com.manabihub.wallet.dto.response.StudentWalletResponse;
-import com.manabihub.wallet.entity.StudentWallet;
+import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 
 import java.math.BigDecimal;
@@ -12,7 +12,7 @@ import java.util.UUID;
  */
 public interface StudentWalletService {
 
-    StudentWallet getOrCreateStudentWallet(UUID studentId);
+    Wallet getOrCreateStudentWallet(UUID studentId);
 
     /** Wallet overview (balance) for the authenticated student, resolved by their user id. */
     StudentWalletResponse getWalletOverview(UUID userId);

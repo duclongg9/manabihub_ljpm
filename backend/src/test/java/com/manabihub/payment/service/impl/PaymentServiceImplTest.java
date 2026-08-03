@@ -19,7 +19,7 @@ import com.manabihub.payment.event.PaymentNotificationEvent;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
-import com.manabihub.wallet.entity.StudentWallet;
+import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.service.StudentWalletService;
@@ -272,7 +272,7 @@ class PaymentServiceImplTest {
     @Test
     void initiateCombinedPayment_partialBalance_setsWalletPortionAndChargesRemainder() {
         when(studentWalletService.getOrCreateStudentWallet(any()))
-                .thenReturn(StudentWallet.builder().id(UUID.randomUUID()).balance(new BigDecimal("40.00")).build());
+                .thenReturn(Wallet.builder().id(UUID.randomUUID()).balance(new BigDecimal("40.00")).build());
         when(paymentGateway.buildPaymentUrl(eq(order), anyString())).thenReturn("https://vnpay/pay");
 
         String url = service.initiateCombinedPayment(order, "1.2.3.4");
