@@ -142,7 +142,8 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
                 "liveness", "success",
                 "faceMatch", true
         );
-        return new KycIdentityVerificationRequest("sess-1", "tx-1", sdkResult);
+        String uniqueSuffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+        return new KycIdentityVerificationRequest("sess-" + uniqueSuffix, "tx-" + uniqueSuffix, sdkResult);
     }
 
     private String generateUniqueCccdDigits() {
