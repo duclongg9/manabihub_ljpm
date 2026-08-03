@@ -184,6 +184,8 @@ class CourseServiceImplAnalyticsTest {
         when(courseRepository.findByIdAndTeacher_Id(course.getId(), teacherProfile.getId())).thenReturn(Optional.empty());
 
         BusinessException exception = assertThrows(BusinessException.class, () -> courseService.getCourseAnalytics(course.getId(), null, null));
-        assertEquals("Course not found", exception.getMessage());
+        assertEquals("Course was not found or does not belong to you", exception.getMessage());
+        assertEquals("COURSE_NOT_FOUND", exception.getMessageCode());
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, exception.getHttpStatus());
     }
 }

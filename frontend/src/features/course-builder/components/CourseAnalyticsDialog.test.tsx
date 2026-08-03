@@ -70,12 +70,23 @@ describe('CourseAnalyticsDialog', () => {
       // The first call was without dates, the last call should be with dates
       const lastCallArgs = vi.mocked(fetchCourseAnalytics).mock.lastCall;
       expect(lastCallArgs?.[0]).toBe('123');
-      expect(lastCallArgs?.[1]).toContain('2023-01-01');
-      expect(lastCallArgs?.[2]).toContain('2023-12-31');
+      const submittedStartDate = new Date(lastCallArgs![1]!);
+      expect(submittedStartDate.getFullYear()).toBe(2023);
+      expect(submittedStartDate.getMonth()).toBe(0);
+      expect(submittedStartDate.getDate()).toBe(1);
+
+      const submittedEndDate = new Date(lastCallArgs![2]!);
+      expect(submittedEndDate.getFullYear()).toBe(2023);
+      expect(submittedEndDate.getMonth()).toBe(11);
+      expect(submittedEndDate.getDate()).toBe(31);
     });
   });
 
   it('clamps today end dates to current time', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const mockNow = new Date('2023-08-03T10:00:00.000Z');
+    vi.setSystemTime(mockNow);
+
     vi.mocked(fetchCourseAnalytics).mockResolvedValue(mockAnalytics);
     
     render(<CourseAnalyticsDialog courseId="123" courseTitle="Test Course" onClose={() => {}} />);
@@ -83,14 +94,16 @@ describe('CourseAnalyticsDialog', () => {
     const endDateInput = screen.getByLabelText('Đến ngày');
     
     // Set to today's date
-    const today = new Date().toISOString().substring(0, 10);
-    fireEvent.change(endDateInput, { target: { value: today } });
+    const todayStr = '2023-08-03';
+    fireEvent.change(endDateInput, { target: { value: todayStr } });
     
     await waitFor(() => {
       const lastCallArgs = vi.mocked(fetchCourseAnalytics).mock.lastCall;
       expect(lastCallArgs?.[2]).toBeDefined();
-      // It should pass an ISO string containing today's date or the clamped full date
-      expect(lastCallArgs?.[2]).toContain(today);
+      const submittedEndDate = new Date(lastCallArgs![2]!);
+      expect(submittedEndDate.getTime()).toBeLessThanOrEqual(mockNow.getTime());
     });
+
+    vi.useRealTimers();
   });
 });

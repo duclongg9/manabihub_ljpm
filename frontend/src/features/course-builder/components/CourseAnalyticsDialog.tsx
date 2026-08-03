@@ -52,13 +52,18 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
     setIsLoading(true);
     setError(null);
 
-    const formattedStartDate = startDate ? new Date(startDate).toISOString() : undefined;
-    // Set endDate to the end of the day if provided
+    let formattedStartDate = undefined;
+    if (startDate) {
+      const [year, month, day] = startDate.split('-').map(Number);
+      const d = new Date(year, month - 1, day, 0, 0, 0, 0);
+      formattedStartDate = d.toISOString();
+    }
     let formattedEndDate = undefined;
     if (endDate) {
-      const d = new Date(endDate);
-      d.setHours(23, 59, 59, 999);
-      formattedEndDate = d.toISOString();
+      const [year, month, day] = endDate.split('-').map(Number);
+      const d = new Date(year, month - 1, day, 23, 59, 59, 999);
+      const now = new Date();
+      formattedEndDate = d > now ? now.toISOString() : d.toISOString();
     }
 
     fetchCourseAnalytics(courseId, formattedStartDate, formattedEndDate)
