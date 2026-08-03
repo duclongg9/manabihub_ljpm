@@ -22,8 +22,8 @@ import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.notification.repository.NotificationRepository;
-import com.manabihub.wallet.entity.TeacherWallet;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.repository.WalletRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,7 +73,7 @@ class KycServiceImplTest {
     @Mock
     private CourseRepository courseRepository;
     @Mock
-    private TeacherWalletRepository teacherWalletRepository;
+    private WalletRepository walletRepository;
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
     @Mock
@@ -313,12 +313,12 @@ class KycServiceImplTest {
                 teacherProfile.getId(),
                 CourseStatus.ARCHIVED
         )).thenReturn(List.of(publishedCourse, draftCourse));
-        TeacherWallet wallet = TeacherWallet.builder()
+        Wallet wallet = Wallet.builder()
                 .id(UUID.randomUUID())
-                .teacherId(teacherProfile.getId())
+                .teacher(teacherProfile)
                 .frozen(false)
                 .build();
-        when(teacherWalletRepository.findByTeacherIdForUpdate(teacherProfile.getId()))
+        when(walletRepository.findTeacherWalletForUpdate(teacherProfile.getId()))
                 .thenReturn(Optional.of(wallet));
         KycReviewRequest request = new KycReviewRequest(
                 KycRequestStatus.REVOKED,
@@ -336,7 +336,7 @@ class KycServiceImplTest {
         assertEquals(CourseStatus.DRAFT, draftCourse.getStatus());
         assertTrue(wallet.isFrozen());
         verify(courseRepository).saveAll(List.of(publishedCourse));
-        verify(teacherWalletRepository).save(wallet);
+        verify(walletRepository).save(wallet);
     }
 
     @Test

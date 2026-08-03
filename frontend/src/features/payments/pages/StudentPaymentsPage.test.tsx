@@ -26,8 +26,8 @@ vi.mock('../../refunds/hooks/useStudentRefunds', () => ({
 vi.mock('../../help-center/hooks/useCommercialPolicy', () => ({
   useCommercialPolicy: vi.fn(() => ({
     data: {
-      refundWindowDays: 7,
-      refundProgressLimitPercent: 30,
+      refundWindowDays: 14,
+      refundProgressLimitPercent: 20,
     },
     isLoading: false,
     isError: false,

@@ -18,6 +18,7 @@ import com.manabihub.order.enums.OrderStatus;
 import com.manabihub.order.mapper.OrderMapper;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
+import com.manabihub.wallet.config.WalletPaymentProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,6 +54,7 @@ class OrderServiceImplTest {
     @Mock private StudentProfileRepository studentProfileRepository;
     @Mock private CurrentUserService currentUserService;
     @Mock private OrderMapper orderMapper;
+    @Mock private WalletPaymentProperties walletPaymentProperties;
 
     @InjectMocks
     private OrderServiceImpl service;
@@ -75,6 +77,10 @@ class OrderServiceImplTest {
 
         lenient().when(currentUserService.getCurrentUserId()).thenReturn(userId);
         lenient().when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+        lenient().when(walletPaymentProperties.getTopUpMinAmount())
+                .thenReturn(new BigDecimal("10000"));
+        lenient().when(walletPaymentProperties.getTopUpMaxAmount())
+                .thenReturn(new BigDecimal("100000000"));
     }
 
     @Test
@@ -145,6 +151,24 @@ class OrderServiceImplTest {
         assertEquals(OrderStatus.PAID, order.getStatus());
         verify(enrollmentRepository).save(any(Enrollment.class));
         verify(orderRepository).save(order);
+    }
+
+    @Test
+    void createTopUpOrder_acceptsConfiguredMaximum() {
+        when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order created = service.createTopUpOrder(new BigDecimal("100000000"));
+
+        assertEquals(new BigDecimal("100000000"), created.getTotalAmount());
+    }
+
+    @Test
+    void createTopUpOrder_rejectsAmountAboveConfiguredMaximum() {
+        assertThrows(BusinessException.class,
+                () -> service.createTopUpOrder(new BigDecimal("100000001")));
+
+        verify(orderRepository, never()).save(any());
     }
 
     @Test

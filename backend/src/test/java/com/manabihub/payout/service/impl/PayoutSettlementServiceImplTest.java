@@ -29,11 +29,11 @@ import com.manabihub.payout.security.PayoutSecurityService;
 import com.manabihub.payout.service.PayoutGateway;
 import com.manabihub.payout.service.PayoutProofStorageService;
 import com.manabihub.payout.service.PayoutReconciliationService;
-import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletTransactionType;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,7 +73,7 @@ class PayoutSettlementServiceImplTest {
     @Mock private WithdrawalRequestRepository withdrawalRequestRepository;
     @Mock private PayoutSettlementRepository payoutSettlementRepository;
     @Mock private PayoutReconciliationLogRepository reconciliationLogRepository;
-    @Mock private TeacherWalletRepository teacherWalletRepository;
+    @Mock private WalletRepository walletRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
     @Mock private InternalAdminAccountRepository internalAdminAccountRepository;
@@ -90,7 +90,7 @@ class PayoutSettlementServiceImplTest {
     private UUID adminId;
     private UUID requestId;
     private WithdrawalRequest request;
-    private TeacherWallet wallet;
+    private Wallet wallet;
     private TeacherProfile teacher;
     private InternalAdminAccount admin;
     private AtomicReference<PayoutSettlement> settlementRef;
@@ -133,9 +133,9 @@ class PayoutSettlementServiceImplTest {
                 .bankAccountSnapshot(bank)
                 .requestedAt(LocalDateTime.now())
                 .build();
-        wallet = TeacherWallet.builder()
+        wallet = Wallet.builder()
                 .id(walletId)
-                .teacherId(teacherId)
+                .teacher(teacher)
                 .balance(new BigDecimal("2000000.00"))
                 .frozenBalance(new BigDecimal("1000000.00"))
                 .currency("VND")
@@ -158,7 +158,7 @@ class PayoutSettlementServiceImplTest {
         when(internalAdminAccountRepository.findById(adminId)).thenReturn(Optional.of(admin));
         when(withdrawalRequestRepository.findByIdWithLock(requestId)).thenReturn(Optional.of(request));
         when(teacherProfileRepository.findById(teacherId)).thenReturn(Optional.of(teacher));
-        when(teacherWalletRepository.findByTeacherIdForUpdate(teacherId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findTeacherWalletForUpdate(teacherId)).thenReturn(Optional.of(wallet));
         when(payoutSettlementRepository.findByWithdrawalRequestIdWithLock(requestId))
                 .thenAnswer(ignored -> Optional.ofNullable(settlementRef.get()));
         when(payoutSettlementRepository.findByIdWithLock(any()))
@@ -190,7 +190,7 @@ class PayoutSettlementServiceImplTest {
                 withdrawalRequestRepository,
                 payoutSettlementRepository,
                 reconciliationLogRepository,
-                teacherWalletRepository,
+                walletRepository,
                 walletTransactionRepository,
                 teacherProfileRepository,
                 internalAdminAccountRepository,

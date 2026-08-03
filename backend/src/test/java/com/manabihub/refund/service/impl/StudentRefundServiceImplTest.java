@@ -15,6 +15,7 @@ import com.manabihub.order.entity.OrderItemSnapshot;
 import com.manabihub.order.enums.OrderStatus;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderItemSnapshotRepository;
+import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
 import com.manabihub.refund.dto.request.CreateStudentRefundRequest;
@@ -39,6 +40,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -57,11 +59,13 @@ class StudentRefundServiceImplTest {
     @Mock private StudentProfileRepository studentProfileRepository;
     @Mock private RefundRequestRepository refundRequestRepository;
     @Mock private OrderItemRepository orderItemRepository;
+    @Mock private OrderRepository orderRepository;
     @Mock private OrderItemSnapshotRepository orderItemSnapshotRepository;
     @Mock private EnrollmentRepository enrollmentRepository;
     @Mock private PaymentTransactionRepository paymentTransactionRepository;
     @Mock private CommercialPolicyService commercialPolicyService;
     @Mock private LearningProgressDomainService learningProgressDomainService;
+    @Mock private RefundDecisionTransactionService refundDecisionTransactionService;
 
     @InjectMocks private StudentRefundServiceImpl service;
 
@@ -104,25 +108,10 @@ class StudentRefundServiceImplTest {
     }
 
     @Test
-    void standardRefund_exactlyThirtyPercent_isIneligible() {
+    void standardRefund_progressAboveTwentyPercent_routesToManualReview() {
         stubCommon(StudentRefundType.STANDARD);
         when(learningProgressDomainService.calculateProgress(orderItem.getCourse().getId(), enrollment.getId()))
                 .thenReturn(new LearningProgressDomainService.ProgressResult(3, 10, 30.0));
-
-        BusinessException error = assertThrows(BusinessException.class, () ->
-                service.createRefundRequest(userId, request(StudentRefundType.STANDARD)));
-
-        assertEquals(MessageCodes.REFUND_PROGRESS_LIMIT_REACHED, error.getMessageCode());
-        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, error.getHttpStatus());
-        verify(refundRequestRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
-    void standardRefund_daySevenAnd2999Percent_createsPendingSnapshot() {
-        payment.setSucceededAt(Instant.now().minus(7, ChronoUnit.DAYS));
-        stubCommon(StudentRefundType.STANDARD);
-        when(learningProgressDomainService.calculateProgress(orderItem.getCourse().getId(), enrollment.getId()))
-                .thenReturn(new LearningProgressDomainService.ProgressResult(2999, 10000, 29.99));
         when(refundRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             RefundRequest saved = invocation.getArgument(0);
             saved.setId(UUID.randomUUID());
@@ -132,11 +121,66 @@ class StudentRefundServiceImplTest {
         var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
 
         assertEquals(RefundStatus.PENDING, response.status());
+        assertEquals(EligibilityResult.MANUAL_REVIEW_REQUIRED,
+                response.eligibilitySnapshot().getEligibilityResult());
+        assertTrue(response.eligibilitySnapshot().getReasonCodes()
+                .contains("PROGRESS_LIMIT_EXCEEDED"));
+        verify(refundDecisionTransactionService, never()).autoApproveToStudentWallet(any());
+    }
+
+    @Test
+    void standardRefund_dayFourteenAndExactlyTwentyPercent_autoApprovesToWallet() {
+        payment.setSucceededAt(Instant.now().minus(14, ChronoUnit.DAYS));
+        stubCommon(StudentRefundType.STANDARD);
+        when(learningProgressDomainService.calculateProgress(orderItem.getCourse().getId(), enrollment.getId()))
+                .thenReturn(new LearningProgressDomainService.ProgressResult(2, 10, 20.0));
+        AtomicReference<RefundRequest> savedRefund = new AtomicReference<>();
+        when(refundRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            RefundRequest saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            savedRefund.set(saved);
+            return saved;
+        });
+        when(refundDecisionTransactionService.autoApproveToStudentWallet(any())).thenAnswer(invocation -> {
+            RefundRequest approved = savedRefund.get();
+            approved.setStatus(RefundStatus.APPROVED);
+            approved.setDecidedAt(Instant.now());
+            return approved;
+        });
+
+        var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
+
+        assertEquals(RefundStatus.APPROVED, response.status());
         assertEquals(EligibilityResult.STANDARD_ELIGIBLE,
                 response.eligibilitySnapshot().getEligibilityResult());
-        assertTrue(response.cancellable());
+        assertFalse(response.cancellable());
+        assertFalse(response.eligibilitySnapshot().getProtectedMaterialsFullyDownloaded());
         assertEquals(new BigDecimal("799000"),
                 response.eligibilitySnapshot().getActuallyPaidAmount());
+        verify(refundDecisionTransactionService).autoApproveToStudentWallet(any());
+    }
+
+    @Test
+    void standardRefund_afterAllProtectedMaterialsDownloaded_routesToManualReview() {
+        enrollment.setProtectedMaterialsFullyDownloadedAt(Instant.now().minus(1, ChronoUnit.DAYS));
+        stubCommon(StudentRefundType.STANDARD);
+        when(learningProgressDomainService.calculateProgress(orderItem.getCourse().getId(), enrollment.getId()))
+                .thenReturn(new LearningProgressDomainService.ProgressResult(0, 10, 0.0));
+        when(refundRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            RefundRequest saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            return saved;
+        });
+
+        var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
+
+        assertEquals(RefundStatus.PENDING, response.status());
+        assertEquals(EligibilityResult.MANUAL_REVIEW_REQUIRED,
+                response.eligibilitySnapshot().getEligibilityResult());
+        assertTrue(response.eligibilitySnapshot().getProtectedMaterialsFullyDownloaded());
+        assertTrue(response.eligibilitySnapshot().getReasonCodes()
+                .contains("PROTECTED_MATERIALS_FULLY_DOWNLOADED"));
+        verify(refundDecisionTransactionService, never()).autoApproveToStudentWallet(any());
     }
 
     @Test
@@ -168,6 +212,7 @@ class StudentRefundServiceImplTest {
         when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
         when(orderItemRepository.findByIdForRefundUpdate(orderItem.getId()))
                 .thenReturn(Optional.of(orderItem));
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
         RefundRequest existing = RefundRequest.builder()
                 .id(UUID.randomUUID())
                 .order(order)
@@ -177,8 +222,8 @@ class StudentRefundServiceImplTest {
                 .providerStatus(RefundProviderStatus.NOT_REQUESTED)
                 .reason("existing")
                 .build();
-        when(refundRequestRepository.findFirstByOrderItem_IdAndStatusInOrderByCreatedAtDesc(
-                eq(orderItem.getId()), anyList())).thenReturn(Optional.of(existing));
+        when(refundRequestRepository.findFirstByOrder_IdAndStatusInOrderByCreatedAtDesc(
+                eq(order.getId()), anyList())).thenReturn(Optional.of(existing));
 
         var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
 
@@ -239,8 +284,9 @@ class StudentRefundServiceImplTest {
         when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
         when(orderItemRepository.findByIdForRefundUpdate(orderItem.getId()))
                 .thenReturn(Optional.of(orderItem));
-        when(refundRequestRepository.findFirstByOrderItem_IdAndStatusInOrderByCreatedAtDesc(
-                eq(orderItem.getId()), anyList())).thenReturn(Optional.empty());
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(refundRequestRepository.findFirstByOrder_IdAndStatusInOrderByCreatedAtDesc(
+                eq(order.getId()), anyList())).thenReturn(Optional.empty());
     }
 
     private CreateStudentRefundRequest request(StudentRefundType type) {
@@ -251,8 +297,8 @@ class StudentRefundServiceImplTest {
         return new CommercialPolicy(
                 "VND",
                 new BigDecimal("0.20"),
-                7,
-                30,
+                14,
+                20,
                 14,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,

@@ -6,7 +6,7 @@ import com.manabihub.payout.entity.BankAccountSnapshot;
 import com.manabihub.payout.entity.WithdrawalRequest;
 import com.manabihub.payout.enums.ReconciliationStatus;
 import com.manabihub.payout.service.PayoutReconciliationService;
-import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.enums.WalletDirection;
@@ -33,7 +33,7 @@ public class PayoutReconciliationServiceImpl implements PayoutReconciliationServ
     @Override
     public ReconciliationResult reconcile(
             WithdrawalRequest request,
-            TeacherWallet wallet,
+            Wallet wallet,
             TeacherProfile teacher
     ) {
         List<ReconciliationAlert> critical = new ArrayList<>();
@@ -153,7 +153,7 @@ public class PayoutReconciliationServiceImpl implements PayoutReconciliationServ
     private boolean matchesReservation(
             WalletTransaction reservation,
             WithdrawalRequest request,
-            TeacherWallet wallet
+            Wallet wallet
     ) {
         return reservation.getWalletId() != null
                 && reservation.getWalletId().equals(wallet.getId())

@@ -21,6 +21,7 @@ import com.manabihub.order.mapper.OrderMapper;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.order.service.OrderService;
+import com.manabihub.wallet.config.WalletPaymentProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
@@ -48,9 +49,6 @@ public class OrderServiceImpl implements OrderService {
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Set<EnrollmentStatus> OWNED_STATUSES =
             EnumSet.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED);
-    /** Minimum wallet top-up amount (VND); must be a whole number ≥ this. */
-    private static final BigDecimal MIN_TOPUP_AMOUNT = new BigDecimal("10000");
-
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CourseRepository courseRepository;
@@ -58,6 +56,7 @@ public class OrderServiceImpl implements OrderService {
     private final StudentProfileRepository studentProfileRepository;
     private final CurrentUserService currentUserService;
     private final OrderMapper orderMapper;
+    private final WalletPaymentProperties walletPaymentProperties;
 
     @Override
     @Transactional
@@ -112,12 +111,17 @@ public class OrderServiceImpl implements OrderService {
         StudentProfile student = resolveCurrentStudent();
 
         boolean invalid = amount == null
-                || amount.compareTo(MIN_TOPUP_AMOUNT) < 0
+                || amount.compareTo(walletPaymentProperties.getTopUpMinAmount()) < 0
+                || amount.compareTo(walletPaymentProperties.getTopUpMaxAmount()) > 0
                 || amount.stripTrailingZeros().scale() > 0; // must be a whole number of VND
         if (invalid) {
             throw new BusinessException(
                     MessageCodes.COMMON_BAD_REQUEST,
-                    "Số tiền nạp phải là số nguyên và tối thiểu 10.000đ",
+                    "Số tiền nạp phải là số nguyên trong khoảng "
+                            + walletPaymentProperties.getTopUpMinAmount().toPlainString()
+                            + "đ đến "
+                            + walletPaymentProperties.getTopUpMaxAmount().toPlainString()
+                            + "đ",
                     HttpStatus.BAD_REQUEST);
         }
 

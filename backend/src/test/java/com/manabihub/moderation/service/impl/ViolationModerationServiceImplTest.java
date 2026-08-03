@@ -34,8 +34,8 @@ import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.review.entity.CourseReview;
 import com.manabihub.review.enums.CourseReviewStatus;
 import com.manabihub.review.repository.CourseReviewRepository;
-import com.manabihub.wallet.entity.TeacherWallet;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.repository.WalletRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -80,7 +80,7 @@ class ViolationModerationServiceImplTest {
     @Mock private CourseReviewRepository courseReviewRepository;
     @Mock private AppUserRepository appUserRepository;
     @Mock private IdentityTeacherProfileRepository teacherProfileRepository;
-    @Mock private TeacherWalletRepository teacherWalletRepository;
+    @Mock private WalletRepository walletRepository;
     @Mock private OrderItemRepository orderItemRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private ApplicationEventPublisher eventPublisher;
@@ -98,7 +98,7 @@ class ViolationModerationServiceImplTest {
     private AppUser reporterUser;
     private AppUser teacherUser;
     private Course course;
-    private TeacherWallet wallet;
+    private Wallet wallet;
 
     @BeforeEach
     void setUp() {
@@ -155,9 +155,9 @@ class ViolationModerationServiceImplTest {
         admin.setAccountStatus(AccountStatus.ACTIVE);
         admin.setRole(role);
 
-        wallet = new TeacherWallet();
+        wallet = new Wallet();
         wallet.setId(UUID.randomUUID());
-        wallet.setTeacherId(teacherProfileId);
+        wallet.setTeacher(profile);
         wallet.setBalance(BigDecimal.valueOf(5_000_000));
         wallet.setFrozenBalance(BigDecimal.ZERO);
         wallet.setCurrency("VND");
@@ -173,7 +173,7 @@ class ViolationModerationServiceImplTest {
 
         assertEquals(ViolationReportStatus.RESOLVED_NO_VIOLATION, report.getStatus());
         verify(courseRepository, never()).save(any());
-        verify(teacherWalletRepository, never()).save(any());
+        verify(walletRepository, never()).save(any());
         verify(eventPublisher, times(2))
                 .publishEvent(any(ModerationNotificationEvent.class));
     }
@@ -210,7 +210,7 @@ class ViolationModerationServiceImplTest {
         when(courseRepository.findByIdForModeration(courseId)).thenReturn(Optional.of(course));
         when(appUserRepository.findByIdForUpdate(teacherUserId))
                 .thenReturn(Optional.of(teacherUser));
-        when(teacherWalletRepository.findByTeacherIdForUpdate(teacherProfileId))
+        when(walletRepository.findTeacherWalletForUpdate(teacherProfileId))
                 .thenReturn(Optional.of(wallet));
 
         moderationService.resolveViolation(
@@ -228,7 +228,7 @@ class ViolationModerationServiceImplTest {
         assertEquals(AccountStatus.LOCKED, teacherUser.getUserStatus());
         assertTrue(wallet.isFrozen());
         verify(appUserRepository).findByIdForUpdate(teacherUserId);
-        verify(teacherWalletRepository).findByTeacherIdForUpdate(teacherProfileId);
+        verify(walletRepository).findTeacherWalletForUpdate(teacherProfileId);
     }
 
     @Test
@@ -337,7 +337,7 @@ class ViolationModerationServiceImplTest {
 
         assertEquals(ViolationReportStatus.PENDING_EVIDENCE, report.getStatus());
         verify(appUserRepository, never()).save(any());
-        verify(teacherWalletRepository, never()).save(any());
+        verify(walletRepository, never()).save(any());
         verify(eventPublisher).publishEvent(any(ModerationNotificationEvent.class));
     }
 
@@ -433,7 +433,7 @@ class ViolationModerationServiceImplTest {
         assertEquals(AccountStatus.ACTIVE, teacherUser.getUserStatus());
         verify(appUserRepository).findByIdForUpdate(reviewAuthor.getId());
         verify(appUserRepository, never()).findByIdForUpdate(teacherUserId);
-        verify(teacherWalletRepository, never()).findByTeacherIdForUpdate(any());
+        verify(walletRepository, never()).findTeacherWalletForUpdate(any());
     }
 
     @Test

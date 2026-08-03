@@ -5,11 +5,16 @@ import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.wallet.dto.response.StudentWalletResponse;
-import com.manabihub.wallet.entity.StudentWallet;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.entity.WalletPaymentReservation;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
+import com.manabihub.wallet.enums.WalletOwnerType;
+import com.manabihub.wallet.enums.WalletReservationStatus;
 import com.manabihub.wallet.enums.WalletTransactionType;
-import com.manabihub.wallet.repository.StudentWalletRepository;
+import com.manabihub.wallet.exception.WalletCaptureReconciliationException;
+import com.manabihub.wallet.repository.WalletPaymentReservationRepository;
+import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import com.manabihub.wallet.service.StudentWalletService;
 import lombok.RequiredArgsConstructor;
@@ -18,102 +23,318 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class StudentWalletServiceImpl implements StudentWalletService {
 
-    private final StudentWalletRepository studentWalletRepository;
+    private static final String TOP_UP_KEY_PREFIX = "wallet-topup:";
+    private static final String PURCHASE_KEY_PREFIX = "wallet-purchase:";
+    private static final String REFUND_KEY_PREFIX = "wallet-refund:";
+
+    private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
+    private final WalletPaymentReservationRepository reservationRepository;
     private final StudentProfileRepository studentProfileRepository;
 
     @Override
     @Transactional(readOnly = true)
     public StudentWalletResponse getWalletOverview(UUID userId) {
-        StudentProfile student = studentProfileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND,
-                        "Student profile was not found",
-                        HttpStatus.NOT_FOUND));
-        StudentWallet wallet = studentWalletRepository.findByStudentId(student.getId())
-                .orElse(StudentWallet.builder().studentId(student.getId()).build());
-        return new StudentWalletResponse(
-                wallet.getBalance(),
-                wallet.getFrozenBalance(),
-                wallet.getAvailableBalance(),
-                wallet.getCurrency());
+        StudentProfile student = requireStudentByUserId(userId);
+        return walletRepository
+                .findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, student.getId())
+                .map(wallet -> new StudentWalletResponse(
+                        wallet.getBalance(),
+                        wallet.getFrozenBalance(),
+                        wallet.getAvailableBalance(),
+                        wallet.getCurrency()))
+                .orElseGet(() -> new StudentWalletResponse(
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        "VND"));
     }
 
     @Override
     @Transactional
-    public StudentWallet getOrCreateStudentWallet(UUID studentId) {
-        return studentWalletRepository.findByStudentId(studentId)
-                .orElseGet(() -> studentWalletRepository.save(StudentWallet.builder()
-                        .ownerType("STUDENT")
-                        .studentId(studentId)
-                        .build()));
+    public Wallet getOrCreateStudentWallet(UUID studentId) {
+        walletRepository.insertStudentWalletIfAbsent(UUID.randomUUID(), studentId);
+        return walletRepository
+                .findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)
+                .orElseThrow(this::walletNotFound);
     }
 
     @Override
     @Transactional
-    public WalletTransaction creditBalance(UUID studentId, BigDecimal amount,
-                                           String referenceType, UUID referenceId, String note) {
-        // Ensure the wallet exists, then re-load under a pessimistic lock before mutating.
-        getOrCreateStudentWallet(studentId);
-        StudentWallet wallet = studentWalletRepository.findByStudentIdForUpdate(studentId)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.WALLET_NOT_FOUND,
-                        "Student wallet was not found",
-                        HttpStatus.NOT_FOUND));
-
-        wallet.setBalance(wallet.getBalance().add(amount));
-        studentWalletRepository.save(wallet);
-
-        WalletTransaction transaction = WalletTransaction.builder()
-                .walletId(wallet.getId())
-                .transactionType(WalletTransactionType.TOP_UP)
-                .amount(amount)
-                .direction(WalletDirection.IN)
-                .referenceType(referenceType)
-                .referenceId(referenceId)
-                .note(note)
-                .build();
-
-        return walletTransactionRepository.save(transaction);
+    public WalletTransaction creditTopUp(
+            UUID studentId,
+            BigDecimal amount,
+            UUID orderId,
+            String note
+    ) {
+        return credit(
+                studentId,
+                amount,
+                WalletTransactionType.TOP_UP,
+                "WALLET_TOPUP",
+                orderId,
+                TOP_UP_KEY_PREFIX + orderId,
+                note
+        );
     }
 
     @Override
     @Transactional
-    public WalletTransaction debitBalance(UUID studentId, BigDecimal amount,
-                                          String referenceType, UUID referenceId, String note) {
-        getOrCreateStudentWallet(studentId);
-        StudentWallet wallet = studentWalletRepository.findByStudentIdForUpdate(studentId)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.WALLET_NOT_FOUND,
-                        "Student wallet was not found",
-                        HttpStatus.NOT_FOUND));
+    public WalletTransaction creditRefund(
+            UUID studentId,
+            BigDecimal amount,
+            UUID refundRequestId,
+            String note
+    ) {
+        return credit(
+                studentId,
+                amount,
+                WalletTransactionType.REFUND,
+                "REFUND_REQUEST",
+                refundRequestId,
+                REFUND_KEY_PREFIX + refundRequestId,
+                note
+        );
+    }
 
-        if (wallet.getBalance().compareTo(amount) < 0) {
+    @Override
+    @Transactional
+    public WalletPaymentReservation reserveForOrder(
+            UUID studentId,
+            UUID orderId,
+            BigDecimal amount,
+            Instant expiresAt
+    ) {
+        requirePositive(amount, "Wallet reservation amount must be positive");
+        if (expiresAt == null || !expiresAt.isAfter(Instant.now())) {
             throw new BusinessException(
-                    MessageCodes.WALLET_INSUFFICIENT_BALANCE,
-                    "Số dư ví không đủ để thanh toán",
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Wallet reservation expiry must be in the future",
                     HttpStatus.BAD_REQUEST);
         }
 
-        wallet.setBalance(wallet.getBalance().subtract(amount));
-        studentWalletRepository.save(wallet);
+        WalletPaymentReservation existing = reservationRepository
+                .findByOrderIdForUpdate(orderId)
+                .orElse(null);
+        if (existing != null) {
+            requireMatchingReservation(existing, amount);
+            return existing;
+        }
 
-        WalletTransaction transaction = WalletTransaction.builder()
+        getOrCreateStudentWallet(studentId);
+        Wallet wallet = walletRepository.findStudentWalletForUpdate(studentId)
+                .orElseThrow(this::walletNotFound);
+
+        existing = reservationRepository.findByOrderIdForUpdate(orderId).orElse(null);
+        if (existing != null) {
+            requireMatchingReservation(existing, amount);
+            return existing;
+        }
+
+        if (wallet.isFrozen()) {
+            throw new BusinessException(
+                    MessageCodes.WALLET_FROZEN,
+                    "Student wallet is frozen",
+                    HttpStatus.CONFLICT);
+        }
+        if (wallet.getAvailableBalance().compareTo(amount) < 0) {
+            throw insufficientBalance();
+        }
+
+        wallet.setFrozenBalance(wallet.getFrozenBalance().add(amount));
+        walletRepository.save(wallet);
+
+        return reservationRepository.save(WalletPaymentReservation.builder()
+                .walletId(wallet.getId())
+                .orderId(orderId)
+                .amount(amount)
+                .status(WalletReservationStatus.RESERVED)
+                .expiresAt(expiresAt)
+                .build());
+    }
+
+    @Override
+    @Transactional(noRollbackFor = WalletCaptureReconciliationException.class)
+    public WalletTransaction captureForOrder(UUID orderId, Instant succeededAt) {
+        String idempotencyKey = PURCHASE_KEY_PREFIX + orderId;
+        WalletTransaction existingTransaction = walletTransactionRepository
+                .findByIdempotencyKey(idempotencyKey)
+                .orElse(null);
+        if (existingTransaction != null) {
+            return existingTransaction;
+        }
+
+        WalletPaymentReservation reservation = reservationRepository
+                .findByOrderIdForUpdate(orderId)
+                .orElseThrow(() -> new WalletCaptureReconciliationException(
+                        "Wallet reservation was not found"));
+
+        if (reservation.getStatus() == WalletReservationStatus.CAPTURED) {
+            return walletTransactionRepository.findByIdempotencyKey(idempotencyKey)
+                    .orElseThrow(() -> new WalletCaptureReconciliationException(
+                            "Captured reservation is missing its wallet ledger entry"));
+        }
+        if (reservation.getStatus() != WalletReservationStatus.RESERVED) {
+            reservation.setStatus(WalletReservationStatus.RECONCILIATION_REQUIRED);
+            reservationRepository.save(reservation);
+            throw new WalletCaptureReconciliationException(
+                    "Wallet reservation can no longer be captured");
+        }
+
+        Wallet wallet = walletRepository.findByIdForUpdate(reservation.getWalletId())
+                .orElseThrow(() -> new WalletCaptureReconciliationException(
+                        "Reserved wallet was not found"));
+        BigDecimal amount = reservation.getAmount();
+        if (wallet.getFrozenBalance().compareTo(amount) < 0
+                || wallet.getBalance().compareTo(amount) < 0) {
+            reservation.setStatus(WalletReservationStatus.RECONCILIATION_REQUIRED);
+            reservationRepository.save(reservation);
+            throw new WalletCaptureReconciliationException(
+                    "Reserved wallet funds are inconsistent");
+        }
+
+        wallet.setBalance(wallet.getBalance().subtract(amount));
+        wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(amount));
+        walletRepository.save(wallet);
+
+        WalletTransaction transaction = walletTransactionRepository.save(WalletTransaction.builder()
                 .walletId(wallet.getId())
                 .transactionType(WalletTransactionType.PURCHASE)
                 .amount(amount)
                 .direction(WalletDirection.OUT)
+                .referenceType("ORDER")
+                .referenceId(orderId)
+                .idempotencyKey(idempotencyKey)
+                .note("Capture phần thanh toán từ ví")
+                .build());
+
+        reservation.setStatus(WalletReservationStatus.CAPTURED);
+        reservation.setCapturedAt(succeededAt == null ? Instant.now() : succeededAt);
+        reservationRepository.save(reservation);
+        return transaction;
+    }
+
+    @Override
+    @Transactional
+    public void releaseForOrder(UUID orderId, Instant releasedAt) {
+        WalletPaymentReservation reservation = reservationRepository
+                .findByOrderIdForUpdate(orderId)
+                .orElse(null);
+        if (reservation == null || reservation.getStatus() == WalletReservationStatus.RELEASED) {
+            return;
+        }
+        if (reservation.getStatus() == WalletReservationStatus.CAPTURED) {
+            return;
+        }
+        if (reservation.getStatus() == WalletReservationStatus.RECONCILIATION_REQUIRED) {
+            return;
+        }
+
+        Wallet wallet = walletRepository.findByIdForUpdate(reservation.getWalletId())
+                .orElseThrow(this::walletNotFound);
+        if (wallet.getFrozenBalance().compareTo(reservation.getAmount()) < 0) {
+            reservation.setStatus(WalletReservationStatus.RECONCILIATION_REQUIRED);
+            reservationRepository.save(reservation);
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "Frozen wallet balance is inconsistent with the reservation",
+                    HttpStatus.CONFLICT);
+        }
+
+        wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(reservation.getAmount()));
+        walletRepository.save(wallet);
+        reservation.setStatus(WalletReservationStatus.RELEASED);
+        reservation.setReleasedAt(releasedAt == null ? Instant.now() : releasedAt);
+        reservationRepository.save(reservation);
+    }
+
+    private WalletTransaction credit(
+            UUID studentId,
+            BigDecimal amount,
+            WalletTransactionType type,
+            String referenceType,
+            UUID referenceId,
+            String idempotencyKey,
+            String note
+    ) {
+        requirePositive(amount, "Wallet credit amount must be positive");
+        WalletTransaction existing = walletTransactionRepository
+                .findByIdempotencyKey(idempotencyKey)
+                .orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+
+        getOrCreateStudentWallet(studentId);
+        Wallet wallet = walletRepository.findStudentWalletForUpdate(studentId)
+                .orElseThrow(this::walletNotFound);
+
+        existing = walletTransactionRepository.findByIdempotencyKey(idempotencyKey).orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+
+        wallet.setBalance(wallet.getBalance().add(amount));
+        walletRepository.save(wallet);
+        return walletTransactionRepository.save(WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .transactionType(type)
+                .amount(amount)
+                .direction(WalletDirection.IN)
                 .referenceType(referenceType)
                 .referenceId(referenceId)
+                .idempotencyKey(idempotencyKey)
                 .note(note)
-                .build();
+                .build());
+    }
 
-        return walletTransactionRepository.save(transaction);
+    private StudentProfile requireStudentByUserId(UUID userId) {
+        return studentProfileRepository.findByUser_Id(userId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND,
+                        "Student profile was not found",
+                        HttpStatus.NOT_FOUND));
+    }
+
+    private void requireMatchingReservation(
+            WalletPaymentReservation reservation,
+            BigDecimal amount
+    ) {
+        if (reservation.getAmount().compareTo(amount) != 0) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "The order already has a reservation with a different amount",
+                    HttpStatus.CONFLICT);
+        }
+    }
+
+    private void requirePositive(BigDecimal amount, String message) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    message,
+                    HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private BusinessException walletNotFound() {
+        return new BusinessException(
+                MessageCodes.WALLET_NOT_FOUND,
+                "Student wallet was not found",
+                HttpStatus.NOT_FOUND);
+    }
+
+    private BusinessException insufficientBalance() {
+        return new BusinessException(
+                MessageCodes.WALLET_INSUFFICIENT_BALANCE,
+                "Số dư khả dụng của ví không đủ để thanh toán",
+                HttpStatus.BAD_REQUEST);
     }
 }

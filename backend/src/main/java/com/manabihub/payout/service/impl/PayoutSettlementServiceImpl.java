@@ -36,11 +36,12 @@ import com.manabihub.payout.service.PayoutGateway;
 import com.manabihub.payout.service.PayoutProofStorageService;
 import com.manabihub.payout.service.PayoutReconciliationService;
 import com.manabihub.payout.service.PayoutSettlementService;
-import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletTransactionType;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,7 +77,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
     private final WithdrawalRequestRepository withdrawalRequestRepository;
     private final PayoutSettlementRepository payoutSettlementRepository;
     private final PayoutReconciliationLogRepository reconciliationLogRepository;
-    private final TeacherWalletRepository teacherWalletRepository;
+    private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final InternalAdminAccountRepository internalAdminAccountRepository;
@@ -117,7 +118,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         requireFinanceAdmin();
         WithdrawalRequest request = findRequest(withdrawalRequestId);
         TeacherProfile teacher = findTeacher(request.getTeacherId());
-        TeacherWallet wallet = findWallet(request.getTeacherId());
+        Wallet wallet = findWallet(request.getTeacherId());
         PayoutSettlement settlement = payoutSettlementRepository
                 .findByWithdrawalRequestId(withdrawalRequestId)
                 .orElse(null);
@@ -134,7 +135,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         InternalAdminAccount admin = requireFinanceAdmin();
         WithdrawalRequest request = findRequest(withdrawalRequestId);
         TeacherProfile teacher = findTeacher(request.getTeacherId());
-        TeacherWallet wallet = findWallet(request.getTeacherId());
+        Wallet wallet = findWallet(request.getTeacherId());
         PayoutSettlement settlement = payoutSettlementRepository
                 .findByWithdrawalRequestId(withdrawalRequestId)
                 .orElse(null);
@@ -428,7 +429,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         }
 
         TeacherProfile teacher = findTeacher(request.getTeacherId());
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherIdForUpdate(request.getTeacherId())
+        Wallet wallet = walletRepository.findTeacherWalletForUpdate(request.getTeacherId())
                 .orElseThrow(() -> walletNotFound(request.getTeacherId()));
         PayoutReconciliationService.ReconciliationResult reconciliation =
                 reconciliationService.reconcile(request, wallet, teacher);
@@ -669,7 +670,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         }
 
         TeacherProfile teacher = findTeacher(request.getTeacherId());
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherIdForUpdate(request.getTeacherId())
+        Wallet wallet = walletRepository.findTeacherWalletForUpdate(request.getTeacherId())
                 .orElseThrow(() -> walletNotFound(request.getTeacherId()));
         PayoutReconciliationService.ReconciliationResult reconciliation =
                 reconciliationService.reconcile(request, wallet, teacher);
@@ -731,7 +732,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         String statusBefore = request.getStatus().name();
         wallet.setBalance(wallet.getBalance().subtract(amount));
         wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(amount));
-        teacherWalletRepository.save(wallet);
+        walletRepository.save(wallet);
         walletTransactionRepository.save(WalletTransaction.builder()
                 .walletId(wallet.getId())
                 .transactionType(WalletTransactionType.WITHDRAWAL_COMPLETED)
@@ -837,7 +838,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         }
 
         TeacherProfile teacher = findTeacher(request.getTeacherId());
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherIdForUpdate(request.getTeacherId())
+        Wallet wallet = walletRepository.findTeacherWalletForUpdate(request.getTeacherId())
                 .orElseThrow(() -> walletNotFound(request.getTeacherId()));
         PayoutReconciliationService.ReconciliationResult reconciliation =
                 reconciliationService.reconcile(request, wallet, teacher);
@@ -920,7 +921,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         String statusBefore = request.getStatus().name();
         wallet.setBalance(wallet.getBalance().subtract(amount));
         wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(amount));
-        teacherWalletRepository.save(wallet);
+        walletRepository.save(wallet);
         walletTransactionRepository.save(WalletTransaction.builder()
                 .walletId(wallet.getId())
                 .transactionType(WalletTransactionType.WITHDRAWAL_COMPLETED)
@@ -995,7 +996,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             );
         }
 
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherIdForUpdate(request.getTeacherId())
+        Wallet wallet = walletRepository.findTeacherWalletForUpdate(request.getTeacherId())
                 .orElseThrow(() -> walletNotFound(request.getTeacherId()));
         BigDecimal amount = request.getRequestedAmount();
         if (wallet.getFrozenBalance().compareTo(amount) < 0) {
@@ -1031,7 +1032,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                         WalletTransactionType.WITHDRAWAL_REJECTED
                 )) {
             wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(amount));
-            teacherWalletRepository.save(wallet);
+            walletRepository.save(wallet);
             walletTransactionRepository.save(WalletTransaction.builder()
                     .walletId(wallet.getId())
                     .transactionType(WalletTransactionType.WITHDRAWAL_REJECTED)
@@ -1079,7 +1080,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
 
     private PayoutQueueItemResponse toQueueItem(WithdrawalRequest request) {
         TeacherProfile teacher = findTeacher(request.getTeacherId());
-        TeacherWallet wallet = findWallet(request.getTeacherId());
+        Wallet wallet = findWallet(request.getTeacherId());
         PayoutSettlement settlement = payoutSettlementRepository
                 .findByWithdrawalRequestId(request.getId())
                 .orElse(null);
@@ -1103,7 +1104,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
     private PayoutDetailResponse toDetail(
             WithdrawalRequest request,
             TeacherProfile teacher,
-            TeacherWallet wallet,
+            Wallet wallet,
             PayoutSettlement settlement,
             PayoutReconciliationService.ReconciliationResult reconciliation
     ) {
@@ -1173,7 +1174,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
     private void saveReconciliationLog(
             WithdrawalRequest request,
             PayoutSettlement settlement,
-            TeacherWallet wallet,
+            Wallet wallet,
             PayoutReconciliationService.ReconciliationResult reconciliation,
             UUID checkedBy,
             String triggerType
@@ -1255,7 +1256,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
 
     private PayoutSettlement newSettlement(
             WithdrawalRequest request,
-            TeacherWallet wallet,
+            Wallet wallet,
             UUID adminId
     ) {
         return PayoutSettlement.builder()
@@ -1443,8 +1444,8 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 ));
     }
 
-    private TeacherWallet findWallet(UUID teacherId) {
-        return teacherWalletRepository.findByTeacherId(teacherId)
+    private Wallet findWallet(UUID teacherId) {
+        return walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacherId)
                 .orElseThrow(() -> walletNotFound(teacherId));
     }
 

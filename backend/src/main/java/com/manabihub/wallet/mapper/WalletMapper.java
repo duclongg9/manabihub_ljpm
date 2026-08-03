@@ -1,7 +1,7 @@
 package com.manabihub.wallet.mapper;
 
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
-import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.entity.Wallet;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -15,5 +15,5 @@ public interface WalletMapper {
     @Mapping(target = "pendingBalance", constant = "0")
     @Mapping(target = "reservedBalance", source = "wallet.frozenBalance")
     @Mapping(target = "availableBalance", expression = "java(wallet.getAvailableBalance())")
-    TeacherWalletResponse toResponse(TeacherWallet wallet, BigDecimal minimumPayoutAmount, int clearingPeriodDays, LocalDate nextPayoutDate);
+    TeacherWalletResponse toResponse(Wallet wallet, BigDecimal minimumPayoutAmount, int clearingPeriodDays, LocalDate nextPayoutDate);
 }
