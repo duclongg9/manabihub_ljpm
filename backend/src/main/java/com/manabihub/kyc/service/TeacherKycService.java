@@ -331,23 +331,17 @@ public class TeacherKycService {
                 kycRequest.setVerificationPayload(currentPayload);
 
                 // NOW process the identity claim (CCCD fingerprint) using SERVER data
-                try {
-                    String normalizedCccd = teacherIdentityClaimService.normalizeCccd(serverResult.serverIdNumber());
-                    teacherIdentityClaimService.processIdentityClaim(
-                            teacherProfile.getId(),
-                            normalizedCccd,
-                            user,
-                            ipAddress,
-                            userAgent
-                    );
-                    // Unlock certificate only if claim processing is successful
-                    kycRequest.setCertificateStatus(CertificateVerificationStatus.NOT_SUBMITTED);
-                } catch (BusinessException ex) {
-                    log.warn("Identity claim processing failed after server verification: {}", ex.getMessage());
-                    kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
-                    kycRequest.setIdentityVerifiedAt(null);
-                    kycRequest.setServerVerifiedAt(null);
-                }
+                String normalizedCccd = teacherIdentityClaimService.normalizeCccd(serverResult.serverIdNumber());
+                teacherIdentityClaimService.processIdentityClaim(
+                        teacherProfile.getId(),
+                        normalizedCccd,
+                        user,
+                        ipAddress,
+                        userAgent
+                );
+                // Unlock certificate only if claim processing is successful
+                kycRequest.setCertificateStatus(CertificateVerificationStatus.NOT_SUBMITTED);
+
             }
         } else {
             // Server rejected
