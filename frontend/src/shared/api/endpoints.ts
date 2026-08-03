@@ -24,6 +24,7 @@ export const ENDPOINTS = {
   profile: {
     student: '/v1/student/profile',
     teacher: '/v1/teacher/profile',
+    avatar: '/v1/users/avatar',
   },
   teacherDashboard: {
     stats: '/v1/teacher/dashboard',

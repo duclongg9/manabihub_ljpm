@@ -8,7 +8,7 @@ import {PageHeader} from "../../shared/components/PageHeader/PageHeader";
 import {LoadingState} from "../../shared/components/LoadingState/LoadingState";
 import AvatarUpload from "../../shared/components/AvatarUpload/AvatarUpload";
 
-import {getMyTeacherProfile, updateMyTeacherProfile, uploadAvatar} from "./profileApi";
+import {avatarUploadErrorMessage, getMyTeacherProfile, updateMyTeacherProfile, uploadAvatar} from "./profileApi";
 import {resolvePublicAssetUrl} from "../../shared/utils/assetUtils";
 
 export default function TeacherProfilePage() {
@@ -274,7 +274,7 @@ export default function TeacherProfilePage() {
         } catch (error) {
             console.error("Avatar upload failed:", error);
             setForm(prev => ({ ...prev, avatarUrl: previousAvatarUrl }));
-            setSnackbar({ open: true, message: "Failed to upload avatar", severity: "error" });
+            setSnackbar({ open: true, message: avatarUploadErrorMessage(error), severity: "error" });
         } finally {
             setSaving(false);
             URL.revokeObjectURL(preview);
