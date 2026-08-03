@@ -22,7 +22,7 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
 
     Optional<Wallet> findFirstByOwnerType(WalletOwnerType ownerType);
 
-    @Modifying(flushAutomatically = true)
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             INSERT INTO wallets (
                 id, owner_type, student_id, balance, frozen_balance, frozen, currency, created_at

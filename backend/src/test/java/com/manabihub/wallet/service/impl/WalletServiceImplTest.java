@@ -86,9 +86,9 @@ class WalletServiceImplTest {
         when(walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId()))
                 .thenReturn(Optional.of(teacherWallet));
         when(walletMapper.toResponse(
-                eq(wallet),
-                any(BigDecimal.class),
-                anyInt(),
+                eq(teacherWallet),
+                eq(new BigDecimal("500000.00")),
+                eq(14),
                 any(LocalDate.class)))
                 .thenReturn(expected);
 
@@ -98,7 +98,7 @@ class WalletServiceImplTest {
         verify(teacherProfileRepository).findByUserId(userId);
         verify(walletRepository).findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId());
         verify(walletMapper).toResponse(
-                wallet,
+                teacherWallet,
                 new BigDecimal("500000.00"),
                 14,
                 LocalDate.now().plusDays(14));
@@ -168,8 +168,8 @@ class WalletServiceImplTest {
         );
 
         assertEquals(MessageCodes.PAYOUT_BALANCE_FROZEN, exception.getMessageCode());
-        assertEquals(new BigDecimal("2000000.00"), wallet.getBalance());
-        assertEquals(BigDecimal.ZERO, wallet.getFrozenBalance());
+        assertEquals(new BigDecimal("2000000.00"), teacherWallet.getBalance());
+        assertEquals(BigDecimal.ZERO, teacherWallet.getFrozenBalance());
         verifyNoInteractions(walletTransactionRepository);
     }
 

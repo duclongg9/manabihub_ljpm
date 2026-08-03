@@ -5,9 +5,7 @@ import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.MigrationState;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -26,9 +24,8 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace.NONE;
 
-@DataJpaTest
+@org.springframework.boot.test.context.SpringBootTest(webEnvironment = org.springframework.boot.test.context.SpringBootTest.WebEnvironment.NONE)
 @AutoConfigureTestDatabase(replace = NONE)
-@Import(FlywayAutoConfiguration.class)
 @Testcontainers
 @ActiveProfiles("it")
 public class FlywayMigrationIntegrationTest {
@@ -46,6 +43,10 @@ public class FlywayMigrationIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.mail.host", () -> "localhost");
+        registry.add("spring.mail.port", () -> "25");
+        registry.add("manabihub.kyc.identity-secret", () -> "test-only-identity-secret-at-least-32-bytes");
+        registry.add("manabihub.payout.security-secret", () -> "test-only-payout-security-secret-at-least-32-bytes");
     }
 
     @Autowired
@@ -74,13 +75,13 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("053");
+        assertThat(current).isEqualTo("055");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V053 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V055 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");
@@ -210,6 +211,38 @@ public class FlywayMigrationIntegrationTest {
                         + "AND schemaname = 'public'",
                 Integer.class);
         assertThat(uqPt).as("uq_payment_transactions_provider_txn exists").isEqualTo(1);
+        // wallet_payment_reservations table
+        Integer tblWpr = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'wallet_payment_reservations' AND table_schema = 'public'",
+                Integer.class);
+        assertThat(tblWpr).as("wallet_payment_reservations exists").isEqualTo(1);
+
+        // uq_wallet_transactions_idempotency_key constraint
+        Integer uqWti = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_indexes WHERE indexname = 'uq_wallet_transactions_idempotency_key' AND schemaname = 'public'",
+                Integer.class);
+        if (uqWti == 0) {
+            uqWti = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM information_schema.table_constraints WHERE constraint_name = 'uq_wallet_transactions_idempotency_key' AND table_schema = 'public'",
+                    Integer.class);
+        }
+        assertThat(uqWti).as("uq_wallet_transactions_idempotency_key exists").isEqualTo(1);
+
+        // uq_refund_request_active_order constraint
+        Integer uqRro = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_indexes WHERE indexname = 'uq_refund_request_active_order' AND schemaname = 'public'",
+                Integer.class);
+        if (uqRro == 0) {
+            uqRro = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM information_schema.table_constraints WHERE constraint_name = 'uq_refund_request_active_order' AND table_schema = 'public'",
+                    Integer.class);
+        }
+        assertThat(uqRro).as("uq_refund_request_active_order exists").isEqualTo(1);
+
+        // enrollments.protected_materials_fully_downloaded_at column
+        Integer colEpm = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'enrollments' AND column_name = 'protected_materials_fully_downloaded_at' AND table_schema = 'public'",
+                Integer.class);
+        assertThat(colEpm).as("enrollments.protected_materials_fully_downloaded_at exists").isEqualTo(1);
     }
 }
-// trigger CI

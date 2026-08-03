@@ -61,10 +61,12 @@ public class StudentWalletServiceImpl implements StudentWalletService {
     @Transactional
     public Wallet getOrCreateStudentWallet(UUID studentId) {
         return walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)
-                .orElseGet(() -> walletRepository.save(Wallet.builder()
-                        .ownerType(WalletOwnerType.STUDENT)
-                        .student(studentProfileRepository.getReferenceById(studentId))
-                        .build()));
+                .orElseGet(() -> {
+                    UUID candidateWalletId = UUID.randomUUID();
+                    walletRepository.insertStudentWalletIfAbsent(candidateWalletId, studentId);
+                    return walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)
+                            .orElseThrow(() -> new IllegalStateException("Failed to find or create canonical wallet"));
+                });
     }
 
     @Override
