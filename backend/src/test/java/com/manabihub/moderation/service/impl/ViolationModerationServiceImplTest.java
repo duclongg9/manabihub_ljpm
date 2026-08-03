@@ -36,6 +36,7 @@ import com.manabihub.review.enums.CourseReviewStatus;
 import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -210,7 +211,7 @@ class ViolationModerationServiceImplTest {
         when(courseRepository.findByIdForModeration(courseId)).thenReturn(Optional.of(course));
         when(appUserRepository.findByIdForUpdate(teacherUserId))
                 .thenReturn(Optional.of(teacherUser));
-        when(walletRepository.findTeacherWalletForUpdate(teacherProfileId))
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherProfileId))
                 .thenReturn(Optional.of(wallet));
 
         moderationService.resolveViolation(
@@ -228,7 +229,7 @@ class ViolationModerationServiceImplTest {
         assertEquals(AccountStatus.LOCKED, teacherUser.getUserStatus());
         assertTrue(wallet.isFrozen());
         verify(appUserRepository).findByIdForUpdate(teacherUserId);
-        verify(walletRepository).findTeacherWalletForUpdate(teacherProfileId);
+        verify(walletRepository).findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherProfileId);
     }
 
     @Test
@@ -433,7 +434,7 @@ class ViolationModerationServiceImplTest {
         assertEquals(AccountStatus.ACTIVE, teacherUser.getUserStatus());
         verify(appUserRepository).findByIdForUpdate(reviewAuthor.getId());
         verify(appUserRepository, never()).findByIdForUpdate(teacherUserId);
-        verify(walletRepository, never()).findTeacherWalletForUpdate(any());
+        verify(walletRepository, never()).findByOwnerTypeAndTeacher_IdForUpdate(eq(com.manabihub.wallet.enums.WalletOwnerType.TEACHER), any());
     }
 
     @Test

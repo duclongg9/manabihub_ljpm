@@ -38,6 +38,7 @@ import com.manabihub.review.entity.CourseReview;
 import com.manabihub.review.enums.CourseReviewStatus;
 import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -477,7 +478,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
         }
 
         Wallet wallet = walletRepository
-                .findTeacherWalletForUpdate(context.affectedTeacherProfileId())
+                .findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, context.affectedTeacherProfileId())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.MODERATION_TARGET_NOT_FOUND,
                         "The affected teacher wallet does not exist",

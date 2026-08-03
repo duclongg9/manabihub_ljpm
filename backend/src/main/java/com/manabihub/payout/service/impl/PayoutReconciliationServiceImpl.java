@@ -49,7 +49,7 @@ public class PayoutReconciliationServiceImpl implements PayoutReconciliationServ
             ));
         }
 
-        if (!request.getTeacherId().equals(wallet.getTeacherId())) {
+        if (wallet.getTeacher() == null || !wallet.getTeacher().getId().equals(request.getTeacherId())) {
             critical.add(alert(
                     "PAYOUT_WALLET_OWNER_MISMATCH",
                     "CRITICAL",

@@ -34,6 +34,7 @@ import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletTransactionType;
 import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -158,7 +159,7 @@ class PayoutSettlementServiceImplTest {
         when(internalAdminAccountRepository.findById(adminId)).thenReturn(Optional.of(admin));
         when(withdrawalRequestRepository.findByIdWithLock(requestId)).thenReturn(Optional.of(request));
         when(teacherProfileRepository.findById(teacherId)).thenReturn(Optional.of(teacher));
-        when(walletRepository.findTeacherWalletForUpdate(teacherId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherId)).thenReturn(Optional.of(wallet));
         when(payoutSettlementRepository.findByWithdrawalRequestIdWithLock(requestId))
                 .thenAnswer(ignored -> Optional.ofNullable(settlementRef.get()));
         when(payoutSettlementRepository.findByIdWithLock(any()))

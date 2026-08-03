@@ -40,8 +40,8 @@ import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletTransactionType;
-import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.enums.WalletOwnerType;
+import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -429,7 +429,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         }
 
         TeacherProfile teacher = findTeacher(request.getTeacherId());
-        Wallet wallet = walletRepository.findTeacherWalletForUpdate(request.getTeacherId())
+        Wallet wallet = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, request.getTeacherId())
                 .orElseThrow(() -> walletNotFound(request.getTeacherId()));
         PayoutReconciliationService.ReconciliationResult reconciliation =
                 reconciliationService.reconcile(request, wallet, teacher);
@@ -670,7 +670,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         }
 
         TeacherProfile teacher = findTeacher(request.getTeacherId());
-        Wallet wallet = walletRepository.findTeacherWalletForUpdate(request.getTeacherId())
+        Wallet wallet = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, request.getTeacherId())
                 .orElseThrow(() -> walletNotFound(request.getTeacherId()));
         PayoutReconciliationService.ReconciliationResult reconciliation =
                 reconciliationService.reconcile(request, wallet, teacher);
@@ -838,7 +838,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         }
 
         TeacherProfile teacher = findTeacher(request.getTeacherId());
-        Wallet wallet = walletRepository.findTeacherWalletForUpdate(request.getTeacherId())
+        Wallet wallet = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, request.getTeacherId())
                 .orElseThrow(() -> walletNotFound(request.getTeacherId()));
         PayoutReconciliationService.ReconciliationResult reconciliation =
                 reconciliationService.reconcile(request, wallet, teacher);
@@ -996,7 +996,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             );
         }
 
-        Wallet wallet = walletRepository.findTeacherWalletForUpdate(request.getTeacherId())
+        Wallet wallet = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, request.getTeacherId())
                 .orElseThrow(() -> walletNotFound(request.getTeacherId()));
         BigDecimal amount = request.getRequestedAmount();
         if (wallet.getFrozenBalance().compareTo(amount) < 0) {

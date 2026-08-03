@@ -63,13 +63,25 @@ class StudentWalletServiceImplTest {
     }
 
     @Test
-    void getOrCreateStudentWallet_usesAtomicInsertAndReturnsCanonicalWallet() {
+    void getOrCreateStudentWallet_whenWalletExists_returnsExistingAndDoesNotInsert() {
         when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId))
                 .thenReturn(Optional.of(wallet));
 
         assertSame(wallet, service.getOrCreateStudentWallet(studentId));
 
+        verify(walletRepository, never()).insertStudentWalletIfAbsent(any(), any());
+    }
+
+    @Test
+    void getOrCreateStudentWallet_whenWalletMissing_insertsAndReturnsCanonical() {
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(wallet));
+
+        assertSame(wallet, service.getOrCreateStudentWallet(studentId));
+
         verify(walletRepository).insertStudentWalletIfAbsent(any(UUID.class), eq(studentId));
+        verify(walletRepository, never()).save(any());
     }
 
     @Test
@@ -189,6 +201,6 @@ class StudentWalletServiceImplTest {
     private void stubExistingWallet() {
         when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId))
                 .thenReturn(Optional.of(wallet));
-        when(walletRepository.findStudentWalletForUpdate(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
     }
 }

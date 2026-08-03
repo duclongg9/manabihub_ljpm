@@ -60,10 +60,13 @@ public class StudentWalletServiceImpl implements StudentWalletService {
     @Override
     @Transactional
     public Wallet getOrCreateStudentWallet(UUID studentId) {
-        walletRepository.insertStudentWalletIfAbsent(UUID.randomUUID(), studentId);
-        return walletRepository
-                .findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)
-                .orElseThrow(this::walletNotFound);
+        return walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)
+                .orElseGet(() -> {
+                    UUID candidateWalletId = UUID.randomUUID();
+                    walletRepository.insertStudentWalletIfAbsent(candidateWalletId, studentId);
+                    return walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)
+                            .orElseThrow(() -> new IllegalStateException("Failed to find or create canonical wallet"));
+                });
     }
 
     @Override
@@ -120,19 +123,11 @@ public class StudentWalletServiceImpl implements StudentWalletService {
                     HttpStatus.BAD_REQUEST);
         }
 
-        WalletPaymentReservation existing = reservationRepository
-                .findByOrderIdForUpdate(orderId)
-                .orElse(null);
-        if (existing != null) {
-            requireMatchingReservation(existing, amount);
-            return existing;
-        }
-
         getOrCreateStudentWallet(studentId);
-        Wallet wallet = walletRepository.findStudentWalletForUpdate(studentId)
+        Wallet wallet = walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)
                 .orElseThrow(this::walletNotFound);
 
-        existing = reservationRepository.findByOrderIdForUpdate(orderId).orElse(null);
+        WalletPaymentReservation existing = reservationRepository.findByOrderIdForUpdate(orderId).orElse(null);
         if (existing != null) {
             requireMatchingReservation(existing, amount);
             return existing;
@@ -273,7 +268,7 @@ public class StudentWalletServiceImpl implements StudentWalletService {
         }
 
         getOrCreateStudentWallet(studentId);
-        Wallet wallet = walletRepository.findStudentWalletForUpdate(studentId)
+        Wallet wallet = walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)
                 .orElseThrow(this::walletNotFound);
 
         existing = walletTransactionRepository.findByIdempotencyKey(idempotencyKey).orElse(null);

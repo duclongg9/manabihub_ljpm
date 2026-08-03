@@ -30,6 +30,7 @@ import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -501,7 +502,7 @@ public class KycServiceImpl implements KycService {
             courseRepository.saveAll(coursesToRemove);
         }
 
-        boolean walletFrozen = walletRepository.findTeacherWalletForUpdate(teacher.getId())
+        boolean walletFrozen = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, teacher.getId())
                 .map(this::freezeWallet)
                 .orElse(false);
         return new SuspensionImpact(coursesToRemove.size(), walletFrozen);
