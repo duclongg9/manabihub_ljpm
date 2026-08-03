@@ -3,11 +3,14 @@ package com.manabihub.wallet.repository;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletTransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.Optional;
 import java.util.UUID;
 
-public interface WalletTransactionRepository extends JpaRepository<WalletTransaction, java.util.UUID> {
+public interface WalletTransactionRepository
+        extends JpaRepository<WalletTransaction, java.util.UUID>,
+                JpaSpecificationExecutor<WalletTransaction> {
 
     Optional<WalletTransaction> findByReferenceTypeAndReferenceIdAndTransactionType(
             String referenceType,
@@ -20,4 +23,11 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
             UUID referenceId,
             WalletTransactionType transactionType
     );
+
+    /**
+     * Ownership-scoped lookup for the transaction detail view (UC-17 flow 6a).
+     * Returning empty for a transaction that belongs to another wallet is what enforces
+     * BR-RBAC-01 — the caller can never read a foreign ledger line by guessing its id.
+     */
+    Optional<WalletTransaction> findByIdAndWalletId(UUID id, UUID walletId);
 }
