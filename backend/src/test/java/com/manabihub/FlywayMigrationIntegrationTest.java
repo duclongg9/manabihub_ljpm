@@ -28,10 +28,16 @@ import static org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTest
 @AutoConfigureTestDatabase(replace = NONE)
 @Testcontainers
 @ActiveProfiles("it")
+@Import(FlywayMigrationIntegrationTest.MockConfig.class)
 public class FlywayMigrationIntegrationTest {
 
-    @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.web.servlet.handler.HandlerMappingIntrospector mvcHandlerMappingIntrospector;
+    @org.springframework.boot.test.context.TestConfiguration
+    static class MockConfig {
+        @org.springframework.context.annotation.Bean(name = "mvcHandlerMappingIntrospector")
+        public org.springframework.web.servlet.handler.HandlerMappingIntrospector mvcHandlerMappingIntrospector() {
+            return org.mockito.Mockito.mock(org.springframework.web.servlet.handler.HandlerMappingIntrospector.class);
+        }
+    }
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine")
