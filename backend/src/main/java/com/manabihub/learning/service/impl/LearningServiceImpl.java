@@ -32,10 +32,14 @@ import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.learning.repository.FlashcardProgressRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.LearningService;
+import com.manabihub.learning.service.CertificateEligibilityService;
+import com.manabihub.learning.service.StudentAssessmentService;
 import com.manabihub.writing.entity.WritingSubmission;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
 import com.manabihub.writing.entity.AiWritingSuggestion;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
+import com.manabihub.writing.entity.TeacherWritingFeedback;
+import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
 import com.manabihub.ai.repository.AiUsageLogRepository;
 import com.manabihub.ai.service.AiChatSettingsService;
 import com.manabihub.ai.service.AiUsageLogService;
@@ -44,6 +48,7 @@ import com.manabihub.writing.enums.WritingSubmissionStatus;
 import com.manabihub.writing.dto.request.WritingSubmissionRequest;
 import com.manabihub.writing.dto.response.StudentWritingSubmissionResponse;
 import com.manabihub.writing.dto.response.AiWritingSuggestionResponse;
+import com.manabihub.writing.dto.response.TeacherWritingFeedbackResponse;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.manabihub.ai.provider.AiWritingAssistanceProvider;
@@ -90,11 +95,14 @@ public class LearningServiceImpl implements LearningService {
     private final ObjectMapper objectMapper;
     private final WritingSubmissionRepository writingSubmissionRepository;
     private final AiWritingSuggestionRepository aiWritingSuggestionRepository;
+    private final TeacherWritingFeedbackRepository teacherWritingFeedbackRepository;
     private final AiChatSettingsService aiChatSettingsService;
     private final AiUsageLogService aiUsageLogService;
     private final TransactionTemplate transactionTemplate;
     private final AiUsageLogRepository aiUsageLogRepository;
     private final AiWritingAssistanceProvider aiWritingAssistanceProvider;
+    private final StudentAssessmentService studentAssessmentService;
+    private final CertificateEligibilityService certificateEligibilityService;
 
     @Override
     public CourseLearningResponse openOrResumeCourse(UUID courseId) {
@@ -269,10 +277,6 @@ public class LearningServiceImpl implements LearningService {
         Course course = enrollment.getCourse();
         List<LessonBlock> allBlocks = flattenBlocks(course);
 
-        if (allBlocks.isEmpty()) {
-            return new CourseProgressSummaryResponse(course.getId(), course.getTitle(), 0, 0, 0.0, null, null, false);
-        }
-
         Map<UUID, LessonBlockProgress> progressByBlockId = lessonBlockProgressRepository.findByEnrollmentId(enrollment.getId())
                 .stream()
                 .collect(Collectors.toMap(progress -> progress.getLessonBlockId(), Function.identity()));
@@ -285,7 +289,7 @@ public class LearningServiceImpl implements LearningService {
                 .filter(block -> !isCompleted(progressByBlockId.get(block.getId())))
                 .findFirst()
                 .orElse(null);
-        boolean courseCompleted = nextLesson == null;
+        boolean courseCompleted = !allBlocks.isEmpty() && nextLesson == null;
 
         return new CourseProgressSummaryResponse(
                 course.getId(),
@@ -293,9 +297,11 @@ public class LearningServiceImpl implements LearningService {
                 allBlocks.size(),
                 completedLessons,
                 progressPercent(completedLessons, allBlocks.size()),
-                courseCompleted ? null : nextLesson.getId(),
-                courseCompleted ? null : nextLesson.getTitle(),
-                courseCompleted
+                nextLesson != null ? nextLesson.getId() : null,
+                nextLesson != null ? nextLesson.getTitle() : null,
+                courseCompleted,
+                studentAssessmentService.getFinalTestEligibility(courseId),
+                certificateEligibilityService.evaluate(enrollment, allBlocks, progressByBlockId)
         );
     }
 
@@ -334,6 +340,7 @@ public class LearningServiceImpl implements LearningService {
 
     private LessonBlock resolveLessonBlock(UUID lessonBlockId) {
         return lessonBlockRepository.findById(lessonBlockId)
+                .filter(block -> !block.isModerationHidden())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.CONTENT_NOT_FOUND,
                         "Lesson block was not found",
@@ -454,6 +461,7 @@ public class LearningServiceImpl implements LearningService {
 
     private List<LessonBlock> sortedBlocks(CourseModule module) {
         return module.getBlocks().stream()
+                .filter(block -> !block.isModerationHidden())
                 .sorted(Comparator.comparingInt(LessonBlock::getOrderIndex))
                 .toList();
     }
@@ -706,6 +714,19 @@ public class LearningServiceImpl implements LearningService {
                 suggestion.getCreatedAt()
         );
 
+        TeacherWritingFeedback feedback = teacherWritingFeedbackRepository
+                .findFirstByWritingSubmission_IdOrderByCreatedAtDesc(submission.getId())
+                .orElse(null);
+        TeacherWritingFeedbackResponse feedbackResponse = feedback == null ? null : new TeacherWritingFeedbackResponse(
+                feedback.getId(),
+                feedback.getScore(),
+                feedback.getComment(),
+                feedback.getRubricResult(),
+                feedback.isOfficial(),
+                feedback.getCreatedAt(),
+                feedback.getUpdatedAt()
+        );
+
         return new StudentWritingSubmissionResponse(
                 submission.getId(),
                 submission.getLessonBlockId(),
@@ -713,7 +734,7 @@ public class LearningServiceImpl implements LearningService {
                 submission.getStatus(),
                 submission.getSubmittedAt(),
                 suggestionResponse,
-                null
+                feedbackResponse
         );
     }
 }

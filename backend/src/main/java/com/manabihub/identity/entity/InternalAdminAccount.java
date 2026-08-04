@@ -46,6 +46,9 @@ public class InternalAdminAccount {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    @Column(name = "credential_version", nullable = false)
+    private long credentialVersion = 1;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

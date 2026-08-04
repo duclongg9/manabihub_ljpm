@@ -3,6 +3,11 @@ manabihub:
     mock-jwt: true
   kyc:
     identity-secret: test-only-identity-secret-key-32chars-minimum-length
+  payout:
+    security-secret: test-only-payout-secret-key-32chars-minimum-length
+  admin-auth:
+    cookie-secure: false
+    cookie-same-site: Lax
 
 spring:
   datasource:

@@ -25,8 +25,42 @@ public interface NotificationService {
      */
     void createNotificationForRole(String roleCode, String title, String message, String type, String actionUrl);
 
+    /**
+     * Broadcasts a notification to active internal admin accounts holding the role.
+     */
+    void createNotificationForAdminRole(String roleCode, String title, String message, String type, String actionUrl);
+
     void createNotification(UUID recipientUserId, String recipientEmail,
                             String title, String message, String type);
+
+    void createNotification(UUID recipientUserId, String recipientEmail,
+                            String title, String message, String type, String actionUrl);
+
+    void createAdminNotification(UUID recipientAdminId, String recipientEmail,
+                                 String title, String message, String type, String actionUrl);
+
+    /**
+     * Creates and sends a notification at most once for the supplied business
+     * event key. Callers use this from an AFTER_COMMIT callback.
+     */
+    void createNotificationOnce(
+            String dedupeKey,
+            UUID recipientUserId,
+            String recipientEmail,
+            String title,
+            String message,
+            String type
+    );
+
+    void createNotificationOnce(
+            String dedupeKey,
+            UUID recipientUserId,
+            String recipientEmail,
+            String title,
+            String message,
+            String type,
+            String actionUrl
+    );
 
     void sendTestEmailOnly(String recipientEmail, String title, String message, String type);
 }

@@ -4,7 +4,7 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.audit.entity.AuditLog;
-import com.manabihub.identity.entity.User;
+import com.manabihub.audit.service.SecurityAuditService;
 import com.manabihub.kyc.domain.CertificateVerificationStatus;
 import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.KycDocument;
@@ -22,19 +22,26 @@ import com.manabihub.kyc.dto.KycModuleStatusResponse;
 import com.manabihub.kyc.dto.KycRequestResponse;
 import com.manabihub.kyc.dto.KycRestartVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
+import com.manabihub.kyc.port.VnptServerVerificationResult;
+import com.manabihub.kyc.port.VnptVerificationPort;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
-import com.manabihub.kyc.port.JlptRecordDto;
-import com.manabihub.kyc.port.JlptRegistryPort;
-import com.manabihub.kyc.port.NationalIdRecordDto;
-import com.manabihub.kyc.port.NationalIdRegistryPort;
+import com.manabihub.notification.entity.Notification;
+import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
+import com.manabihub.security.service.PublicJwtTokenService;
 import jakarta.persistence.EntityManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -43,60 +50,84 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 
 @Service
 public class TeacherKycService {
 
+    private static final Logger log = LoggerFactory.getLogger(TeacherKycService.class);
+
     private static final long MAX_FILE_SIZE_BYTES = 5L * 1024L * 1024L;
-    private static final Set<String> CERTIFICATE_MIME_TYPES = Set.of("image/jpeg", "image/png", "application/pdf");
-    private static final Set<String> CERTIFICATE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "pdf");
+    private static final int MAX_OCR_TEXT_LENGTH = 20_000;
+    private static final Set<String> CERTIFICATE_MIME_TYPES = Set.of("image/jpeg", "image/png");
     private static final String VNPT_PROVIDER = "VNPT_EKYC_WEB_SDK";
     private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
+    private static final String REVIEW_ETA =
+            "1-2 business days, excluding Saturdays, Sundays, and public holidays";
+    /** Server verification must complete within this duration after SDK result is submitted. */
+    private static final Duration SERVER_VERIFICATION_TTL = Duration.ofMinutes(30);
 
     private final TeacherProfileRepository teacherProfileRepository;
     private final KycRequestRepository kycRequestRepository;
     private final KycDocumentRepository kycDocumentRepository;
     private final AuditLogRepository auditLogRepository;
-    private final NationalIdRegistryPort nationalIdRegistryPort;
-    private final JlptRegistryPort jlptRegistryPort;
+    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final TeacherIdentityClaimService teacherIdentityClaimService;
+    private final TeacherCertificateClaimService teacherCertificateClaimService;
+    private final PublicJwtTokenService publicJwtTokenService;
+    private final VnptVerificationPort vnptVerificationPort;
+    private final SecurityAuditService securityAuditService;
     private final EntityManager entityManager;
     private final Path storageRoot;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    private final VnptVerificationCoordinator verificationCoordinator;
 
     public TeacherKycService(
             TeacherProfileRepository teacherProfileRepository,
             KycRequestRepository kycRequestRepository,
             KycDocumentRepository kycDocumentRepository,
             AuditLogRepository auditLogRepository,
-            NationalIdRegistryPort nationalIdRegistryPort,
-            JlptRegistryPort jlptRegistryPort,
+            NotificationRepository notificationRepository,
+            NotificationService notificationService,
             TeacherIdentityClaimService teacherIdentityClaimService,
+            TeacherCertificateClaimService teacherCertificateClaimService,
+            PublicJwtTokenService publicJwtTokenService,
+            VnptVerificationPort vnptVerificationPort,
+            SecurityAuditService securityAuditService,
             EntityManager entityManager,
+            VnptVerificationCoordinator verificationCoordinator,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
         this.teacherProfileRepository = teacherProfileRepository;
         this.kycRequestRepository = kycRequestRepository;
         this.kycDocumentRepository = kycDocumentRepository;
         this.auditLogRepository = auditLogRepository;
-        this.nationalIdRegistryPort = nationalIdRegistryPort;
-        this.jlptRegistryPort = jlptRegistryPort;
+        this.notificationRepository = notificationRepository;
+        this.notificationService = notificationService;
         this.teacherIdentityClaimService = teacherIdentityClaimService;
+        this.teacherCertificateClaimService = teacherCertificateClaimService;
+        this.publicJwtTokenService = publicJwtTokenService;
+        this.vnptVerificationPort = vnptVerificationPort;
+        this.securityAuditService = securityAuditService;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
+        this.verificationCoordinator = verificationCoordinator;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public KycStatusResponse getStatus(UUID userId) {
         TeacherProfile teacherProfile = resolveTeacher(userId);
         KycRequest latestRequest = kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
@@ -123,109 +154,36 @@ public class TeacherKycService {
             String userAgent
     ) {
         if (request == null || request.sdkResult() == null || request.sdkResult().isEmpty()) {
-            throw new BusinessException(
-                    MessageCodes.MSG_KYC_002,
-                    "VNPT eKYC SDK result is required before identity verification can be recorded"
-            );
+            throw new BusinessException(MessageCodes.MSG_KYC_002, "VNPT eKYC SDK result is required");
         }
 
-        TeacherProfile teacherProfile = resolveTeacher(userId);
-        AppUser user = teacherProfile.getUser();
-        KycRequest latestRequest = findLatestRequest(teacherProfile);
-        validateIdentityAllowed(user, teacherProfile, latestRequest);
+        String incTxId = blankToNull(request.providerTransactionId());
+        String incSessionId = blankToNull(request.providerSessionId());
+        if (incTxId == null || incSessionId == null) {
+            throw new BusinessException(MessageCodes.MSG_KYC_002, "Provider transaction ID and session ID are required");
+        }
 
-        KycRequest kycRequest = findReusableRealtimeRequest(teacherProfile, latestRequest);
         VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
-        boolean verified = sdkDecision.verified();
-        List<String> failureReasons = new ArrayList<>(sdkDecision.failureReasons());
 
-        if (verified && sdkDecision.identityOcr() != null) {
-            Map<String, String> ocr = sdkDecision.identityOcr();
-            String rawIdNumber = ocr.get("idNumber");
-            String ocrFullName = ocr.get("fullName");
-            String ocrDob = ocr.get("dateOfBirth");
+        VnptVerificationCoordinator.VerificationOutcome outcome = verificationCoordinator.orchestrate(
+            userId, request, sdkDecision, ipAddress, userAgent
+        );
 
-            String normalizedCccd = null;
-            try {
-                normalizedCccd = teacherIdentityClaimService.normalizeCccd(rawIdNumber);
-            } catch (BusinessException ex) {
-                verified = false;
-                failureReasons.add(ex.getMessage());
-            }
+        TeacherProfile teacherProfile = teacherProfileRepository.findById(outcome.teacherProfileId())
+                .orElseThrow();
+        KycRequest kycRequest = kycRequestRepository.findById(outcome.requestId())
+                .orElseThrow();
 
-            if (verified && normalizedCccd != null) {
-                NationalIdRecordDto mockRecord = nationalIdRegistryPort.findActiveByIdNumber(normalizedCccd).orElse(null);
-                if (mockRecord == null) {
-                    verified = false;
-                    failureReasons.add("Thông tin CCCD không tồn tại trong cơ sở dữ liệu quốc gia (Mock)");
-                } else {
-                    if (!normalizeSearchText(ocrFullName).equals(normalizeSearchText(mockRecord.fullName()))) {
-                        verified = false;
-                        failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia");
-                    }
-                    if (StringUtils.hasText(ocrDob)) {
-                        try {
-                            LocalDate dob;
-                            if (ocrDob.length() == 8 && !ocrDob.contains("/")) {
-                                dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("ddMMyyyy"));
-                            } else {
-                                dob = LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-                            }
-                            if (!dob.equals(mockRecord.dateOfBirth())) {
-                                verified = false;
-                                failureReasons.add("Ngày sinh không khớp với cơ sở dữ liệu quốc gia");
-                            }
-                        } catch (Exception e) {
-                            verified = false;
-                            failureReasons.add("Ngày sinh trên CCCD không hợp lệ");
-                        }
-                    }
-                }
+        return buildIdentityResponse(teacherProfile, kycRequest, outcome.auditLogged());
+    }
 
-                if (verified) {
-                    // Check identity claim duplicate before marking identity as verified
-                    teacherIdentityClaimService.processIdentityClaim(
-                            teacherProfile.getId(),
-                            normalizedCccd,
-                            user,
-                            ipAddress,
-                            userAgent
-                    );
-                }
-            }
-        }
-
-        Instant now = Instant.now();
-
-        kycRequest.setStatus(KycRequestStatus.DRAFT);
-        kycRequest.setTeacherProfile(teacherProfile);
-        kycRequest.setEkycProvider(VNPT_PROVIDER);
-        kycRequest.setProviderSessionId(blankToNull(request.providerSessionId()));
-        kycRequest.setProviderTransactionId(blankToNull(request.providerTransactionId()));
-        kycRequest.setIdentityStatus(verified ? IdentityVerificationStatus.VERIFIED : IdentityVerificationStatus.FAILED);
-        kycRequest.setIdentityVerifiedAt(verified ? now : null);
-        kycRequest.setCertificateStatus(verified ? CertificateVerificationStatus.NOT_SUBMITTED : CertificateVerificationStatus.LOCKED);
-        kycRequest.setVerificationPayload(Map.of(
-                "identityProvider", VNPT_PROVIDER,
-                "providerResult", request.sdkResult() == null ? Map.of() : request.sdkResult(),
-                "providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED",
-                "identityOcr", sdkDecision.identityOcr(),
-                "failureReasons", failureReasons,
-                "certificateAsyncReviewRequired", true,
-                "autoApproval", false,
-                "srs", srsTrace()
-        ));
-
-        KycRequest savedRequest = kycRequestRepository.save(kycRequest);
-        savedRequest.setEkycReferenceId("VNPT-SDK-" + savedRequest.getId());
-        boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
-
+    private KycIdentityVerificationResponse buildIdentityResponse(TeacherProfile teacherProfile, KycRequest request, boolean auditLogged) {
         return new KycIdentityVerificationResponse(
                 teacherProfile.getId(),
                 teacherProfile.getKycStatus().name(),
-                toRequestResponse(savedRequest),
-                identityModuleStatus(teacherProfile, savedRequest),
-                certificateModuleStatus(teacherProfile, savedRequest),
+                toRequestResponse(request),
+                identityModuleStatus(teacherProfile, request),
+                certificateModuleStatus(teacherProfile, request),
                 auditLogged,
                 srsTrace()
         );
@@ -289,6 +247,10 @@ public class TeacherKycService {
             UUID userId,
             MultipartFile certificate,
             String certificateCode,
+            String certificateHolderName,
+            String certificateDateOfBirth,
+            String certificateLevel,
+            String certificateOcrText,
             boolean copyrightAgreementAccepted,
             String ipAddress,
             String userAgent
@@ -298,26 +260,49 @@ public class TeacherKycService {
         KycRequest kycRequest = validateCertificateSubmissionAllowed(user, teacherProfile);
         validateAgreement(copyrightAgreementAccepted);
 
-        if (!StringUtils.hasText(certificateCode)) {
-            throw new BusinessException(
-                    MessageCodes.MSG_KYC_002,
-                    "Certificate code is required for JLPT / J-Test / NAT-TEST registry matching"
-            );
-        }
-
         PreparedFile certificateFile = prepareCertificateFile(certificate);
+        String normalizedCertificateCode =
+                teacherCertificateClaimService.normalizeJlptCertificateCode(certificateCode);
+        CertificateEvidence certificateEvidence = validateCertificateEvidence(
+                kycRequest,
+                normalizedCertificateCode,
+                certificateHolderName,
+                certificateDateOfBirth,
+                certificateLevel,
+                certificateOcrText
+        );
+        teacherCertificateClaimService.processCertificateClaim(
+                teacherProfile.getId(),
+                kycRequest.getId(),
+                normalizedCertificateCode,
+                user,
+                ipAddress,
+                userAgent
+        );
         KycDocument certificateDocument = storeDocument(kycRequest, certificateFile);
         kycDocumentRepository.save(certificateDocument);
 
         TeacherKycStatus beforeStatus = teacherProfile.getKycStatus();
-        kycRequest.setCertificateCode(certificateCode.trim());
+        kycRequest.setCertificateCode(normalizedCertificateCode);
         kycRequest.setCertificateSubmittedAt(Instant.now());
         kycRequest.setCopyrightAgreed(true);
+        kycRequest.setStatus(KycRequestStatus.PENDING);
+        kycRequest.setCertificateStatus(CertificateVerificationStatus.PENDING_REVIEW);
+        kycRequest.setVerificationPayload(withCertificatePayload(
+                kycRequest,
+                certificateEvidence
+        ));
 
-        // Strict auto-approve: lookup JLPT registry, cross-match with CCCD OCR data, throw exception if fails
-        verifyAndApproveJlptRegistry(kycRequest, teacherProfile, user);
+        teacherProfile.setKycStatus(TeacherKycStatus.PENDING);
+        teacherProfile.setCanPublishCourse(false);
+        grantTeacherRoleIfAbsent(user.getId());
+        teacherProfileRepository.save(teacherProfile);
+        kycRequestRepository.saveAndFlush(kycRequest);
+        entityManager.flush();
 
         boolean auditLogged = createCertificateSubmissionAudit(kycRequest, user, beforeStatus, ipAddress, userAgent);
+        boolean adminNotificationCreated = createPendingReviewNotifications(kycRequest, user);
+        String sessionToken = publicJwtTokenService.issueCurrentRoleToken(user.getId());
         List<KycDocument> documents = kycDocumentRepository.findByKycRequestIdOrderByCreatedAtAsc(kycRequest.getId());
 
         return new KycCertificateSubmissionResponse(
@@ -327,19 +312,30 @@ public class TeacherKycService {
                 toRequestResponse(kycRequest, documents),
                 identityModuleStatus(teacherProfile, kycRequest),
                 certificateModuleStatus(teacherProfile, kycRequest),
-                false, // adminNotificationCreated is now false since there is no manual review
+                adminNotificationCreated,
                 auditLogged,
+                true,
+                REVIEW_ETA,
+                sessionToken,
                 srsTrace()
         );
     }
 
     private TeacherProfile resolveTeacher(UUID userId) {
         return teacherProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new BusinessException(
-                        MessageCodes.KYC_TEACHER_NOT_FOUND,
-                        "Teacher profile was not found for the current user",
-                        HttpStatus.NOT_FOUND
-                ));
+                .orElseGet(() -> {
+                    teacherProfileRepository.createCandidateIfAbsent(UUID.randomUUID(), userId);
+                    return teacherProfileRepository.findByUserId(userId)
+                            .orElseThrow(() -> teacherProfileNotFound());
+                });
+    }
+
+    private BusinessException teacherProfileNotFound() {
+        return new BusinessException(
+                MessageCodes.KYC_TEACHER_NOT_FOUND,
+                "Teacher profile could not be initialized for the current user",
+                HttpStatus.NOT_FOUND
+        );
     }
 
     private void validateIdentityAllowed(AppUser user, TeacherProfile teacherProfile, KycRequest latestRequest) {
@@ -351,13 +347,10 @@ public class TeacherKycService {
             );
         }
 
-        if (latestRequest != null
-                && latestRequest.getStatus() == KycRequestStatus.PENDING
-                && resolvedIdentityStatus(latestRequest) == IdentityVerificationStatus.VERIFIED
-                && resolvedCertificateStatus(latestRequest) == CertificateVerificationStatus.PENDING_REVIEW) {
+        if (latestRequest != null && latestRequest.getStatus() == KycRequestStatus.PENDING) {
             throw new BusinessException(
                     MessageCodes.KYC_ALREADY_PENDING,
-                    "Certificate review is already pending",
+                    "JLPT certificate authenticity review is already pending",
                     HttpStatus.CONFLICT
             );
         }
@@ -391,7 +384,7 @@ public class TeacherKycService {
                 || certificateStatus == CertificateVerificationStatus.PENDING_REVIEW) {
             throw new BusinessException(
                     MessageCodes.KYC_ALREADY_PENDING,
-                    "Certificate is already waiting for registry matching",
+                    "JLPT certificate is already waiting for manual authenticity review",
                     HttpStatus.CONFLICT
             );
         }
@@ -423,7 +416,8 @@ public class TeacherKycService {
     private KycRequest findReusableRealtimeRequest(TeacherProfile teacherProfile, KycRequest latestRequest) {
         return java.util.Optional.ofNullable(latestRequest)
                 .filter(request -> request.getStatus() == KycRequestStatus.DRAFT
-                        || request.getIdentityStatus() == IdentityVerificationStatus.FAILED)
+                        && request.getIdentityStatus() == IdentityVerificationStatus.NOT_STARTED
+                        && request.getProviderTransactionId() == null)
                 .orElseGet(KycRequest::new);
     }
 
@@ -436,19 +430,24 @@ public class TeacherKycService {
             throw invalidFile("File must not exceed 5MB");
         }
 
-        String originalFileName = sanitizeFileName(file.getOriginalFilename());
-        String extension = extensionOf(originalFileName);
-        String mimeType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
-
-        if (!CERTIFICATE_MIME_TYPES.contains(mimeType) && !CERTIFICATE_EXTENSIONS.contains(extension)) {
-            throw invalidFile("Certificate must be JPG, PNG, or PDF");
-        }
-
         try {
             byte[] bytes = file.getBytes();
+            String detectedMimeType = detectCertificateMimeType(bytes);
+            if (!CERTIFICATE_MIME_TYPES.contains(detectedMimeType)) {
+                throw invalidFile("Certificate must be a genuine JPG or PNG image");
+            }
+            String originalFileName = sanitizeFileName(file.getOriginalFilename());
+            String canonicalFileName = withDetectedExtension(originalFileName, detectedMimeType);
             String hash = sha256(bytes);
 
-            return new PreparedFile(KycDocumentType.CERTIFICATE, originalFileName, mimeType, file.getSize(), hash, bytes);
+            return new PreparedFile(
+                    KycDocumentType.CERTIFICATE,
+                    canonicalFileName,
+                    detectedMimeType,
+                    file.getSize(),
+                    hash,
+                    bytes
+            );
         } catch (IOException ex) {
             throw invalidFile("Could not read uploaded certificate");
         }
@@ -466,6 +465,7 @@ public class TeacherKycService {
         try {
             Files.createDirectories(targetDirectory);
             Files.write(targetPath, preparedFile.bytes());
+            registerRollbackCleanup(targetPath);
         } catch (IOException ex) {
             throw new BusinessException(
                     MessageCodes.COMMON_INTERNAL_ERROR,
@@ -485,6 +485,78 @@ public class TeacherKycService {
         document.setFileUrl("restricted://kyc/" + request.getId() + "/" + storedFileName);
 
         return document;
+    }
+
+    private String detectCertificateMimeType(byte[] bytes) {
+        if (bytes.length >= 8
+                && (bytes[0] & 0xff) == 0x89
+                && bytes[1] == 0x50
+                && bytes[2] == 0x4e
+                && bytes[3] == 0x47
+                && bytes[4] == 0x0d
+                && bytes[5] == 0x0a
+                && bytes[6] == 0x1a
+                && bytes[7] == 0x0a) {
+            return "image/png";
+        }
+        if (bytes.length >= 3
+                && (bytes[0] & 0xff) == 0xff
+                && (bytes[1] & 0xff) == 0xd8
+                && (bytes[2] & 0xff) == 0xff) {
+            return "image/jpeg";
+        }
+        return "application/octet-stream";
+    }
+
+    private String withDetectedExtension(String fileName, String mimeType) {
+        String extension = "image/png".equals(mimeType) ? ".png" : ".jpg";
+        int dotIndex = fileName.lastIndexOf('.');
+        String baseName = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
+        return (baseName.isBlank() ? "jlpt-certificate" : baseName) + extension;
+    }
+
+    private void registerRollbackCleanup(Path targetPath) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    try {
+                        Files.deleteIfExists(targetPath);
+                    } catch (IOException ignored) {
+                        // The database rollback remains authoritative; stale file cleanup is best-effort.
+                    }
+                }
+            }
+        });
+    }
+
+    private boolean createPendingReviewNotifications(KycRequest request, AppUser user) {
+        notificationService.createNotification(
+                user.getId(),
+                user.getEmail(),
+                "Đã tiếp nhận chứng chỉ JLPT",
+                "Hệ thống đã tiếp nhận chứng chỉ và chuyển sang bước kiểm tra tính xác thực. "
+                        + "Kết quả dự kiến có trong 1-2 ngày làm việc, không tính cuối tuần và ngày nghỉ lễ.",
+                NotificationTypes.KYC_CERTIFICATE_PENDING,
+                "/teacher/kyc"
+        );
+
+        List<UUID> courseManagerIds = notificationRepository.findActiveAdminIdsByRoleCode("COURSE_MANAGER");
+        if (courseManagerIds.isEmpty()) {
+            return false;
+        }
+        notificationService.createNotificationForAdminRole(
+                "COURSE_MANAGER",
+                "Chứng chỉ JLPT cần được xác minh",
+                "Các bước đối chiếu danh tính, OCR và kiểm tra trùng lặp đã hoàn tất. "
+                        + "Vui lòng kiểm tra tính xác thực của chứng chỉ trước khi ra quyết định.",
+                NotificationTypes.KYC_CERTIFICATE_REVIEW,
+                "/admin/kyc/" + request.getId()
+        );
+        return true;
     }
 
 
@@ -705,7 +777,7 @@ public class TeacherKycService {
     private CertificateVerificationStatus resolvedCertificateStatus(KycRequest request) {
         return switch (request.getStatus()) {
             case APPROVED -> CertificateVerificationStatus.APPROVED;
-            case REJECTED, CORRECTION_REQUIRED -> CertificateVerificationStatus.REJECTED;
+            case REJECTED, CORRECTION_REQUIRED, REVOKED -> CertificateVerificationStatus.REJECTED;
             case DRAFT, PENDING -> request.getCertificateStatus();
         };
     }
@@ -728,7 +800,9 @@ public class TeacherKycService {
         }
 
         IdentityVerificationStatus status = resolvedIdentityStatus(latestRequest);
-        if (status == IdentityVerificationStatus.VERIFIED || status == IdentityVerificationStatus.PROCESSING) {
+        if (status == IdentityVerificationStatus.VERIFIED
+                || status == IdentityVerificationStatus.PROCESSING
+                || status == IdentityVerificationStatus.PENDING_SERVER_VERIFICATION) {
             return false;
         }
 
@@ -736,89 +810,120 @@ public class TeacherKycService {
                 || resolvedCertificateStatus(latestRequest) != CertificateVerificationStatus.PENDING_REVIEW;
     }
 
-    private Map<String, Object> withCertificatePayload(KycRequest request, boolean autoApproved, String autoApproveDetail) {
+    private Map<String, Object> withCertificatePayload(
+            KycRequest request,
+            CertificateEvidence evidence
+    ) {
         Map<String, Object> payload = new LinkedHashMap<>(request.getVerificationPayload());
         payload.put("certificateStatus", request.getCertificateStatus().name());
         payload.put("certificateCode", request.getCertificateCode());
+        payload.put("certificateType", "JLPT");
+        payload.put("certificateHolderName", evidence.holderName());
+        payload.put("certificateDateOfBirth", evidence.dateOfBirth().toString());
+        payload.put("certificateLevel", evidence.level());
+        payload.put("certificateOcrText", evidence.ocrText());
         payload.put("copyrightAgreement", "ACCEPTED_BY_CHECKBOX");
-        payload.put("autoApproval", autoApproved);
-        payload.put("certificateReviewMode", "AUTO_APPROVED_VIA_JLPT_REGISTRY");
-        payload.put("registryVerification", "MATCHED");
-        if (autoApproveDetail != null) {
-            payload.put("autoApproveDetail", autoApproveDetail);
-        }
+        payload.put("autoApproval", false);
+        payload.put("certificateReviewMode", "MANUAL_JAPAN_FOUNDATION");
+        payload.put("ocrReadStatus", "SUCCESS");
+        payload.put("identityCrossMatch", "MATCHED");
+        payload.put("duplicateCertificateCheck", "PASSED");
+        payload.put("exceptionStage", "CERTIFICATE");
+        payload.put("exceptionType", "JLPT_AUTHENTICITY_CHECK");
+        payload.put(
+                "exceptionReason",
+                "OCR data matches the VNPT-verified identity; Course Manager must verify certificate authenticity"
+        );
+        payload.put("reviewEta", REVIEW_ETA);
+        payload.put("teacherWorkspaceAvailable", true);
+        payload.put("publishLockedUntilKycApproval", true);
         return payload;
     }
 
-    /**
-     * Verifies the JLPT certificate by:
-     * 1. Looking up the certificate code in the mock JLPT registry
-     * 2. Cross-matching fullName and dateOfBirth from the JLPT registry against CCCD OCR data
-     * 3. If both match → auto-approve KYC and grant TEACHER role
-     * 4. If any fails → throw exception to abort submission
-     */
-    private void verifyAndApproveJlptRegistry(KycRequest kycRequest, TeacherProfile teacherProfile, AppUser user) {
-        String code = kycRequest.getCertificateCode();
-        if (!StringUtils.hasText(code)) {
-            throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "Mã chứng chỉ là bắt buộc", HttpStatus.BAD_REQUEST);
+    private CertificateEvidence validateCertificateEvidence(
+            KycRequest kycRequest,
+            String normalizedCertificateCode,
+            String certificateHolderName,
+            String certificateDateOfBirth,
+            String certificateLevel,
+            String certificateOcrText
+    ) {
+        if (!StringUtils.hasText(certificateOcrText)
+                || certificateOcrText.trim().length() > MAX_OCR_TEXT_LENGTH) {
+            throw certificateMismatch(
+                    "The JLPT image could not be read reliably. Upload a clear JPG or PNG image"
+            );
+        }
+        if (!StringUtils.hasText(certificateHolderName)
+                || !StringUtils.hasText(certificateDateOfBirth)
+                || !StringUtils.hasText(certificateLevel)) {
+            throw certificateMismatch(
+                    "OCR must extract the certificate holder name, date of birth, and JLPT level"
+            );
         }
 
-        JlptRecordDto jlptRecord = jlptRegistryPort
-                .findActiveByRegistrationNumber(code.trim())
-                .orElse(null);
-
-        if (jlptRecord == null) {
-            throw new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Mã chứng chỉ không tồn tại trên hệ thống, vui lòng kiểm tra lại", HttpStatus.NOT_FOUND);
+        String normalizedLevel = certificateLevel.trim().toUpperCase(Locale.ROOT);
+        if (!normalizedLevel.matches("N[1-5]")) {
+            throw certificateMismatch("Only JLPT levels N1 through N5 are accepted");
         }
 
-        // Extract identity OCR from the verification payload (saved during identity verification step)
-        Map<String, String> identityOcr = extractOcrFromPayload(kycRequest.getVerificationPayload());
-        String ocrFullName = identityOcr.get("fullName");
-        String ocrDob = identityOcr.get("dateOfBirth");
-
-        if (!StringUtils.hasText(ocrFullName)) {
-            throw new BusinessException(MessageCodes.MSG_KYC_006, "Không tìm thấy thông tin định danh (Họ Tên) từ CCCD để đối soát chứng chỉ", HttpStatus.BAD_REQUEST);
+        String identityFullName = kycRequest.getServerFullName();
+        String identityDateOfBirth = kycRequest.getServerDateOfBirth();
+        if (!StringUtils.hasText(identityFullName) || !StringUtils.hasText(identityDateOfBirth)) {
+            throw certificateMismatch(
+                    "VNPT identity result is missing the name or date of birth required for matching"
+            );
         }
 
-        // Cross-match: JLPT registry fullName vs CCCD OCR fullName
-        if (!normalizeSearchText(jlptRecord.fullName()).equals(normalizeSearchText(ocrFullName))) {
-            throw new BusinessException(MessageCodes.MSG_KYC_006, "Họ và tên trên chứng chỉ JLPT không khớp với thông tin định danh CCCD", HttpStatus.BAD_REQUEST);
+        String normalizedCertificateName = normalizePersonName(certificateHolderName);
+        String normalizedIdentityName = normalizePersonName(identityFullName);
+        if (normalizedCertificateName.isBlank()
+                || !normalizedCertificateName.equals(normalizedIdentityName)) {
+            throw certificateMismatch(
+                    "The name read from the JLPT certificate does not match the VNPT-verified CCCD"
+            );
         }
 
-        // Cross-match: JLPT registry dateOfBirth vs CCCD OCR dateOfBirth
-        if (!StringUtils.hasText(ocrDob)) {
-            throw new BusinessException(MessageCodes.MSG_KYC_006, "Không tìm thấy thông tin định danh (Ngày sinh) từ CCCD để đối soát chứng chỉ", HttpStatus.BAD_REQUEST);
+        LocalDate certificateDob = parseSupportedDate(certificateDateOfBirth);
+        LocalDate identityDob = parseSupportedDate(identityDateOfBirth);
+        if (!certificateDob.equals(identityDob)) {
+            throw certificateMismatch(
+                    "The date of birth read from the JLPT certificate does not match the VNPT-verified CCCD"
+            );
         }
 
-        try {
-            LocalDate ocrDate = parseOcrDate(ocrDob);
-            if (!ocrDate.equals(jlptRecord.dateOfBirth())) {
-                throw new BusinessException(MessageCodes.MSG_KYC_006, "Ngày sinh trên chứng chỉ JLPT không khớp với thông tin định danh CCCD", HttpStatus.BAD_REQUEST);
-            }
-        } catch (Exception e) {
-            throw new BusinessException(MessageCodes.MSG_KYC_006, "Ngày sinh trên CCCD không hợp lệ hoặc không thể đối soát", HttpStatus.BAD_REQUEST);
+        String searchableOcr = normalizeCertificateOcrText(certificateOcrText);
+        if (!searchableOcr.contains(normalizedCertificateName)) {
+            throw certificateMismatch(
+                    "OCR output does not contain the submitted JLPT certificate holder name"
+            );
+        }
+        if (!searchableOcr.contains(normalizedLevel)) {
+            throw certificateMismatch(
+                    "OCR output does not contain the submitted JLPT level"
+            );
+        }
+        if (!searchableOcr.contains(normalizedCertificateCode)) {
+            throw certificateMismatch(
+                    "OCR output does not contain the submitted JLPT certificate code"
+            );
         }
 
-        // All checks passed → auto-approve
-        String detail = String.format(
-                "JLPT %s registry match: %s (DOB: %s) — certificate %s, score %d, status %s",
-                jlptRecord.testLevel(),
-                jlptRecord.fullName(),
-                jlptRecord.dateOfBirth(),
-                jlptRecord.registrationNumber(),
-                jlptRecord.totalScore(),
-                jlptRecord.passStatus()
+        String ocrDigits = certificateOcrText.replaceAll("[^0-9]", "");
+        String dobDmy = certificateDob.format(DateTimeFormatter.ofPattern("ddMMyyyy"));
+        String dobYmd = certificateDob.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        if (!ocrDigits.contains(dobDmy) && !ocrDigits.contains(dobYmd)) {
+            throw certificateMismatch(
+                    "OCR output does not contain the submitted JLPT certificate date of birth"
+            );
+        }
+
+        return new CertificateEvidence(
+                certificateHolderName.trim(),
+                certificateDob,
+                normalizedLevel,
+                certificateOcrText.trim()
         );
-
-        kycRequest.setStatus(KycRequestStatus.APPROVED);
-        kycRequest.setCertificateStatus(CertificateVerificationStatus.APPROVED);
-        kycRequest.setVerificationPayload(withCertificatePayload(kycRequest, true, detail));
-
-        teacherProfile.setKycStatus(TeacherKycStatus.APPROVED);
-        teacherProfile.setCanPublishCourse(true);
-
-        // Grant TEACHER role if not already present
-        grantTeacherRoleIfAbsent(user.getId());
     }
 
     private Map<String, String> extractOcrFromPayload(Map<String, Object> payload) {
@@ -838,21 +943,54 @@ public class TeacherKycService {
         return Map.of();
     }
 
-    private LocalDate parseOcrDate(String ocrDob) {
-        if (ocrDob.length() == 8 && !ocrDob.contains("/")) {
-            return LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("ddMMyyyy"));
+    private LocalDate parseSupportedDate(String rawDate) {
+        if (!StringUtils.hasText(rawDate)) {
+            throw certificateMismatch("Date of birth is required");
         }
-        return LocalDate.parse(ocrDob, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        String value = rawDate.trim();
+        List<DateTimeFormatter> formatters = List.of(
+                DateTimeFormatter.ISO_LOCAL_DATE,
+                DateTimeFormatter.ofPattern("dd/MM/uuuu"),
+                DateTimeFormatter.ofPattern("dd-MM-uuuu"),
+                DateTimeFormatter.ofPattern("ddMMyyyy")
+        );
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                return LocalDate.parse(value, formatter);
+            } catch (DateTimeParseException ignored) {
+                // Try the next supported format.
+            }
+        }
+        throw certificateMismatch("Date of birth could not be parsed");
+    }
+
+    private BusinessException certificateMismatch(String message) {
+        return new BusinessException(
+                MessageCodes.KYC_CERTIFICATE_OCR_MISMATCH,
+                message,
+                HttpStatus.BAD_REQUEST
+        );
+    }
+
+    private String normalizePersonName(String value) {
+        return java.text.Normalizer.normalize(value == null ? "" : value, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^A-Za-z0-9]", "")
+                .toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeCertificateOcrText(String value) {
+        return normalizePersonName(value);
     }
 
     private void grantTeacherRoleIfAbsent(UUID userId) {
-        Long count = (Long) entityManager.createNativeQuery(
+        Number count = (Number) entityManager.createNativeQuery(
                 "SELECT COUNT(*) FROM user_roles WHERE user_id = :userId AND role_id = :roleId"
         ).setParameter("userId", userId)
          .setParameter("roleId", TEACHER_ROLE_ID)
          .getSingleResult();
 
-        if (count == 0) {
+        if (count.longValue() == 0) {
             entityManager.createNativeQuery(
                     "INSERT INTO user_roles (user_id, role_id) VALUES (:userId, :roleId)"
             ).setParameter("userId", userId)
@@ -870,7 +1008,8 @@ public class TeacherKycService {
         boolean hasExplicitInvalid = entries.stream().anyMatch(this::isExplicitInvalidValue);
         Map<String, String> identityOcr = extractIdentityOcr(entries);
         boolean hasRequiredOcr = StringUtils.hasText(identityOcr.get("idNumber"))
-                && StringUtils.hasText(identityOcr.get("fullName"));
+                && StringUtils.hasText(identityOcr.get("fullName"))
+                && StringUtils.hasText(identityOcr.get("dateOfBirth"));
         boolean hasFaceVerification = hasAcceptedFaceVerification(entries);
 
         java.util.ArrayList<String> failureReasons = new java.util.ArrayList<>();
@@ -878,7 +1017,7 @@ public class TeacherKycService {
             failureReasons.add("VNPT validation returned invalid document, mismatch, failed, or null result");
         }
         if (!hasRequiredOcr) {
-            failureReasons.add("VNPT OCR did not return both CCCD number and full name");
+            failureReasons.add("VNPT OCR did not return CCCD number, full name, and date of birth");
         }
         if (!hasFaceVerification) {
             failureReasons.add("VNPT liveness/face compare result was not successful");
@@ -920,7 +1059,7 @@ public class TeacherKycService {
 
         if (isValidationKey(key) && value instanceof Boolean booleanValue) {
             String normalizedKey = normalizeKey(key);
-            boolean isNegativeKey = normalizedKey.contains("fake") 
+            boolean isNegativeKey = normalizedKey.contains("fake")
                     || normalizedKey.contains("spoof")
                     || normalizedKey.contains("multiple")
                     || normalizedKey.contains("warning")
@@ -1090,7 +1229,7 @@ public class TeacherKycService {
     private BusinessException invalidFile(String reason) {
         return new BusinessException(
                 MessageCodes.MSG_KYC_002,
-                "JLPT / J-Test / NAT-TEST Certificate: " + reason
+                "JLPT certificate: " + reason
         );
     }
 
@@ -1099,12 +1238,6 @@ public class TeacherKycService {
         String fileName = Path.of(cleanName).getFileName().toString().replaceAll("[^A-Za-z0-9._-]", "_");
 
         return fileName.isBlank() ? "kyc-certificate" : fileName;
-    }
-
-    private String extensionOf(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-
-        return dotIndex < 0 ? "" : fileName.substring(dotIndex + 1).toLowerCase();
     }
 
     private String sha256(byte[] bytes) {
@@ -1132,6 +1265,7 @@ public class TeacherKycService {
             case APPROVED -> "Đã duyệt";
             case REJECTED -> "Bị từ chối";
             case CORRECTION_REQUIRED -> "Yêu cầu bổ sung";
+            case REVOKED -> "Đã thu hồi";
         };
     }
 
@@ -1142,6 +1276,7 @@ public class TeacherKycService {
             case APPROVED -> "Đã duyệt";
             case REJECTED -> "Bị từ chối";
             case CORRECTION_REQUIRED -> "Yêu cầu bổ sung";
+            case REVOKED -> "Đã thu hồi";
         };
     }
 
@@ -1149,6 +1284,7 @@ public class TeacherKycService {
         return switch (status) {
             case NOT_STARTED -> "Chưa xác thực danh tính";
             case PROCESSING -> "Đang xác thực danh tính";
+            case PENDING_SERVER_VERIFICATION -> "Đang xác nhận với VNPT";
             case VERIFIED -> "Xác thực danh tính thành công";
             case FAILED -> "Xác thực danh tính thất bại";
         };
@@ -1158,6 +1294,7 @@ public class TeacherKycService {
         return switch (status) {
             case NOT_STARTED -> "Bắt đầu VNPT eKYC để chụp CCCD và kiểm tra liveness khuôn mặt.";
             case PROCESSING -> "VNPT eKYC đang xử lý phiên xác thực realtime.";
+            case PENDING_SERVER_VERIFICATION -> "Hệ thống đang xác nhận kết quả với máy chủ VNPT. Vui lòng chờ.";
             case VERIFIED -> "CCCD và liveness khuôn mặt đã được xác thực qua VNPT eKYC.";
             case FAILED -> "Kết quả VNPT eKYC không hợp lệ. Giáo viên có thể thực hiện lại ngay.";
         };
@@ -1176,19 +1313,41 @@ public class TeacherKycService {
     private String certificateStatusDetail(CertificateVerificationStatus status) {
         return switch (status) {
             case LOCKED -> "Hoàn tất xác thực danh tính trước khi nộp chứng chỉ.";
-            case NOT_SUBMITTED -> "Nộp JLPT / J-Test / NAT-TEST Certificate và mã chứng chỉ bắt buộc.";
-            case PENDING_REVIEW -> "Chứng chỉ đang chờ đối soát registry với thông tin chính chủ trên CCCD.";
-            case APPROVED -> "Chứng chỉ đã khớp thông tin chính chủ và đạt yêu cầu.";
-            case REJECTED -> "Chứng chỉ không khớp thông tin chính chủ trên CCCD. Giáo viên cần xác thực lại từ đầu.";
+            case NOT_SUBMITTED -> "Chỉ chấp nhận ảnh chứng chỉ JLPT và mã chứng chỉ tương ứng.";
+            case PENDING_REVIEW ->
+                    "Hệ thống đã đọc chứng chỉ, khớp họ tên và ngày sinh với CCCD, đồng thời kiểm tra trùng. "
+                            + "Course Manager sẽ kiểm tra tính xác thực trên Japan Foundation trong 1-2 ngày "
+                            + "làm việc, không tính thứ Bảy, Chủ nhật và ngày nghỉ lễ. Bạn có thể dùng không gian "
+                            + "giảng viên nhưng khóa học chưa được hiển thị trên nền tảng.";
+            case APPROVED -> "Chứng chỉ JLPT đã được xác minh tính xác thực và đạt yêu cầu.";
+            case REJECTED ->
+                    "Chứng chỉ JLPT chưa đạt yêu cầu xác minh. Vui lòng xem lý do và thực hiện lại theo hướng dẫn.";
         };
     }
 
     private Map<String, Object> srsTrace() {
         return Map.of(
                 "uc", "UC-22",
-                "br", List.of("BR-KYC-01", "BR-KYC-03", "BR-KYC-05", "BR-NOTIF-02", "BR-AUD-01"),
-                "msg", List.of(MessageCodes.MSG_KYC_003, MessageCodes.MSG_KYC_002, MessageCodes.MSG_KYC_008),
-                "moduleFlow", List.of("VNPT realtime identity verification", "Async certificate review")
+                "br", List.of(
+                        "BR-KYC-01",
+                        "BR-KYC-03",
+                        "BR-KYC-05",
+                        "BR-KYC-CCCD-DUPLICATE",
+                        "BR-KYC-JLPT-DUPLICATE",
+                        "BR-NOTIF-02",
+                        "BR-AUD-01"
+                ),
+                "msg", List.of(
+                        MessageCodes.MSG_KYC_003,
+                        MessageCodes.MSG_KYC_002,
+                        MessageCodes.MSG_KYC_008,
+                        MessageCodes.KYC_CERTIFICATE_ALREADY_CLAIMED
+                ),
+                "moduleFlow", List.of(
+                        "VNPT realtime identity verification",
+                        "JLPT OCR and identity cross-match",
+                        "Course Manager authenticity review"
+                )
         );
     }
 
@@ -1205,10 +1364,13 @@ public class TeacherKycService {
     private record ResultEntry(String key, Object value) {
     }
 
-    private record VnptSdkDecision(
-            boolean verified,
-            Map<String, String> identityOcr,
-            List<String> failureReasons
+
+
+    private record CertificateEvidence(
+            String holderName,
+            LocalDate dateOfBirth,
+            String level,
+            String ocrText
     ) {
     }
 }

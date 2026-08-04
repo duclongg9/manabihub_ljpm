@@ -60,13 +60,28 @@ management:
       enabled: false
 
 manabihub:
+  payment:
+    vnpay:
+      # Required in production. Startup also verifies HTTPS, the frontend
+      # origin, and the exact /checkout/return route.
+      return-url: ${VNPAY_RETURN_URL}
+  bootstrap:
+    admin:
+      email: ${ADMIN_BOOTSTRAP_EMAIL:}
+      password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+      full-name: ${ADMIN_BOOTSTRAP_FULL_NAME:ManabiHub System Administrator}
   security:
     mock-jwt: false
+  admin-auth:
+    cookie-secure: true
+    cookie-same-site: None
 
 jwt:
   secret: ${JWT_SECRET}
 
 app:
   frontend:
+    base-url: ${FRONTEND_BASE_URL}
+    login-url: ${FRONTEND_BASE_URL}/login
     onboarding-url: ${FRONTEND_BASE_URL}/onboarding/student
     success-url: ${FRONTEND_BASE_URL}/auth/callback

@@ -84,7 +84,7 @@ export default function TeacherProfilePage() {
 
                 open: true,
 
-                message: "Cannot load profile.",
+                message: "Không thể tải hồ sơ. Vui lòng thử lại.",
 
                 severity: "error",
 
@@ -112,7 +112,7 @@ export default function TeacherProfilePage() {
 
         if (!form.fullName.trim()) {
 
-            newErrors.fullName = "Full name is required.";
+            newErrors.fullName = "Vui lòng nhập họ và tên.";
 
             valid = false;
 
@@ -122,7 +122,7 @@ export default function TeacherProfilePage() {
 
         if (!phoneRegex.test(form.phoneNumber)) {
 
-            newErrors.phoneNumber = "Invalid phone number.";
+            newErrors.phoneNumber = "Số điện thoại không hợp lệ.";
 
             valid = false;
 
@@ -166,7 +166,7 @@ export default function TeacherProfilePage() {
 
                 open: true,
 
-                message: "Profile updated successfully.",
+                message: "Cập nhật hồ sơ thành công.",
 
                 severity: "success",
 
@@ -194,7 +194,7 @@ export default function TeacherProfilePage() {
 
                 open: true,
 
-                message: response?.message ?? "Update failed.",
+                message: response?.message ?? "Không thể cập nhật hồ sơ. Vui lòng thử lại.",
 
                 severity: "error",
 
@@ -252,13 +252,13 @@ export default function TeacherProfilePage() {
 
     async function handleAvatar(file: File) {
         if (file.size > 2 * 1024 * 1024) {
-            setSnackbar({ open: true, message: "File size exceeds 2MB", severity: "error" });
+            setSnackbar({ open: true, message: "Dung lượng ảnh không được vượt quá 2 MB.", severity: "error" });
             return;
         }
 
         const validTypes = ["image/jpeg", "image/png", "image/webp"];
         if (!validTypes.includes(file.type)) {
-            setSnackbar({ open: true, message: "Invalid file type. Only JPEG, PNG, and WebP are allowed", severity: "error" });
+            setSnackbar({ open: true, message: "Định dạng không hợp lệ. Chỉ hỗ trợ ảnh JPEG, PNG và WebP.", severity: "error" });
             return;
         }
 
@@ -270,7 +270,7 @@ export default function TeacherProfilePage() {
             setSaving(true);
             const serverUrl = await uploadAvatar(file);
             setForm(prev => ({ ...prev, avatarUrl: serverUrl }));
-            setSnackbar({ open: true, message: "Avatar uploaded successfully", severity: "success" });
+            setSnackbar({ open: true, message: "Cập nhật ảnh đại diện thành công.", severity: "success" });
         } catch (error) {
             console.error("Avatar upload failed:", error);
             setForm(prev => ({ ...prev, avatarUrl: previousAvatarUrl }));
@@ -289,20 +289,12 @@ export default function TeacherProfilePage() {
 
                 fullHeight
 
-                message="Loading profile..."
+                message="Đang tải hồ sơ..."
 
             />
 
         );
 
-    }
-    if (loading) {
-        return (
-            <LoadingState
-                fullHeight
-                message="Loading profile..."
-            />
-        );
     }
     return (
 
@@ -317,13 +309,13 @@ export default function TeacherProfilePage() {
             >
 
                 <PageHeader
-                    title="Manage Teacher Profile"
+                    title="Quản lý hồ sơ giảng viên"
                     breadcrumbs={[
                         {
-                            label: "Teacher",
+                            label: "Giảng viên",
                         },
                         {
-                            label: "Profile",
+                            label: "Hồ sơ",
                         },
                     ]}
                 />
@@ -353,7 +345,7 @@ export default function TeacherProfilePage() {
                         <TextField
                             fullWidth
                             margin="normal"
-                            label="Full Name"
+                            label="Họ và tên"
                             value={form.fullName}
                             onChange={handleChange("fullName")}
                             error={!!errors.fullName}
@@ -371,7 +363,7 @@ export default function TeacherProfilePage() {
                         <TextField
                             fullWidth
                             margin="normal"
-                            label="Phone Number"
+                            label="Số điện thoại"
                             value={form.phoneNumber}
                             onChange={handleChange("phoneNumber")}
                             error={!!errors.phoneNumber}
@@ -381,7 +373,7 @@ export default function TeacherProfilePage() {
                         <TextField
                             fullWidth
                             margin="normal"
-                            label="Display Name"
+                            label="Tên hiển thị"
                             value={form.displayName}
                             onChange={handleChange("displayName")}
                         />
@@ -389,7 +381,7 @@ export default function TeacherProfilePage() {
                         <TextField
                             fullWidth
                             margin="normal"
-                            label="JLPT Goal"
+                            label="Mục tiêu JLPT"
                             value={form.jlptGoal}
                             onChange={handleChange("jlptGoal")}
                         />
@@ -399,7 +391,7 @@ export default function TeacherProfilePage() {
                             margin="normal"
                             multiline
                             rows={5}
-                            label="Biography"
+                            label="Tiểu sử"
                             value={form.bio}
                             onChange={handleChange("bio")}
                         />
@@ -420,7 +412,7 @@ export default function TeacherProfilePage() {
                             onClick={handleSave}
                         >
 
-                            {saving ? "Saving..." : "Save Changes"}
+                            {saving ? "Đang lưu..." : "Lưu thay đổi"}
 
                         </Button>
 

@@ -36,6 +36,7 @@ import Cropper, { type Area } from 'react-easy-crop';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
+import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
 import {
   type CourseCategory,
   type CourseDraftResponse,
@@ -118,16 +119,16 @@ function buildInitialForm(draft?: CourseDraftResponse): CourseDraftForm {
 
   return {
     title: draft.title || '',
-    introduction: draft.introduction || '',
+    introduction: sanitizeRichText(draft.introduction),
     jlptLevel: draft.jlptLevel,
     category: draft.category || '',
     thumbnailUrl: draft.thumbnailUrl || '',
     thumbnailPreviewUrl: resolveCourseAssetUrl(draft.thumbnailUrl) || '',
     thumbnailFileName: draft.thumbnailUrl ? 'Ảnh bìa hiện tại' : '',
-    outcomes: draft.outcomes || '',
+    outcomes: sanitizeRichText(draft.outcomes),
     price: String(Number(draft.price || 0)),
-    prerequisites: draft.prerequisites || '',
-    targetStudents: draft.targetStudents || '',
+    prerequisites: sanitizeRichText(draft.prerequisites),
+    targetStudents: sanitizeRichText(draft.targetStudents),
     learningGoals: withMinimumGoals(draft.learningGoals),
   };
 }
@@ -320,14 +321,14 @@ export function CourseDraftPage() {
     try {
       const payload = {
         title: form.title.trim(),
-        introduction: form.introduction,
+        introduction: sanitizeRichText(form.introduction),
         jlptLevel: form.jlptLevel,
         category: form.category,
         thumbnailUrl: form.thumbnailUrl || null,
-        outcomes: form.outcomes,
+        outcomes: sanitizeRichText(form.outcomes),
         price: Number(form.price),
-        prerequisites: form.prerequisites,
-        targetStudents: form.targetStudents,
+        prerequisites: sanitizeRichText(form.prerequisites),
+        targetStudents: sanitizeRichText(form.targetStudents),
         learningGoals: form.learningGoals.map((goal) => goal.trim()).filter(Boolean),
       };
       const draft = editingDraft
@@ -749,9 +750,9 @@ function RichTextEditor({ label, value, onChange, placeholder, error }: RichText
       },
     });
 
-    quill.clipboard.dangerouslyPasteHTML(initialValueRef.current || '');
+    quill.clipboard.dangerouslyPasteHTML(sanitizeRichText(initialValueRef.current));
     const handleTextChange = () => {
-      const html = quill.root.innerHTML;
+      const html = sanitizeRichText(quill.root.innerHTML);
       onChangeRef.current(stripHtml(html).length === 0 ? '' : html);
     };
 
@@ -767,11 +768,16 @@ function RichTextEditor({ label, value, onChange, placeholder, error }: RichText
 
   useEffect(() => {
     const quill = quillRef.current;
-    if (!quill || document.activeElement === quill.root || quill.root.innerHTML === value) {
+    const sanitizedValue = sanitizeRichText(value);
+    if (
+      !quill
+      || document.activeElement === quill.root
+      || quill.root.innerHTML === sanitizedValue
+    ) {
       return;
     }
 
-    quill.clipboard.dangerouslyPasteHTML(value || '');
+    quill.clipboard.dangerouslyPasteHTML(sanitizedValue);
   }, [value]);
 
   return (
@@ -836,6 +842,7 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   async function handleFile(file: File | undefined) {
     if (!file) {
@@ -857,6 +864,7 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
+    setUploadError(null);
   }
 
   function handleCropComplete(_area: Area, areaPixels: Area) {
@@ -865,11 +873,12 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
 
   async function confirmCrop() {
     if (!cropDraft || !croppedAreaPixels) {
-      onError('Vui lòng chọn vùng ảnh 16:9 trước khi lưu.');
+      setUploadError('Vui lòng chọn vùng ảnh 16:9 trước khi lưu.');
       return;
     }
 
     setUploading(true);
+    setUploadError(null);
     try {
       const croppedBlob = await cropImageToBlob(cropDraft.dataUrl, croppedAreaPixels, cropDraft.mimeType);
       const croppedFile = new File([croppedBlob], normalizeImageFileName(cropDraft.fileName, cropDraft.mimeType), {
@@ -881,6 +890,7 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
       onChange(uploaded.publicUrl, previewUrl, uploaded.fileName);
       setCropDraft(null);
     } catch {
+      setUploadError('Không thể tải ảnh lên hệ thống. Vui lòng thử lại sau khi backend hoạt động ổn định.');
       onError('Không thể tải ảnh lên hệ thống. Vui lòng thử lại sau khi backend hoạt động ổn định.');
     } finally {
       setUploading(false);
@@ -1001,6 +1011,11 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
               Phóng to/thu nhỏ để đặt nội dung chính vào khung ảnh ngang.
             </Typography>
             <Slider min={1} max={3} step={0.1} value={zoom} onChange={(_, value) => setZoom(Number(value))} aria-label="Phóng to ảnh" />
+            {uploadError && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                {uploadError}
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -1008,7 +1023,7 @@ function ImageUpload({ imagePreviewUrl, fileName, error, onChange, onError }: Im
             Hủy
           </Button>
           <Button variant="contained" onClick={() => void confirmCrop()} disabled={uploading} sx={{ textTransform: 'none', fontWeight: 700 }}>
-            {uploading ? 'Đang tải ảnh...' : 'Dùng ảnh này'}
+            {uploading ? 'Đang tải ảnh...' : (uploadError ? 'Thử lại' : 'Dùng ảnh này')}
           </Button>
         </DialogActions>
       </Dialog>

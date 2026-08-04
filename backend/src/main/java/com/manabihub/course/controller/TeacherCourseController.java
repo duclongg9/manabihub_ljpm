@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import com.manabihub.course.dto.response.TeacherCourseAnalyticsResponse;
 import com.manabihub.course.dto.response.ValidationResultResponse;
 import com.manabihub.course.service.CourseValidationService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,6 +42,19 @@ public class TeacherCourseController {
         ));
     }
 
+    @GetMapping("/{courseId}/analytics")
+    public ResponseEntity<ApiResponse<TeacherCourseAnalyticsResponse>> getCourseAnalytics(
+            @PathVariable UUID courseId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) java.time.Instant startDate,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) java.time.Instant endDate) {
+        TeacherCourseAnalyticsResponse response = courseService.getCourseAnalytics(courseId, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.COMMON_SUCCESS,
+                "Course analytics loaded.",
+                response
+        ));
+    }
+
     @PostMapping("/drafts/{draftId}/submit-review")
     public ResponseEntity<ApiResponse<Void>> submitForReview(@PathVariable UUID draftId) {
         courseService.submitForReview(draftId);
@@ -48,6 +62,26 @@ public class TeacherCourseController {
                 "MSG-COURSE-005", // MSG-COURSE-005 from SRS: Course submitted for review
                 "Sản phẩm đã được gửi để xét duyệt.",
                 null
+        ));
+    }
+
+    @PostMapping("/{courseId}/publish")
+    public ResponseEntity<ApiResponse<Void>> publishCourse(@PathVariable UUID courseId) {
+        courseService.publishCourse(courseId);
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.MSG_COURSE_014,
+                "Sản phẩm đã được xuất bản và hiển thị trên danh mục.",
+                null
+        ));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<CourseDraftResponse>>> listCourses() {
+        List<CourseDraftResponse> response = courseService.listMyCourses();
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.COMMON_SUCCESS,
+                "Teacher courses loaded.",
+                response
         ));
     }
 

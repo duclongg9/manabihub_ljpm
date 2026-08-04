@@ -3,6 +3,8 @@ package com.manabihub.course.service;
 import com.manabihub.course.dto.request.CreateCourseDraftRequest;
 import com.manabihub.course.dto.response.CourseDraftResponse;
 import com.manabihub.course.dto.response.PublicCourseSummaryResponse;
+import com.manabihub.course.dto.response.TeacherCourseAnalyticsResponse;
+import com.manabihub.course.dto.response.TeacherDashboardResponse;
 import com.manabihub.course.enums.JlptLevel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +19,10 @@ public interface CourseService {
 
     List<CourseDraftResponse> listMyDrafts();
 
+    List<CourseDraftResponse> listMyCourses();
+    
+    TeacherCourseAnalyticsResponse getCourseAnalytics(UUID courseId, java.time.Instant startDate, java.time.Instant endDate);
+
     com.manabihub.course.dto.response.TeacherDashboardResponse getTeacherDashboardStats();
 
     CourseDraftResponse updateDraft(UUID draftId, CreateCourseDraftRequest request);
@@ -24,6 +30,8 @@ public interface CourseService {
     void deleteDraft(UUID draftId);
 
     void submitForReview(UUID draftId);
+
+    void publishCourse(UUID courseId);
 
     com.manabihub.course.dto.response.PublicCourseDetailResponse getPublicCourseDetail(String identifier);
 

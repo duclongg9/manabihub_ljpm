@@ -7,6 +7,8 @@ import com.manabihub.course.dto.response.PublicCourseDetailResponse;
 import com.manabihub.course.dto.response.PublicCourseSummaryResponse;
 import com.manabihub.course.enums.JlptLevel;
 import com.manabihub.course.service.CourseService;
+import com.manabihub.review.dto.response.CourseReviewResponse;
+import com.manabihub.review.service.CourseReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -31,6 +33,7 @@ import org.springframework.validation.annotation.Validated;
 public class PublicCourseController {
 
     private final CourseService courseService;
+    private final CourseReviewService courseReviewService;
 
     @GetMapping
     public ApiResponse<PageResponse<PublicCourseSummaryResponse>> searchCourses(
@@ -62,6 +65,28 @@ public class PublicCourseController {
     public ApiResponse<PublicCourseDetailResponse> getCourseDetail(@PathVariable String identifier) {
         PublicCourseDetailResponse data = courseService.getPublicCourseDetail(identifier);
         return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "Success", data);
+    }
+
+    @GetMapping("/{identifier}/reviews")
+    public ApiResponse<PageResponse<CourseReviewResponse>> getCourseReviews(
+            @PathVariable String identifier,
+            @RequestParam(defaultValue = "0")
+            @Min(value = 0, message = "Page index must not be less than zero")
+            int page,
+            @RequestParam(defaultValue = "10")
+            @Min(value = 1, message = "Page size must not be less than one")
+            @Max(value = 20, message = "Page size must not be greater than twenty")
+            int size
+    ) {
+        Page<CourseReviewResponse> result = courseReviewService.getPublicReviews(
+                identifier,
+                PageRequest.of(page, size)
+        );
+        return ApiResponse.success(
+                MessageCodes.COMMON_SUCCESS,
+                "Course reviews loaded.",
+                PageResponse.from(result)
+        );
     }
 
     private Pageable buildPageable(int page, int size, String sort) {

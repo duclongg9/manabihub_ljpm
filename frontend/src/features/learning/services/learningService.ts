@@ -1,10 +1,43 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
-import type { CourseLearning, LessonProgress, WritingSubmissionDetail } from '../types';
+import { isAxiosError } from 'axios';
+import type {
+  CourseLearning,
+  CourseProgressSummary,
+  FinalTestAttempt,
+  FinalTestEligibility,
+  FinalTestSubmissionResult,
+  LessonProgress,
+  LearningCertificate,
+  QuizSubmissionResult,
+  WritingSubmissionDetail,
+} from '../types';
 
 export const learningService = {
   openCourse: async (courseId: string): Promise<CourseLearning> => {
     const response = await axiosClient.get(ENDPOINTS.LEARNING.COURSE_LEARN(courseId));
+    return response.data.data;
+  },
+
+  getCourseProgress: async (courseId: string): Promise<CourseProgressSummary> => {
+    const response = await axiosClient.get(ENDPOINTS.LEARNING.COURSE_PROGRESS(courseId));
+    return response.data.data;
+  },
+
+  getCertificate: async (courseId: string): Promise<LearningCertificate | null> => {
+    try {
+      const response = await axiosClient.get(ENDPOINTS.LEARNING.CERTIFICATE(courseId));
+      return response.data.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  generateCertificate: async (courseId: string): Promise<LearningCertificate> => {
+    const response = await axiosClient.post(ENDPOINTS.LEARNING.CERTIFICATE(courseId));
     return response.data.data;
   },
 
@@ -19,6 +52,33 @@ export const learningService = {
     const response = await axiosClient.put(ENDPOINTS.LEARNING.FLASHCARD_REVIEW(blockId), {
       cardIndex,
       status,
+    });
+    return response.data.data;
+  },
+
+  submitQuiz: async (blockId: string, answers: string[]): Promise<QuizSubmissionResult> => {
+    const response = await axiosClient.post(ENDPOINTS.LEARNING.QUIZ_SUBMIT(blockId), { answers });
+    return response.data.data;
+  },
+
+  getFinalTestEligibility: async (courseId: string): Promise<FinalTestEligibility> => {
+    const response = await axiosClient.get(ENDPOINTS.LEARNING.FINAL_TEST_ELIGIBILITY(courseId));
+    return response.data.data;
+  },
+
+  startFinalTest: async (courseId: string): Promise<FinalTestAttempt> => {
+    const response = await axiosClient.post(ENDPOINTS.LEARNING.FINAL_TEST_START(courseId));
+    return response.data.data;
+  },
+
+  submitFinalTest: async (
+    courseId: string,
+    attemptId: string,
+    answers: Array<{ questionId: string; selectedChoiceIds: string[] }>,
+  ): Promise<FinalTestSubmissionResult> => {
+    const response = await axiosClient.post(ENDPOINTS.LEARNING.FINAL_TEST_SUBMIT(courseId), {
+      attemptId,
+      answers,
     });
     return response.data.data;
   },

@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Box, Typography, Chip, IconButton, Paper, Collapse, Button } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CheckIcon from '@mui/icons-material/Check';
 import { NOTIFICATION_TYPES } from '../types';
 import type { NotificationResponse } from '../types';
+import { Link } from 'react-router-dom';
+import { getSafeNotificationActionPath } from '../utils/notificationActionUrl';
 
 interface NotificationItemProps {
   notification: NotificationResponse;
@@ -41,6 +43,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const typeConfig = NOTIFICATION_TYPES[notification.notificationType];
   const isUnread = !notification.read;
+  const actionPath = getSafeNotificationActionPath(notification.actionUrl);
 
   const handleToggleExpand = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent bubbling if needed
@@ -121,7 +124,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
               {notification.title}
             </Typography>
             {/* QUAN TRỌNG badge for certain types */}
-            {(notification.notificationType === 'PAYMENT' || notification.notificationType === 'REFUND') && (
+            {typeConfig?.important && (
               <Chip
                 label="QUAN TRỌNG"
                 size="small"
@@ -193,16 +196,14 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
               </Typography>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                {notification.actionUrl && (
+                {actionPath && (
                   <Button
                     size="small"
                     variant="contained"
-                    component="a"
-                    href={notification.actionUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    component={Link}
+                    to={actionPath}
                     onClick={(e) => e.stopPropagation()}
-                    endIcon={<OpenInNewIcon sx={{ fontSize: 16 }} />}
+                    endIcon={<ArrowForwardIcon sx={{ fontSize: 16 }} />}
                     sx={{
                       textTransform: 'none',
                       fontWeight: 600,

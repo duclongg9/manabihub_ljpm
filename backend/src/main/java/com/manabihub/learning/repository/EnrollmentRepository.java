@@ -19,6 +19,21 @@ import java.util.UUID;
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     int countByStudentIdAndStatus(UUID studentId, EnrollmentStatus status);
+    
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.course.id = :courseId " +
+           "AND e.enrolledAt >= :startDate AND e.enrolledAt <= :endDate")
+    long countByCourseIdAndDateRange(
+            @Param("courseId") UUID courseId, 
+            @Param("startDate") java.time.Instant startDate, 
+            @Param("endDate") java.time.Instant endDate);
+
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.course.id = :courseId AND e.status = :status " +
+           "AND e.enrolledAt >= :startDate AND e.enrolledAt <= :endDate")
+    long countByCourseIdAndStatusAndDateRange(
+            @Param("courseId") UUID courseId, 
+            @Param("status") EnrollmentStatus status,
+            @Param("startDate") java.time.Instant startDate, 
+            @Param("endDate") java.time.Instant endDate);
 
     @EntityGraph(attributePaths = {"course", "course.teacher", "course.teacher.user"})
     Page<Enrollment> findByStudentIdAndStatusIn(
@@ -29,6 +44,35 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     // UC-10: study course lessons — resolve the current student's enrollment for a course.
     Optional<Enrollment> findByStudent_IdAndCourse_Id(UUID studentId, UUID courseId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT enrollment
+            FROM Enrollment enrollment
+            WHERE enrollment.student.id = :studentId
+              AND enrollment.course.id = :courseId
+            """)
+    Optional<Enrollment> findByStudentIdAndCourseIdForUpdate(
+            @Param("studentId") UUID studentId,
+            @Param("courseId") UUID courseId
+    );
+
+    /**
+     * Serializes review upserts for the same enrollment. The database unique
+     * constraint remains the final guarantee, while this lock makes concurrent
+     * PUT requests deterministic at the service boundary.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT enrollment
+            FROM Enrollment enrollment
+            JOIN FETCH enrollment.course
+            WHERE enrollment.student.id = :studentId
+              AND enrollment.course.id = :courseId
+            """)
+    Optional<Enrollment> findByStudentIdAndCourseIdForReview(
+            @Param("studentId") UUID studentId,
+            @Param("courseId") UUID courseId
+    );
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM Enrollment e WHERE e.id = :id")
     Optional<Enrollment> findByIdForUpdate(@Param("id") UUID id);

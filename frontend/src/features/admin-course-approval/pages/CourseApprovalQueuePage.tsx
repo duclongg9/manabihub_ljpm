@@ -12,21 +12,10 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import HistoryIcon from '@mui/icons-material/History';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SearchIcon from '@mui/icons-material/Search';
-
-// Helper function to format "Time Waiting"
-const formatTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) return `${diffInMinutes} mins ago`;
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) return `${diffInHours} hours ago`;
-  const diffInDays = Math.floor(diffInHours / 24);
-  return `${diffInDays} days ago`;
-};
+import {
+  formatSubmittedTime,
+  getCourseApprovalStatusLabel,
+} from '../courseApprovalLocalization';
 
 export const CourseApprovalQueuePage: React.FC = () => {
   const [queue, setQueue] = useState<CourseApproval[]>([]);
@@ -81,8 +70,8 @@ export const CourseApprovalQueuePage: React.FC = () => {
     return (
       <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#fef2f2', borderRadius: 2, color: '#991b1b', border: '1px solid #fecaca', mt: 4 }}>
         <ErrorIcon sx={{ fontSize: 48, mb: 2, color: '#dc2626' }} />
-        <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>Access Denied</Typography>
-        <Typography>Finance Manager access to course approval is blocked.</Typography>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>Không có quyền truy cập</Typography>
+        <Typography>Quản lý tài chính không được phép truy cập chức năng duyệt khóa học.</Typography>
       </Box>
     );
   }
@@ -91,7 +80,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
     return (
       <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#fffbeb', borderRadius: 2, color: '#b45309', border: '1px solid #fde68a', mt: 4 }}>
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>Phiên đăng nhập không hợp lệ</Typography>
-        <Typography>Vui lòng đăng nhập lại với tư cách Course Manager.</Typography>
+        <Typography>Vui lòng đăng nhập lại bằng tài khoản Quản lý khóa học.</Typography>
       </Box>
     );
   }
@@ -107,7 +96,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f8fafc', minHeight: '100vh' }}>
       <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 4 }}>
-        Task Queue
+        Danh sách khóa học chờ duyệt
       </Typography>
 
       <Paper elevation={0} sx={{ p: 2, mb: 4, borderRadius: 3, border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', justifyContent: 'space-between', bgcolor: 'white', boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)' }}>
@@ -131,12 +120,12 @@ export const CourseApprovalQueuePage: React.FC = () => {
               onChange={(e) => setTempStatusFilter(e.target.value)}
               displayEmpty
             >
-              <MenuItem value="ALL">All</MenuItem>
-              <MenuItem value="PENDING">Pending</MenuItem>
-              <MenuItem value="APPROVED">Approved</MenuItem>
-              <MenuItem value="REJECTED">Rejected</MenuItem>
-              <MenuItem value="DRAFT">Correction</MenuItem>
-              <MenuItem value="PUBLISHED">Published</MenuItem>
+              <MenuItem value="ALL">Tất cả</MenuItem>
+              <MenuItem value="PENDING">Chờ phê duyệt</MenuItem>
+              <MenuItem value="APPROVED">Đã phê duyệt</MenuItem>
+              <MenuItem value="REJECTED">Đã từ chối</MenuItem>
+              <MenuItem value="DRAFT">Cần chỉnh sửa</MenuItem>
+              <MenuItem value="PUBLISHED">Đã xuất bản</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -176,7 +165,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
         <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <HistoryIcon sx={{ color: 'text.secondary' }} />
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Operation Queue</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Khóa học đã gửi duyệt</Typography>
           </Box>
         </Box>
 
@@ -184,12 +173,12 @@ export const CourseApprovalQueuePage: React.FC = () => {
           <Table sx={{ minWidth: 800 }}>
             <TableHead>
               <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Task ID</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Type / Request</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Requester</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Time Waiting</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }} align="right">Action</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Mã yêu cầu</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Loại yêu cầu</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Người gửi</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Thời gian chờ</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }}>Trạng thái</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', py: 2 }} align="right">Thao tác</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -199,7 +188,9 @@ export const CourseApprovalQueuePage: React.FC = () => {
                 </TableRow>
               ) : paginatedQueue.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>Không có dữ liệu phù hợp.</TableCell>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    Không có khóa học nào đang chờ duyệt.
+                  </TableCell>
                 </TableRow>
               ) : (
                 paginatedQueue.map((row) => {
@@ -232,24 +223,24 @@ export const CourseApprovalQueuePage: React.FC = () => {
                               Khóa học: {row.courseName}
                             </Typography>
                             <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                              Course Approval
+                              Phê duyệt khóa học
                             </Typography>
                           </Box>
                         </Box>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#334155' }}>
-                          Teacher: {row.teacherName}
+                          Giảng viên: {row.teacherName}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                          {formatTimeAgo(row.submittedAt)}
+                          {formatSubmittedTime(row.submittedAt)}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={row.status === 'REQUEST_CORRECTION' ? 'Correction' : row.status}
+                          label={getCourseApprovalStatusLabel(row.status)}
                           sx={{
                             bgcolor: statusColor,
                             color: statusTextColor,
@@ -274,7 +265,7 @@ export const CourseApprovalQueuePage: React.FC = () => {
                           }}
                           onClick={() => navigate(`/admin/courses/approvals/${row.id}`)}
                         >
-                          Review
+                          Xem xét
                         </Button>
                       </TableCell>
                     </TableRow>

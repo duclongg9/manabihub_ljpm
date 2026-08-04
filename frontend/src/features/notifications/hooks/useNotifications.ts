@@ -11,14 +11,18 @@ export function useNotifications(params?: NotificationQueryParams) {
   return useQuery({
     queryKey: [QUERY_KEYS.notifications, params],
     queryFn: () => notificationService.fetchNotifications(params),
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
-export function useUnreadCount() {
+export function useUnreadCount(enabled = true) {
   return useQuery({
     queryKey: [QUERY_KEYS.unreadCount],
     queryFn: () => notificationService.fetchUnreadCount(),
-    refetchInterval: 30000, // Poll every 30 seconds
+    enabled,
+    refetchInterval: enabled ? 30000 : false,
+    refetchOnWindowFocus: true,
   });
 }
 

@@ -1,162 +1,203 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  Box,
   Card,
   CardActionArea,
   CardContent,
   Chip,
   Stack,
   Typography,
-  Box,
 } from '@mui/material';
-import SchoolIcon from '@mui/icons-material/School';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
-import { useNavigate } from 'react-router-dom';
+import StarRoundedIcon from '@mui/icons-material/StarRounded';
+import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
+import { ROUTES } from '../../../shared/constants/routes';
+import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 import type { PublicCourseSummary } from '../types/catalogTypes';
 
 interface CourseCatalogCardProps {
   course: PublicCourseSummary;
 }
 
-const JLPT_COLORS: Record<string, string> = {
-  N5: '#4caf50',
-  N4: '#8bc34a',
-  N3: '#ff9800',
-  N2: '#f44336',
-  N1: '#9c27b0',
-};
+function formatPrice(price: number, currency: string): string {
+  if (price === 0) return 'Miễn phí';
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: currency || 'VND',
+    maximumFractionDigits: 0,
+  }).format(price);
+}
 
 export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) => {
-  const navigate = useNavigate();
   const [imageFailed, setImageFailed] = useState(false);
-
-  const formatPrice = (price: number, currency: string) => {
-    if (price === 0) return 'Miễn phí';
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: currency || 'VND',
-      maximumFractionDigits: 0,
-    }).format(price);
-  };
-
-  const handleClick = () => {
-    navigate(`/courses/${course.slug || course.id}`);
-  };
+  const thumbnailUrl = useMemo(
+    () => resolvePublicAssetUrl(course.thumbnailUrl),
+    [course.thumbnailUrl],
+  );
 
   return (
     <Card
+      elevation={0}
       sx={{
         height: '100%',
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        borderRadius: 2,
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 1,
         overflow: 'hidden',
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
         '&:hover': {
           transform: 'translateY(-4px)',
-          boxShadow: 6,
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+          '& .card-title': { color: '#C41E3A' },
         },
       }}
     >
+      <WishlistToggleButton courseId={course.id} variant="icon" />
       <CardActionArea
-        onClick={handleClick}
-        sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+        component={Link}
+        to={`/courses/${course.slug || course.id}`}
+        aria-label={`Xem khóa học ${course.title}`}
       >
-        {course.thumbnailUrl && !imageFailed ? (
-          <Box
-            component="img"
-            src={course.thumbnailUrl}
-            alt={course.title}
-            onError={() => setImageFailed(true)}
-            sx={{ width: '100%', height: 160, objectFit: 'cover', bgcolor: 'grey.100' }}
-          />
-        ) : (
-          <Box
-            role="img"
-            aria-label={`Chưa có ảnh bìa cho ${course.title}`}
-            sx={{
-              height: 160,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'grey.100',
-              color: 'text.disabled',
-            }}
-          >
-            <ImageNotSupportedOutlinedIcon sx={{ fontSize: 48 }} />
-          </Box>
-        )}
+        <Box
+          sx={{
+            position: 'relative',
+            width: '100%',
+            aspectRatio: '16 / 9',
+            bgcolor: 'grey.100',
+            overflow: 'hidden',
+          }}
+        >
+          {thumbnailUrl && !imageFailed ? (
+            <Box
+              component="img"
+              src={thumbnailUrl}
+              alt={`Ảnh khóa học ${course.title}`}
+              onError={() => setImageFailed(true)}
+              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <Box
+              role="img"
+              aria-label={`Khóa học ${course.title} chưa có ảnh bìa`}
+              sx={{
+                width: '100%',
+                height: '100%',
+                display: 'grid',
+                placeItems: 'center',
+                color: 'text.disabled',
+              }}
+            >
+              <ImageNotSupportedOutlinedIcon sx={{ fontSize: 44 }} />
+            </Box>
+          )}
+          {course.jlptLevel && (
+            <Chip
+              label={course.jlptLevel}
+              size="small"
+              sx={{
+                position: 'absolute',
+                top: 12,
+                left: 12,
+                fontWeight: 700,
+                bgcolor: '#C41E3A',
+                color: 'white',
+              }}
+            />
+          )}
+        </Box>
 
-        <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1, p: 2 }}>
-          {/* JLPT Level + Category */}
-          <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
-            {course.jlptLevel && (
-              <Chip
-                label={course.jlptLevel}
-                size="small"
-                sx={{
-                  bgcolor: JLPT_COLORS[course.jlptLevel] || 'grey.500',
-                  color: 'white',
-                  fontWeight: 700,
-                  fontSize: '0.7rem',
-                  height: 22,
-                }}
-              />
-            )}
-            {course.category && (
-              <Chip
-                label={course.category}
-                size="small"
-                variant="outlined"
-                sx={{ fontSize: '0.7rem', height: 22 }}
-              />
-            )}
-          </Stack>
-
-          {/* Title */}
+        <CardContent sx={{ pb: 1 }}>
+          {course.category && (
+            <Typography variant="caption" color="primary.main" sx={{ mb: 0.5, fontWeight: 700 }}>
+              {course.category}
+            </Typography>
+          )}
           <Typography
+            className="card-title"
+            component="h3"
             variant="subtitle1"
             sx={{
-              fontWeight: 600,
-              lineHeight: 1.3,
+              fontWeight: 700,
+              lineHeight: 1.4,
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              minHeight: '2.6em',
+              transition: 'color 0.2s',
             }}
           >
             {course.title}
           </Typography>
-
-          {/* Teacher + Lessons */}
-          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }} spacing={1}>
-            <Stack direction="row" sx={{ alignItems: 'center' }} spacing={0.5}>
-              <SchoolIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary" noWrap>
-                {course.teacherName || 'Giảng viên'}
-              </Typography>
-            </Stack>
-            <Stack direction="row" sx={{ alignItems: 'center' }} spacing={0.3}>
-              <MenuBookIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary">
-                {course.totalLessons} bài
-              </Typography>
-            </Stack>
-          </Stack>
-
-          {/* Price */}
-          <Box sx={{ mt: 'auto', pt: 1 }}>
-            <Typography
-              variant="h6"
-              color={course.price === 0 ? 'success.main' : 'primary.main'}
-              sx={{ fontWeight: 700, fontSize: '1.1rem' }}
-            >
-              {formatPrice(course.price, course.currency)}
-            </Typography>
-          </Box>
         </CardContent>
       </CardActionArea>
+
+      <CardContent
+        sx={{
+          pt: 0,
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          '&:last-child': { pb: 2 },
+        }}
+      >
+        {course.teacherId ? (
+          <Typography
+            component={Link}
+            to={ROUTES.PUBLIC.TEACHER_PROFILE(course.teacherId)}
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              alignSelf: 'flex-start',
+              textDecoration: 'none',
+              fontWeight: 600,
+              '&:hover': { color: '#C41E3A', textDecoration: 'underline' },
+            }}
+          >
+            {course.teacherName || 'Giảng viên ManabiHub'}
+          </Typography>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            {course.teacherName || 'Giảng viên ManabiHub'}
+          </Typography>
+        )}
+
+        {(course.reviewCount ?? 0) > 0 && course.averageRating != null && (
+          <Stack
+            direction="row"
+            spacing={0.4}
+            sx={{ mt: 1, alignItems: 'center' }}
+            aria-label={`${course.averageRating.toFixed(1)} trên 5 sao từ ${course.reviewCount} đánh giá`}
+          >
+            <StarRoundedIcon sx={{ color: '#F59E0B', fontSize: 19 }} />
+            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+              {course.averageRating.toFixed(1)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              ({course.reviewCount})
+            </Typography>
+          </Stack>
+        )}
+
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ mt: 'auto', pt: 2, justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <Typography
+            variant="subtitle1"
+            sx={{ fontWeight: 800, color: course.price === 0 ? 'success.main' : '#C41E3A' }}
+          >
+            {formatPrice(course.price, course.currency)}
+          </Typography>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+            {course.totalLessons} bài học
+          </Typography>
+        </Stack>
+      </CardContent>
     </Card>
   );
 };

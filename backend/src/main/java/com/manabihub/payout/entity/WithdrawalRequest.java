@@ -1,0 +1,66 @@
+package com.manabihub.payout.entity;
+
+import com.manabihub.payout.enums.WithdrawalStatus;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "withdrawal_requests")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class WithdrawalRequest {
+
+    @Id
+    @UuidGenerator
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.UUID)
+    private java.util.UUID id;
+
+    @Column(name = "teacher_id", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.UUID)
+    private java.util.UUID teacherId;
+
+    @Column(name = "amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal requestedAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    @Builder.Default
+    private WithdrawalStatus status = WithdrawalStatus.PENDING;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "bank_account_snapshot", columnDefinition = "jsonb")
+    private BankAccountSnapshot bankAccountSnapshot;
+
+    @CreationTimestamp
+    @Column(name = "requested_at", nullable = false, updatable = false)
+    private LocalDateTime requestedAt;
+
+    @Column(name = "decided_by")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.UUID)
+    private java.util.UUID decidedBy;
+
+    @Column(name = "decision_note", columnDefinition = "TEXT")
+    private String decisionNote;
+
+    @Column(name = "decided_at")
+    private LocalDateTime decidedAt;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+}

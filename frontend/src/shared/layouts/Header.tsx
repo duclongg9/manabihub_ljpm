@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   AppBar,
   Avatar,
+  Badge,
   Box,
   Button,
   Divider,
@@ -18,6 +19,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LoginIcon from '@mui/icons-material/Login';
+import PasswordIcon from '@mui/icons-material/Password';
 import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -28,6 +30,9 @@ import {
 } from '../auth/authSession';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
+import { logoutAdminSession } from '../auth/adminAuthApi';
+import { getHeaderBrand } from './headerBrand';
+import { useUnreadCount } from '../../features/notifications/hooks/useNotifications';
 
 interface HeaderProps {
   menuExpanded?: boolean;
@@ -56,12 +61,25 @@ export const Header: React.FC<HeaderProps> = ({
   const profilePath = session ? getProfilePath(session) : null;
   const primaryRole = session?.roles[0];
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
+  const brandLabel = getHeaderBrand(session);
+  const { data: unreadCount = 0 } = useUnreadCount(Boolean(session));
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (!session) return;
 
     setAccountAnchor(null);
-    clearAuthSession(session.kind);
+    if (session.kind === 'admin') {
+      const serverSessionRevoked = await logoutAdminSession();
+      navigate(
+        serverSessionRevoked
+          ? getLoginRoute(session.kind)
+          : `${getLoginRoute(session.kind)}?reason=logout-local-only`,
+        { replace: true },
+      );
+      return;
+    } else {
+      clearAuthSession(session.kind);
+    }
     navigate(getLoginRoute(session.kind), { replace: true });
   };
 
@@ -83,35 +101,53 @@ export const Header: React.FC<HeaderProps> = ({
           </Tooltip>
         )}
         
-        <Typography variant="h6" component={Link} to="/" sx={{ flexGrow: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 700 }}>
-          ManabiHub
+        <Typography variant="h6" component={Link} to={ROUTES.PUBLIC.HOME} sx={{ alignItems: 'center', display: 'flex', flexGrow: 1, gap: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
+          <Box
+            component="img"
+            src="/manabihub-header-logo.svg"
+            alt="ManabiHub"
+            sx={{ display: 'block', flexShrink: 0, height: 48, width: 'auto' }}
+          />
+          {brandLabel}
         </Typography>
 
-        {session && notificationPath ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Tooltip title="Thông báo">
-              <IconButton color="inherit" aria-label="Mở thông báo" onClick={() => navigate(notificationPath)}>
-                <NotificationsIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Tài khoản">
-              <IconButton
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 2 } }}>
+          {!session && (
+            <Button component={Link} to="/" color="inherit" sx={{ display: { xs: 'none', md: 'flex' }, textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+              Trang chủ
+            </Button>
+          )}
+
+          {session && notificationPath ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Tooltip title="Thông báo">
+                <IconButton color="inherit" aria-label="Mở thông báo" onClick={() => navigate(notificationPath)} sx={{ color: 'text.secondary' }}>
+                  <Badge badgeContent={unreadCount} color="error" max={99}>
+                    <NotificationsIcon />
+                  </Badge>
+                </IconButton>
+              </Tooltip>
+              <Button
+                color="inherit"
                 aria-label="Mở menu tài khoản"
                 aria-controls={accountAnchor ? 'account-menu' : undefined}
-                aria-expanded={accountAnchor ? 'true' : undefined}
                 aria-haspopup="true"
                 onClick={(event) => setAccountAnchor(event.currentTarget)}
-                size="small"
+                sx={{ textTransform: 'none', color: 'text.primary', borderRadius: 8, pl: 0.5, pr: 1.5, py: 0.5, '&:hover': { bgcolor: 'grey.100' } }}
               >
-                <Avatar sx={{ bgcolor: 'secondary.main', width: 32, height: 32 }}>{avatarLabel}</Avatar>
-              </IconButton>
-            </Tooltip>
-          </Box>
-        ) : (
-          <Button startIcon={<LoginIcon />} onClick={() => navigate(ROUTES.PUBLIC.LOGIN)}>
-            Đăng nhập
-          </Button>
-        )}
+                <Avatar sx={{ bgcolor: '#C41E3A', width: 32, height: 32, mr: 1, fontSize: '0.875rem', fontWeight: 700 }}>{avatarLabel}</Avatar>
+                <Typography variant="body2" sx={{ fontWeight: 600, display: { xs: 'none', sm: 'block' } }}>
+                  {session.email?.split('@')[0] || 'Tài khoản'}
+                </Typography>
+                <Box component="span" sx={{ display: 'inline-flex', ml: 0.5, fontSize: '0.7rem', color: 'grey.500' }}>▼</Box>
+              </Button>
+            </Box>
+          ) : (
+            <Button startIcon={<LoginIcon />} onClick={() => navigate(ROUTES.PUBLIC.LOGIN)} sx={{ fontWeight: 600 }}>
+              Đăng nhập
+            </Button>
+          )}
+        </Box>
       </Toolbar>
       {session && (
         <Menu
@@ -124,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Box sx={{ maxWidth: 260, minWidth: 220, px: 2, py: 1 }}>
             <Typography noWrap variant="body2" sx={{ fontWeight: 700 }}>
-              {session.email || 'Tài khoản ManabiHub'}
+              {session.email || `Tài khoản ${brandLabel}`}
             </Typography>
             <Typography color="text.secondary" variant="caption">
               {primaryRole ? ROLE_LABELS[primaryRole] || primaryRole : 'Tài khoản'}
@@ -141,7 +177,16 @@ export const Header: React.FC<HeaderProps> = ({
               Hồ sơ
             </MenuItem>
           )}
-          <MenuItem onClick={handleLogout}>
+          {session.kind === 'admin' && (
+            <MenuItem onClick={() => {
+              setAccountAnchor(null);
+              navigate(ROUTES.ADMIN.CHANGE_PASSWORD);
+            }}>
+              <ListItemIcon><PasswordIcon fontSize="small" /></ListItemIcon>
+              Đổi mật khẩu
+            </MenuItem>
+          )}
+          <MenuItem onClick={() => void handleLogout()}>
             <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
             Đăng xuất
           </MenuItem>

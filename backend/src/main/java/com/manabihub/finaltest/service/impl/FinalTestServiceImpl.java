@@ -112,8 +112,12 @@ public class FinalTestServiceImpl implements FinalTestService {
             throw new BusinessException(MessageCodes.MSG_ADM_002, "Not authorized");
         }
 
-        if (teacher.getKycStatus() != TeacherKycStatus.APPROVED) {
-            throw new BusinessException(MessageCodes.MSG_KYC_010, "KYC not approved");
+        if (teacher.getKycStatus() != TeacherKycStatus.PENDING
+                && teacher.getKycStatus() != TeacherKycStatus.APPROVED) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_010,
+                    "Complete identity and JLPT submission before configuring the final test"
+            );
         }
 
         if (course.getStatus() != CourseStatus.DRAFT && course.getStatus() != CourseStatus.REJECTED && course.getStatus() != CourseStatus.FORCED_DRAFT) {

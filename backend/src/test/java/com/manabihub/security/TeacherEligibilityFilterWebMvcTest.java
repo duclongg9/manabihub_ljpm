@@ -7,11 +7,18 @@ import com.manabihub.course.service.CourseService;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.controller.TeacherKycController;
 import com.manabihub.kyc.service.TeacherKycService;
+import com.manabihub.payout.controller.TeacherWithdrawalController;
+import com.manabihub.payout.service.WithdrawalService;
 import com.manabihub.security.config.SecurityConfig;
+import com.manabihub.security.config.InternalAdminRoleFilter;
 import com.manabihub.security.config.TeacherEligibilityFilter;
 import com.manabihub.security.oauth2.CustomOAuth2UserService;
 import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
 import com.manabihub.security.oauth2.OAuth2AuthenticationSuccessHandler;
+import com.manabihub.wallet.controller.TeacherWalletController;
+import com.manabihub.wallet.service.WalletService;
+import com.manabihub.wallet.service.EscrowService;
+import com.manabihub.wallet.service.WalletTransactionService;
 import com.manabihub.writing.controller.TeacherWritingReviewController;
 import com.manabihub.writing.dto.response.WritingSubmissionSummaryResponse;
 import com.manabihub.writing.service.TeacherWritingReviewService;
@@ -45,7 +52,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest({
         TeacherDashboardController.class,
         TeacherWritingReviewController.class,
-        TeacherKycController.class
+        TeacherKycController.class,
+        TeacherWalletController.class,
+        TeacherWithdrawalController.class
 })
 @Import({SecurityConfig.class, TeacherEligibilityFilter.class})
 class TeacherEligibilityFilterWebMvcTest {
@@ -68,6 +77,18 @@ class TeacherEligibilityFilterWebMvcTest {
     private TeacherKycService teacherKycService;
 
     @MockBean
+    private WalletService walletService;
+
+    @MockBean
+    private EscrowService escrowService;
+
+    @MockBean
+    private WalletTransactionService walletTransactionService;
+
+    @MockBean
+    private WithdrawalService withdrawalService;
+
+    @MockBean
     private CurrentUserService currentUserService;
 
     @MockBean
@@ -81,6 +102,9 @@ class TeacherEligibilityFilterWebMvcTest {
 
     @MockBean
     private JdbcTemplate jdbcTemplate;
+
+    @MockBean
+    private InternalAdminRoleFilter internalAdminRoleFilter;
 
     @Test
     void activeTeacher_dashboardReturns200() throws Exception {
@@ -149,6 +173,26 @@ class TeacherEligibilityFilterWebMvcTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.messageCode").value("AUTH_FORBIDDEN"));
+    }
+
+    @Test
+    void quarantinedTeacher_staleJwt_financialEndpointsReturn403() throws Exception {
+        UUID userId = UUID.randomUUID();
+        mockTeacherRoleCount(userId, 0);
+
+        var staleTeacherJwt = jwt()
+                .jwt(j -> j.subject(userId.toString()).claim("role", "TEACHER"))
+                .authorities(new SimpleGrantedAuthority("ROLE_TEACHER"));
+
+        mockMvc.perform(get("/api/v1/teacher/wallet").with(staleTeacherJwt))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.messageCode").value("AUTH_FORBIDDEN"));
+
+        mockMvc.perform(get("/api/v1/teacher/withdrawals").with(staleTeacherJwt))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.messageCode").value("AUTH_FORBIDDEN"));
+
+        verifyNoInteractions(walletService, withdrawalService);
     }
 
     @Test

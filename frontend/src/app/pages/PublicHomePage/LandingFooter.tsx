@@ -1,9 +1,6 @@
 import React from 'react';
-import { Box, Container, Grid, Typography, Stack, Divider, IconButton } from '@mui/material';
+import { Box, Container, Grid, Typography, Stack, Divider } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 
@@ -15,9 +12,12 @@ const FooterLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, c
     sx={{
       color: '#94a3b8',
       textDecoration: 'none',
-      display: 'inline-block',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 0.5,
       transition: 'all 0.3s ease',
       position: 'relative',
+      cursor: 'pointer',
       '&::after': {
         content: '""',
         position: 'absolute',
@@ -25,7 +25,7 @@ const FooterLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, c
         height: '1px',
         bottom: '-2px',
         left: 0,
-        backgroundColor: '#3b82f6',
+        backgroundColor: '#C41E3A',
         transition: 'width 0.3s ease',
       },
       '&:hover': {
@@ -43,10 +43,10 @@ const FooterLink: React.FC<{ to: string; children: React.ReactNode }> = ({ to, c
 
 export const LandingFooter: React.FC = () => {
   return (
-    <Box sx={{ bgcolor: '#0b1120', pt: { xs: 10, md: 14 }, pb: 6, borderTop: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
+    <Box sx={{ bgcolor: '#0A1628', pt: { xs: 10, md: 14 }, pb: 6, borderTop: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
       {/* Background Glow Effects */}
-      <Box sx={{ position: 'absolute', top: '-20%', left: '-10%', width: '40%', height: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
-      <Box sx={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '30%', height: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.05) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
+      <Box sx={{ position: 'absolute', top: '-20%', left: '-10%', width: '40%', height: '50%', background: 'radial-gradient(circle, rgba(196,30,58,0.06) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
+      <Box sx={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '30%', height: '50%', background: 'radial-gradient(circle, rgba(91,140,90,0.04) 0%, rgba(0,0,0,0) 70%)', zIndex: 0 }} />
 
       <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
         <Grid container spacing={8} sx={{ mb: 10 }}>
@@ -56,10 +56,10 @@ export const LandingFooter: React.FC = () => {
               <Box
                 sx={{
                   width: 40, height: 40,
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)',
                   borderRadius: 2,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)'
+                  boxShadow: '0 4px 15px rgba(196, 30, 58, 0.3)'
                 }}
               >
                 <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
@@ -69,29 +69,9 @@ export const LandingFooter: React.FC = () => {
               </Typography>
             </Box>
             <Typography variant="body1" sx={{ color: '#94a3b8', lineHeight: 1.8, pr: { md: 4 }, mb: 4, fontWeight: 300 }}>
-              Nền tảng học tiếng Nhật trực tuyến hàng đầu, kết nối học viên và những chuyên gia xuất sắc nhất. Chinh phục JLPT dễ dàng hơn bao giờ hết.
+              Nền tảng học tiếng Nhật trực tuyến, kết nối học viên với giảng viên và
+              các khóa học theo nhiều cấp độ JLPT.
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              {[<FacebookIcon key="fb" />, <TwitterIcon key="tw" />, <LinkedInIcon key="in" />].map((icon, index) => (
-                <IconButton
-                  key={index}
-                  sx={{
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    color: '#cbd5e1',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&:hover': {
-                      bgcolor: '#3b82f6',
-                      color: '#ffffff',
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 10px 20px rgba(59, 130, 246, 0.3)'
-                    }
-                  }}
-                >
-                  {icon}
-                </IconButton>
-              ))}
-            </Box>
           </Grid>
 
           {/* Links Column 1 */}
@@ -101,7 +81,6 @@ export const LandingFooter: React.FC = () => {
             </Typography>
             <Stack spacing={2}>
               <FooterLink to={ROUTES.PUBLIC.ABOUT}>Về chúng tôi</FooterLink>
-              <FooterLink to={ROUTES.PUBLIC.ABOUT}>Liên hệ</FooterLink>
               <FooterLink to={ROUTES.PUBLIC.COURSE_BROWSE}>Khám phá khóa học</FooterLink>
             </Stack>
           </Grid>
@@ -112,9 +91,9 @@ export const LandingFooter: React.FC = () => {
               Hỗ Trợ
             </Typography>
             <Stack spacing={2}>
-              <FooterLink to="#">Điều khoản sử dụng</FooterLink>
-              <FooterLink to="#">Chính sách bảo mật</FooterLink>
-              <FooterLink to="#">Câu hỏi thường gặp</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.TERMS}>Điều khoản sử dụng</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.PRIVACY}>Chính sách bảo mật</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.HELP}>Trung tâm trợ giúp</FooterLink>
             </Stack>
           </Grid>
 
@@ -125,28 +104,21 @@ export const LandingFooter: React.FC = () => {
             </Typography>
             <Stack spacing={2}>
               <FooterLink to={ROUTES.TEACHER.KYC}>Trở thành giảng viên</FooterLink>
-              <FooterLink to="#">Quy định giảng viên</FooterLink>
-              <FooterLink to="#">Chia sẻ doanh thu (lên đến 97%)</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.INSTRUCTOR_TERMS}>Điều khoản giảng viên</FooterLink>
+              <FooterLink to={ROUTES.PUBLIC.INSTRUCTOR_REVENUE_SHARE}>Chính sách chia sẻ doanh thu</FooterLink>
             </Stack>
           </Grid>
         </Grid>
 
-        <Divider sx={{ mb: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
+        <Divider sx={{ mb: 4, borderColor: 'rgba(255,255,255,0.08)' }} />
 
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 300 }}>
+          <Typography variant="body2" sx={{ color: '#4a5568', fontWeight: 300 }}>
             © {new Date().getFullYear()} ManabiHub. All rights reserved.
           </Typography>
           <Box sx={{ display: 'flex', gap: 3 }}>
-            <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.3s', '&:hover': { color: '#ffffff' } }}>
-              Privacy
-            </Typography>
-            <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.3s', '&:hover': { color: '#ffffff' } }}>
-              Terms
-            </Typography>
-            <Typography variant="body2" component={Link} to="#" sx={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.3s', '&:hover': { color: '#ffffff' } }}>
-              Sitemap
-            </Typography>
+            <FooterLink to={ROUTES.PUBLIC.PRIVACY}>Quyền riêng tư</FooterLink>
+            <FooterLink to={ROUTES.PUBLIC.TERMS}>Điều khoản</FooterLink>
           </Box>
         </Box>
       </Container>

@@ -4,16 +4,22 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import PublishIcon from '@mui/icons-material/Publish';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   InputAdornment,
@@ -28,18 +34,23 @@ import {
 } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
+import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
+import { CourseAnalyticsDialog } from '../components/CourseAnalyticsDialog';
 import {
   deleteCourseDraft,
   fetchCourseCategories,
   fetchCourseDrafts,
+  publishCourse,
   type CourseCategory,
   type CourseDraftResponse,
   type JlptLevel,
   submitCourseForReview,
   validateCourseDraft
 } from '../services/courseDraftService';
+import { courseStatusColor, courseStatusLabel } from '../utils/courseStatus';
 
 interface CourseDraftSavedState {
   draftSaved?: boolean;
@@ -87,6 +98,9 @@ export function TeacherCoursesPage() {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [publishCandidate, setPublishCandidate] = useState<CourseDraftResponse | null>(null);
+  const [analyticsCourse, setAnalyticsCourse] = useState<{ id: string; title: string } | null>(null);
 
   const categoryNames = useMemo(
     () => new Map(categories.map((category) => [category.code, category.name])),
@@ -237,6 +251,33 @@ export function TeacherCoursesPage() {
     }
   }
 
+  async function publishApprovedCourse() {
+    if (!publishCandidate) {
+      return;
+    }
+
+    const course = publishCandidate;
+    setPublishingId(course.id);
+    setFeedback(null);
+
+    try {
+      const response = await publishCourse(course.id);
+      setFeedback({
+        severity: 'success',
+        message: response.message || 'Sản phẩm đã được xuất bản và hiển thị trên danh mục.',
+      });
+      await loadDrafts();
+    } catch {
+      setFeedback({
+        severity: 'error',
+        message: 'Không thể xuất bản khóa học. Vui lòng tải lại và thử lại.',
+      });
+    } finally {
+      setPublishingId(null);
+      setPublishCandidate(null);
+    }
+  }
+
   return (
     <Box>
       <PageHeader
@@ -300,10 +341,10 @@ export function TeacherCoursesPage() {
           >
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                Danh sách bản nháp
+                Danh sách khóa học
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Tìm, lọc và tiếp tục hoàn thiện các khóa học đang soạn trước khi gửi duyệt.
+                Theo dõi trạng thái, hoàn thiện và xuất bản các khóa học đã được phê duyệt.
               </Typography>
             </Box>
             <Button
@@ -325,7 +366,7 @@ export function TeacherCoursesPage() {
             <TextField
               fullWidth
               size="small"
-              label="Tìm kiếm bản nháp"
+              label="Tìm kiếm khóa học"
               placeholder="Nhập tên khóa học, mô tả hoặc danh mục"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -377,7 +418,7 @@ export function TeacherCoursesPage() {
             </Button>
           </Stack>
 
-          {isLoading && <DraftLoadingState />}
+          {isLoading && <LoadingState message="Đang tải danh sách bản nháp..." />}
 
           {!isLoading && loadError && (
             <Alert
@@ -393,7 +434,14 @@ export function TeacherCoursesPage() {
           )}
 
           {!isLoading && !loadError && drafts.length === 0 && (
-            <DraftEmptyState onCreate={() => navigate(ROUTES.TEACHER.COURSE_CREATE)} />
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+              <EmptyState
+                title="Chưa có khóa học nào"
+                description="Khóa học mới, đang chờ duyệt, đã duyệt và đã xuất bản sẽ xuất hiện tại đây."
+                actionLabel="Tạo bản nháp đầu tiên"
+                onAction={() => navigate(ROUTES.TEACHER.COURSE_CREATE)}
+              />
+            </Box>
           )}
 
           {!isLoading && !loadError && drafts.length > 0 && filteredDrafts.length === 0 && (
@@ -410,12 +458,16 @@ export function TeacherCoursesPage() {
                     course={course}
                     deleting={deletingId === course.id}
                     highlighted={course.id === draftState?.draftId}
+                    publishing={publishingId === course.id}
                     submitting={submittingId === course.id}
                     onBuild={() => buildCourseContent(course)}
                     onConfigureFinalTest={() => navigate(`/teacher/courses/${course.id}/final-test`)}
                     onDelete={() => void deleteDraft(course)}
                     onEdit={() => editDraft(course)}
+                    onPublish={() => setPublishCandidate(course)}
                     onSubmit={() => void submitDraft(course)}
+                    onView={() => navigate(ROUTES.PUBLIC.COURSE_DETAIL.replace(':id', course.slug || course.id))}
+                    onAnalytics={() => setAnalyticsCourse({ id: course.id, title: displayDraftTitle(course) })}
                   />
                 ))}
               </Stack>
@@ -423,7 +475,7 @@ export function TeacherCoursesPage() {
               {pageCount > 1 && (
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between', pt: 1 }}>
                   <Typography variant="body2" color="text.secondary">
-                    Hiển thị {pagedDrafts.length} trong {filteredDrafts.length} bản nháp
+                    Hiển thị {pagedDrafts.length} trong {filteredDrafts.length} khóa học
                   </Typography>
                   <Pagination
                     color="primary"
@@ -438,6 +490,108 @@ export function TeacherCoursesPage() {
           )}
         </Stack>
       </Paper>
+
+      <Dialog
+        open={Boolean(publishCandidate)}
+        onClose={() => {
+          if (!publishingId) {
+            setPublishCandidate(null);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+        aria-labelledby="publish-course-dialog-title"
+      >
+        <DialogTitle
+          id="publish-course-dialog-title"
+          component="div"
+          sx={{ borderBottom: '1px solid', borderColor: 'divider', px: 3, py: 2.5 }}
+        >
+          <Stack direction="row" spacing={1.75} sx={{ alignItems: 'center' }}>
+            <Box
+              sx={{
+                alignItems: 'center',
+                bgcolor: 'success.light',
+                borderRadius: 2,
+                color: 'success.dark',
+                display: 'flex',
+                height: 44,
+                justifyContent: 'center',
+                width: 44,
+              }}
+            >
+              <PublishIcon />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Xuất bản khóa học?
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Khóa học sẽ được hiển thị công khai trên ManabiHub.
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogTitle>
+
+        <DialogContent sx={{ px: 3, py: '24px !important' }}>
+          <Stack spacing={2}>
+            <Box
+              sx={{
+                bgcolor: 'action.hover',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+                px: 2,
+                py: 1.75,
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Khóa học được xuất bản
+              </Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mt: 0.25 }}>
+                {publishCandidate ? displayDraftTitle(publishCandidate) : ''}
+              </Typography>
+            </Box>
+
+            <Typography variant="body2" color="text.secondary">
+              Trạng thái khóa học sẽ chuyển từ <strong>Đã duyệt</strong> sang{' '}
+              <strong>Đã xuất bản</strong>. Học viên có thể tìm kiếm và xem thông tin
+              khóa học ngay sau khi xuất bản.
+            </Typography>
+
+            <Alert severity="info">
+              Vui lòng kiểm tra lần cuối ảnh bìa, học phí và nội dung khóa học trước khi tiếp tục.
+            </Alert>
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ borderTop: '1px solid', borderColor: 'divider', gap: 1, px: 3, py: 2 }}>
+          <Button
+            color="inherit"
+            disabled={Boolean(publishingId)}
+            onClick={() => setPublishCandidate(null)}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            Để sau
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            disabled={Boolean(publishingId)}
+            onClick={() => void publishApprovedCourse()}
+            startIcon={publishingId ? <CircularProgress color="inherit" size={16} /> : <PublishIcon />}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            {publishingId ? 'Đang xuất bản...' : 'Xuất bản ngay'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      <CourseAnalyticsDialog
+        courseId={analyticsCourse?.id ?? null}
+        courseTitle={analyticsCourse?.title ?? null}
+        onClose={() => setAnalyticsCourse(null)}
+      />
     </Box>
   );
 }
@@ -464,6 +618,10 @@ interface CourseDraftRowProps {
   onConfigureFinalTest: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onPublish: () => void;
+  onView: () => void;
+  onAnalytics: () => void;
+  publishing: boolean;
   submitting: boolean;
   onSubmit: () => void;
 }
@@ -473,12 +631,16 @@ function CourseDraftRow({
   course,
   deleting,
   highlighted,
+  publishing,
   submitting,
   onBuild,
   onConfigureFinalTest,
   onDelete,
   onEdit,
+  onPublish,
   onSubmit,
+  onView,
+  onAnalytics,
 }: CourseDraftRowProps) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const thumbnailSrc = resolveAssetUrl(course.thumbnailUrl);
@@ -549,17 +711,11 @@ function CourseDraftRow({
           >
             {title}
           </Typography>
-          <Chip color={
-            course.status === "PENDING"
-              ? "warning"
-              : course.status === "APPROVED"
-                ? "info"
-                : "default"}
-                label={
-                  course.status === "PENDING"
-                      ? "Chờ duyệt"
-                      : "Bản nháp"}
-                size="small" />
+          <Chip
+            color={courseStatusColor(course.status)}
+            label={courseStatusLabel(course.status)}
+            size="small"
+          />
         </Stack>
 
         <Typography
@@ -588,46 +744,103 @@ function CourseDraftRow({
         </Stack>
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'flex-end', pt: 0.5 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<EditOutlinedIcon />}
-            onClick={onEdit}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
-          >
-            Tiếp tục soạn
-          </Button>
-          <Button
-            variant="contained"
-            color="secondary"
-            size="small"
-            startIcon={<MenuBookIcon />}
-            onClick={onConfigureFinalTest}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
-          >
-            Cấu hình Final Test
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<ViewModuleIcon />}
-            onClick={onBuild}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
-          >
-            Xây nội dung
-          </Button>
-          <Tooltip title="Tác vụ khác">
-            <IconButton
-              aria-controls={menuOpen ? `course-draft-${course.id}-menu` : undefined}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen ? 'true' : undefined}
-              onClick={(event) => setMenuAnchor(event.currentTarget)}
+          {isEditableCourse(course.status) && (
+            <>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<EditOutlinedIcon />}
+                onClick={onEdit}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                Tiếp tục soạn
+              </Button>
+              <Button
+                variant="contained"
+                color="secondary"
+                size="small"
+                startIcon={<MenuBookIcon />}
+                onClick={onConfigureFinalTest}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                Cấu hình Final Test
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<ViewModuleIcon />}
+                onClick={onBuild}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                Xây nội dung
+              </Button>
+              <Tooltip
+                title="Khóa học phải đạt toàn bộ checklist: tối thiểu 5 bài học, 30 phút nội dung và Final Test hợp lệ."
+                placement="top"
+              >
+                <span>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={submitting ? <CircularProgress color="inherit" size={16} /> : <SendOutlinedIcon />}
+                    disabled={deleting || submitting}
+                    onClick={onSubmit}
+                    sx={{ textTransform: 'none', fontWeight: 700 }}
+                  >
+                    {submitting ? 'Đang gửi...' : 'Gửi duyệt'}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title="Tác vụ khác">
+                <IconButton
+                  aria-controls={menuOpen ? `course-draft-${course.id}-menu` : undefined}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen ? 'true' : undefined}
+                  onClick={(event) => setMenuAnchor(event.currentTarget)}
+                  size="small"
+                  sx={{ border: '1px solid', borderColor: 'divider' }}
+                >
+                  <MoreHorizIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
+          {course.status === 'APPROVED' && (
+            <Button
+              variant="contained"
+              color="success"
               size="small"
-              sx={{ border: '1px solid', borderColor: 'divider' }}
+              startIcon={publishing ? <CircularProgress color="inherit" size={16} /> : <PublishIcon />}
+              disabled={publishing}
+              onClick={onPublish}
+              sx={{ textTransform: 'none', fontWeight: 700 }}
             >
-              <MoreHorizIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+              {publishing ? 'Đang xuất bản...' : 'Xuất bản khóa học'}
+            </Button>
+          )}
+          {course.status === 'PUBLISHED' && (
+            <>
+              <Button
+                variant="outlined"
+                color="info"
+                size="small"
+                onClick={onAnalytics}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+                startIcon={<AssessmentIcon />}
+              >
+                Xem Analytics
+              </Button>
+              <Button
+                variant="outlined"
+                color="success"
+                size="small"
+                onClick={onView}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                Xem trên danh mục
+              </Button>
+            </>
+          )}
           <Menu
             id={`course-draft-${course.id}-menu`}
             anchorEl={menuAnchor}
@@ -642,20 +855,6 @@ function CourseDraftRow({
                 <Typography variant="body2">{deleting ? 'Đang xóa...' : 'Xóa bản nháp'}</Typography>
               </Stack>
             </MenuItem>
-            <Tooltip title="Vui lòng vào phần Xây nội dung để thêm ít nhất 1 bài học trước khi gửi duyệt." placement="left">
-              <span>
-                <MenuItem disabled={deleting || submitting}
-                          onClick={() => {
-                            closeMenu();
-                            onSubmit();
-                          }}>
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <SendOutlinedIcon fontSize="small" />
-                    <Typography variant="body2">Gửi duyệt</Typography>
-                  </Stack>
-                </MenuItem>
-              </span>
-            </Tooltip>
           </Menu>
         </Stack>
       </Stack>
@@ -686,39 +885,7 @@ function CourseCoverPlaceholder() {
   );
 }
 
-function DraftLoadingState() {
-  return (
-    <Stack spacing={1.5} sx={{ alignItems: 'center', py: 6 }}>
-      <CircularProgress size={28} />
-      <Typography variant="body2" color="text.secondary">
-        Đang tải danh sách bản nháp...
-      </Typography>
-    </Stack>
-  );
-}
 
-interface DraftEmptyStateProps {
-  onCreate: () => void;
-}
-
-function DraftEmptyState({ onCreate }: DraftEmptyStateProps) {
-  return (
-    <Stack spacing={2} sx={{ alignItems: 'center', py: 6, textAlign: 'center' }}>
-      <CourseCoverPlaceholder />
-      <Box>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          Chưa có bản nháp khóa học
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520 }}>
-          Khi bạn lưu bản nháp, khóa học sẽ xuất hiện tại đây để kiểm tra và hoàn thiện trước khi gửi duyệt.
-        </Typography>
-      </Box>
-      <Button variant="contained" startIcon={<AddIcon />} onClick={onCreate} sx={{ textTransform: 'none', fontWeight: 700 }}>
-        Tạo bản nháp đầu tiên
-      </Button>
-    </Stack>
-  );
-}
 
 interface DraftNoResultsStateProps {
   onClear: () => void;
@@ -729,7 +896,7 @@ function DraftNoResultsState({ onClear }: DraftNoResultsStateProps) {
     <Stack spacing={1.5} sx={{ alignItems: 'center', py: 5, textAlign: 'center' }}>
       <SearchIcon color="primary" sx={{ fontSize: 40 }} />
       <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-        Không tìm thấy bản nháp phù hợp
+        Không tìm thấy khóa học phù hợp
       </Typography>
       <Typography variant="body2" color="text.secondary">
         Thử đổi từ khóa hoặc bỏ bớt bộ lọc để xem thêm bản nháp.
@@ -739,6 +906,10 @@ function DraftNoResultsState({ onClear }: DraftNoResultsStateProps) {
       </Button>
     </Stack>
   );
+}
+
+function isEditableCourse(status: CourseDraftResponse['status']) {
+  return status === 'DRAFT' || status === 'REJECTED' || status === 'FORCED_DRAFT';
 }
 
 function displayDraftTitle(course: CourseDraftResponse) {

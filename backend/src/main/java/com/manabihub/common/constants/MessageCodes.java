@@ -42,6 +42,12 @@ public final class MessageCodes {
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
 
     // ──────────────────────────────────────────────
+    // REPORT — report/violation errors
+    // ──────────────────────────────────────────────
+    public static final String MSG_REP_001 = "MSG-REP-001";
+    public static final String MSG_REP_002 = "MSG-REP-002";
+
+    // ──────────────────────────────────────────────
     // AUTH — authentication & authorization
     // ──────────────────────────────────────────────
     public static final String AUTH_UNAUTHORIZED = "AUTH_UNAUTHORIZED";
@@ -50,6 +56,20 @@ public final class MessageCodes {
     public static final String AUTH_TOKEN_INVALID = "AUTH_TOKEN_INVALID";
     public static final String AUTH_LOGIN_SUCCESS = "AUTH_LOGIN_SUCCESS";
     public static final String AUTH_LOGOUT_SUCCESS = "AUTH_LOGOUT_SUCCESS";
+    public static final String ADMIN_SESSION_INVALID = "ADMIN_SESSION_INVALID";
+    public static final String ADMIN_PASSWORD_RESET_REQUEST_ACCEPTED =
+            "ADMIN_PASSWORD_RESET_REQUEST_ACCEPTED";
+    public static final String ADMIN_PASSWORD_RESET_COMPLETED =
+            "ADMIN_PASSWORD_RESET_COMPLETED";
+    public static final String ADMIN_PASSWORD_RESET_INVALID =
+            "ADMIN_PASSWORD_RESET_INVALID";
+    public static final String ADMIN_PASSWORD_CHANGED = "ADMIN_PASSWORD_CHANGED";
+    public static final String ADMIN_PASSWORD_REUSE_FORBIDDEN =
+            "ADMIN_PASSWORD_REUSE_FORBIDDEN";
+    public static final String ADMIN_CURRENT_PASSWORD_INVALID =
+            "ADMIN_CURRENT_PASSWORD_INVALID";
+    public static final String ADMIN_PASSWORD_CHANGE_RATE_LIMITED =
+            "ADMIN_PASSWORD_CHANGE_RATE_LIMITED";
     public static final String MSG_AUTH_007 = "MSG-AUTH-007"; // Admin login failed
     public static final String MSG_AUTH_008 = "MSG-AUTH-008"; // Admin account locked
     public static final String MSG_AUTH_009 = "MSG-AUTH-009";
@@ -74,6 +94,9 @@ public final class MessageCodes {
     public static final String KYC_ALREADY_PENDING = "KYC_ALREADY_PENDING";
     public static final String KYC_ALREADY_APPROVED = "KYC_ALREADY_APPROVED";
     public static final String KYC_SUBMISSION_NOT_ALLOWED = "KYC_SUBMISSION_NOT_ALLOWED";
+    public static final String KYC_CERTIFICATE_ALREADY_CLAIMED = "KYC_CERTIFICATE_ALREADY_CLAIMED";
+    public static final String KYC_CERTIFICATE_OCR_MISMATCH = "KYC_CERTIFICATE_OCR_MISMATCH";
+    public static final String KYC_TRUST_CASE_REQUIRED = "KYC_TRUST_CASE_REQUIRED";
     public static final String MSG_KYC_002 = "MSG-KYC-002";
     public static final String MSG_KYC_003 = "MSG-KYC-003";
     public static final String MSG_KYC_006 = "MSG-KYC-006";
@@ -151,6 +174,48 @@ public final class MessageCodes {
     public static final String LEARNING_INVALID_BLOCK_TYPE = "LEARNING_INVALID_BLOCK_TYPE";
     public static final String LEARNING_INVALID_VIDEO_POSITION = "LEARNING_INVALID_VIDEO_POSITION";
     public static final String LEARNING_INVALID_FLASHCARD_INDEX = "LEARNING_INVALID_FLASHCARD_INDEX";
+    public static final String LEARNING_INVALID_QUIZ_ANSWERS = "LEARNING_INVALID_QUIZ_ANSWERS";
+    public static final String LEARNING_QUIZ_SUBMITTED = "LEARNING_QUIZ_SUBMITTED";
+    public static final String LEARNING_FINAL_TEST_NOT_ELIGIBLE = "LEARNING_FINAL_TEST_NOT_ELIGIBLE";
+    public static final String LEARNING_FINAL_TEST_ATTEMPT_NOT_FOUND = "LEARNING_FINAL_TEST_ATTEMPT_NOT_FOUND";
+    public static final String LEARNING_FINAL_TEST_ATTEMPT_EXPIRED = "LEARNING_FINAL_TEST_ATTEMPT_EXPIRED";
+    public static final String LEARNING_FINAL_TEST_STARTED = "LEARNING_FINAL_TEST_STARTED";
+    public static final String LEARNING_FINAL_TEST_SUBMITTED = "LEARNING_FINAL_TEST_SUBMITTED";
+    public static final String LEARNING_CERTIFICATE_NOT_FOUND = "LEARNING_CERTIFICATE_NOT_FOUND";
+    public static final String LEARNING_CERTIFICATE_NOT_ELIGIBLE = "LEARNING_CERTIFICATE_NOT_ELIGIBLE";
+    public static final String LEARNING_CERTIFICATE_ISSUED = "LEARNING_CERTIFICATE_ISSUED";
+    public static final String LEARNING_WISHLIST_ADDED = "LEARNING_WISHLIST_ADDED";
+    public static final String LEARNING_WISHLIST_REMOVED = "LEARNING_WISHLIST_REMOVED";
+    public static final String LEARNING_WISHLIST_DUPLICATE = "LEARNING_WISHLIST_DUPLICATE";
+    public static final String LEARNING_WISHLIST_ITEM_NOT_FOUND = "LEARNING_WISHLIST_ITEM_NOT_FOUND";
+    public static final String COURSE_REVIEW_SAVED = "COURSE_REVIEW_SAVED";
+    public static final String COURSE_REVIEW_NOT_ELIGIBLE = "COURSE_REVIEW_NOT_ELIGIBLE";
+    public static final String COURSE_REVIEW_INVALID = "COURSE_REVIEW_INVALID";
+
+    // SYSTEM CONFIGURATION / INTERNAL ADMIN RBAC — UC-31
+    public static final String SYSTEM_SETTING_UPDATED = "SYSTEM_SETTING_UPDATED";
+    public static final String SYSTEM_SETTING_INVALID = "SYSTEM_SETTING_INVALID";
+    public static final String SYSTEM_SETTING_NOT_EDITABLE = "SYSTEM_SETTING_NOT_EDITABLE";
+    public static final String SYSTEM_ADMIN_REQUIRED = "SYSTEM_ADMIN_REQUIRED";
+    public static final String INTERNAL_ROLE_UPDATED = "INTERNAL_ROLE_UPDATED";
+    public static final String INTERNAL_ROLE_INVALID = "INTERNAL_ROLE_INVALID";
+    public static final String INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN =
+            "INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN";
+    public static final String LAST_SYSTEM_ADMIN_REQUIRED = "LAST_SYSTEM_ADMIN_REQUIRED";
+    public static final String ADMIN_SESSION_STALE = "ADMIN_SESSION_STALE";
+    public static final String INTERNAL_ADMIN_INVITATION_CREATED =
+            "INTERNAL_ADMIN_INVITATION_CREATED";
+    public static final String INTERNAL_ADMIN_INVITATION_RESENT =
+            "INTERNAL_ADMIN_INVITATION_RESENT";
+    public static final String INTERNAL_ADMIN_INVITATION_CONFLICT =
+            "INTERNAL_ADMIN_INVITATION_CONFLICT";
+    public static final String INTERNAL_ADMIN_INVITATION_INVALID =
+            "INTERNAL_ADMIN_INVITATION_INVALID";
+    public static final String INTERNAL_ADMIN_PASSWORD_INVALID =
+            "INTERNAL_ADMIN_PASSWORD_INVALID";
+    public static final String INTERNAL_ADMIN_PASSWORD_SET =
+            "INTERNAL_ADMIN_PASSWORD_SET";
+    public static final String LEARNING_STUDENT_PROFILE_NOT_FOUND = "LEARNING_STUDENT_PROFILE_NOT_FOUND";
 
     // ──────────────────────────────────────────────
     // AI — AI-related operations
@@ -165,25 +230,55 @@ public final class MessageCodes {
     public static final String MSG_AI_008 = "MSG-AI-008"; // AI is unavailable for this course or request
 
     // ──────────────────────────────────────────────
+    // ORDER — course purchase orders (UC-08)
+    // ──────────────────────────────────────────────
+    public static final String ORDER_CREATED = "ORDER_CREATED";
+    public static final String ORDER_NOT_FOUND = "ORDER_NOT_FOUND";
+    public static final String ORDER_RETRIEVED = "ORDER_RETRIEVED";
+    public static final String ORDER_COURSE_NOT_PUBLISHED = "ORDER_COURSE_NOT_PUBLISHED";
+    public static final String ORDER_ALREADY_ENROLLED = "ORDER_ALREADY_ENROLLED";
+    public static final String ORDER_ALREADY_PAID = "ORDER_ALREADY_PAID";
+
+    // ──────────────────────────────────────────────
     // PAYMENT — payment processing
     // ──────────────────────────────────────────────
     public static final String PAYMENT_SUCCESS = "PAYMENT_SUCCESS";
     public static final String PAYMENT_FAILED = "PAYMENT_FAILED";
     public static final String PAYMENT_WEBHOOK_INVALID = "PAYMENT_WEBHOOK_INVALID";
+    public static final String PAYMENT_WEBHOOK_PROCESSED = "PAYMENT_WEBHOOK_PROCESSED";
     public static final String PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND";
+    public static final String PAYMENT_INITIATED = "PAYMENT_INITIATED";
+
+    // Canonical payment-result codes defined by the SRS (UC-08, message catalog).
+    public static final String MSG_PAY_001 = "MSG-PAY-001"; // Payment pending — awaiting confirmation
+    public static final String MSG_PAY_002 = "MSG-PAY-002"; // Payment successful — product unlocked
+    public static final String MSG_PAY_003 = "MSG-PAY-003"; // Payment failed
+    public static final String MSG_PAY_004 = "MSG-PAY-004"; // Invalid/unverifiable payment webhook
+    public static final String MSG_PAY_005 = "MSG-PAY-005"; // Duplicate payment (already processed)
 
     // ──────────────────────────────────────────────
     // WALLET — wallet operations
     // ──────────────────────────────────────────────
     public static final String WALLET_NOT_FOUND = "WALLET_NOT_FOUND";
     public static final String WALLET_INSUFFICIENT_BALANCE = "WALLET_INSUFFICIENT_BALANCE";
+    public static final String WALLET_TRANSACTION_NOT_FOUND = "WALLET_TRANSACTION_NOT_FOUND";
+    public static final String WALLET_HISTORY_UNAVAILABLE = "WALLET_HISTORY_UNAVAILABLE";
 
     // ──────────────────────────────────────────────
     // REFUND — refund processing
     // ──────────────────────────────────────────────
     public static final String REFUND_NOT_ELIGIBLE = "REFUND_NOT_ELIGIBLE";
+    public static final String REFUND_WINDOW_EXPIRED = "REFUND_WINDOW_EXPIRED";
+    public static final String REFUND_PROGRESS_LIMIT_REACHED = "REFUND_PROGRESS_LIMIT_REACHED";
+    public static final String REFUND_PROTECTED_MATERIALS_DOWNLOADED = "REFUND_PROTECTED_MATERIALS_DOWNLOADED";
+    public static final String REFUND_ENROLLMENT_MISSING = "REFUND_ENROLLMENT_MISSING";
+    public static final String REFUND_ACTIVE_REQUEST_EXISTS = "REFUND_ACTIVE_REQUEST_EXISTS";
+    public static final String REFUND_REQUEST_NOT_FOUND = "REFUND_REQUEST_NOT_FOUND";
+    public static final String REFUND_CANCELLATION_NOT_ALLOWED = "REFUND_CANCELLATION_NOT_ALLOWED";
     public static final String REFUND_REQUESTED = "REFUND_REQUESTED";
     public static final String REFUND_PROCESSED = "REFUND_PROCESSED";
+    public static final String FINANCIAL_INTEGRITY_VIOLATION = "FINANCIAL_INTEGRITY_VIOLATION";
+    public static final String REFUND_RECONCILIATION_REQUIRED = "REFUND_RECONCILIATION_REQUIRED";
 
     // ──────────────────────────────────────────────
     // PAYOUT — teacher payout
@@ -191,6 +286,41 @@ public final class MessageCodes {
     public static final String PAYOUT_NOT_ELIGIBLE = "PAYOUT_NOT_ELIGIBLE";
     public static final String PAYOUT_REQUESTED = "PAYOUT_REQUESTED";
     public static final String PAYOUT_PROCESSED = "PAYOUT_PROCESSED";
+    public static final String PAYOUT_WITHDRAWAL_REQUEST_CREATED = "PAYOUT_WITHDRAWAL_REQUEST_CREATED";
+    public static final String PAYOUT_WITHDRAWAL_NOT_FOUND = "PAYOUT_WITHDRAWAL_NOT_FOUND";
+    public static final String PAYOUT_AMOUNT_BELOW_MINIMUM = "PAYOUT_AMOUNT_BELOW_MINIMUM";
+    public static final String PAYOUT_PENDING_REQUEST_EXISTS = "PAYOUT_PENDING_REQUEST_EXISTS";
+    public static final String PAYOUT_MONTHLY_LIMIT_EXCEEDED = "PAYOUT_MONTHLY_LIMIT_EXCEEDED";
+    public static final String PAYOUT_BANK_ACCOUNT_REQUIRED = "PAYOUT_BANK_ACCOUNT_REQUIRED";
+    public static final String PAYOUT_EMAIL_REQUIRED = "PAYOUT_EMAIL_REQUIRED";
+    public static final String PAYOUT_INVALID_OTP = "PAYOUT_INVALID_OTP";
+    public static final String PAYOUT_OTP_RATE_LIMITED = "PAYOUT_OTP_RATE_LIMITED";
+    public static final String PAYOUT_NOT_FOUND = "PAYOUT_NOT_FOUND";
+    public static final String PAYOUT_INVALID_STATUS = "PAYOUT_INVALID_STATUS";
+    public static final String PAYOUT_SETTLEMENT_PROCESSING = "PAYOUT_SETTLEMENT_PROCESSING";
+    public static final String PAYOUT_SETTLEMENT_COMPLETED = "PAYOUT_SETTLEMENT_COMPLETED";
+    public static final String PAYOUT_REJECTED = "PAYOUT_REJECTED";
+    public static final String PAYOUT_PERMISSION_DENIED = "PAYOUT_PERMISSION_DENIED";
+    public static final String PAYOUT_RECONCILIATION_MISMATCH = "PAYOUT_RECONCILIATION_MISMATCH";
+    public static final String PAYOUT_BALANCE_FROZEN = "PAYOUT_BALANCE_FROZEN";
+    public static final String PAYOUT_INSUFFICIENT_RESERVED_BALANCE = "PAYOUT_INSUFFICIENT_RESERVED_BALANCE";
+    public static final String PAYOUT_GATEWAY_FAILED = "PAYOUT_GATEWAY_FAILED";
+    public static final String PAYOUT_PENDING_RETRY = "PAYOUT_PENDING_RETRY";
+    public static final String PAYOUT_DUPLICATE_SETTLEMENT = "PAYOUT_DUPLICATE_SETTLEMENT";
+    public static final String PAYOUT_MANUAL_REFERENCE_DUPLICATE = "PAYOUT_MANUAL_REFERENCE_DUPLICATE";
+    public static final String PAYOUT_DECISION_REASON_REQUIRED = "PAYOUT_DECISION_REASON_REQUIRED";
+    public static final String PAYOUT_MANUAL_AMOUNT_MISMATCH = "PAYOUT_MANUAL_AMOUNT_MISMATCH";
+    public static final String PAYOUT_PROOF_INVALID = "PAYOUT_PROOF_INVALID";
+    public static final String PAYOUT_RETRY_NOT_ALLOWED = "PAYOUT_RETRY_NOT_ALLOWED";
+    public static final String PAYOUT_PROOF_NOT_FOUND = "PAYOUT_PROOF_NOT_FOUND";
+    public static final String MSG_ADM_004 = "MSG-ADM-004";
+    public static final String MSG_ADM_005 = "MSG-ADM-005";
+
+    // ──────────────────────────────────────────────
+    // WALLET — wallet operations
+    // ──────────────────────────────────────────────
+    public static final String WALLET_FROZEN = "WALLET_FROZEN";
+    public static final String WALLET_RESERVATION_FAILED = "WALLET_RESERVATION_FAILED";
 
     // ──────────────────────────────────────────────
     // ADMIN — admin operations
@@ -199,6 +329,23 @@ public final class MessageCodes {
     public static final String ADMIN_ACTION_FORBIDDEN = "ADMIN_ACTION_FORBIDDEN";
     public static final String COURSE_MANAGER_REQUIRED = "COURSE_MANAGER_REQUIRED";
     public static final String ADMIN_PERMISSION_DENIED = "ADMIN_PERMISSION_DENIED";
+
+    // Moderation specific codes
+    public static final String MODERATION_REPORT_NOT_FOUND = "MODERATION_REPORT_NOT_FOUND";
+    public static final String MODERATION_INVALID_STATUS = "MODERATION_INVALID_STATUS";
+    public static final String MODERATION_ALREADY_RESOLVED = "MODERATION_ALREADY_RESOLVED";
+    public static final String MODERATION_DECISION_NOTE_REQUIRED = "MODERATION_DECISION_NOTE_REQUIRED";
+    public static final String MODERATION_ACTION_REQUIRED = "MODERATION_ACTION_REQUIRED";
+    public static final String MODERATION_TARGET_NOT_FOUND = "MODERATION_TARGET_NOT_FOUND";
+    public static final String MODERATION_PENDING_EVIDENCE = "MODERATION_PENDING_EVIDENCE";
+    public static final String MODERATION_REPORT_DISMISSED = "MODERATION_REPORT_DISMISSED";
+    public static final String MODERATION_CONCURRENT_UPDATE = "MODERATION_CONCURRENT_UPDATE";
+    public static final String MODERATION_SEVERE_PERMISSION_REQUIRED = "MODERATION_SEVERE_PERMISSION_REQUIRED";
+    public static final String MODERATION_CONTENT_PERMISSION_REQUIRED = "MODERATION_CONTENT_PERMISSION_REQUIRED";
+    public static final String MODERATION_INVALID_ACTION = "MODERATION_INVALID_ACTION";
+    public static final String MODERATION_INVALID_TRANSITION = "MODERATION_INVALID_TRANSITION";
+    public static final String AUTH_ACCOUNT_RESTRICTED = "AUTH_ACCOUNT_RESTRICTED";
+    public static final String MSG_ADM_003 = "MSG-ADM-003"; // Moderation action applied
 
     // ──────────────────────────────────────────────
     // NOTIFICATION — notification system

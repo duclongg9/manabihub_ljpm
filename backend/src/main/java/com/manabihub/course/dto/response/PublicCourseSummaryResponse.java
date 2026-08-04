@@ -24,8 +24,11 @@ public class PublicCourseSummaryResponse {
     private String category;
     private BigDecimal price;
     private String currency;
+    private UUID teacherId;
     private String teacherName;
     private String teacherAvatarUrl;
     private Integer totalLessons;
     private Instant publishedAt;
+    private BigDecimal averageRating;
+    private Long reviewCount;
 }

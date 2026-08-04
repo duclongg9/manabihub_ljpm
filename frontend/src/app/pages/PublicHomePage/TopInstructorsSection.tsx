@@ -1,267 +1,211 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Box, Container, Typography, Button, Paper, Divider } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  Avatar,
+  Box,
+  Button,
+  Container,
+  Grid,
+  Paper,
+  Skeleton,
+  Stack,
+  Typography,
+} from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import ArticleIcon from '@mui/icons-material/Article';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
-import AddIcon from '@mui/icons-material/Add';
-import { useNavigate } from 'react-router-dom';
+import VerifiedIcon from '@mui/icons-material/Verified';
 import { ROUTES } from '../../../shared/constants/routes';
-import { getAsset } from '../../../shared/utils/assets';
+import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
+import { publicTeacherService } from '../../../features/teacher-discovery/services/publicTeacherService';
+import type { PublicTeacherSummary } from '../../../features/teacher-discovery/types/publicTeacherTypes';
 
-const INSTRUCTORS = [
-  {
-    id: 1,
-    name: 'Đức long',
-    title: 'Giảng viên',
-    image: getAsset('teacher1.png'),
-    courses: 2,
-    students: '60+',
-    quote: '"Học tiếng Nhật là hành trình khám phá văn hóa."'
-  },
-  {
-    id: 2,
-    name: 'Tuấn Hưng',
-    title: 'Giảng viên',
-    image: getAsset('teacher2.png'),
-    courses: 4,
-    students: '30+',
-    quote: '"Nỗ lực hôm nay, thành công ngày mai."'
-  },
-  {
-    id: 3,
-    name: 'Thành Yến',
-    title: 'Giảng viên',
-    image: getAsset('teacher3.png'),
-    courses: 3,
-    students: '50+',
-    quote: '"Ngôn ngữ là cầu nối giữa các tâm hồn."'
-  },
-  {
-    id: 4,
-    name: 'Thu Hương',
-    title: 'Giảng viên',
-    image: getAsset('teacher4.png'),
-    courses: 5,
-    students: '120+',
-    quote: '"Thành thạo giao tiếp chỉ sau 3 tháng."'
-  }
-];
+type InstructorState =
+  | { status: 'loading' }
+  | { status: 'success'; teachers: PublicTeacherSummary[] }
+  | { status: 'hidden' };
 
-export const TopInstructorsSection: React.FC = () => {
-  const navigate = useNavigate();
+export const TopInstructorsSection = () => {
+  const [state, setState] = useState<InstructorState>({ status: 'loading' });
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let active = true;
+
+    publicTeacherService.listFeatured(4)
+      .then((teachers) => {
+        if (!active) return;
+        setState(teachers.length > 0 ? { status: 'success', teachers } : { status: 'hidden' });
+      })
+      .catch(() => {
+        if (active) setState({ status: 'hidden' });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
+        if (entry.isIntersecting) setIsVisible(true);
       },
-      { threshold: 0.1, rootMargin: '0px' }
+      { threshold: 0.1, rootMargin: '0px' },
     );
-    if (sectionRef.current) observer.observe(sectionRef.current);
+    const section = sectionRef.current;
+    if (section) observer.observe(section);
     return () => observer.disconnect();
   }, []);
 
+  if (state.status === 'hidden') {
+    return null;
+  }
+
   return (
-    <Box ref={sectionRef} sx={{ py: { xs: 8, md: 12 }, bgcolor: '#ffffff' }}>
-      <Container disableGutters sx={{ maxWidth: { md: '1157px' }, px: { xs: 3, md: 0 }, margin: '0 auto' }}>
-
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: { xs: 4, md: 0 } }}>
-
-          {/* Left Side: Text and Buttons (578.5 x 575.56) */}
+    <Box ref={sectionRef} component="section" sx={{ py: { xs: 8, md: 12 }, bgcolor: '#FBF9F5' }}>
+      <Container
+        disableGutters
+        sx={{ maxWidth: { md: '1157px' }, px: { xs: 3, md: 0 }, margin: '0 auto' }}
+      >
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={{ xs: 5, md: 6 }}>
           <Box
             sx={{
-              width: { xs: '100%', md: '578.5px' },
-              height: { xs: 'auto', md: '575.56px' },
-              pr: { xs: 0, md: 4 }, // Padding right to avoid text hitting the images directly
+              width: { xs: '100%', md: '35%' },
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
               opacity: isVisible ? 1 : 0,
-              transform: isVisible ? 'translateX(0)' : 'translateX(-50px)',
-              transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)'
+              transform: isVisible ? 'translateX(0)' : 'translateX(-40px)',
+              transition: 'all 700ms ease',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <ArticleIcon sx={{ fontSize: 18, color: '#3b82f6', mr: 1 }} />
-              <Typography variant="overline" sx={{ color: '#3b82f6', fontWeight: 600, letterSpacing: '0.05em', fontSize: '0.85rem' }}>
-                GIẢNG VIÊN CỦA CHÚNG TÔI
+            <Stack direction="row" spacing={1.5} sx={{ mb: 2, alignItems: 'center' }}>
+              <Box sx={{ width: 4, height: 20, bgcolor: '#C41E3A', borderRadius: 2 }} />
+              <Typography
+                variant="overline"
+                sx={{ color: '#C41E3A', fontWeight: 800, letterSpacing: '0.08em' }}
+              >
+                GIẢNG VIÊN ĐÃ XÁC MINH
               </Typography>
-            </Box>
-
-            <Typography variant="h2" sx={{ fontWeight: 800, color: '#0f172a', mb: 3, letterSpacing: '-0.02em', lineHeight: 1.2, fontSize: { xs: '2.2rem', md: '3rem' } }}>
-              Gặp Gỡ Giảng Viên Chuyên Nghiệp Của Chúng Tôi
+            </Stack>
+            <Typography
+              variant="h2"
+              sx={{
+                fontWeight: 900,
+                color: '#1A1A2E',
+                mb: 3,
+                lineHeight: 1.15,
+                fontSize: { xs: '2.2rem', md: '2.8rem' },
+              }}
+            >
+              Học cùng giảng viên thật
             </Typography>
-
-            <Typography variant="body1" sx={{ color: '#475569', fontSize: '1.05rem', lineHeight: 1.7, mb: 3 }}>
-              Giảng viên của chúng tôi là những chuyên gia tận tâm và giàu kinh nghiệm trong lĩnh vực của mình. Chúng tôi tự hào có đội ngũ giảng viên chuyên nghiệp, được tuyển chọn kỹ lưỡng và có trình độ học vấn cao.
+            <Typography sx={{ color: '#475569', lineHeight: 1.75, mb: 4 }}>
+              Chỉ những giảng viên đang hoạt động, đã hoàn tất xác minh và có khóa học công khai
+              mới xuất hiện tại đây.
             </Typography>
-
-            <Typography variant="body1" sx={{ color: '#475569', fontSize: '1.05rem', lineHeight: 1.7, mb: 5 }}>
-              Họ không chỉ có kiến thức sắc bén, mà còn có khả năng truyền đạt và tạo động lực cho học viên.
-            </Typography>
-
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <Button
-                variant="contained"
-                endIcon={<ArrowForwardIcon />}
-                onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
-                sx={{
-                  bgcolor: '#2563eb',
-                  py: 1.5,
-                  px: 4,
-                  fontWeight: 700,
-                  borderRadius: 1,
-                  boxShadow: 'none',
-                  '&:hover': { bgcolor: '#1d4ed8', boxShadow: '0 4px 14px rgba(37,99,235,0.4)' }
-                }}
-              >
-                KHÁM PHÁ KHÓA HỌC
-              </Button>
-              <Button
-                variant="contained"
-                endIcon={<ArrowForwardIcon />}
-                sx={{
-                  bgcolor: '#ef4444',
-                  py: 1.5,
-                  px: 4,
-                  fontWeight: 700,
-                  borderRadius: 1,
-                  boxShadow: 'none',
-                  '&:hover': { bgcolor: '#dc2626', boxShadow: '0 4px 14px rgba(239,68,68,0.4)' }
-                }}
-              >
-                LIÊN HỆ
-              </Button>
-            </Box>
+            <Button
+              component={Link}
+              to={ROUTES.PUBLIC.COURSE_BROWSE}
+              variant="contained"
+              endIcon={<ArrowForwardIcon />}
+              sx={{
+                alignSelf: 'flex-start',
+                background: 'linear-gradient(135deg, #C41E3A, #E8432A)',
+                py: 1.5,
+                px: 4,
+                fontWeight: 800,
+                borderRadius: 2.5,
+              }}
+            >
+              Khám phá khóa học
+            </Button>
           </Box>
 
-          {/* Right Side: Instructor Grid (578.5 x 575.56 total) */}
-          <Box
-            sx={{
-              width: { xs: '100%', md: '578.5px' },
-              height: { xs: 'auto', md: '575.56px' },
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 0 // Exact pixel matching implies they sit flush with each other, though we can add gaps inside their boxes
-            }}
-          >
-            {INSTRUCTORS.map((instructor, index) => (
-              <Box
-                key={instructor.id}
-                sx={{
-                  width: { xs: '100%', sm: '50%', md: '289.25px' }, // Exact width
-                  height: { xs: 'auto', sm: 'auto', md: '287.78px' }, // Exact height (575.56 / 2)
-                  p: 1.5, // Padding acts as gap between cards so they don't stick completely
-                  opacity: isVisible ? 1 : 0,
-                  transform: isVisible ? 'translateY(0)' : 'translateY(50px)',
-                  transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.2}s`,
-                }}
-              >
-                <Box
-                  sx={{
-                    position: 'relative',
-                    borderRadius: 4,
-                    overflow: 'hidden',
-                    bgcolor: '#f1f5f9',
-                    width: '100%',
-                    height: '100%',
-                    minHeight: { xs: '250px', md: '100%' }, // For mobile
-                    cursor: 'pointer',
-                    '&:hover .instructor-info': {
-                      transform: 'translateY(0)',
-                      opacity: 1
-                    },
-                    '&:hover .instructor-img': {
-                      transform: 'scale(1.05)'
-                    }
-                  }}
-                >
-                  {/* Instructor Image */}
-                  <Box
-                    className="instructor-img"
-                    sx={{
-                      width: '100%',
-                      height: '100%',
-                      backgroundImage: `url(${instructor.image})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      transition: 'transform 0.5s ease',
-                      ...(!instructor.image && { background: 'linear-gradient(45deg, #3b82f6, #0ea5e9)' })
-                    }}
-                  />
-
-                  {/* Blue Plus Button */}
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      bottom: 12,
-                      right: 12,
-                      width: 40,
-                      height: 40,
-                      bgcolor: '#2563eb',
-                      color: '#fff',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(37,99,235,0.4)',
-                      zIndex: 10,
-                    }}
-                  >
-                    <AddIcon />
-                  </Box>
-
-                  {/* Slide-up Info Panel */}
-                  <Paper
-                    className="instructor-info"
-                    elevation={0}
-                    sx={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      bgcolor: '#ffffff',
-                      p: 2,
-                      transform: 'translateY(100%)',
-                      opacity: 0,
-                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                      borderTopRightRadius: 20,
-                      borderTopLeftRadius: 20,
-                      boxShadow: '0 -10px 40px rgba(0,0,0,0.08)'
-                    }}
-                  >
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5, fontSize: '1.1rem' }}>
-                      {instructor.name}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#3b82f6', fontWeight: 600, mb: 1, fontSize: '0.8rem' }}>
-                      {instructor.title}
-                    </Typography>
-
-                    <Divider sx={{ mb: 1.5 }} />
-
-                    <Box sx={{ display: 'flex', alignItems: 'center', color: '#64748b', flexWrap: 'wrap', gap: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <MenuBookIcon sx={{ fontSize: 14, mr: 0.5, color: '#94a3b8' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 500 }}>{instructor.courses} Khóa học</Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <PeopleAltIcon sx={{ fontSize: 14, mr: 0.5, color: '#94a3b8' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 500 }}>{instructor.students} Học viên</Typography>
-                      </Box>
-                    </Box>
-                  </Paper>
-
-                </Box>
-              </Box>
-            ))}
+          <Box sx={{ width: { xs: '100%', md: '65%' } }}>
+            <Grid container spacing={3}>
+              {state.status === 'loading'
+                ? [0, 1, 2, 3].map((item) => (
+                    <Grid key={item} size={{ xs: 12, sm: 6 }}>
+                      <Skeleton variant="rounded" height={210} sx={{ borderRadius: 4 }} />
+                    </Grid>
+                  ))
+                : state.teachers.map((teacher, index) => (
+                    <Grid key={teacher.id} size={{ xs: 12, sm: 6 }}>
+                      <Paper
+                        component={Link}
+                        to={ROUTES.PUBLIC.TEACHER_PROFILE(teacher.id)}
+                        elevation={0}
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          height: '100%',
+                          p: 3,
+                          color: 'inherit',
+                          textDecoration: 'none',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 4,
+                          opacity: isVisible ? 1 : 0,
+                          transform: isVisible ? 'translateY(0)' : 'translateY(35px)',
+                          transition: `all 600ms ease ${index * 100}ms`,
+                          '&:hover': {
+                            transform: 'translateY(-5px)',
+                            boxShadow: '0 16px 32px rgba(15, 23, 42, 0.08)',
+                            borderColor: '#fecdd3',
+                          },
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                          <Avatar
+                            src={resolvePublicAssetUrl(teacher.avatarUrl)}
+                            alt={teacher.displayName}
+                            sx={{ width: 64, height: 64, fontSize: 24 }}
+                          >
+                            {teacher.displayName.charAt(0).toUpperCase()}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                              <Typography sx={{ fontWeight: 900 }} noWrap>
+                                {teacher.displayName}
+                              </Typography>
+                              {teacher.verified && (
+                                <VerifiedIcon color="success" sx={{ fontSize: 18 }} />
+                              )}
+                            </Stack>
+                            <Stack
+                              direction="row"
+                              spacing={0.75}
+                              sx={{ mt: 0.5, color: 'text.secondary', alignItems: 'center' }}
+                            >
+                              <MenuBookIcon sx={{ fontSize: 17 }} />
+                              <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                                {teacher.publishedCourseCount} khóa học
+                              </Typography>
+                            </Stack>
+                          </Box>
+                        </Stack>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            mt: 2.5,
+                            color: 'text.secondary',
+                            lineHeight: 1.65,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {teacher.bio || 'Xem hồ sơ và các khóa học đã xuất bản của giảng viên.'}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+            </Grid>
           </Box>
-
-        </Box>
+        </Stack>
       </Container>
     </Box>
   );

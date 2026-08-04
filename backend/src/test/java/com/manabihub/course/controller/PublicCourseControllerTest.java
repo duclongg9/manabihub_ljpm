@@ -3,6 +3,8 @@ package com.manabihub.course.controller;
 import com.manabihub.course.dto.response.PublicCourseSummaryResponse;
 import com.manabihub.course.enums.JlptLevel;
 import com.manabihub.course.service.CourseService;
+import com.manabihub.review.dto.response.CourseReviewResponse;
+import com.manabihub.review.service.CourseReviewService;
 import com.manabihub.security.config.SecurityConfig;
 import com.manabihub.security.oauth2.CustomOAuth2UserService;
 import com.manabihub.security.oauth2.OAuth2AuthenticationFailureHandler;
@@ -30,6 +32,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,6 +48,9 @@ class PublicCourseControllerTest {
 
     @MockBean
     private CourseService courseService;
+
+    @MockBean
+    private CourseReviewService courseReviewService;
 
     @MockBean
     private CustomOAuth2UserService customOAuth2UserService;
@@ -182,5 +188,80 @@ class PublicCourseControllerTest {
                 .andExpect(jsonPath("$.data.page", is(1)))
                 .andExpect(jsonPath("$.data.size", is(6)))
                 .andExpect(jsonPath("$.data.first", is(false)));
+    }
+
+    @Test
+    void searchCourses_withNegativePage_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/public/courses")
+                        .param("page", "-1"))
+                .andExpect(status().isBadRequest());
+
+        verify(courseService, never()).searchPublicCourses(
+                any(), any(), any(), any(), any(), any(Pageable.class)
+        );
+    }
+
+    @Test
+    void searchCourses_withInvertedPriceRange_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/public/courses")
+                        .param("minPrice", "500000")
+                        .param("maxPrice", "100000"))
+                .andExpect(status().isBadRequest());
+
+        verify(courseService, never()).searchPublicCourses(
+                any(), any(), any(), any(), any(), any(Pageable.class)
+        );
+    }
+
+    @Test
+    void searchCourses_withUnsupportedSort_fallsBackToPublishedAtDescending() throws Exception {
+        Page<PublicCourseSummaryResponse> emptyPage = new PageImpl<>(Collections.emptyList());
+        when(courseService.searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+        )).thenReturn(emptyPage);
+
+        mockMvc.perform(get("/api/v1/public/courses")
+                        .param("sort", "teacher.passwordHash,asc"))
+                .andExpect(status().isOk());
+
+        verify(courseService).searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(),
+                eq(PageRequest.of(0, 12, Sort.by(Sort.Direction.DESC, "publishedAt")))
+        );
+    }
+
+    @Test
+    void getCourseReviews_returnsOnlyPublicSafeReviewFields() throws Exception {
+        UUID reviewId = UUID.randomUUID();
+        CourseReviewResponse review = new CourseReviewResponse(
+                reviewId,
+                5,
+                "Khóa học rất dễ hiểu.",
+                "Học viên An",
+                "/avatars/student.png",
+                Instant.parse("2026-07-27T00:00:00Z")
+        );
+        when(courseReviewService.getPublicReviews(
+                eq("n5-foundations"),
+                eq(PageRequest.of(0, 10))
+        )).thenReturn(new PageImpl<>(List.of(review), PageRequest.of(0, 10), 1));
+
+        mockMvc.perform(get("/api/v1/public/courses/{identifier}/reviews", "n5-foundations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id", is(reviewId.toString())))
+                .andExpect(jsonPath("$.data.content[0].rating", is(5)))
+                .andExpect(jsonPath("$.data.content[0].authorDisplayName", is("Học viên An")))
+                .andExpect(jsonPath("$.data.content[0].email").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].phoneNumber").doesNotExist())
+                .andExpect(jsonPath("$.data.content[0].studentId").doesNotExist());
+    }
+
+    @Test
+    void getCourseReviews_rejectsUnboundedPageSize() throws Exception {
+        mockMvc.perform(get("/api/v1/public/courses/{identifier}/reviews", "n5-foundations")
+                        .param("size", "21"))
+                .andExpect(status().isBadRequest());
+
+        verify(courseReviewService, never()).getPublicReviews(any(), any());
     }
 }

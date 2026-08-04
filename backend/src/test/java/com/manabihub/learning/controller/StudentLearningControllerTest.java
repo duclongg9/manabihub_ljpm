@@ -335,7 +335,16 @@ class StudentLearningControllerTest {
                 10,
                 5,
                 50.0,
-                null, null, false
+                null,
+                null,
+                false,
+                new com.manabihub.learning.dto.response.FinalTestEligibilityResponse(
+                        true, false, "LESSONS_INCOMPLETE", UUID.randomUUID(), 10, 5, 0, 2, false
+                ),
+                new com.manabihub.learning.dto.response.CertificateEligibilityResponse(
+                        false, false, false, true, null, 85, false,
+                        java.util.List.of("PROGRESS_INCOMPLETE", "FINAL_TEST_NOT_PASSED")
+                )
         );
 
         when(learningService.getCourseProgress(courseId)).thenReturn(response);
@@ -345,7 +354,10 @@ class StudentLearningControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success", is(true)))
                 .andExpect(jsonPath("$.data.totalLessons", is(10)))
-                .andExpect(jsonPath("$.data.completedLessons", is(5)));
+                .andExpect(jsonPath("$.data.completedLessons", is(5)))
+                .andExpect(jsonPath("$.data.finalTestEligibility.eligible", is(false)))
+                .andExpect(jsonPath("$.data.certificateEligibility.eligible", is(false)))
+                .andExpect(jsonPath("$.data.certificateEligibility.exerciseScoreThreshold", is(85)));
     }
 
     @Test
@@ -358,6 +370,58 @@ class StudentLearningControllerTest {
     void getCourseProgressSummary_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/student/courses/{courseId}/progress", UUID.randomUUID())
                         .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())).authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getWritingSubmission_returnsFeedbackSources() throws Exception {
+        UUID lessonBlockId = UUID.randomUUID();
+        var aiSuggestion = new com.manabihub.writing.dto.response.AiWritingSuggestionResponse(
+                UUID.randomUUID(),
+                "READY",
+                null,
+                null,
+                null,
+                "Revise the introduction.",
+                null,
+                false,
+                null,
+                Instant.now()
+        );
+        var teacherFeedback = new com.manabihub.writing.dto.response.TeacherWritingFeedbackResponse(
+                UUID.randomUUID(),
+                new java.math.BigDecimal("8.50"),
+                "Good revision.",
+                null,
+                true,
+                Instant.now(),
+                Instant.now()
+        );
+        var response = new com.manabihub.writing.dto.response.StudentWritingSubmissionResponse(
+                UUID.randomUUID(),
+                lessonBlockId,
+                "My essay",
+                com.manabihub.writing.enums.WritingSubmissionStatus.TEACHER_FEEDBACK_READY,
+                Instant.now(),
+                aiSuggestion,
+                teacherFeedback
+        );
+        when(learningService.getWritingSubmission(lessonBlockId)).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/student/lessons/{lessonBlockId}/writing-submissions/me", lessonBlockId)
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.aiSuggestion.official", is(false)))
+                .andExpect(jsonPath("$.data.teacherFeedback.official", is(true)))
+                .andExpect(jsonPath("$.data.teacherFeedback.comment", is("Good revision.")));
+    }
+
+    @Test
+    void getWritingSubmission_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/student/lessons/{lessonBlockId}/writing-submissions/me", UUID.randomUUID())
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_TEACHER"))))
                 .andExpect(status().isForbidden());
     }
 

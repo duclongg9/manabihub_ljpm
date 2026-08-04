@@ -9,10 +9,12 @@ export interface PublicCourseSummary {
   category?: string;
   price: number;
   currency: string;
+  teacherId?: string;
   teacherName?: string;
   teacherAvatarUrl?: string;
   totalLessons: number;
-  publishedAt?: string;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 // ─── Catalog Filter Params ───────────────────────────────────────

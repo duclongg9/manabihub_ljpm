@@ -98,7 +98,11 @@ class CourseBuilderServiceImplTest {
 
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
-        when(courseRepository.findByIdAndTeacher_IdAndStatus(draft.getId(), approvedTeacher.getId(), CourseStatus.DRAFT))
+        when(courseRepository.findByIdAndTeacher_IdAndStatusIn(
+                draft.getId(),
+                approvedTeacher.getId(),
+                List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
+        ))
                 .thenReturn(Optional.of(draft));
     }
 

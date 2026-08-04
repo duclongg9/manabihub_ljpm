@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Paper, Avatar, TextField, Snackbar, Alert, Slide } from '@mui/material';
+import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { Box, Typography, Button, Paper, Avatar, TextField, Snackbar, Alert, Slide, Link } from '@mui/material';
 import { courseApprovalService } from '../services/courseApprovalService';
 import type { CourseApprovalDetail } from '../types';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import { ROUTES } from '../../../shared/constants/routes';
+import { RichTextContent } from '../../../shared/components/RichTextContent/RichTextContent';
+import {
+  getCourseApprovalStatusLabel,
+  localizePolicyEvidence,
+} from '../courseApprovalLocalization';
 
 function SlideTransition(props: any) {
   return <Slide {...props} direction="left" />;
@@ -44,7 +50,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
     try {
       await courseApprovalService.reviewCourse(id!, { action, reason });
       setFeedback({ message: "Xử lý thành công!", severity: 'success' });
-      setTimeout(() => navigate('/admin/courses/approvals'), 1000);
+      setTimeout(() => navigate(ROUTES.ADMIN.COURSE_APPROVAL), 1000);
     } catch (e: any) {
       const errorMessage = e.response?.data?.message || e.message || "Có lỗi xảy ra khi xử lý.";
       setFeedback({ message: `Lỗi: ${errorMessage}`, severity: 'error' });
@@ -54,11 +60,11 @@ export const CourseApprovalDetailPage: React.FC = () => {
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f8fafc', minHeight: '100vh' }}>
       <Typography variant="h6" sx={{ fontWeight: 'bold',  mb: 1 }}>
-        Course Approvals
+        Duyệt khóa học
       </Typography>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-          Review Course: {detail.courseName}
+          Duyệt khóa học: {detail.courseName}
         </Typography>
         <Box
           sx={{
@@ -70,7 +76,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
             fontSize: '0.875rem'
           }}
         >
-          {detail.status === 'PENDING' ? 'Pending Approval' : detail.status}
+          {getCourseApprovalStatusLabel(detail.status)}
         </Box>
       </Box>
 
@@ -89,11 +95,11 @@ export const CourseApprovalDetailPage: React.FC = () => {
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 4 }}>
               <MenuBookIcon sx={{ color: 'text.secondary' }} />
-              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Course Details & Teacher Info</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Thông tin khóa học và giảng viên</Typography>
             </Box>
 
             <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2, fontWeight: 'bold' }}>
-              Teacher Info
+              Thông tin giảng viên
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, p: 2, bgcolor: '#f8fafc', borderRadius: 2 }}>
               <Avatar sx={{ bgcolor: '#0f172a', width: 56, height: 56 }}>
@@ -108,13 +114,13 @@ export const CourseApprovalDetailPage: React.FC = () => {
             </Box>
 
             <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2, fontWeight: 'bold' }}>
-              Course Metrics
+              Thông tin nội dung
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, border: '1px solid #e2e8f0', borderRadius: 2 }}>
                 <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>(a) Số lượng bài học</Typography>
                 <Box sx={{ bgcolor: '#dcfce7', color: '#166534', px: 1.5, py: 0.5, borderRadius: 1, fontSize: '0.75rem', fontWeight: 'bold' }}>
-                  {detail.lessonBlocksCount} blocks
+                  {detail.lessonBlocksCount} nội dung
                 </Box>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, border: '1px solid #e2e8f0', borderRadius: 2 }}>
@@ -126,20 +132,32 @@ export const CourseApprovalDetailPage: React.FC = () => {
             </Box>
 
             <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2, fontWeight: 'bold' }}>
-              Curriculum Summary
+              Tóm tắt chương trình học
             </Typography>
             <Box sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, mb: 4, bgcolor: '#f8fafc' }}>
-              <Typography variant="body2" sx={{ color: 'text.primary', whiteSpace: 'pre-line' }}>
-                {detail.curriculumSummary || "Không có tóm tắt."}
-              </Typography>
+              {detail.curriculumSummary ? (
+                <RichTextContent value={detail.curriculumSummary} className="text-sm text-slate-900" />
+              ) : (
+                <Typography variant="body2" sx={{ color: 'text.primary' }}>Không có tóm tắt.</Typography>
+              )}
             </Box>
 
-            <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 2, fontWeight: 'bold' }}>
-              Policy Evidence
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
+                Minh chứng tuân thủ
+              </Typography>
+              <Link
+                component={RouterLink}
+                to="/help/instructors/course-review-and-unpublishing"
+                target="_blank"
+                sx={{ fontSize: '0.875rem', fontWeight: 500 }}
+              >
+                Xem quy định xuất bản
+              </Link>
+            </Box>
             <Box sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2, bgcolor: '#f8fafc' }}>
               <Typography variant="body2" sx={{ color: 'text.primary', whiteSpace: 'pre-line' }}>
-                {detail.policyEvidence || "Không có minh chứng."}
+                {localizePolicyEvidence(detail.policyEvidence)}
               </Typography>
             </Box>
           </Paper>
@@ -158,7 +176,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
               top: 24
             }}
           >
-            <Typography variant="h6" sx={{ fontWeight: 'bold',  mb: 3 }}>Decision Panel</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold',  mb: 3 }}>Xử lý yêu cầu</Typography>
 
             <TextField
               multiline
@@ -193,7 +211,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
                   '&:hover': { bgcolor: '#4d7c0f', boxShadow: 'none' }
                 }}
               >
-                Approve Course
+                Phê duyệt
               </Button>
               <Button
                 variant="contained"
@@ -210,7 +228,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
                   '&:hover': { bgcolor: '#b91c1c', boxShadow: 'none' }
                 }}
               >
-                Reject & Return
+                Từ chối và trả lại
               </Button>
             </Box>
 
@@ -230,7 +248,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
                 '&:hover': { bgcolor: '#ca8a04', boxShadow: 'none' }
               }}
             >
-              Request Correction
+              Yêu cầu chỉnh sửa
             </Button>
           </Paper>
         </Box>

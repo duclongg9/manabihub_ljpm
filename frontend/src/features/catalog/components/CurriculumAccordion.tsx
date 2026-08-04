@@ -2,16 +2,10 @@ import { useState } from 'react';
 import { Accordion, AccordionSummary, AccordionDetails, Button, Tooltip, Typography } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
-import OndemandVideoIcon from '@mui/icons-material/OndemandVideo';
-import DescriptionIcon from '@mui/icons-material/Description';
-import QuizIcon from '@mui/icons-material/Quiz';
-import StyleIcon from '@mui/icons-material/Style';
-import EditNoteIcon from '@mui/icons-material/EditNote';
-import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
-import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import type { PublicModule, PublicLessonBlock } from '../types/courseDetailTypes';
+import { ChevronsUp, ChevronsDown, FileText, PlayCircle, Clock } from 'lucide-react';
 
 interface CurriculumAccordionProps {
   modules: PublicModule[];
@@ -44,38 +38,40 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
   const getBlockIcon = (type: PublicLessonBlock['type']) => {
     switch (type) {
       case 'VIDEO':
-        return <OndemandVideoIcon fontSize="small" className="text-slate-500 mr-3" />;
+        return <PlayCircle className="w-4 h-4 text-slate-400 mr-3" />;
       case 'TEXT':
-        return <DescriptionIcon fontSize="small" className="text-slate-500 mr-3" />;
-      case 'QUIZ':
-        return <QuizIcon fontSize="small" className="text-slate-500 mr-3" />;
       case 'FLASHCARD':
-        return <StyleIcon fontSize="small" className="text-slate-500 mr-3" />;
       case 'WRITING':
-        return <EditNoteIcon fontSize="small" className="text-slate-500 mr-3" />;
+        return <FileText className="w-4 h-4 text-slate-400 mr-3" />;
+      case 'QUIZ':
+        return <FileText className="w-4 h-4 text-slate-400 mr-3" />;
       default:
-        return <OndemandVideoIcon fontSize="small" className="text-slate-500 mr-3" />;
+        return <PlayCircle className="w-4 h-4 text-slate-400 mr-3" />;
     }
   };
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 mb-1">Nội dung khóa học</h2>
+          <div className="text-sm font-medium text-slate-500">
+            {modules.length} phần • {modules.reduce((acc, m) => acc + m.blocks.length, 0)} bài học
+          </div>
+        </div>
         {isAllExpanded ? (
           <button
             onClick={handleCollapseAll}
-            className="flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+            className="px-3.5 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-all flex items-center gap-1.5"
           >
-            <UnfoldLessIcon fontSize="small" className="mr-1" />
-            Thu gọn tất cả
+            <ChevronsUp className="w-4 h-4 text-slate-600" /> Thu gọn tất cả
           </button>
         ) : (
           <button
             onClick={handleExpandAll}
-            className="flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+            className="px-3.5 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-all flex items-center gap-1.5"
           >
-            <UnfoldMoreIcon fontSize="small" className="mr-1" />
-            Mở rộng tất cả
+            <ChevronsDown className="w-4 h-4 text-slate-600" /> Mở rộng tất cả
           </button>
         )}
       </div>
@@ -88,7 +84,7 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
             onChange={() => handleToggleAccordion(module.id)}
             disableGutters
             elevation={0}
-            className="border border-slate-200/60 rounded-xl overflow-hidden shadow-sm before:hidden hover:shadow-md transition-shadow"
+            className="border border-slate-200/60 rounded-xl overflow-hidden shadow-sm before:hidden hover:shadow-md transition-shadow bg-white"
             sx={{
               '&:first-of-type': { borderTopLeftRadius: '12px', borderTopRightRadius: '12px' },
               '&:last-of-type': { borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' },
@@ -96,41 +92,49 @@ export const CurriculumAccordion = ({ modules, courseId, showAiChatAction }: Cur
           >
             <AccordionSummary
               expandIcon={<ExpandMoreIcon className="text-slate-400" />}
-              className={`transition-colors px-6 py-1 ${expandedModules[module.id] ? 'bg-indigo-50/50' : 'bg-slate-50/50 hover:bg-slate-100/50'}`}
+              className={`transition-colors px-6 py-1 ${expandedModules[module.id] ? 'bg-slate-50' : 'bg-white hover:bg-slate-50/50'}`}
             >
               <Typography className="font-bold text-slate-800 text-base">
                 Phần {index + 1}: {module.title}
               </Typography>
             </AccordionSummary>
-            <AccordionDetails className="p-0 border-t border-slate-100">
+            <AccordionDetails className="p-0 border-t border-slate-100 bg-white">
               <div className="flex flex-col">
-                {module.blocks.map((block) => (
-                  <div key={block.id} className="flex items-center justify-between py-4 px-6 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-b-0 group">
-                    <div className="flex items-center">
-                      {getBlockIcon(block.type)}
-                      <span className="text-sm text-slate-700 group-hover:text-indigo-700 transition-colors">{block.title}</span>
+                {module.blocks.map((block) => {
+                  return (
+                    <div key={block.id} className="flex flex-col sm:flex-row sm:items-center justify-between py-4 px-6 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-b-0 group gap-3">
+                      <div className="flex items-start sm:items-center">
+                        <div className="mt-0.5 sm:mt-0">{getBlockIcon(block.type)}</div>
+                        <span className="text-sm font-medium text-slate-700 group-hover:text-red-700 transition-colors">{block.title}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:ml-3 pl-8 sm:pl-0">
+                        {block.durationMinutes ? (
+                          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md inline-flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" /> {block.durationMinutes} phút
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-md inline-flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-slate-400" /> 1 tài liệu
+                          </span>
+                        )}
+                        {showAiChatAction && (
+                          <Tooltip title="Ask the AI assistant about this lesson">
+                            <Button
+                              component={Link}
+                              to={ROUTES.STUDENT.AI_CHAT(courseId, block.id)}
+                              size="small"
+                              startIcon={<SmartToyOutlinedIcon />}
+                              onClick={(event) => event.stopPropagation()}
+                              sx={{ minWidth: 96, textTransform: 'none' }}
+                            >
+                              Ask AI
+                            </Button>
+                          </Tooltip>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center justify-end gap-2 ml-3">
-                      {block.durationMinutes && (
-                        <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded-md">{block.durationMinutes} phút</span>
-                      )}
-                      {showAiChatAction && (
-                        <Tooltip title="Ask the AI assistant about this lesson">
-                          <Button
-                            component={Link}
-                            to={ROUTES.STUDENT.AI_CHAT(courseId, block.id)}
-                            size="small"
-                            startIcon={<SmartToyOutlinedIcon />}
-                            onClick={(event) => event.stopPropagation()}
-                            sx={{ minWidth: 96, textTransform: 'none' }}
-                          >
-                            Ask AI
-                          </Button>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {module.blocks.length === 0 && (
                   <div className="py-4 px-6 text-sm text-slate-400 italic text-center">
                     Chưa có nội dung bài giảng

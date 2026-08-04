@@ -7,13 +7,18 @@ import com.manabihub.notification.dto.NotificationResponse;
 import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.notification.NotificationTypes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.util.HtmlUtils;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -30,6 +35,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public Page<NotificationResponse> listMyNotifications(UUID userId, String type,
@@ -155,13 +161,49 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public void createNotificationForAdminRole(
+            String roleCode,
+            String title,
+            String message,
+            String type,
+            String actionUrl
+    ) {
+        List<UUID> adminIds = notificationRepository.findActiveAdminIdsByRoleCode(roleCode);
+        List<Notification> notifications = adminIds.stream()
+                .map(adminId -> Notification.builder()
+                        .recipientAdminId(adminId)
+                        .title(title)
+                        .message(message)
+                        .notificationType(type)
+                        .actionUrl(actionUrl)
+                        .isRead(false)
+                        .createdAt(Instant.now())
+                        .build())
+                .toList();
+
+        notificationRepository.saveAll(notifications);
+        notificationRepository.findActiveAdminEmailsByRoleCode(roleCode)
+                .forEach(email -> scheduleEmailAfterCommit(email, title, message, type));
+        log.info("Broadcasted notification to {} internal admins with role {}", adminIds.size(), roleCode);
+    }
+
+    @Override
+    @Transactional
     public void createNotification(UUID recipientUserId, String recipientEmail,
                                    String title, String message, String type) {
+        createNotification(recipientUserId, recipientEmail, title, message, type, null);
+    }
+
+    @Override
+    @Transactional
+    public void createNotification(UUID recipientUserId, String recipientEmail,
+                                   String title, String message, String type, String actionUrl) {
         Notification notification = Notification.builder()
                 .recipientUserId(recipientUserId)
                 .title(title)
                 .message(message)
                 .notificationType(type)
+                .actionUrl(actionUrl)
                 .build();
 
         notificationRepository.saveAndFlush(notification);
@@ -169,8 +211,77 @@ public class NotificationServiceImpl implements NotificationService {
                 recipientUserId, type, title);
 
         if (recipientEmail != null && !recipientEmail.isBlank()) {
-            String emailBody = buildEmailBody(title, message, type);
-            emailService.sendEmail(recipientEmail, "[ManabiHub] " + title, emailBody);
+            scheduleEmailAfterCommit(recipientEmail, title, message, type);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void createAdminNotification(UUID recipientAdminId, String recipientEmail,
+                                        String title, String message, String type, String actionUrl) {
+        notificationRepository.saveAndFlush(Notification.builder()
+                .recipientAdminId(recipientAdminId)
+                .title(title)
+                .message(message)
+                .notificationType(type)
+                .actionUrl(actionUrl)
+                .build());
+        if (recipientEmail != null && !recipientEmail.isBlank()) {
+            scheduleEmailAfterCommit(recipientEmail, title, message, type);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void createNotificationOnce(
+            String dedupeKey,
+            UUID recipientUserId,
+            String recipientEmail,
+            String title,
+            String message,
+            String type
+    ) {
+        createNotificationOnce(dedupeKey, recipientUserId, recipientEmail, title, message, type, null);
+    }
+
+    @Override
+    @Transactional
+    public void createNotificationOnce(
+            String dedupeKey,
+            UUID recipientUserId,
+            String recipientEmail,
+            String title,
+            String message,
+            String type,
+            String actionUrl
+    ) {
+        int inserted = jdbcTemplate.update("""
+                INSERT INTO notifications (
+                    id,
+                    recipient_user_id,
+                    title,
+                    message,
+                    notification_type,
+                    action_url,
+                    dedupe_key,
+                    is_read,
+                    created_at
+                )
+                VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, FALSE, NOW())
+                ON CONFLICT DO NOTHING
+                """,
+                recipientUserId,
+                title,
+                message,
+                type,
+                actionUrl,
+                dedupeKey);
+        if (inserted == 0) {
+            log.info("Skipped duplicate notification {}", dedupeKey);
+            return;
+        }
+        if (recipientEmail != null && !recipientEmail.isBlank()) {
+            scheduleEmailAfterCommit(recipientEmail, title, message, type);
         }
     }
 
@@ -209,6 +320,27 @@ public class NotificationServiceImpl implements NotificationService {
                         <p style="color: #999; font-size: 12px;">Đây là email tự động từ hệ thống ManabiHub. Vui lòng không trả lời email này.</p>
                     </div>
                 </div>
-                """.formatted(type != null ? type : "SYSTEM", title, message);
+                """.formatted(
+                        HtmlUtils.htmlEscape(NotificationTypes.vietnameseLabel(type)),
+                        HtmlUtils.htmlEscape(title),
+                        HtmlUtils.htmlEscape(message));
+    }
+
+    private void scheduleEmailAfterCommit(String recipientEmail, String title, String message, String type) {
+        Runnable delivery = () -> emailService.sendEmail(
+                recipientEmail,
+                "[ManabiHub] " + title,
+                buildEmailBody(title, message, type)
+        );
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            delivery.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                delivery.run();
+            }
+        });
     }
 }

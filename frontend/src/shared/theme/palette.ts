@@ -1,8 +1,8 @@
 export const palette = {
   primary: {
-    main: '#4F46E5', // Indigo 600
-    light: '#818CF8', // Indigo 400
-    dark: '#3730A3', // Indigo 800
+    main: '#C41E3A', // Vermilion Red
+    light: '#E8432A', 
+    dark: '#9d182e',
     contrastText: '#FFFFFF',
   },
   secondary: {

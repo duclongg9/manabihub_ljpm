@@ -1,13 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Alert,
   Box,
   Button,
   Chip,
-  CircularProgress,
   FormControl,
-  IconButton,
   InputLabel,
   MenuItem,
   Pagination,
@@ -21,12 +18,14 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import SearchIcon from '@mui/icons-material/Search';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
+import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
+import { ErrorState } from '../../../shared/components/ErrorState/ErrorState';
+import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
 import { ROUTES } from '../../../shared/constants/routes';
 import { useWritingReviews } from '../hooks/useWritingReviews';
 import type { WritingSubmissionSummary } from '../types/writingReviewTypes';
@@ -55,15 +54,15 @@ export function TeacherWritingReviewsPage() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1440, mx: 'auto' }}>
-      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Bài viết cần phản hồi</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {reviews.data ? `${reviews.data.totalElements} bài nộp` : 'Danh sách bài nộp'}
-          </Typography>
-        </Box>
-      </Stack>
+    <Box sx={{ pb: 6 }}>
+      <PageHeader
+        title="Bài viết cần phản hồi"
+        subtitle={reviews.data ? `${reviews.data.totalElements} bài nộp` : 'Danh sách bài nộp'}
+        breadcrumbs={[
+          { label: 'Giảng viên' },
+          { label: 'Chấm bài' },
+        ]}
+      />
 
       <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' } }}>
@@ -104,28 +103,19 @@ export function TeacherWritingReviewsPage() {
         </Stack>
       </Paper>
 
-      {reviews.isPending && (
-        <Box sx={{ display: 'grid', placeItems: 'center', minHeight: 320 }}>
-          <CircularProgress aria-label="Đang tải bài viết" />
-        </Box>
-      )}
+      {reviews.isPending && <LoadingState message="Đang tải danh sách bài viết..." />}
 
       {reviews.isError && (
-        <Alert
-          severity="error"
-          action={<Button color="inherit" onClick={() => reviews.refetch()}>Thử lại</Button>}
-        >
-          Không thể tải danh sách bài viết.
-        </Alert>
+        <ErrorState message="Không thể tải danh sách bài viết." onRetry={() => reviews.refetch()} />
       )}
 
       {reviews.data && reviews.data.content.length === 0 && (
-        <Paper variant="outlined" sx={{ p: 6, textAlign: 'center' }}>
-          <AssignmentOutlinedIcon sx={{ fontSize: 52, color: 'text.disabled', mb: 1 }} />
-          <Typography variant="h6" gutterBottom>Không có bài viết phù hợp</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Hãy thay đổi từ khóa hoặc bộ lọc trạng thái.
-          </Typography>
+        <Paper variant="outlined">
+          <EmptyState
+            title="Không có bài viết phù hợp"
+            description="Hãy thay đổi từ khóa hoặc bộ lọc trạng thái."
+            icon={<AssignmentOutlinedIcon sx={{ fontSize: 64, color: 'text.disabled' }} />}
+          />
         </Paper>
       )}
 
@@ -140,7 +130,7 @@ export function TeacherWritingReviewsPage() {
                   <TableCell>Ngày nộp</TableCell>
                   <TableCell>AI hỗ trợ</TableCell>
                   <TableCell>Phản hồi</TableCell>
-                  <TableCell align="right">Mở</TableCell>
+                  <TableCell align="right">Hành động</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -165,11 +155,14 @@ export function TeacherWritingReviewsPage() {
                     </TableCell>
                     <TableCell>{renderReviewChip(submission)}</TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Mở bài viết">
-                        <IconButton onClick={() => openSubmission(submission.id)} aria-label="Mở bài viết">
-                          <VisibilityOutlinedIcon />
-                        </IconButton>
-                      </Tooltip>
+                      <Button
+                        variant={submission.hasTeacherFeedback ? 'outlined' : 'contained'}
+                        size="small"
+                        onClick={() => openSubmission(submission.id)}
+                        sx={{ textTransform: 'none', fontWeight: 700 }}
+                      >
+                        {submission.hasTeacherFeedback ? 'Xem lại' : 'Chấm bài'}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

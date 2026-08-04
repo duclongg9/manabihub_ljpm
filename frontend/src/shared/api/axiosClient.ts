@@ -3,9 +3,11 @@ import {
   clearAuthSession,
   getAuthSession,
   getLoginRoute,
+  hasAdminRefreshSession,
   rememberPostLoginRoute,
   type AuthSessionKind,
 } from '../auth/authSession';
+import { refreshAdminSession } from '../auth/adminAuthApi';
 
 export const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api',
@@ -15,12 +17,16 @@ export const axiosClient = axios.create({
   withCredentials: true,
 });
 
-axiosClient.interceptors.request.use((config) => {
-  if (isLoginRequest(config.url)) {
+axiosClient.interceptors.request.use(async (config) => {
+  if (isPublicAdminAuthRequest(config.url)) {
     return config;
   }
 
-  const session = getAuthSession(resolveSessionKind(config.url));
+  const kind = resolveSessionKind(config.url);
+  let session = getAuthSession(kind);
+  if (!session && kind === 'admin' && hasAdminRefreshSession()) {
+    session = await refreshAdminSession();
+  }
   if (session) {
     config.headers.Authorization = `Bearer ${session.token}`;
   }
@@ -32,14 +38,40 @@ let redirectingToLogin = false;
 
 axiosClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
     const requestUrl = error.config?.url as string | undefined;
+    const requestConfig = error.config as (typeof error.config & {
+      adminRefreshAttempted?: boolean;
+    }) | undefined;
 
-    if (status === 401 && !isLoginRequest(requestUrl)) {
+    if (
+      status === 401
+      && !isPublicAdminAuthRequest(requestUrl)
+      && !isPublicApiRequest(requestUrl)
+    ) {
       const kind = resolveSessionKind(requestUrl);
-      clearAuthSession(kind);
-      redirectToLogin(kind);
+      if (
+        kind === 'admin'
+        && requestConfig
+        && !requestConfig.adminRefreshAttempted
+        && hasAdminRefreshSession()
+      ) {
+        requestConfig.adminRefreshAttempted = true;
+        const refreshedSession = await refreshAdminSession(true);
+        if (refreshedSession) {
+          requestConfig.headers.Authorization = `Bearer ${refreshedSession.token}`;
+          return axiosClient.request(requestConfig);
+        }
+        if (hasAdminRefreshSession()) {
+          return Promise.reject(error);
+        }
+      }
+
+      if (getAuthSession(kind) || isProtectedScreen(kind)) {
+        clearAuthSession(kind);
+        redirectToLogin(kind);
+      }
     }
 
     return Promise.reject(error);
@@ -54,8 +86,35 @@ function resolveSessionKind(requestUrl?: string): AuthSessionKind {
   return isAdminEndpoint || isAdminScreen ? 'admin' : 'public';
 }
 
-function isLoginRequest(requestUrl?: string) {
-  return requestUrl?.includes('/admin/auth/login') ?? false;
+function isPublicAdminAuthRequest(requestUrl?: string) {
+  return requestUrl?.includes('/admin/auth/login')
+    || requestUrl?.includes('/admin/auth/setup-password')
+    || requestUrl?.includes('/admin/auth/refresh')
+    || requestUrl?.includes('/admin/auth/logout')
+    || requestUrl?.includes('/admin/auth/password/forgot')
+    || requestUrl?.includes('/admin/auth/password/reset')
+    || false;
+}
+
+function isPublicApiRequest(requestUrl?: string) {
+  const path = requestUrl ?? '';
+  return path.includes('/v1/public/')
+    || path.includes('/v1/course-categories');
+}
+
+function isProtectedScreen(kind: AuthSessionKind) {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const path = window.location.pathname;
+  return kind === 'admin'
+    ? path.startsWith('/admin')
+      && path !== '/admin/login'
+      && path !== '/admin/setup-password'
+      && path !== '/admin/forgot-password'
+      && path !== '/admin/reset-password'
+    : path.startsWith('/student') || path.startsWith('/teacher');
 }
 
 function redirectToLogin(kind: AuthSessionKind) {

@@ -79,6 +79,13 @@ public class LessonBlock {
     @Column(name = "order_index", nullable = false)
     private int orderIndex;
 
+    @Builder.Default
+    @Column(name = "moderation_hidden", nullable = false)
+    private boolean moderationHidden = false;
+
+    @Column(name = "moderation_hidden_at")
+    private Instant moderationHiddenAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

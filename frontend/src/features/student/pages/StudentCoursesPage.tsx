@@ -39,7 +39,7 @@ export const StudentCoursesPage: React.FC = () => {
   const totalPages = data?.totalPages || 0;
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+    <Box sx={{ p: 3, maxWidth: '1280px', width: '100%', mx: 'auto' }}>
       <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold' }}>
         My Learning
       </Typography>

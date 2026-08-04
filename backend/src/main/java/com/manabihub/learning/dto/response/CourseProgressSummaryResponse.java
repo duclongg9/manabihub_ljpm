@@ -10,6 +10,8 @@ public record CourseProgressSummaryResponse(
         double progressPercent,
         UUID nextLessonBlockId,
         String nextLessonTitle,
-        boolean courseCompleted
+        boolean courseCompleted,
+        FinalTestEligibilityResponse finalTestEligibility,
+        CertificateEligibilityResponse certificateEligibility
 ) {
 }
