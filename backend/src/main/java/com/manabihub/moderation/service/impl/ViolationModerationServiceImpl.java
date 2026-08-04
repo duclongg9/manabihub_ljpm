@@ -28,6 +28,7 @@ import com.manabihub.moderation.enums.ModerationDecisionType;
 import com.manabihub.moderation.enums.EvidenceRequestedFrom;
 import com.manabihub.moderation.enums.ViolationReportStatus;
 import com.manabihub.moderation.event.ModerationNotificationEvent;
+import com.manabihub.notification.NotificationTypes;
 import com.manabihub.moderation.repository.ModerationActionRecordRepository;
 import com.manabihub.moderation.repository.ModerationDecisionRepository;
 import com.manabihub.moderation.repository.ViolationEvidenceRepository;
@@ -37,8 +38,9 @@ import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.review.entity.CourseReview;
 import com.manabihub.review.enums.CourseReviewStatus;
 import com.manabihub.review.repository.CourseReviewRepository;
-import com.manabihub.wallet.entity.TeacherWallet;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.enums.WalletOwnerType;
+import com.manabihub.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -88,7 +90,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
     private final CourseReviewRepository courseReviewRepository;
     private final AppUserRepository appUserRepository;
     private final IdentityTeacherProfileRepository teacherProfileRepository;
-    private final TeacherWalletRepository teacherWalletRepository;
+    private final WalletRepository walletRepository;
     private final OrderItemRepository orderItemRepository;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
@@ -476,8 +478,8 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             throw invalidAction("FREEZE_BALANCE requires an affected teacher wallet");
         }
 
-        TeacherWallet wallet = teacherWalletRepository
-                .findByTeacherIdForUpdate(context.affectedTeacherProfileId())
+        Wallet wallet = walletRepository
+                .findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, context.affectedTeacherProfileId())
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.MODERATION_TARGET_NOT_FOUND,
                         "The affected teacher wallet does not exist",
@@ -486,7 +488,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
 
         boolean before = wallet.isFrozen();
         wallet.setFrozen(true);
-        teacherWalletRepository.save(wallet);
+        walletRepository.save(wallet);
 
         Map<String, Object> beforeValue = walletSnapshot(wallet, before);
         Map<String, Object> afterValue = walletSnapshot(wallet, true);
@@ -870,19 +872,19 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             return;
         }
         String title = request.getDecision() == ModerationDecisionType.CORRECTION_REQUIRED
-                ? "Content correction required"
-                : "Violation report upheld";
+                ? "Nội dung cần được chỉnh sửa"
+                : "Báo cáo vi phạm đã được xác nhận";
         String actionNames = actions.stream()
-                .map(record -> record.getActionType().name())
+                .map(record -> moderationActionLabel(record.getActionType()))
                 .distinct()
                 .reduce((left, right) -> left + ", " + right)
-                .orElse("NONE");
+                .orElse("Không áp dụng biện pháp");
         String message = request.getDecision() == ModerationDecisionType.CORRECTION_REQUIRED
-                ? "The reported content requires changes before it can proceed. "
+                ? "Nội dung bị báo cáo cần được chỉnh sửa trước khi có thể tiếp tục. Ghi chú: "
                         + request.getDecisionNote().trim()
-                : "A violation was confirmed. Applied actions: "
+                : "Đã xác nhận có vi phạm. Biện pháp áp dụng: "
                         + actionNames
-                        + ". Reason: "
+                        + ". Lý do: "
                         + request.getDecisionNote().trim();
         publishOutcomeNotifications(
                 report.getReporter(),
@@ -932,7 +934,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
                 recipient.getEmail(),
                 title,
                 message,
-                decision.name()
+                NotificationTypes.MODERATION_DECISION
         ));
     }
 
@@ -961,11 +963,22 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
         eventPublisher.publishEvent(new ModerationNotificationEvent(
                 recipient.getId(),
                 recipient.getEmail(),
-                "Additional evidence required",
-                "Please provide additional evidence for this violation report. "
+                "Yêu cầu bổ sung bằng chứng",
+                "Vui lòng bổ sung bằng chứng cho báo cáo vi phạm này. Ghi chú: "
                         + decisionNote,
-                ModerationDecisionType.PENDING_EVIDENCE.name()
+                NotificationTypes.MODERATION_EVIDENCE_REQUIRED
         ));
+    }
+
+    private String moderationActionLabel(ModerationActionType actionType) {
+        return switch (actionType) {
+            case NONE -> "Không áp dụng biện pháp";
+            case FORCE_DRAFT -> "Chuyển nội dung về bản nháp";
+            case REMOVE_CONTENT -> "Gỡ nội dung";
+            case HIDE_COURSE -> "Ẩn khóa học";
+            case BAN_ACCOUNT -> "Khóa tài khoản";
+            case FREEZE_BALANCE -> "Đóng băng số dư";
+        };
     }
 
     private ViolationReport requireReport(UUID reportId) {
@@ -1077,7 +1090,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
                 .build();
     }
 
-    private Map<String, Object> walletSnapshot(TeacherWallet wallet, boolean frozen) {
+    private Map<String, Object> walletSnapshot(Wallet wallet, boolean frozen) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("frozen", frozen);
         snapshot.put("balance", wallet.getBalance());

@@ -1,10 +1,12 @@
 package com.manabihub.wallet.service;
 
 import com.manabihub.wallet.dto.response.StudentWalletResponse;
-import com.manabihub.wallet.entity.StudentWallet;
+import com.manabihub.wallet.entity.Wallet;
+import com.manabihub.wallet.entity.WalletPaymentReservation;
 import com.manabihub.wallet.entity.WalletTransaction;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -12,7 +14,7 @@ import java.util.UUID;
  */
 public interface StudentWalletService {
 
-    StudentWallet getOrCreateStudentWallet(UUID studentId);
+    Wallet getOrCreateStudentWallet(UUID studentId);
 
     /** Wallet overview (balance) for the authenticated student, resolved by their user id. */
     StudentWalletResponse getWalletOverview(UUID userId);
@@ -22,8 +24,8 @@ public interface StudentWalletService {
      * ledger line. Called from the payment webhook after a wallet-top-up order is confirmed.
      * Must run inside a transaction; locks the wallet row to avoid lost updates.
      */
-    WalletTransaction creditBalance(UUID studentId, BigDecimal amount,
-                                    String referenceType, UUID referenceId, String note);
+    WalletTransaction creditTopUp(UUID studentId, BigDecimal amount,
+                                  UUID orderId, String note);
 
     /**
      * Debits {@code amount} from the student's spendable balance (e.g. paying for a course
@@ -32,6 +34,13 @@ public interface StudentWalletService {
      * @throws com.manabihub.common.exception.BusinessException with
      *         {@code WALLET_INSUFFICIENT_BALANCE} if the balance is not enough
      */
-    WalletTransaction debitBalance(UUID studentId, BigDecimal amount,
-                                   String referenceType, UUID referenceId, String note);
+    WalletTransaction creditRefund(UUID studentId, BigDecimal amount,
+                                   UUID refundRequestId, String note);
+
+    WalletPaymentReservation reserveForOrder(UUID studentId, UUID orderId,
+                                             BigDecimal amount, Instant expiresAt);
+
+    WalletTransaction captureForOrder(UUID orderId, Instant succeededAt);
+
+    void releaseForOrder(UUID orderId, Instant releasedAt);
 }

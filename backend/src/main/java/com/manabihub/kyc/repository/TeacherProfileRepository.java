@@ -10,13 +10,23 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface TeacherProfileRepository extends JpaRepository<TeacherProfile, UUID> {
 
+    @Override
+    @EntityGraph(attributePaths = "user")
+    Optional<TeacherProfile> findById(UUID id);
+
     Optional<TeacherProfile> findByUserId(UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM TeacherProfile p WHERE p.user.id = :userId")
+    Optional<TeacherProfile> findForUpdateByUserId(@Param("userId") UUID userId);
 
     @EntityGraph(attributePaths = "user")
     Optional<TeacherProfile> findByIdAndKycStatusAndCanPublishCourseTrueAndUser_UserStatus(

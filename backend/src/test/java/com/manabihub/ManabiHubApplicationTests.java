@@ -18,7 +18,6 @@ import com.manabihub.identity.repository.InternalAdminRefreshTokenRepository;
 import com.manabihub.identity.repository.InternalAdminSessionRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
-import com.manabihub.identity.repository.UserRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.TeacherCertificateClaimRepository;
@@ -42,6 +41,7 @@ import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
 import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
+import com.manabihub.wallet.repository.WalletRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -92,9 +92,6 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private AppUserRepository appUserRepository;
-
-    @MockBean
-    private UserRepository userRepository;
 
     @MockBean
     private InternalAdminAccountRepository identityInternalAdminAccountRepository;
@@ -215,10 +212,13 @@ class ManabiHubApplicationTests {
     private com.manabihub.payment.repository.PaymentTransactionRepository paymentTransactionRepository;
 
     @MockBean
-    private com.manabihub.wallet.repository.WalletRepository walletRepository;
+    private WalletRepository walletRepository;
 
     @MockBean
     private com.manabihub.wallet.repository.WalletTransactionRepository walletTransactionRepository;
+
+    @MockBean
+    private com.manabihub.wallet.repository.WalletPaymentReservationRepository walletPaymentReservationRepository;
 
     @MockBean
     private com.manabihub.wallet.repository.EscrowLedgerRepository escrowLedgerRepository;
@@ -232,11 +232,6 @@ class ManabiHubApplicationTests {
     @MockBean
     private TransactionTemplate transactionTemplate;
 
-    @MockBean
-    private com.manabihub.wallet.repository.TeacherWalletRepository teacherWalletRepository;
-
-    @MockBean
-    private com.manabihub.wallet.repository.StudentWalletRepository studentWalletRepository;
 
     @MockBean
     private com.manabihub.payout.repository.WithdrawalRequestRepository withdrawalRequestRepository;

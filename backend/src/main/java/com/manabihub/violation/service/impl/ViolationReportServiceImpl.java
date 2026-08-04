@@ -6,6 +6,7 @@ import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.notification.NotificationTypes;
 import com.manabihub.review.entity.CourseReview;
 import com.manabihub.violation.dto.ViolationReportRequest;
 import com.manabihub.violation.dto.ViolationReportResponse;
@@ -71,7 +72,7 @@ public class ViolationReportServiceImpl implements ViolationReportService {
                 .targetType(request.getTargetType())
                 .targetId(request.getTargetId())
                 .reason(request.getReason())
-                .status(ViolationStatus.PENDING)
+                .status(ViolationStatus.PENDING_REVIEW)
                 .build();
 
         report = violationReportRepository.save(report);
@@ -79,13 +80,24 @@ public class ViolationReportServiceImpl implements ViolationReportService {
         // Course Manager owns the standard moderation queue and VIOLATION_RESOLVE permission.
         notificationService.createNotificationForAdminRole(
                 "COURSE_MANAGER",
-                "New Violation Report",
-                "A new report has been submitted against " + request.getTargetType() + " " + request.getTargetId(),
-                "VIOLATION_REPORT",
+                "Có báo cáo vi phạm mới",
+                "Một báo cáo mới đã được gửi cho " + targetTypeLabel(request.getTargetType())
+                        + " có mã " + request.getTargetId() + ".",
+                NotificationTypes.VIOLATION_REPORT,
                 "/admin/violations/" + report.getId()
         );
 
         return violationReportMapper.toResponse(report);
+    }
+
+    private String targetTypeLabel(ViolationTargetType targetType) {
+        return switch (targetType) {
+            case COURSE -> "khóa học";
+            case LESSON -> "bài học";
+            case LESSON_BLOCK -> "nội dung bài học";
+            case REVIEW -> "bài đánh giá";
+            case USER -> "tài khoản người dùng";
+        };
     }
 
     private boolean checkTargetExists(ViolationTargetType type, UUID targetId) {
@@ -96,5 +108,14 @@ public class ViolationReportServiceImpl implements ViolationReportService {
             case USER -> AppUser.class;
         };
         return entityManager.find(entityClass, targetId) != null;
+    }
+
+    private String getTargetLabel(ViolationTargetType type) {
+        return switch (type) {
+            case COURSE -> "khóa học";
+            case LESSON, LESSON_BLOCK -> "nội dung bài học";
+            case REVIEW -> "bài đánh giá";
+            case USER -> "tài khoản người dùng";
+        };
     }
 }

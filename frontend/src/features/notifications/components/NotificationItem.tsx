@@ -124,7 +124,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
               {notification.title}
             </Typography>
             {/* QUAN TRỌNG badge for certain types */}
-            {(notification.notificationType === 'PAYMENT' || notification.notificationType === 'REFUND') && (
+            {typeConfig?.important && (
               <Chip
                 label="QUAN TRỌNG"
                 size="small"

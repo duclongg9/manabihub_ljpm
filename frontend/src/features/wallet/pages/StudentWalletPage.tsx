@@ -8,6 +8,7 @@ import { getStudentWallet, topUpWallet } from '../services/studentWalletService'
 import type { StudentWalletResponse, WalletTransactionFilter } from '../types';
 
 const MIN_TOPUP = 10000;
+const MAX_TOPUP = 100000000;
 const QUICK_AMOUNTS = [50000, 100000, 200000, 500000];
 const PAGE_SIZE = 10;
 
@@ -35,8 +36,10 @@ export const StudentWalletPage = () => {
   }, []);
 
   const handleTopUp = async () => {
-    if (!amount || amount < MIN_TOPUP || !Number.isInteger(amount)) {
-      setError(`Số tiền nạp phải là số nguyên và tối thiểu ${MIN_TOPUP.toLocaleString('vi-VN')}đ.`);
+    if (!amount || amount < MIN_TOPUP || amount > MAX_TOPUP || !Number.isInteger(amount)) {
+      setError(
+        `Số tiền nạp phải là số nguyên từ ${MIN_TOPUP.toLocaleString('vi-VN')}đ đến ${MAX_TOPUP.toLocaleString('vi-VN')}đ.`,
+      );
       return;
     }
     setProcessing(true);
@@ -92,12 +95,15 @@ export const StudentWalletPage = () => {
         <input
           type="number"
           min={MIN_TOPUP}
+          max={MAX_TOPUP}
           step={1000}
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
           className="w-full border border-slate-300 rounded-xl px-4 py-3 mb-2 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
         />
-        <p className="text-xs text-slate-400 mb-4">Tối thiểu {MIN_TOPUP.toLocaleString('vi-VN')}đ.</p>
+        <p className="text-xs text-slate-400 mb-4">
+          Từ {MIN_TOPUP.toLocaleString('vi-VN')}đ đến {MAX_TOPUP.toLocaleString('vi-VN')}đ.
+        </p>
 
         {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
 

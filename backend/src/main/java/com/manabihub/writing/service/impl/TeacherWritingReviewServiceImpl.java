@@ -7,6 +7,7 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.notification.NotificationTypes;
 import com.manabihub.writing.dto.request.TeacherWritingFeedbackRequest;
 import com.manabihub.writing.dto.response.AiWritingSuggestionResponse;
 import com.manabihub.writing.dto.response.TeacherWritingFeedbackResponse;
@@ -92,11 +93,13 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
 
         notificationService.createNotification(
                 submission.getStudent().getUser().getId(),
-                null,
-                "Writing feedback is ready",
-                "Your teacher has reviewed your writing submission for "
-                        + submission.getEnrollment().getCourse().getTitle() + ".",
-                "TEACHER_WRITING_FEEDBACK"
+                submission.getStudent().getUser().getEmail(),
+                "Giảng viên đã phản hồi bài viết",
+                "Bài viết của bạn trong khóa học "
+                        + submission.getEnrollment().getCourse().getTitle()
+                        + " đã được giảng viên nhận xét.",
+                NotificationTypes.TEACHER_WRITING_FEEDBACK,
+                "/student/courses/" + submission.getEnrollment().getCourse().getId() + "/learn"
         );
 
         return toDetailResponse(submission);

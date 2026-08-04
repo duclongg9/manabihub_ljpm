@@ -17,6 +17,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers(disabledWithoutDocker = true)
@@ -32,7 +33,7 @@ class RefundExecutionMigrationPostgresTest {
             new PostgreSQLContainer<>("postgres:17-alpine");
 
     @Test
-    void v48BackfillsItemAndPreventsConcurrentActiveRefunds() throws Exception {
+    void refundMigrationsBackfillItemAndEnforceItemThenOrderScopedUniqueness() throws Exception {
         migrateTo("47");
         JdbcTemplate jdbc = jdbc();
 
@@ -141,6 +142,54 @@ class RefundExecutionMigrationPostgresTest {
                           )
                         """, Integer.class)
         );
+
+        migrateTo("55");
+
+        assertEquals("14", jdbc.queryForObject("""
+                SELECT setting_value
+                FROM system_settings
+                WHERE setting_key = 'REFUND_WINDOW_DAYS'
+                """, String.class));
+        assertEquals("20", jdbc.queryForObject("""
+                SELECT setting_value
+                FROM system_settings
+                WHERE setting_key = 'REFUND_PROGRESS_LIMIT_PERCENT'
+                """, String.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_name = 'enrollments'
+                  AND column_name = 'protected_materials_fully_downloaded_at'
+                """, Integer.class));
+
+        UUID secondItemId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO order_items (id, order_id, course_id, price)
+                VALUES (?, ?, ?, 250000.00)
+                """, secondItemId, concurrentOrderId, COURSE_ID);
+
+        assertThrows(RuntimeException.class, () -> jdbc.update("""
+                INSERT INTO refund_requests (
+                    id,
+                    order_id,
+                    order_item_id,
+                    student_id,
+                    status,
+                    reason
+                )
+                VALUES (?, ?, ?, ?, 'PENDING', 'Duplicate active order refund')
+                """, UUID.randomUUID(), concurrentOrderId, secondItemId, STUDENT_ID));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM refund_requests
+                WHERE order_id = ?
+                  AND status IN (
+                      'PENDING',
+                      'PROCESSING',
+                      'RECONCILIATION_REQUIRED',
+                      'APPROVED'
+                  )
+                """, Integer.class, concurrentOrderId));
     }
 
     private boolean insertActiveRefund(

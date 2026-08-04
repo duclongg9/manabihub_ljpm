@@ -12,6 +12,8 @@ public interface WalletTransactionRepository
         extends JpaRepository<WalletTransaction, java.util.UUID>,
                 JpaSpecificationExecutor<WalletTransaction> {
 
+    Optional<WalletTransaction> findByIdempotencyKey(String idempotencyKey);
+
     Optional<WalletTransaction> findByReferenceTypeAndReferenceIdAndTransactionType(
             String referenceType,
             UUID referenceId,

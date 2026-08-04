@@ -28,17 +28,19 @@ class PaymentNotificationListenerTest {
                 "student@test.dev",
                 "Payment succeeded",
                 "Order paid",
-                "PURCHASE_SUCCESS");
+                "PURCHASE_SUCCESS",
+                "/student/courses");
 
         new PaymentNotificationListener(notificationService).sendAfterPaymentCommit(event);
 
         verify(notificationService).createNotificationOnce(
-                "payment:" + orderId + ":PURCHASE_SUCCESS",
+                "payment:" + orderId + ":" + userId + ":PURCHASE_SUCCESS",
                 userId,
                 "student@test.dev",
                 "Payment succeeded",
                 "Order paid",
-                "PURCHASE_SUCCESS");
+                "PURCHASE_SUCCESS",
+                "/student/courses");
     }
 
     @Test
@@ -49,16 +51,18 @@ class PaymentNotificationListenerTest {
                 "student@test.dev",
                 "Payment succeeded",
                 "Order paid",
-                "PURCHASE_SUCCESS");
+                "PURCHASE_SUCCESS",
+                "/student/courses");
         doThrow(new IllegalStateException("notification unavailable"))
                 .when(notificationService)
                 .createNotificationOnce(
-                        "payment:" + event.orderId() + ":PURCHASE_SUCCESS",
+                        "payment:" + event.orderId() + ":" + event.recipientUserId() + ":PURCHASE_SUCCESS",
                         event.recipientUserId(),
                         event.recipientEmail(),
                         event.title(),
                         event.message(),
-                        event.notificationType());
+                        event.notificationType(),
+                        event.actionUrl());
 
         assertDoesNotThrow(() ->
                 new PaymentNotificationListener(notificationService).sendAfterPaymentCommit(event));

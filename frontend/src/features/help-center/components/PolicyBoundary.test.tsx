@@ -66,6 +66,6 @@ describe('PolicyBoundary', () => {
       </PolicyBoundary>,
     );
 
-    expect(screen.getByText('provisional-2026-07-28')).toBeInTheDocument();
+    expect(screen.getByText('br-ref-01-2026-08-03')).toBeInTheDocument();
   });
 });

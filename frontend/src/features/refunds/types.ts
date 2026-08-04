@@ -1,5 +1,6 @@
 export type StudentRefundType =
   | 'STANDARD'
+  | 'DISPUTE'
   | 'DUPLICATE_CHARGE'
   | 'PAYMENT_ERROR'
   | 'PLATFORM_ACCESS_FAILURE';
@@ -25,6 +26,8 @@ export interface RefundEligibilitySnapshot {
   progressTotal: number;
   measuredProgressPercent: number;
   progressThresholdPercent: number;
+  protectedMaterialsFullyDownloaded: boolean;
+  protectedMaterialsFullyDownloadedAt?: string | null;
   actuallyPaidAmount: number;
   currency: string;
   orderId: string;

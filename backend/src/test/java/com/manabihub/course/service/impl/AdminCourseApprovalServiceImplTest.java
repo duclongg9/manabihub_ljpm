@@ -13,8 +13,7 @@ import com.manabihub.course.repository.CourseApprovalDecisionRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.TeacherProfile;
-import com.manabihub.notification.entity.Notification;
-import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class AdminCourseApprovalServiceImplTest {
@@ -48,7 +49,7 @@ class AdminCourseApprovalServiceImplTest {
     private AuditLogRepository auditLogRepository;
 
     @Mock
-    private NotificationRepository notificationRepository;
+    private NotificationService notificationService;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -148,12 +149,14 @@ class AdminCourseApprovalServiceImplTest {
         verify(decisionRepository).save(decisionCaptor.capture());
         assertEquals(expectedDecision, decisionCaptor.getValue().getDecision());
 
-        ArgumentCaptor<Notification> notificationCaptor =
-                ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository).save(notificationCaptor.capture());
-        assertEquals(teacherUserId, notificationCaptor.getValue().getRecipientUserId());
-        assertNotNull(notificationCaptor.getValue().getMessage());
-        assertEquals("/teacher/courses", notificationCaptor.getValue().getActionUrl());
+        verify(notificationService).createNotification(
+                eq(teacherUserId),
+                eq("teacher@manabihub.local"),
+                anyString(),
+                anyString(),
+                eq("COURSE_APPROVAL"),
+                eq("/teacher/courses")
+        );
         assertEquals(expectedStatus, course.getStatus());
     }
 

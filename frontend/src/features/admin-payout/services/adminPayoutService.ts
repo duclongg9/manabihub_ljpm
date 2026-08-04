@@ -61,6 +61,11 @@ export const adminPayoutService = {
     const response = await axiosClient.post<ApiResponse<PayoutDecision>>(
       ENDPOINTS.ADMIN_PAYOUT.MANUAL_TRANSFER(withdrawalRequestId),
       formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
     );
     return response.data.data;
   },

@@ -23,9 +23,13 @@ import com.manabihub.payment.repository.PaymentTransactionRepository;
 import com.manabihub.refund.dto.request.RefundDecisionRequest;
 import com.manabihub.refund.entity.RefundProviderAttempt;
 import com.manabihub.refund.entity.RefundRequest;
+import com.manabihub.refund.enums.EligibilityResult;
 import com.manabihub.refund.enums.RefundDecisionReason;
 import com.manabihub.refund.enums.RefundProviderStatus;
 import com.manabihub.refund.enums.RefundStatus;
+import com.manabihub.refund.enums.RefundSettlementMethod;
+import com.manabihub.refund.enums.RefundSettlementStatus;
+import com.manabihub.refund.enums.StudentRefundType;
 import com.manabihub.refund.gateway.RefundGatewayCommand;
 import com.manabihub.refund.gateway.RefundGatewayResult;
 import com.manabihub.refund.repository.RefundProviderAttemptRepository;
@@ -35,6 +39,8 @@ import com.manabihub.wallet.entity.EscrowLedger;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
 import com.manabihub.wallet.service.EscrowService;
+import com.manabihub.wallet.entity.WalletTransaction;
+import com.manabihub.wallet.service.StudentWalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -66,6 +72,188 @@ public class RefundDecisionTransactionService {
     private final EscrowService escrowService;
     private final AuditLogService auditLogService;
     private final RefundAfterCommitNotifier afterCommitNotifier;
+    private final StudentWalletService studentWalletService;
+
+    @Transactional
+    public RefundStatus approveToStudentWallet(
+            UUID refundId,
+            RefundDecisionRequest decision,
+            UUID adminId
+    ) {
+        requireApprovalReason(decision.getReasonCode());
+        InternalAdminAccount admin = requireAdmin(adminId);
+        RefundRequest refund = lockRefund(refundId);
+        if (refund.getStatus() == RefundStatus.APPROVED) {
+            return RefundStatus.APPROVED;
+        }
+        requireApprovableState(refund);
+
+        refund.setDecidedBy(admin);
+        refund.setDecisionNote(decision.getNote().trim());
+        refund.setDecisionReasonCode(decision.getReasonCode());
+        refund.setDecidedAt(Instant.now());
+        refund.setSettlementMethod(RefundSettlementMethod.WALLET);
+        refund.setSettlementStatus(RefundSettlementStatus.PENDING);
+
+        return settleToStudentWallet(refund, admin, false);
+    }
+
+    /**
+     * Executes BR-REF-01 without a Finance actor. Eligibility evidence is
+     * persisted before this method is called; settlement still uses the same
+     * locked, idempotent wallet-refund path as a manual Finance approval.
+     */
+    @Transactional
+    public RefundRequest autoApproveToStudentWallet(UUID refundId) {
+        RefundRequest refund = lockRefund(refundId);
+        if (refund.getStatus() == RefundStatus.APPROVED) {
+            return refund;
+        }
+        requireApprovableState(refund);
+        if (refund.getEligibilitySnapshot() == null
+                || refund.getEligibilitySnapshot().getEligibilityResult()
+                != EligibilityResult.STANDARD_ELIGIBLE
+                || refund.getEligibilitySnapshot().getRefundType() != StudentRefundType.STANDARD
+                || !Boolean.TRUE.equals(refund.getEligibilitySnapshot().getEligible())) {
+            throw conflict("Refund request does not contain auto-approval eligibility evidence");
+        }
+
+        refund.setDecidedBy(null);
+        refund.setDecisionNote("Tự động phê duyệt theo BR-REF-01");
+        refund.setDecisionReasonCode(RefundDecisionReason.STANDARD_ELIGIBLE);
+        refund.setDecidedAt(Instant.now());
+        refund.setSettlementMethod(RefundSettlementMethod.WALLET);
+        refund.setSettlementStatus(RefundSettlementStatus.PENDING);
+
+        settleToStudentWallet(refund, null, true);
+        return refund;
+    }
+
+    private RefundStatus settleToStudentWallet(
+            RefundRequest refund,
+            InternalAdminAccount admin,
+            boolean automatic
+    ) {
+
+        ValidationContext context = validateBeforeProvider(
+                refund,
+                refund.getDecisionReasonCode()
+        );
+        if (context.failureReason() != null) {
+            refund.setSettlementStatus(RefundSettlementStatus.FAILED);
+            moveToReconciliation(
+                    refund,
+                    RefundProviderStatus.NOT_REQUESTED,
+                    context.failureReason()
+            );
+            if (automatic) {
+                auditAutomaticRefund(
+                        refund,
+                        "AUTO_REFUND_RECONCILIATION_REQUIRED",
+                        "RECONCILIATION_REQUIRED",
+                        Map.of("reason", context.failureReason())
+                );
+            } else {
+                auditReconciliation(admin, refund, context.failureReason());
+            }
+            return RefundStatus.RECONCILIATION_REQUIRED;
+        }
+
+        boolean reversed = escrowService.reverseHeldAllocationForRefund(
+                context.orderItem().getId()
+        );
+        if (!reversed) {
+            throw conflict("Order item allocation was already reversed");
+        }
+
+        WalletTransaction walletCredit = studentWalletService.creditRefund(
+                refund.getStudent().getId(),
+                context.snapshot().getGrossAmount(),
+                refund.getId(),
+                "Hoàn tiền khóa học vào ví cho yêu cầu " + refund.getId()
+        );
+
+        Enrollment enrollment = enrollmentRepository
+                .findByStudent_IdAndCourse_Id(
+                        refund.getStudent().getId(),
+                        context.orderItem().getCourse().getId()
+                )
+                .orElseThrow(() -> conflict(
+                        "Affected enrollment was not found for the refunded order item"));
+        enrollment.setStatus(EnrollmentStatus.REFUNDED);
+        enrollmentRepository.save(enrollment);
+
+        OrderItem item = context.orderItem();
+        item.setRefundStatus(OrderItemRefundStatus.REFUNDED);
+        item.setRefundedAt(Instant.now());
+        orderItemRepository.save(item);
+
+        if (allOrderItemsRefunded(context.order(), item.getId())) {
+            context.order().setStatus(OrderStatus.REFUNDED);
+            orderRepository.save(context.order());
+        }
+
+        refund.setStatus(RefundStatus.APPROVED);
+        refund.setProviderStatus(RefundProviderStatus.NOT_REQUESTED);
+        refund.setProviderAttemptCount(0);
+        refund.setReconciliationReasonCode(null);
+        refund.setSettlementStatus(RefundSettlementStatus.COMPLETED);
+        refund.setSettledAt(Instant.now());
+        refund.setWalletTransactionId(walletCredit.getId());
+        refundRequestRepository.save(refund);
+
+        Map<String, Object> approvalEvidence = Map.of(
+                "status", "APPROVED",
+                "reasonCode", refund.getDecisionReasonCode().name(),
+                "orderItemId", item.getId().toString(),
+                "amount", context.snapshot().getGrossAmount().toPlainString(),
+                "settlementMethod", RefundSettlementMethod.WALLET.name(),
+                "walletTransactionId", walletCredit.getId().toString()
+        );
+        if (automatic) {
+            auditAutomaticRefund(
+                    refund,
+                    "AUTO_APPROVE_REFUND_TO_WALLET",
+                    "APPROVED",
+                    approvalEvidence
+            );
+        } else {
+            auditLogService.logAdminAction(
+                    admin.getId(),
+                    admin.getRole().getCode().name(),
+                    "APPROVE_REFUND_TO_WALLET",
+                    "REFUND_REQUEST",
+                    refund.getId(),
+                    Map.of("status", "PENDING"),
+                    approvalEvidence,
+                    Map.of("providerStatus", RefundProviderStatus.NOT_REQUESTED.name())
+            );
+        }
+        scheduleNotifications(refund, RefundStatus.APPROVED);
+        return RefundStatus.APPROVED;
+    }
+
+    private void auditAutomaticRefund(
+            RefundRequest refund,
+            String action,
+            String status,
+            Map<String, Object> evidence
+    ) {
+        auditLogService.logUserAction(
+                refund.getStudent().getUser().getId(),
+                "STUDENT",
+                action,
+                "REFUND_REQUEST",
+                refund.getId(),
+                Map.of("status", "PENDING"),
+                evidence,
+                Map.of(
+                        "workflow", "BR-REF-01",
+                        "result", status,
+                        "providerStatus", RefundProviderStatus.NOT_REQUESTED.name()
+                )
+        );
+    }
 
     @Transactional(readOnly = true)
     public void requireAccess(UUID adminId) {
@@ -225,8 +413,6 @@ public class RefundDecisionTransactionService {
         if (allOrderItemsRefunded(context.order(), item.getId())) {
             context.order().setStatus(OrderStatus.REFUNDED);
             orderRepository.save(context.order());
-            context.payment().setStatus(PaymentStatus.REFUNDED);
-            paymentTransactionRepository.save(context.payment());
         }
 
         refund.setStatus(RefundStatus.APPROVED);
@@ -364,18 +550,29 @@ public class RefundDecisionTransactionService {
             return ValidationContext.failed("REFUND_AMOUNT_NOT_POSITIVE");
         }
 
-        PaymentTransaction payment = paymentTransactionRepository
-                .findFirstByOrder_IdAndStatusOrderByCreatedAtDesc(
+        List<PaymentTransaction> paymentComposition = paymentTransactionRepository
+                .findByOrder_IdAndStatusInOrderByCreatedAtAsc(
                         order.getId(),
-                        PaymentStatus.SUCCESS
-                )
-                .orElse(null);
-        if (payment == null
-                || payment.getProviderTransactionId() == null
-                || payment.getProviderTransactionId().isBlank()
-                || payment.getAmount().compareTo(order.getTotalAmount()) != 0) {
+                        List.of(PaymentStatus.SUCCESS)
+                );
+        BigDecimal capturedTotal = paymentComposition.stream()
+                .map(PaymentTransaction::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        boolean invalidComponent = paymentComposition.isEmpty()
+                || paymentComposition.stream().anyMatch(payment ->
+                        payment.getProviderTransactionId() == null
+                                || payment.getProviderTransactionId().isBlank()
+                                || payment.getSucceededAt() == null
+                                || payment.getAmount() == null
+                                || payment.getAmount().signum() <= 0);
+        if (invalidComponent || capturedTotal.compareTo(order.getTotalAmount()) != 0) {
             return ValidationContext.failed("CONFIRMED_PAYMENT_EVIDENCE_INVALID");
         }
+        PaymentTransaction payment = paymentComposition.stream()
+                .filter(component -> !"WALLET".equals(component.getProvider()))
+                .findFirst()
+                .orElse(paymentComposition.get(0));
 
         EscrowLedger escrow = escrowLedgerRepository
                 .findByOrderItemIdForUpdate(item.getId())
