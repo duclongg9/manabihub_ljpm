@@ -36,8 +36,10 @@ public class StudentProfile {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private AppUser user;
 
+    @Column(name = "display_name")
     private String displayName;
 
+    @Column(name = "jlpt_goal", length = 20)
     private String jlptGoal;
 
     @CreationTimestamp

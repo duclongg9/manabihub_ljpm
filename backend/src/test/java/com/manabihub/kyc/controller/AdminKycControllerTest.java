@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 @WebMvcTest(AdminKycController.class)
+@org.springframework.context.annotation.Import(com.manabihub.security.DummyFilterConfig.class)
 @AutoConfigureMockMvc
 class AdminKycControllerTest {
 
@@ -88,7 +89,8 @@ class AdminKycControllerTest {
         approvedResponse.setId(seededKycId);
         approvedResponse.setStatus(KycRequestStatus.APPROVED);
 
-        when(kycService.reviewKyc(eq(seededKycId), any(KycReviewRequest.class), any(), any(), any())).thenReturn(approvedResponse);
+        when(kycService.reviewKyc(eq(seededKycId), any(KycReviewRequest.class), any()))
+                .thenReturn(approvedResponse);
 
         mockMvc.perform(post("/api/v1/admin/kyc-requests/" + seededKycId + "/review")
                         .with(jwt().jwt(j -> j.subject("c0000000-0000-0000-0000-000000000002")))
@@ -107,7 +109,7 @@ class AdminKycControllerTest {
                 .decisionNote("") // Empty reason
                 .build();
 
-        when(kycService.reviewKyc(eq(seededKycId), any(KycReviewRequest.class), any(), any(), any()))
+        when(kycService.reviewKyc(eq(seededKycId), any(KycReviewRequest.class), any()))
                 .thenThrow(new com.manabihub.common.exception.BusinessException(
                         "VALIDATION_FAILED",
                         "Decision reason is required for rejection or correction request",

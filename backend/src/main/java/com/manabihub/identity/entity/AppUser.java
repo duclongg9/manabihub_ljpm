@@ -48,6 +48,9 @@ public class AppUser {
     @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
 
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
     @Builder.Default
     @Column(nullable = false)
     private String provider = "GOOGLE";

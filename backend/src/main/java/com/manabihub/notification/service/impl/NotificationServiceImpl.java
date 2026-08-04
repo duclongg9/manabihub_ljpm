@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public Page<NotificationResponse> listMyNotifications(UUID userId, String type,
@@ -155,6 +157,32 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public void createNotificationForAdminRole(
+            String roleCode,
+            String title,
+            String message,
+            String type,
+            String actionUrl
+    ) {
+        List<UUID> adminIds = notificationRepository.findActiveAdminIdsByRoleCode(roleCode);
+        List<Notification> notifications = adminIds.stream()
+                .map(adminId -> Notification.builder()
+                        .recipientAdminId(adminId)
+                        .title(title)
+                        .message(message)
+                        .notificationType(type)
+                        .actionUrl(actionUrl)
+                        .isRead(false)
+                        .createdAt(Instant.now())
+                        .build())
+                .toList();
+
+        notificationRepository.saveAll(notifications);
+        log.info("Broadcasted notification to {} internal admins with role {}", adminIds.size(), roleCode);
+    }
+
+    @Override
+    @Transactional
     public void createNotification(UUID recipientUserId, String recipientEmail,
                                    String title, String message, String type) {
         Notification notification = Notification.builder()
@@ -171,6 +199,48 @@ public class NotificationServiceImpl implements NotificationService {
         if (recipientEmail != null && !recipientEmail.isBlank()) {
             String emailBody = buildEmailBody(title, message, type);
             emailService.sendEmail(recipientEmail, "[ManabiHub] " + title, emailBody);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void createNotificationOnce(
+            String dedupeKey,
+            UUID recipientUserId,
+            String recipientEmail,
+            String title,
+            String message,
+            String type
+    ) {
+        int inserted = jdbcTemplate.update("""
+                INSERT INTO notifications (
+                    id,
+                    recipient_user_id,
+                    title,
+                    message,
+                    notification_type,
+                    dedupe_key,
+                    is_read,
+                    created_at
+                )
+                VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, FALSE, NOW())
+                ON CONFLICT DO NOTHING
+                """,
+                recipientUserId,
+                title,
+                message,
+                type,
+                dedupeKey);
+        if (inserted == 0) {
+            log.info("Skipped duplicate notification {}", dedupeKey);
+            return;
+        }
+        if (recipientEmail != null && !recipientEmail.isBlank()) {
+            emailService.sendEmail(
+                    recipientEmail,
+                    "[ManabiHub] " + title,
+                    buildEmailBody(title, message, type)
+            );
         }
     }
 

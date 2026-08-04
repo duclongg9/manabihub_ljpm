@@ -18,11 +18,14 @@ replay_pid*
 backend/target/
 frontend/dist/
 frontend/node_modules/
+/node_modules/
 
 # Local/temp workspace files
 tmp/
 .vscode/settings.json
 .mtj.tmp/
+.codex-deploy/
+ci_log.txt
 
 # Local environment and secret files
 .env

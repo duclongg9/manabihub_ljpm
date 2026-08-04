@@ -1,8 +1,6 @@
 import { axiosClient } from '../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../shared/api/endpoints';
 
-export const DEMO_TEACHER_USER_ID = 'd0000000-0000-0000-0000-000000000003';
-
 export interface ApiEnvelope<T> {
   success: boolean;
   messageCode: string;
@@ -89,6 +87,9 @@ export interface KycCertificateSubmissionResponse {
   certificateVerification: KycModuleStatusResponse;
   adminNotificationCreated: boolean;
   auditLogged: boolean;
+  teacherWorkspaceAvailable: boolean;
+  reviewEta: string;
+  sessionToken: string;
   srsTrace: Record<string, unknown>;
 }
 
@@ -106,13 +107,15 @@ export interface KycRestartVerificationResponse {
 export interface KycCertificateSubmissionPayload {
   certificate: File;
   certificateCode: string;
+  certificateHolderName: string;
+  certificateDateOfBirth: string;
+  certificateLevel: string;
+  certificateOcrText: string;
   copyrightAgreementAccepted: boolean;
 }
 
 export async function getTeacherKycStatus() {
-  const response = await axiosClient.get<ApiEnvelope<KycStatusResponse>>(ENDPOINTS.teacherKyc.status, {
-    headers: demoTeacherHeaders(),
-  });
+  const response = await axiosClient.get<ApiEnvelope<KycStatusResponse>>(ENDPOINTS.teacherKyc.status);
 
   return response.data.data;
 }
@@ -121,9 +124,6 @@ export async function verifyTeacherIdentity(payload: KycIdentityVerificationPayl
   const response = await axiosClient.post<ApiEnvelope<KycIdentityVerificationResponse>>(
     ENDPOINTS.teacherKyc.identityVerifications,
     payload,
-    {
-      headers: demoTeacherHeaders(),
-    },
   );
 
   return response.data;
@@ -133,9 +133,6 @@ export async function restartTeacherVerification() {
   const response = await axiosClient.post<ApiEnvelope<KycRestartVerificationResponse>>(
     ENDPOINTS.teacherKyc.restartVerification,
     undefined,
-    {
-      headers: demoTeacherHeaders(),
-    },
   );
 
   return response.data;
@@ -145,24 +142,16 @@ export async function submitTeacherCertificate(payload: KycCertificateSubmission
   const formData = new FormData();
   formData.append('certificate', payload.certificate);
   formData.append('certificateCode', payload.certificateCode.trim());
+  formData.append('certificateHolderName', payload.certificateHolderName.trim());
+  formData.append('certificateDateOfBirth', payload.certificateDateOfBirth);
+  formData.append('certificateLevel', payload.certificateLevel);
+  formData.append('certificateOcrText', payload.certificateOcrText);
   formData.append('copyrightAgreementAccepted', String(payload.copyrightAgreementAccepted));
 
   const response = await axiosClient.post<ApiEnvelope<KycCertificateSubmissionResponse>>(
     ENDPOINTS.teacherKyc.certificateSubmissions,
     formData,
-    {
-      headers: {
-        ...demoTeacherHeaders(),
-        'Content-Type': 'multipart/form-data',
-      },
-    },
   );
 
   return response.data;
-}
-
-function demoTeacherHeaders() {
-  return {
-    'X-Demo-User-Id': DEMO_TEACHER_USER_ID,
-  };
 }

@@ -1,33 +1,19 @@
-import React, { useState } from 'react';
-import { Box, Toolbar } from '@mui/material';
-import { Outlet } from 'react-router-dom';
-import { Header } from './Header';
-import { Sidebar } from './Sidebar';
+import React from 'react';
+import { useLocation } from 'react-router-dom';
+import { ROLES } from '../constants/roles';
+import { ROUTES } from '../constants/routes';
 import { TEACHER_MENU } from '../navigation/teacherMenu';
+import { DashboardLayout } from './DashboardLayout';
 
 export const TeacherLayout: React.FC = () => {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
+  const location = useLocation();
+  const isKycRoute = location.pathname.startsWith(ROUTES.TEACHER.KYC);
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Header showMenuIcon onMenuClick={handleDrawerToggle} />
-      <Sidebar 
-        menuItems={TEACHER_MENU} 
-        open={mobileOpen} 
-        onClose={handleDrawerToggle}
-        variant="permanent" // Ideally handled responsively in a real app
-      />
-      
-      <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - 260px)` } }}>
-        <Toolbar /> {/* Spacer */}
-        <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
-          <Outlet />
-        </Box>
-      </Box>
-    </Box>
+    <DashboardLayout
+      allowedRoles={isKycRoute ? [ROLES.STUDENT, ROLES.TEACHER] : [ROLES.TEACHER]}
+      menuItems={TEACHER_MENU}
+      sessionKind="public"
+    />
   );
 };

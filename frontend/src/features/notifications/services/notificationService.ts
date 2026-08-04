@@ -3,20 +3,6 @@ import type { NotificationResponse, NotificationQueryParams, PageResponse } from
 import type { ApiResponse } from '../../../shared/types/api';
 
 const BASE_URL = '/v1/notifications';
-const getTempUserId = () => {
-  if (typeof window !== 'undefined') {
-    if (window.location.pathname.includes('/student')) {
-      return 'd0000000-0000-0000-0000-000000000001'; // Demo Student
-    } else if (window.location.pathname.includes('/admin')) {
-      return 'c0000000-0000-0000-0000-000000000001'; // SysAdmin
-    }
-  }
-  return 'd0000000-0000-0000-0000-000000000002'; // Demo Teacher
-};
-
-const authHeaders = () => ({
-  'Authorization': `Bearer ${getTempUserId()}`,
-});
 
 export const notificationService = {
   async fetchNotifications(params?: NotificationQueryParams): Promise<PageResponse<NotificationResponse>> {
@@ -28,23 +14,19 @@ export const notificationService = {
 
     const { data } = await axiosClient.get<ApiResponse<PageResponse<NotificationResponse>>>(BASE_URL, {
       params: queryParams,
-      headers: authHeaders(),
     });
     return data.data;
   },
 
   async fetchUnreadCount(): Promise<number> {
-    const { data } = await axiosClient.get<ApiResponse<{ unreadCount: number }>>(`${BASE_URL}/unread-count`, {
-      headers: authHeaders(),
-    });
+    const { data } = await axiosClient.get<ApiResponse<{ unreadCount: number }>>(`${BASE_URL}/unread-count`);
     return data.data.unreadCount;
   },
 
   async markAsRead(notificationId: string): Promise<NotificationResponse> {
     const { data } = await axiosClient.patch<ApiResponse<NotificationResponse>>(
       `${BASE_URL}/${notificationId}/read`,
-      null,
-      { headers: authHeaders() }
+      null
     );
     return data.data;
   },
@@ -52,8 +34,7 @@ export const notificationService = {
   async markAsUnread(notificationId: string): Promise<NotificationResponse> {
     const { data } = await axiosClient.patch<ApiResponse<NotificationResponse>>(
       `${BASE_URL}/${notificationId}/unread`,
-      null,
-      { headers: authHeaders() }
+      null
     );
     return data.data;
   },
@@ -61,8 +42,7 @@ export const notificationService = {
   async markAllAsRead(): Promise<number> {
     const { data } = await axiosClient.patch<ApiResponse<{ updatedCount: number }>>(
       `${BASE_URL}/read-all`,
-      null,
-      { headers: authHeaders() }
+      null
     );
     return data.data.updatedCount;
   },

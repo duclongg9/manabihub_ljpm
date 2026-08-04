@@ -1,6 +1,15 @@
 manabihub:
   security:
-    mock-jwt: true
+    mock-jwt: false
+  demo:
+    admin-password: ${DEMO_ADMIN_PASSWORD:Admin@123}
+  kyc:
+    identity-secret: ${KYC_IDENTITY_SECRET:local-dev-only-identity-secret-key-32chars}
+  payout:
+    security-secret: ${PAYOUT_SECURITY_SECRET:local-dev-only-payout-secret-key-32chars}
+  payment:
+    vnpay:
+      dev-simulator-enabled: true
 
 spring:
   config:
@@ -23,14 +32,15 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: true
+    out-of-order: true
 
   security:
     oauth2:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:your-client-id-here}
-            client-secret: ${GOOGLE_CLIENT_SECRET:your-client-secret-here}
+            client-id: ${GOOGLE_CLIENT_ID:your-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-client-secret}
             scope: profile, email
         provider:
           google:

@@ -1,18 +1,17 @@
-import { Box, Typography, Button, Stack, Avatar, AvatarGroup, keyframes } from '@mui/material';
+import { Alert, Box, Typography, Button, keyframes } from '@mui/material';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getAsset } from '../../shared/utils/assets';
+import {
+  getAuthSession,
+  getDefaultRoute,
+  rememberPostLoginRoute,
+} from '../../shared/auth/authSession';
+import { ROUTES } from '../../shared/constants/routes';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
-`;
-
-const pulseGlow = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
-  70% { box-shadow: 0 0 0 15px rgba(37, 99, 235, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
 `;
 
 const GoogleIcon = () => (
@@ -25,10 +24,23 @@ const GoogleIcon = () => (
 );
 
 export function PublicLoginPage() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get('reason') === 'session-expired';
+  const session = getAuthSession('public');
+
+  if (session) {
+    return <Navigate to={getDefaultRoute(session)} replace />;
+  }
+
   const handleGoogleLogin = () => {
-    // Navigate to backend OAuth endpoint
+    const returnTo = (location.state as { from?: unknown } | null)?.from;
+    if (typeof returnTo === 'string') {
+      rememberPostLoginRoute('public', returnTo);
+    }
+
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api';
-    const baseUrl = apiBaseUrl.replace('/api', '');
+    const baseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
     window.location.href = `${baseUrl}/oauth2/authorization/google`;
   };
 
@@ -44,7 +56,7 @@ export function PublicLoginPage() {
           overflow: 'hidden',
           '&::before': {
             content: '""', position: 'absolute', inset: 0,
-            background: 'rgba(0, 0, 0, 0.4)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 30%, rgba(0,0,0,0.7) 100%)',
             zIndex: 1
           }
         }}
@@ -53,9 +65,10 @@ export function PublicLoginPage() {
           <img src={getAsset('hero.png')} alt="Japan Study" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </Box>
 
-        <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', p: 8, width: '100%' }}>
-          <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none' }}>
-            <Box sx={{ width: 40, height: 40, bgcolor: '#3b82f6', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.39)' }}>
+        <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', p: 8, height: '100%' }}>
+          {/* Logo at top */}
+          <Box component={Link} to={ROUTES.PUBLIC.HOME} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none', flexShrink: 0 }}>
+            <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px 0 rgba(196, 30, 58, 0.39)' }}>
               <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
             </Box>
             <Typography variant="h5" sx={{ fontWeight: 800, color: 'white', letterSpacing: '-0.5px' }}>
@@ -63,26 +76,25 @@ export function PublicLoginPage() {
             </Typography>
           </Box>
 
-          <Box sx={{ maxWidth: 500, mb: 4, animation: `${fadeIn} 1s ease-out` }}>
-            <Typography variant="h2" sx={{ fontWeight: 800, color: 'white', mb: 3, lineHeight: 1.1, fontSize: '3.5rem' }}>
-              Hành trình chinh phục tiếng Nhật bắt đầu từ đây
-            </Typography>
-            <Typography variant="h6" sx={{ color: '#cbd5e1', mb: 4, fontWeight: 400, lineHeight: 1.6 }}>
-              Học tập cùng các chuyên gia JLPT hàng đầu. Hơn 50,000+ học viên đã đạt được mục tiêu của mình cùng ManabiHub.
-            </Typography>
-
-            <Stack direction="row" sx={{ alignItems: 'center' }} spacing={2}>
-              <AvatarGroup total={50000} sx={{ '& .MuiAvatar-root': { width: 48, height: 48, border: '2px solid', borderColor: 'grey.900' } }}>
-                <Avatar alt="Student 1" src={getAsset('anh1.png')} />
-                <Avatar alt="Student 2" src={getAsset('anh2.png')} />
-                <Avatar alt="Student 3" src={getAsset('anh3.png')} />
-                <Avatar alt="Student 4" src={getAsset('anh4.png')} />
-              </AvatarGroup>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', lineHeight: 1.4 }}>
-                Tham gia cộng đồng <br />
-                <Typography component="span" sx={{ color: 'white', fontWeight: 700 }}>hơn 50k+ học viên</Typography>
+          {/* Content shifted slightly up for vertical balance */}
+          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', pb: '15vh' }}>
+            <Box sx={{ maxWidth: 500, animation: `${fadeIn} 1s ease-out` }}>
+              <Typography sx={{ fontFamily: '"Noto Sans JP", sans-serif', color: 'rgba(255,255,255,0.7)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.15em', mb: 2 }}>
+                日本学問 — Nhật Bản Học
               </Typography>
-            </Stack>
+              <Typography variant="h2" sx={{ fontWeight: 800, color: 'white', mb: 3, lineHeight: 1.1, fontSize: '3.5rem' }}>
+                Hành trình chinh phục <Box component="span" sx={{ color: '#FF6B6B' }}>tiếng Nhật</Box> bắt đầu từ đây
+              </Typography>
+              <Typography variant="h6" sx={{ color: '#cbd5e1', mb: 4, fontWeight: 400, lineHeight: 1.6 }}>
+                Học tiếng Nhật theo mục tiêu của bạn cùng giảng viên trên ManabiHub.
+              </Typography>
+
+              <Box sx={{ display: 'inline-block', background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50px', px: 3, py: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'white' }}>
+                  Nội dung nhiều cấp độ • Theo dõi tiến độ • AI hỗ trợ
+                </Typography>
+              </Box>
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -94,29 +106,42 @@ export function PublicLoginPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           p: { xs: 3, sm: 6, md: 8 },
           position: 'relative',
-          bgcolor: '#ffffff',
+          bgcolor: '#FAF9F6',
         }}
       >
-        <Box sx={{ width: '100%', maxWidth: 400, animation: `${fadeIn} 0.6s ease-out` }}>
+        <Box sx={{
+          width: '100%', maxWidth: 420, animation: `${fadeIn} 0.6s ease-out`,
+          bgcolor: '#ffffff',
+          p: { xs: 4, sm: 5 },
+          borderRadius: '24px',
+          boxShadow: '0 20px 40px -10px rgba(0,0,0,0.05)',
+          border: '1px solid #f1f5f9'
+        }}>
           {/* Mobile Header Logo */}
           <Box component={Link} to="/" sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 6, textDecoration: 'none' }}>
-            <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
             </Box>
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>ManabiHub</Typography>
           </Box>
 
-          <Box sx={{ textAlign: 'center', mb: 5 }}>
-            <Box sx={{ width: 64, height: 64, margin: '0 auto 24px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: `${pulseGlow} 2s infinite` }}>
-              <MenuBookIcon sx={{ fontSize: 32, color: '#2563eb' }} />
-            </Box>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography sx={{ fontFamily: '"Noto Sans JP", sans-serif', color: '#C41E3A', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mb: 1 }}>
+              ようこそ!
+            </Typography>
             <Typography variant="h4" sx={{ fontWeight: 800, color: '#0f172a', mb: 1.5, letterSpacing: '-0.5px' }}>
-              Chào mừng đến hệ thống 👋
+              Chào mừng bạn! 👋
             </Typography>
             <Typography variant="body1" sx={{ color: '#64748b', lineHeight: 1.6 }}>
-              Để đảm bảo tính minh bạch cộng đồng và chất lượng người dùng, ManabiHub <Box component="span" sx={{ fontWeight: 600, color: '#334155' }}>chỉ hỗ trợ đăng ký và đăng nhập qua tài khoản Google</Box>.
+              Đăng nhập nhanh chóng và bảo mật chỉ với một chạm.
             </Typography>
           </Box>
+
+          {sessionExpired && (
+            <Alert severity="warning" sx={{ mb: 3 }}>
+              Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.
+            </Alert>
+          )}
 
           {/* Primary Action */}
           <Button
@@ -125,50 +150,50 @@ export function PublicLoginPage() {
             onClick={handleGoogleLogin}
             startIcon={<GoogleIcon />}
             sx={{
-              py: 1.8,
-              mb: 4,
-              borderRadius: 3,
+              py: 1.5,
+              mb: 3,
+              borderRadius: '12px',
               textTransform: 'none',
               fontWeight: 700,
-              fontSize: '1rem',
-              borderColor: '#cbd5e1',
+              fontSize: '1.05rem',
+              bgcolor: '#ffffff',
               color: '#334155',
-              transition: 'all 0.3s ease',
+              borderColor: '#e2e8f0',
+              borderWidth: '1.5px',
               boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+              transition: 'all 0.3s ease',
               '&:hover': {
-                bgcolor: '#f8fafc',
-                borderColor: '#94a3b8',
+                bgcolor: '#fcfcfc',
+                borderColor: '#C41E3A',
+                color: '#C41E3A',
                 transform: 'translateY(-2px)',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+                boxShadow: '0 8px 16px rgba(196, 30, 58, 0.12)',
               },
               '&:active': {
                 transform: 'translateY(0)',
               }
             }}
           >
-            Tiếp tục với tài khoản Google
+            Đăng nhập với Google
           </Button>
 
-          {/* Info Notice */}
-          <Box sx={{ p: 2, mb: 4, bgcolor: '#eff6ff', borderRadius: 3, border: '1px solid', borderColor: '#bfdbfe' }}>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
-              <Box sx={{ mt: 0.25 }}>
-                <InfoOutlinedIcon sx={{ color: '#2563eb', fontSize: 20 }} />
-              </Box>
-              <Box>
-                <Typography variant="body2" sx={{ color: '#0f172a', fontWeight: 700, mb: 0.5 }}>
-                  Thông tin vai trò (Role)
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.6, display: 'block' }}>
-                  Mọi tài khoản đăng ký mới sẽ mặc định là <Box component="span" sx={{ fontWeight: 600, color: '#0f172a' }}>Học viên</Box>. Nếu muốn trở thành Giảng viên, bạn có thể thực hiện nâng cấp tài khoản (Nộp KYC & Bằng cấp) tại Trang chủ sau khi đăng nhập.
-                </Typography>
-              </Box>
-            </Stack>
-          </Box>
-
-          {/* Admin Notice */}
           <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', textAlign: 'center', lineHeight: 1.6 }}>
-            *Đối với Quản trị viên (Admin), vui lòng đăng nhập thông qua Cổng nội bộ (<Box component={Link} to="/admin/login" sx={{ color: '#64748b', textDecoration: 'underline', '&:hover': { color: '#2563eb' } }}>Admin Portal</Box>).
+            Trước khi tiếp tục, vui lòng đọc{' '}
+            <Box
+              component={Link}
+              to={ROUTES.PUBLIC.TERMS}
+              sx={{ color: '#C41E3A', textDecoration: 'underline', fontWeight: 600, '&:hover': { color: '#E8432A' } }}
+            >
+              Điều khoản sử dụng
+            </Box>{' '}
+            và{' '}
+            <Box
+              component={Link}
+              to={ROUTES.PUBLIC.PRIVACY}
+              sx={{ color: '#C41E3A', textDecoration: 'underline', fontWeight: 600, '&:hover': { color: '#E8432A' } }}
+            >
+              Chính sách bảo mật
+            </Box>.
           </Typography>
 
         </Box>

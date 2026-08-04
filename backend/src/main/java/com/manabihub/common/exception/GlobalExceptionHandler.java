@@ -12,6 +12,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -19,6 +20,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 import java.util.stream.Collectors;
+
+import com.manabihub.common.exception.ValidationBusinessException;
 
 /**
  * Centralized exception handler that guarantees all API responses follow
@@ -51,6 +54,29 @@ public class GlobalExceptionHandler {
         ApiResponse<Void> response = ApiResponse.error(
                 ex.getMessageCode(),
                 ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(ex.getHttpStatus().value()).body(response);
+    }
+
+    @ExceptionHandler(ValidationBusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleValidationBusinessException(
+            ValidationBusinessException ex, HttpServletRequest request) {
+
+        log.warn("Validation Business rule violation: [{}] - {} with {} errors", 
+                ex.getMessageCode(), ex.getMessage(), ex.getValidationErrors().size());
+
+        List<ErrorResponse> fieldErrors = ex.getValidationErrors().stream()
+                .map(err -> ErrorResponse.builder()
+                        .messageCode(err.code())
+                        .message(err.message())
+                        .build())
+                .collect(Collectors.toList());
+
+        ApiResponse<Void> response = ApiResponse.error(
+                ex.getMessageCode(),
+                ex.getMessage(),
+                fieldErrors,
                 request.getRequestURI()
         );
         return ResponseEntity.status(ex.getHttpStatus().value()).body(response);
@@ -127,6 +153,21 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST.value()).body(response);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingHeader(
+            MissingRequestHeaderException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("Missing required request header: {}", ex.getHeaderName());
+
+        ApiResponse<Void> response = ApiResponse.error(
+                MessageCodes.COMMON_BAD_REQUEST,
+                "Missing required request header: " + ex.getHeaderName(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
