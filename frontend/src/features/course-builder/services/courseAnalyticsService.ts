@@ -17,7 +17,7 @@ export async function fetchCourseAnalytics(courseId: string, startDate?: string,
   if (startDate) params.append('startDate', startDate);
   if (endDate) params.append('endDate', endDate);
   
-  const url = `/api/v1/teacher/courses/${courseId}/analytics${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `/v1/teacher/courses/${courseId}/analytics${params.toString() ? '?' + params.toString() : ''}`;
   const response = await axiosClient.get<{ data: TeacherCourseAnalyticsResponse }>(url);
   return response.data.data;
 }

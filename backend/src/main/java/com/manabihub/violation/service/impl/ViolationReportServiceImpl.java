@@ -72,7 +72,7 @@ public class ViolationReportServiceImpl implements ViolationReportService {
                 .targetType(request.getTargetType())
                 .targetId(request.getTargetId())
                 .reason(request.getReason())
-                .status(ViolationStatus.PENDING)
+                .status(ViolationStatus.PENDING_REVIEW)
                 .build();
 
         report = violationReportRepository.save(report);
@@ -108,5 +108,14 @@ public class ViolationReportServiceImpl implements ViolationReportService {
             case USER -> AppUser.class;
         };
         return entityManager.find(entityClass, targetId) != null;
+    }
+
+    private String getTargetLabel(ViolationTargetType type) {
+        return switch (type) {
+            case COURSE -> "khóa học";
+            case LESSON, LESSON_BLOCK -> "nội dung bài học";
+            case REVIEW -> "bài đánh giá";
+            case USER -> "tài khoản người dùng";
+        };
     }
 }
