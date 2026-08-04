@@ -184,8 +184,8 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
         tx1.executeWithoutResult(status -> {
             KycIdentityVerificationRequest originalReqA = reqARef.get();
             KycIdentityVerificationRequest retryReqA = new KycIdentityVerificationRequest(
-                    originalReqA.providerTransactionId(),
                     originalReqA.providerSessionId(),
+                    originalReqA.providerTransactionId(),
                     originalReqA.sdkResult()
             );
             
