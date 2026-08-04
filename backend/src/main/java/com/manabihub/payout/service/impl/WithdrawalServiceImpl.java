@@ -242,6 +242,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         notifyAfterCommit(
                 () -> notificationService.notifyTeacherCancellation(
                         UUID.fromString(userId),
+                        teacherEmail(teacherProfileId),
                         request.getRequestedAmount()
                 ),
                 "withdrawal cancellation " + withdrawalId
@@ -277,6 +278,12 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                         "Teacher profile not found"
                 ));
         return teacherProfile.getId();
+    }
+
+    private String teacherEmail(UUID teacherProfileId) {
+        return teacherProfileRepository.findById(teacherProfileId)
+                .map(profile -> profile.getUser().getEmail())
+                .orElse(null);
     }
 
     private void notifyAfterCommit(Runnable notification, String operation) {

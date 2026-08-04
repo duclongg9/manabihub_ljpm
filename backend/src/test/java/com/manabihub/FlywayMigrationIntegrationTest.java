@@ -89,13 +89,13 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("055");
+        assertThat(current).isEqualTo("057");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V055 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V057 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");

@@ -9,6 +9,8 @@ import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.service.InternalAdminInvitationService;
 import com.manabihub.systemconfig.dto.response.InternalAdminAccountResponse;
@@ -47,6 +49,7 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
     private final CommercialPolicyService commercialPolicyService;
     private final InternalAdminInvitationService invitationService;
     private final ApplicationEventPublisher eventPublisher;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -114,6 +117,13 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
                 Map.of("settingKey", key, "value", previousValue),
                 Map.of("settingKey", key, "value", normalizedValue),
                 Map.of("reason", reason.trim())
+        );
+        notificationService.createNotificationForAdminRole(
+                RoleCode.SYSTEM_ADMIN.name(),
+                "Cấu hình hệ thống đã được cập nhật",
+                "Thiết lập \"" + key + "\" vừa được thay đổi. Lý do: " + reason.trim(),
+                NotificationTypes.SYSTEM_SETTING_CHANGED,
+                "/admin/settings"
         );
         return toSettingResponse(saved);
     }
@@ -283,7 +293,26 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
                         "requiresReauthentication", true
                 )
         );
+        notificationService.createAdminNotification(
+                saved.getId(),
+                saved.getEmail(),
+                "Vai trò quản trị đã được thay đổi",
+                "Vai trò của tài khoản đã chuyển từ " + roleLabel(previousRole)
+                        + " sang " + roleLabel(roleCode) + ". Vui lòng đăng nhập lại để tiếp tục.",
+                NotificationTypes.ADMIN_ROLE_CHANGED,
+                "/admin/dashboard"
+        );
         return toAdminResponse(saved, invitationSummary(saved.getId()));
+    }
+
+    private String roleLabel(RoleCode roleCode) {
+        return switch (roleCode) {
+            case STUDENT -> "Học viên";
+            case TEACHER -> "Giảng viên";
+            case SYSTEM_ADMIN -> "Quản trị hệ thống";
+            case COURSE_MANAGER -> "Quản lý khóa học";
+            case FINANCE_MANAGER -> "Quản lý tài chính";
+        };
     }
 
     private InternalAdminAccount requireLiveSystemAdmin(UUID actorId) {

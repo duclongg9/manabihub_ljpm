@@ -1,6 +1,7 @@
 package com.manabihub.payout.service;
 
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.notification.NotificationTypes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -21,7 +22,7 @@ public class WithdrawalNotificationService {
                 "FINANCE_MANAGER",
                 "Yêu cầu rút doanh thu mới",
                 "Giáo viên vừa yêu cầu rút " + amount + " VND.",
-                "SYSTEM",
+                NotificationTypes.WITHDRAWAL_REQUESTED,
                 "/admin/payouts/" + withdrawalId
         );
     }
@@ -29,14 +30,16 @@ public class WithdrawalNotificationService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void notifyTeacherCancellation(
             UUID userId,
+            String email,
             BigDecimal amount
     ) {
         notificationService.createNotification(
                 userId,
-                null,
+                email,
                 "Đã hủy lệnh rút tiền",
                 "Bạn đã hủy thành công lệnh rút tiền " + amount + " VND.",
-                "PAYOUT_CANCELLED"
+                NotificationTypes.PAYOUT_CANCELLED,
+                "/teacher/wallet"
         );
     }
 }

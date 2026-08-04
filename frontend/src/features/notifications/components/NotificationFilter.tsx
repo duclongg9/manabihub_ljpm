@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Chip, Stack } from '@mui/material';
+import { Box, Chip, FormControl, InputLabel, MenuItem, Select, Stack } from '@mui/material';
 import { NOTIFICATION_TYPES, NOTIFICATION_TYPE_KEYS } from '../types';
 import type { ReadFilter } from '../types';
 
@@ -18,47 +18,22 @@ export const NotificationFilter: React.FC<NotificationFilterProps> = ({
 }) => {
   return (
     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
-      {/* Type filter chips */}
-      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-        <Chip
-          label="Tất cả loại"
-          onClick={() => onTypeChange(null)}
-          variant={selectedType === null ? 'filled' : 'outlined'}
-          color={selectedType === null ? 'primary' : 'default'}
-          sx={{
-            fontWeight: selectedType === null ? 600 : 400,
-            borderRadius: '8px',
-            px: 0.5,
-          }}
-        />
-        {NOTIFICATION_TYPE_KEYS.map((typeKey) => {
-          const config = NOTIFICATION_TYPES[typeKey];
-          const isSelected = selectedType === typeKey;
-          return (
-            <Chip
-              key={typeKey}
-              label={config.label}
-              onClick={() => onTypeChange(typeKey)}
-              variant={isSelected ? 'filled' : 'outlined'}
-              sx={{
-                fontWeight: isSelected ? 600 : 400,
-                borderRadius: '8px',
-                px: 0.5,
-                ...(isSelected
-                  ? {
-                      bgcolor: config.color,
-                      color: '#fff',
-                      '&:hover': { bgcolor: config.color, opacity: 0.9 },
-                    }
-                  : {
-                      borderColor: '#D1D5DB',
-                      color: 'text.secondary',
-                    }),
-              }}
-            />
-          );
-        })}
-      </Stack>
+      <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 260 } }}>
+        <InputLabel id="notification-type-label">Loại thông báo</InputLabel>
+        <Select
+          labelId="notification-type-label"
+          value={selectedType ?? ''}
+          label="Loại thông báo"
+          onChange={(event) => onTypeChange(event.target.value || null)}
+        >
+          <MenuItem value="">Tất cả loại</MenuItem>
+          {NOTIFICATION_TYPE_KEYS.map((typeKey) => (
+            <MenuItem key={typeKey} value={typeKey}>
+              {NOTIFICATION_TYPES[typeKey].icon} {NOTIFICATION_TYPES[typeKey].label}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
 
       {/* Read status filter */}
       <Stack direction="row" spacing={1}>

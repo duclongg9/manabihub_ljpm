@@ -28,6 +28,18 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             """, nativeQuery = true)
     List<UUID> findActiveAdminIdsByRoleCode(@Param("roleCode") String roleCode);
 
+    @Query(value = """
+            SELECT DISTINCT admin.email
+            FROM internal_admin_accounts admin
+            JOIN internal_admin_roles admin_role ON admin_role.admin_account_id = admin.id
+            JOIN roles role ON role.id = admin_role.role_id
+            WHERE role.code = :roleCode
+              AND admin.account_status = 'ACTIVE'
+              AND admin.email IS NOT NULL
+              AND BTRIM(admin.email) <> ''
+            """, nativeQuery = true)
+    List<String> findActiveAdminEmailsByRoleCode(@Param("roleCode") String roleCode);
+
     @Query("SELECT n FROM Notification n WHERE (n.recipientUserId = :userId OR n.recipientAdminId = :userId) ORDER BY n.createdAt DESC")
     Page<Notification> findAllByUserIdOrderByCreatedAtDesc(@Param("userId") UUID userId, Pageable pageable);
 
