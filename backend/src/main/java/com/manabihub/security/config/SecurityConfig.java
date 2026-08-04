@@ -181,48 +181,43 @@ public class SecurityConfig {
         return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSecret.getBytes()));
     }
 
+    private JwtDecoder createNimbusDecoder() {
+        SecretKeySpec secretKey = new SecretKeySpec(jwtSecret.getBytes(), "HmacSHA256");
+        return NimbusJwtDecoder.withSecretKey(secretKey).macAlgorithm(MacAlgorithm.HS256).build();
+    }
+
     @Bean
     @ConditionalOnProperty(name = "manabihub.security.mock-jwt", havingValue = "true")
     public JwtDecoder mockJwtDecoder() {
+        JwtDecoder realDecoder = createNimbusDecoder();
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
         return token -> {
+            if (token.contains(".")) {
+                try {
+                    return realDecoder.decode(token);
+                } catch (Exception e) {
+                    throw new JwtException("Invalid real token: " + e.getMessage(), e);
+                }
+            }
+            
             try {
-                String subject = token;
-                String role = "STUDENT";
+                // It's a raw base64 string from testing scripts (e.g., verify.js)
+                String payloadJson = new String(java.util.Base64.getDecoder().decode(token));
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                java.util.Map<String, Object> payloadMap = mapper.readValue(payloadJson, java.util.Map.class);
                 
-                if (token.contains(".")) {
-                    String[] parts = token.split("\\.");
-                    if (parts.length >= 2) {
-                        try {
-                            String base64Url = parts[1];
-                            int pad = 4 - (base64Url.length() % 4);
-                            if (pad > 0 && pad < 4) {
-                                StringBuilder sb = new StringBuilder(base64Url);
-                                for (int i = 0; i < pad; i++) sb.append("=");
-                                base64Url = sb.toString();
-                            }
-                            String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(base64Url));
-                            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                            java.util.Map<String, Object> payloadMap = mapper.readValue(payloadJson, java.util.Map.class);
-                            if (payloadMap.containsKey("sub")) {
-                                subject = payloadMap.get("sub").toString();
-                            }
-                            if (payloadMap.containsKey("role")) {
-                                role = payloadMap.get("role").toString();
-                            }
-                        } catch (Exception ex) {
-                            // If parsing fails, we shouldn't pass the whole JWT as subject, just fallback to a dummy UUID
-                            subject = "c0000000-0000-0000-0000-000000000001";
-                        }
-                    }
+                if (!payloadMap.containsKey("sub") || !payloadMap.containsKey("role")) {
+                    throw new JwtException("Mock token payload is missing required claims 'sub' or 'role'");
                 }
                 
                 return org.springframework.security.oauth2.jwt.Jwt.withTokenValue(token)
                         .header("alg", "none")
-                        .claim("sub", subject)
-                        .claim("role", role)
+                        .claim("sub", payloadMap.get("sub").toString())
+                        .claim("role", payloadMap.get("role").toString())
                         .build();
-            } catch (Exception e) {
-                throw new JwtException("Invalid mock token: " + token);
+            } catch (Exception ex) {
+                log.error("Failed to parse mock token payload: {}", token, ex);
+                throw new JwtException("Malformed mock token: " + ex.getMessage(), ex);
             }
         };
     }
@@ -230,8 +225,7 @@ public class SecurityConfig {
     @Bean
     @ConditionalOnProperty(name = "manabihub.security.mock-jwt", havingValue = "false", matchIfMissing = true)
     public JwtDecoder jwtDecoder() {
-        SecretKeySpec secretKey = new SecretKeySpec(jwtSecret.getBytes(), "HmacSHA256");
-        return NimbusJwtDecoder.withSecretKey(secretKey).macAlgorithm(MacAlgorithm.HS256).build();
+        return createNimbusDecoder();
     }
 
     @Bean
