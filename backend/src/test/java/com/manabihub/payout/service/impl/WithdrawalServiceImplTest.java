@@ -256,6 +256,7 @@ class WithdrawalServiceImplTest {
         );
         verify(notificationService).notifyTeacherCancellation(
                 userId,
+                null,
                 request.getRequestedAmount()
         );
     }

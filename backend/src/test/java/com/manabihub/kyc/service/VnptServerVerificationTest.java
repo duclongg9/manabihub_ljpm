@@ -16,6 +16,7 @@ import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.security.service.PublicJwtTokenService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +57,7 @@ class VnptServerVerificationTest {
     @Mock private KycDocumentRepository kycDocumentRepository;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private NotificationRepository notificationRepository;
+    @Mock private NotificationService notificationService;
     @Mock private TeacherIdentityClaimService teacherIdentityClaimService;
     @Mock private TeacherCertificateClaimService teacherCertificateClaimService;
     @Mock private PublicJwtTokenService publicJwtTokenService;
@@ -91,6 +93,7 @@ class VnptServerVerificationTest {
                 kycDocumentRepository,
                 auditLogRepository,
                 notificationRepository,
+                notificationService,
                 teacherIdentityClaimService,
                 teacherCertificateClaimService,
                 publicJwtTokenService,

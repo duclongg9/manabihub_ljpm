@@ -20,6 +20,7 @@ import com.manabihub.payment.dto.IpnAckResponse;
 import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.enums.PaymentStatus;
 import com.manabihub.payment.event.PaymentNotificationEvent;
+import com.manabihub.notification.NotificationTypes;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
@@ -40,6 +41,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,7 +49,6 @@ import java.util.UUID;
 public class PaymentServiceImpl implements PaymentService {
 
     private static final BigDecimal MINOR_UNIT_FACTOR = BigDecimal.valueOf(100);
-    private static final String NOTIFICATION_TYPE = "PURCHASE_SUCCESS";
     private static final Duration WALLET_RESERVATION_TTL = Duration.ofMinutes(15);
     private static final String WALLET_PROVIDER = "WALLET";
 
@@ -117,6 +118,7 @@ public class PaymentServiceImpl implements PaymentService {
             studentWalletService.releaseForOrder(order.getId(), Instant.now());
             order.setStatus(OrderStatus.FAILED);
             orderRepository.save(order);
+            notifyPaymentFailed(order);
             log.info("[{}] Recorded FAILED payment for order {} (responseCode={})",
                     MessageCodes.MSG_PAY_003, order.getOrderCode(), result.responseCode());
             return IpnAckResponse.of("00", "Confirm Success");
@@ -145,6 +147,7 @@ public class PaymentServiceImpl implements PaymentService {
                 } catch (BusinessException captureFailure) {
                     order.setStatus(OrderStatus.FAILED);
                     orderRepository.save(order);
+                    notifyPaymentFailed(order);
                     log.error(
                             "[{}] Gateway payment succeeded but wallet reservation capture requires reconciliation for order {}",
                             MessageCodes.MSG_PAY_004,
@@ -258,6 +261,7 @@ public class PaymentServiceImpl implements PaymentService {
         createEnrollments(order);
         escrowService.holdForOrder(order);
         notifyStudent(order);
+        notifyTeachers(order);
     }
 
     private void fulfillWalletTopUp(Order order) {
@@ -346,7 +350,8 @@ public class PaymentServiceImpl implements PaymentService {
                 "Mua khoá học thành công",
                 "Đơn hàng " + order.getOrderCode()
                         + " đã được thanh toán thành công. Bạn có thể bắt đầu học ngay bây giờ.",
-                NOTIFICATION_TYPE));
+                NotificationTypes.PURCHASE_SUCCESS,
+                "/student/courses"));
     }
 
     private void notifyTopUp(Order order) {
@@ -360,6 +365,47 @@ public class PaymentServiceImpl implements PaymentService {
                 "Đơn nạp ví " + order.getOrderCode() + " ("
                         + order.getTotalAmount().toPlainString() + "đ) đã được xử lý thành công. "
                         + "Số dư ví của bạn đã được cập nhật.",
-                "WALLET_TOPUP_SUCCESS"));
+                NotificationTypes.WALLET_TOPUP_SUCCESS,
+                "/student/wallet"));
+    }
+
+    private void notifyPaymentFailed(Order order) {
+        AppUser user = order.getStudent().getUser();
+        eventPublisher.publishEvent(new PaymentNotificationEvent(
+                order.getId(),
+                user.getId(),
+                user.getEmail(),
+                "Thanh toán chưa thành công",
+                "Đơn hàng " + order.getOrderCode()
+                        + " chưa được thanh toán. Vui lòng kiểm tra lại phương thức thanh toán.",
+                NotificationTypes.PAYMENT_FAILED,
+                "/student/payments"));
+    }
+
+    private void notifyTeachers(Order order) {
+        orderItemRepository.findByOrder_Id(order.getId()).stream()
+                .filter(item -> item.getCourse() != null
+                        && item.getCourse().getTeacher() != null
+                        && item.getCourse().getTeacher().getUser() != null)
+                .collect(Collectors.groupingBy(item -> item.getCourse().getTeacher().getUser().getId()))
+                .values()
+                .forEach(items -> {
+            var teacherUser = items.getFirst().getCourse().getTeacher().getUser();
+            String courseTitles = items.stream()
+                    .map(item -> item.getCourse().getTitle())
+                    .collect(Collectors.joining(", "));
+            BigDecimal grossAmount = items.stream()
+                    .map(OrderItem::getPrice)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            eventPublisher.publishEvent(new PaymentNotificationEvent(
+                    order.getId(),
+                    teacherUser.getId(),
+                    teacherUser.getEmail(),
+                    "Khóa học vừa có học viên mới",
+                    "Học viên vừa mua khóa học: " + courseTitles
+                            + ". Tổng giá trị trước phân bổ: " + grossAmount.toPlainString() + " VND.",
+                    NotificationTypes.TEACHER_SALE,
+                    "/teacher/wallet"));
+        });
     }
 }

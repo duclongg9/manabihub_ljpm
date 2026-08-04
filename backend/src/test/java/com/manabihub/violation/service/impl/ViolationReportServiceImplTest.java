@@ -81,7 +81,7 @@ class ViolationReportServiceImplTest {
 
         verify(notificationService).createNotificationForAdminRole(
                 eq("COURSE_MANAGER"),
-                eq("New Violation Report"),
+                eq("Có báo cáo vi phạm mới"),
                 contains(targetId.toString()),
                 eq("VIOLATION_REPORT"),
                 eq("/admin/violations/" + reportId)

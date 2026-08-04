@@ -30,6 +30,8 @@ import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.security.service.PublicJwtTokenService;
 import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
@@ -83,6 +85,7 @@ public class TeacherKycService {
     private final KycDocumentRepository kycDocumentRepository;
     private final AuditLogRepository auditLogRepository;
     private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final TeacherIdentityClaimService teacherIdentityClaimService;
     private final TeacherCertificateClaimService teacherCertificateClaimService;
     private final PublicJwtTokenService publicJwtTokenService;
@@ -98,6 +101,7 @@ public class TeacherKycService {
             KycDocumentRepository kycDocumentRepository,
             AuditLogRepository auditLogRepository,
             NotificationRepository notificationRepository,
+            NotificationService notificationService,
             TeacherIdentityClaimService teacherIdentityClaimService,
             TeacherCertificateClaimService teacherCertificateClaimService,
             PublicJwtTokenService publicJwtTokenService,
@@ -112,6 +116,7 @@ public class TeacherKycService {
         this.kycDocumentRepository = kycDocumentRepository;
         this.auditLogRepository = auditLogRepository;
         this.notificationRepository = notificationRepository;
+        this.notificationService = notificationService;
         this.teacherIdentityClaimService = teacherIdentityClaimService;
         this.teacherCertificateClaimService = teacherCertificateClaimService;
         this.publicJwtTokenService = publicJwtTokenService;
@@ -529,35 +534,28 @@ public class TeacherKycService {
     }
 
     private boolean createPendingReviewNotifications(KycRequest request, AppUser user) {
-        notificationRepository.save(Notification.builder()
-                .recipientUserId(user.getId())
-                .title("Da tiep nhan chung chi JLPT")
-                .message(
-                        "He thong da doc chung chi, doi chieu ho ten va ngay sinh voi CCCD, "
-                                + "dong thoi kiem tra trung lap. Ket qua xac minh tinh xac thuc "
-                                + "du kien trong 1-2 ngay lam viec, khong tinh thu Bay, Chu nhat va ngay nghi le."
-                )
-                .notificationType("KYC_CERTIFICATE_PENDING")
-                .actionUrl("/teacher/kyc")
-                .build());
+        notificationService.createNotification(
+                user.getId(),
+                user.getEmail(),
+                "Đã tiếp nhận chứng chỉ JLPT",
+                "Hệ thống đã tiếp nhận chứng chỉ và chuyển sang bước kiểm tra tính xác thực. "
+                        + "Kết quả dự kiến có trong 1-2 ngày làm việc, không tính cuối tuần và ngày nghỉ lễ.",
+                NotificationTypes.KYC_CERTIFICATE_PENDING,
+                "/teacher/kyc"
+        );
 
         List<UUID> courseManagerIds = notificationRepository.findActiveAdminIdsByRoleCode("COURSE_MANAGER");
         if (courseManagerIds.isEmpty()) {
             return false;
         }
-        List<Notification> adminNotifications = courseManagerIds.stream()
-                .map(adminId -> Notification.builder()
-                        .recipientAdminId(adminId)
-                        .title("JLPT certificate requires authenticity review")
-                        .message(
-                                "Identity, OCR matching, and duplicate checks passed. "
-                                        + "Verify the certificate against Japan Foundation before deciding."
-                        )
-                        .notificationType("KYC_CERTIFICATE_REVIEW")
-                        .actionUrl("/admin/kyc/" + request.getId())
-                        .build())
-                .toList();
-        notificationRepository.saveAll(adminNotifications);
+        notificationService.createNotificationForAdminRole(
+                "COURSE_MANAGER",
+                "Chứng chỉ JLPT cần được xác minh",
+                "Các bước đối chiếu danh tính, OCR và kiểm tra trùng lặp đã hoàn tất. "
+                        + "Vui lòng kiểm tra tính xác thực của chứng chỉ trước khi ra quyết định.",
+                NotificationTypes.KYC_CERTIFICATE_REVIEW,
+                "/admin/kyc/" + request.getId()
+        );
         return true;
     }
 

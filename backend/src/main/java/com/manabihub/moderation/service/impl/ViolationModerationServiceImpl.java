@@ -28,6 +28,7 @@ import com.manabihub.moderation.enums.ModerationDecisionType;
 import com.manabihub.moderation.enums.EvidenceRequestedFrom;
 import com.manabihub.moderation.enums.ViolationReportStatus;
 import com.manabihub.moderation.event.ModerationNotificationEvent;
+import com.manabihub.notification.NotificationTypes;
 import com.manabihub.moderation.repository.ModerationActionRecordRepository;
 import com.manabihub.moderation.repository.ModerationDecisionRepository;
 import com.manabihub.moderation.repository.ViolationEvidenceRepository;
@@ -871,19 +872,19 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
             return;
         }
         String title = request.getDecision() == ModerationDecisionType.CORRECTION_REQUIRED
-                ? "Content correction required"
-                : "Violation report upheld";
+                ? "Nội dung cần được chỉnh sửa"
+                : "Báo cáo vi phạm đã được xác nhận";
         String actionNames = actions.stream()
-                .map(record -> record.getActionType().name())
+                .map(record -> moderationActionLabel(record.getActionType()))
                 .distinct()
                 .reduce((left, right) -> left + ", " + right)
-                .orElse("NONE");
+                .orElse("Không áp dụng biện pháp");
         String message = request.getDecision() == ModerationDecisionType.CORRECTION_REQUIRED
-                ? "The reported content requires changes before it can proceed. "
+                ? "Nội dung bị báo cáo cần được chỉnh sửa trước khi có thể tiếp tục. Ghi chú: "
                         + request.getDecisionNote().trim()
-                : "A violation was confirmed. Applied actions: "
+                : "Đã xác nhận có vi phạm. Biện pháp áp dụng: "
                         + actionNames
-                        + ". Reason: "
+                        + ". Lý do: "
                         + request.getDecisionNote().trim();
         publishOutcomeNotifications(
                 report.getReporter(),
@@ -933,7 +934,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
                 recipient.getEmail(),
                 title,
                 message,
-                decision.name()
+                NotificationTypes.MODERATION_DECISION
         ));
     }
 
@@ -962,11 +963,22 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
         eventPublisher.publishEvent(new ModerationNotificationEvent(
                 recipient.getId(),
                 recipient.getEmail(),
-                "Additional evidence required",
-                "Please provide additional evidence for this violation report. "
+                "Yêu cầu bổ sung bằng chứng",
+                "Vui lòng bổ sung bằng chứng cho báo cáo vi phạm này. Ghi chú: "
                         + decisionNote,
-                ModerationDecisionType.PENDING_EVIDENCE.name()
+                NotificationTypes.MODERATION_EVIDENCE_REQUIRED
         ));
+    }
+
+    private String moderationActionLabel(ModerationActionType actionType) {
+        return switch (actionType) {
+            case NONE -> "Không áp dụng biện pháp";
+            case FORCE_DRAFT -> "Chuyển nội dung về bản nháp";
+            case REMOVE_CONTENT -> "Gỡ nội dung";
+            case HIDE_COURSE -> "Ẩn khóa học";
+            case BAN_ACCOUNT -> "Khóa tài khoản";
+            case FREEZE_BALANCE -> "Đóng băng số dư";
+        };
     }
 
     private ViolationReport requireReport(UUID reportId) {

@@ -335,8 +335,8 @@ class CourseServiceImplTest {
         assertNotNull(draft.getSubmittedAt());
         verify(notificationService).createNotificationForAdminRole(
                 "COURSE_MANAGER",
-                "Course submitted for review",
-                "Teacher submitted course \"JLPT N5 Foundation\" for review.",
+                "Khóa học mới đang chờ xét duyệt",
+                "Giảng viên đã gửi khóa học \"JLPT N5 Foundation\" để xét duyệt.",
                 "COURSE_REVIEW",
                 "/admin/courses/approvals/" + draftId
         );

@@ -39,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.notification.NotificationTypes;
 import com.manabihub.review.dto.response.CourseReviewAggregateResponse;
 import com.manabihub.review.service.CourseReviewService;
 import com.manabihub.systemconfig.service.SystemSettingValueService;
@@ -294,9 +295,9 @@ public class CourseServiceImpl implements CourseService {
 
         notificationService.createNotificationForAdminRole(
                 "COURSE_MANAGER",
-                "Course submitted for review",
-                "Teacher submitted course \"" + course.getTitle() + "\" for review.",
-                "COURSE_REVIEW",
+                "Khóa học mới đang chờ xét duyệt",
+                "Giảng viên đã gửi khóa học \"" + course.getTitle() + "\" để xét duyệt.",
+                NotificationTypes.COURSE_REVIEW,
                 "/admin/courses/approvals/" + course.getId()
         );
 

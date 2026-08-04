@@ -20,6 +20,8 @@ import com.manabihub.learning.repository.LearningCertificateRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.CertificateEligibilityService;
 import com.manabihub.learning.service.StudentCertificateService;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,7 @@ public class StudentCertificateServiceImpl implements StudentCertificateService 
     private final CertificateEligibilityService eligibilityService;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     @Override
     public LearningCertificateResponse getCertificate(UUID courseId) {
@@ -107,6 +110,16 @@ public class StudentCertificateServiceImpl implements StudentCertificateService 
                         .courseTitle(enrollment.getCourse().getTitle())
                         .eligibilitySnapshot(objectMapper.valueToTree(eligibility))
                         .build()
+        );
+        notificationService.createNotificationOnce(
+                "course-completed:" + enrollment.getId(),
+                student.getUser().getId(),
+                student.getUser().getEmail(),
+                "Chúc mừng bạn đã hoàn thành khóa học",
+                "Bạn đã hoàn thành khóa học \"" + enrollment.getCourse().getTitle()
+                        + "\" và chứng chỉ đã sẵn sàng.",
+                NotificationTypes.COURSE_COMPLETED,
+                "/student/courses/" + courseId + "/learn"
         );
         return toResponse(certificate);
     }

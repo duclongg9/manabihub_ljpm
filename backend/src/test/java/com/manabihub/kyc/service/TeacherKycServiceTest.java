@@ -19,6 +19,7 @@ import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.security.service.PublicJwtTokenService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
@@ -62,6 +63,8 @@ class TeacherKycServiceTest {
     @Mock
     private NotificationRepository notificationRepository;
     @Mock
+    private NotificationService notificationService;
+    @Mock
     private TeacherIdentityClaimService teacherIdentityClaimService;
     @Mock
     private TeacherCertificateClaimService teacherCertificateClaimService;
@@ -90,6 +93,7 @@ class TeacherKycServiceTest {
                 kycDocumentRepository,
                 auditLogRepository,
                 notificationRepository,
+                notificationService,
                 teacherIdentityClaimService,
                 teacherCertificateClaimService,
                 publicJwtTokenService,

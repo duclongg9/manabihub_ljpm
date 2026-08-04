@@ -223,7 +223,7 @@ class PayoutSettlementServiceImplTest {
         verify(payoutGateway, times(1)).transfer(any());
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(notificationService, times(1))
-                .createNotification(any(), any(), any(), any(), eq("PAYOUT_SUCCESS"));
+                .createNotification(any(), any(), any(), any(), eq("PAYOUT_SUCCESS"), any());
     }
 
     @Test
@@ -240,6 +240,13 @@ class PayoutSettlementServiceImplTest {
         assertEquals(PayoutStatus.FAILED, settlementRef.get().getStatus());
         verify(payoutGateway, never()).transfer(any());
         assertEquals(0, wallet.getBalance().compareTo(new BigDecimal("2000000.00")));
+        verify(notificationService).createNotificationForAdminRole(
+                eq("FINANCE_MANAGER"),
+                any(),
+                any(),
+                eq("PAYOUT_ALERT"),
+                eq("/admin/payouts/" + requestId)
+        );
     }
 
     @Test
@@ -277,7 +284,7 @@ class PayoutSettlementServiceImplTest {
         assertEquals(0, wallet.getBalance().compareTo(new BigDecimal("2000000.00")));
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(notificationService, times(1))
-                .createNotification(any(), any(), any(), any(), eq("PAYOUT_REJECTED"));
+                .createNotification(any(), any(), any(), any(), eq("PAYOUT_REJECTED"), any());
     }
 
     @Test
@@ -318,7 +325,7 @@ class PayoutSettlementServiceImplTest {
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(reconciliationLogRepository, times(1)).save(any());
         verify(notificationService, times(1))
-                .createNotification(any(), any(), any(), any(), eq("PAYOUT_SUCCESS"));
+                .createNotification(any(), any(), any(), any(), eq("PAYOUT_SUCCESS"), any());
     }
 
     @Test

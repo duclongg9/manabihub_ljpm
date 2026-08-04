@@ -18,6 +18,10 @@ import java.util.UUID;
 
 public interface TeacherProfileRepository extends JpaRepository<TeacherProfile, UUID> {
 
+    @Override
+    @EntityGraph(attributePaths = "user")
+    Optional<TeacherProfile> findById(UUID id);
+
     Optional<TeacherProfile> findByUserId(UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

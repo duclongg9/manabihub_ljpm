@@ -21,6 +21,7 @@ import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.learning.repository.LearningCertificateRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.CertificateEligibilityService;
+import com.manabihub.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,6 +62,8 @@ class StudentCertificateServiceImplTest {
     private CertificateEligibilityService eligibilityService;
     @Mock
     private CurrentUserService currentUserService;
+    @Mock
+    private NotificationService notificationService;
     @Captor
     private org.mockito.ArgumentCaptor<List<LessonBlock>> lessonBlocksCaptor;
     @Spy
@@ -126,6 +129,15 @@ class StudentCertificateServiceImplTest {
         assertEquals(course.getTitle(), result.courseTitle());
         assertTrue(result.certificateNumber().startsWith("MHB-"));
         verify(certificateRepository).save(any(LearningCertificate.class));
+        verify(notificationService).createNotificationOnce(
+                "course-completed:" + enrollment.getId(),
+                userId,
+                "student@example.com",
+                "Chúc mừng bạn đã hoàn thành khóa học",
+                "Bạn đã hoàn thành khóa học \"Japanese Foundations\" và chứng chỉ đã sẵn sàng.",
+                "COURSE_COMPLETED",
+                "/student/courses/" + course.getId() + "/learn"
+        );
     }
 
     @Test

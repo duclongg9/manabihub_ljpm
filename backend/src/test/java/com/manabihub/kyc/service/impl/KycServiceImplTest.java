@@ -21,7 +21,7 @@ import com.manabihub.kyc.repository.InternalAdminAccountRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
-import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.enums.WalletOwnerType;
@@ -70,7 +70,7 @@ class KycServiceImplTest {
     @Mock
     private AuditLogRepository auditLogRepository;
     @Mock
-    private NotificationRepository notificationRepository;
+    private NotificationService notificationService;
     @Mock
     private CourseRepository courseRepository;
     @Mock

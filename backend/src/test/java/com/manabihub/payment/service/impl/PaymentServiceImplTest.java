@@ -187,7 +187,7 @@ class PaymentServiceImplTest {
         assertEquals(OrderStatus.FAILED, order.getStatus());
         verify(enrollmentRepository, never()).save(any());
         verify(escrowService, never()).holdForOrder(any());
-        verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
+        verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
     }
 
     @Test

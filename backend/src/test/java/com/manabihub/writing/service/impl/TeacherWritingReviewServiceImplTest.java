@@ -152,10 +152,11 @@ class TeacherWritingReviewServiceImplTest {
         assertThat(result.teacherFeedback()).isNotNull();
         verify(notificationService).createNotification(
                 eq(submission.getStudent().getUser().getId()),
-                eq(null),
-                eq("Writing feedback is ready"),
-                eq("Your teacher has reviewed your writing submission for N3 Writing."),
-                eq("TEACHER_WRITING_FEEDBACK")
+                eq(submission.getStudent().getUser().getEmail()),
+                eq("Giảng viên đã phản hồi bài viết"),
+                eq("Bài viết của bạn trong khóa học N3 Writing đã được giảng viên nhận xét."),
+                eq("TEACHER_WRITING_FEEDBACK"),
+                eq("/student/courses/" + submission.getEnrollment().getCourse().getId() + "/learn")
         );
     }
 }

@@ -11,6 +11,7 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.notification.NotificationTypes;
 import com.manabihub.payout.dto.request.ManualTransferRequest;
 import com.manabihub.payout.dto.request.RejectPayoutRequest;
 import com.manabihub.payout.dto.request.PayoutQueueFilterRequest;
@@ -29,6 +30,7 @@ import com.manabihub.payout.enums.PayoutTransferMethod;
 import com.manabihub.payout.enums.ReconciliationStatus;
 import com.manabihub.payout.enums.WithdrawalStatus;
 import com.manabihub.payout.repository.PayoutReconciliationLogRepository;
+import com.manabihub.payout.repository.PayoutQueueSpecification;
 import com.manabihub.payout.repository.PayoutSettlementRepository;
 import com.manabihub.payout.repository.WithdrawalRequestRepository;
 import com.manabihub.payout.security.PayoutSecurityService;
@@ -98,15 +100,8 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             Pageable pageable
     ) {
         requireFinanceAdmin();
-        String teacherKeyword = isBlank(filter.getTeacherKeyword())
-                ? null
-                : "%" + filter.getTeacherKeyword().trim().toLowerCase() + "%";
-        return withdrawalRequestRepository.findPayoutQueue(
-                filter.getStatus(),
-                filter.getReconciliationStatus(),
-                teacherKeyword,
-                filter.getRequestedFrom(),
-                filter.getRequestedTo(),
+        return withdrawalRequestRepository.findAll(
+                PayoutQueueSpecification.from(filter),
                 pageable
         ).map(this::toQueueItem);
     }
@@ -236,7 +231,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         } catch (RuntimeException exception) {
             notifyFinanceAlert(
                     prepared.request(),
-                    "Không thể hoàn tất bút toán payout",
+                    "Không thể hoàn tất bút toán thanh toán",
                     "Nhà cung cấp có thể đã nhận lệnh chuyển tiền nhưng bút toán nội bộ thất bại. "
                             + "Không tạo giao dịch mới; hãy dùng chức năng thử lại/đối soát."
             );
@@ -319,7 +314,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             if (result.blockMessageCode() != null) {
                 notifyFinanceAlert(
                         result.request(),
-                        "Manual payout bị chặn bởi đối soát",
+                        "Thanh toán thủ công bị chặn bởi đối soát",
                         result.blockMessage()
                 );
                 throw new BusinessException(
@@ -879,7 +874,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                     false,
                     false,
                     MessageCodes.MSG_ADM_005,
-                    "Critical reconciliation mismatch blocks manual payout confirmation."
+                    "Sai lệch đối soát nghiêm trọng đang chặn việc xác nhận thanh toán thủ công."
             );
         }
 
@@ -1325,9 +1320,10 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
     ) {
         boolean sent = false;
         try {
+            TeacherProfile teacher = findTeacher(request.getTeacherId());
             notificationService.createNotification(
-                    teacherUserId(request.getTeacherId()),
-                    null,
+                    teacher.getUser().getId(),
+                    teacher.getUser().getEmail(),
                     "Thanh toán doanh thu thành công",
                     "Yêu cầu rút " + request.getRequestedAmount()
                             + " VND đã được thanh toán tới tài khoản "
@@ -1335,13 +1331,15 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                                     request.getBankAccountSnapshot().getAccountNumber()
                             )
                             + ". Mã đối soát: " + settlement.getProviderReferenceId(),
-                    "PAYOUT_SUCCESS"
+                    NotificationTypes.PAYOUT_SUCCESS,
+                    "/teacher/wallet"
             );
             sent = true;
         } catch (Exception exception) {
             log.warn(
-                    "Payout {} succeeded but its notification could not be created.",
-                    settlement.getId()
+                    "Payout {} succeeded but its notification could not be created: {}",
+                    settlement.getId(),
+                    exception.getClass().getSimpleName()
             );
         } finally {
             recordNotificationResult(settlement, sent);
@@ -1353,16 +1351,20 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             PayoutGateway.PayoutGatewayResult result
     ) {
         try {
+            TeacherProfile teacher = findTeacher(request.getTeacherId());
             notificationService.createNotification(
-                    teacherUserId(request.getTeacherId()),
-                    null,
+                    teacher.getUser().getId(),
+                    teacher.getUser().getEmail(),
                     result.isRetryable()
                             ? "Yêu cầu rút tiền đang được xử lý lại"
                             : "Thanh toán doanh thu chưa thành công",
                     result.isRetryable()
                             ? "Yêu cầu rút tiền đang chờ hệ thống xử lý lại. Bạn không cần tạo yêu cầu mới."
                             : "Yêu cầu rút tiền chưa thể thanh toán. Số tiền đã giữ vẫn được bảo toàn.",
-                    result.isRetryable() ? "PAYOUT_PENDING_RETRY" : "PAYOUT_FAILED"
+                    result.isRetryable()
+                            ? NotificationTypes.PAYOUT_PENDING_RETRY
+                            : NotificationTypes.PAYOUT_FAILED,
+                    "/teacher/wallet"
             );
         } catch (Exception exception) {
             log.warn("Gateway failure notification could not be created for withdrawal {}.", request.getId());
@@ -1376,13 +1378,15 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
     ) {
         boolean sent = false;
         try {
+            TeacherProfile teacher = findTeacher(request.getTeacherId());
             notificationService.createNotification(
-                    teacherUserId(request.getTeacherId()),
-                    null,
+                    teacher.getUser().getId(),
+                    teacher.getUser().getEmail(),
                     "Yêu cầu rút tiền bị từ chối",
                     "Yêu cầu rút tiền đã bị từ chối. Lý do: " + reason
                             + ". Số tiền đã giữ được trả lại số dư khả dụng.",
-                    "PAYOUT_REJECTED"
+                    NotificationTypes.PAYOUT_REJECTED,
+                    "/teacher/wallet"
             );
             sent = true;
         } catch (Exception exception) {
@@ -1413,21 +1417,16 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             String message
     ) {
         try {
-            notificationService.createNotificationForRole(
+            notificationService.createNotificationForAdminRole(
                     FINANCE_ROLE,
                     title,
                     message,
-                    "PAYOUT_ALERT",
+                    NotificationTypes.PAYOUT_ALERT,
                     "/admin/payouts/" + request.getId()
             );
         } catch (Exception exception) {
             log.warn("Finance alert could not be created for withdrawal {}.", request.getId());
         }
-    }
-
-    private UUID teacherUserId(UUID teacherProfileId) {
-        TeacherProfile teacher = findTeacher(teacherProfileId);
-        return teacher.getUser().getId();
     }
 
     private WithdrawalRequest findRequest(UUID id) {
