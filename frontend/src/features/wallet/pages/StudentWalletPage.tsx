@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
+import { WalletTransactionDetailModal } from '../components/WalletTransactionDetailModal';
+import { WalletTransactionFilters } from '../components/WalletTransactionFilters';
+import { WalletTransactionTable } from '../components/WalletTransactionTable';
+import { STUDENT_TRANSACTION_TYPES } from '../constants/transactionLabels';
+import { useStudentWalletTransactions } from '../hooks/useStudentWalletTransactions';
 import { getStudentWallet, topUpWallet } from '../services/studentWalletService';
-import type { StudentWalletResponse } from '../types';
+import type { StudentWalletResponse, WalletTransactionFilter } from '../types';
 
 const MIN_TOPUP = 10000;
 const MAX_TOPUP = 100000000;
 const QUICK_AMOUNTS = [50000, 100000, 200000, 500000];
+const PAGE_SIZE = 10;
 
 export const StudentWalletPage = () => {
   const [wallet, setWallet] = useState<StudentWalletResponse | null>(null);
@@ -12,6 +18,11 @@ export const StudentWalletPage = () => {
   const [amount, setAmount] = useState<number>(100000);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<WalletTransactionFilter>({ page: 0, size: PAGE_SIZE });
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+
+  const historyQuery = useStudentWalletTransactions(filter);
+  const history = historyQuery.data;
 
   useEffect(() => {
     let active = true;
@@ -49,7 +60,7 @@ export const StudentWalletPage = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-extrabold text-slate-900 mb-6">Ví của tôi</h1>
 
       {/* Balance card */}
@@ -107,6 +118,87 @@ export const StudentWalletPage = () => {
           Giao dịch chỉ được xác nhận qua cổng thanh toán (webhook), không qua trình duyệt.
         </p>
       </div>
+
+      {/* Transaction history (UC-17) */}
+      <div className="bg-white rounded-2xl shadow border border-slate-200/60 mt-8 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 p-6 pb-4">
+          <div>
+            <h2 className="font-bold text-slate-900">Lịch sử giao dịch</h2>
+            <p className="text-sm text-slate-500">
+              Nạp tiền, thanh toán khóa học và các khoản hoàn tiền của bạn.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void historyQuery.refetch()}
+            disabled={historyQuery.isFetching}
+            className="text-sm font-semibold text-red-600 hover:text-red-700 disabled:opacity-60 whitespace-nowrap"
+          >
+            {historyQuery.isFetching ? 'Đang tải…' : 'Tải lại'}
+          </button>
+        </div>
+
+        <WalletTransactionFilters
+          availableTypes={STUDENT_TRANSACTION_TYPES}
+          value={filter}
+          onChange={setFilter}
+          disabled={historyQuery.isLoading}
+        />
+
+        {historyQuery.isError ? (
+          <div className="px-5 py-10 text-center">
+            <p className="text-sm text-slate-600 mb-3">
+              Không tải được lịch sử giao dịch. Vui lòng thử lại.
+            </p>
+            <button
+              type="button"
+              onClick={() => void historyQuery.refetch()}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-xl"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : (
+          <>
+            <WalletTransactionTable
+              transactions={history?.content ?? []}
+              loading={historyQuery.isLoading}
+              onSelect={(transaction) => setSelectedTransactionId(transaction.id)}
+            />
+
+            {history && history.totalPages > 1 && (
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-200">
+                <span className="text-sm text-slate-500">
+                  Trang {history.page + 1}/{history.totalPages} · {history.totalElements} giao dịch
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={history.first || historyQuery.isFetching}
+                    onClick={() => setFilter((prev) => ({ ...prev, page: (prev.page ?? 0) - 1 }))}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-semibold disabled:opacity-50"
+                  >
+                    Trước
+                  </button>
+                  <button
+                    type="button"
+                    disabled={history.last || historyQuery.isFetching}
+                    onClick={() => setFilter((prev) => ({ ...prev, page: (prev.page ?? 0) + 1 }))}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-semibold disabled:opacity-50"
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <WalletTransactionDetailModal
+        transactionId={selectedTransactionId}
+        onClose={() => setSelectedTransactionId(null)}
+      />
     </div>
   );
 };

@@ -261,6 +261,8 @@ public final class MessageCodes {
     // ──────────────────────────────────────────────
     public static final String WALLET_NOT_FOUND = "WALLET_NOT_FOUND";
     public static final String WALLET_INSUFFICIENT_BALANCE = "WALLET_INSUFFICIENT_BALANCE";
+    public static final String WALLET_TRANSACTION_NOT_FOUND = "WALLET_TRANSACTION_NOT_FOUND";
+    public static final String WALLET_HISTORY_UNAVAILABLE = "WALLET_HISTORY_UNAVAILABLE";
 
     // ──────────────────────────────────────────────
     // REFUND — refund processing

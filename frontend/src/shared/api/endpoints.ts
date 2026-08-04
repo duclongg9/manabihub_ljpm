@@ -58,6 +58,9 @@ export const ENDPOINTS = {
   teacherWallet: {
     detail: '/v1/teacher/wallet',
     escrow: '/v1/teacher/wallet/escrow',
+    transactions: '/v1/teacher/wallet/transactions',
+    transactionDetail: (transactionId: string) =>
+      `/v1/teacher/wallet/transactions/${transactionId}`,
     withdrawals: '/v1/teacher/withdrawals',
     withdrawalDetail: (id: string) => `/v1/teacher/withdrawals/${id}`,
     cancelWithdrawal: (id: string) => `/v1/teacher/withdrawals/${id}/cancel`,
@@ -77,6 +80,9 @@ export const ENDPOINTS = {
     courseReview: (courseId: string) => `/v1/student/courses/${courseId}/review`,
     wallet: '/v1/student/wallet',
     walletTopUp: '/v1/student/wallet/top-up',
+    walletTransactions: '/v1/student/wallet/transactions',
+    walletTransactionDetail: (transactionId: string) =>
+      `/v1/student/wallet/transactions/${transactionId}`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>
