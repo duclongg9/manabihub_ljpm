@@ -41,7 +41,7 @@ public class ViolationReport {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private ViolationStatus status = ViolationStatus.PENDING;
+    private ViolationStatus status = ViolationStatus.PENDING_REVIEW;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

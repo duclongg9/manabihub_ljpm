@@ -31,6 +31,6 @@ public class ViolationReportController {
 
         UUID reporterId = currentUserService.getCurrentUserId();
         ViolationReportResponse response = violationReportService.submitReport(request, reporterId);
-        return ApiResponse.success(MessageCodes.MSG_REP_001, "Report submitted successfully", response);
+        return ApiResponse.success(MessageCodes.MSG_REP_001, "Báo cáo vi phạm đã được gửi thành công.", response);
     }
 }
