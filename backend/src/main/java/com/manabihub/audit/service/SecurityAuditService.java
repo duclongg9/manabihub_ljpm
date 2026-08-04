@@ -158,4 +158,50 @@ public class SecurityAuditService {
                 .build();
         auditLogRepository.save(auditLog);
     }
+
+    /**
+     * Logs a generic VNPT server verification event with REQUIRES_NEW propagation.
+     * <p>
+     * Persists even if the outer transaction rolls back.
+     * CRITICAL: No PII, no raw transaction IDs, no CCCD in the payload.
+     *
+     * @param action       one of: SERVER_VERIFIED, PROVIDER_REJECTED, PROVIDER_TIMEOUT,
+     *                     EXPIRED, MAX_ATTEMPTS, TRANSACTION_MISMATCH, SESSION_MISMATCH,
+     *                     STALE_TIMESTAMP, FUTURE_TIMESTAMP, MISSING_SERVER_IDENTITY,
+     *                     PROVIDER_NOT_CONFIGURED, IDENTITY_CLAIM_FAILED, DUPLICATE_TRANSACTION
+     * @param teacherId    the teacher profile ID (not user ID)
+     * @param requestId    the KycRequest ID (nullable for pre-bind events)
+     * @param actorUserId  the acting user ID
+     * @param ipAddress    client IP
+     * @param userAgent    client User-Agent
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logVerificationEvent(
+            String action,
+            UUID teacherId,
+            UUID requestId,
+            UUID actorUserId,
+            String ipAddress,
+            String userAgent
+    ) {
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(actorUserId)
+                .actorRoleCode("TEACHER")
+                .action("KYC_" + action)
+                .targetType(requestId != null ? "KYC_REQUEST" : "TEACHER_PROFILE")
+                .targetId(requestId != null ? requestId : teacherId)
+                .afterValue(Map.of(
+                        "event", action,
+                        "status", "RECORDED"
+                ))
+                .metadata(Map.of(
+                        "uc", "UC-22",
+                        "module", "SERVER_VERIFICATION"
+                ))
+                .ipAddress(ipAddress)
+                .userAgent(userAgent)
+                .build();
+        auditLogRepository.save(auditLog);
+    }
 }

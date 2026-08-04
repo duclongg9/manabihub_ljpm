@@ -17,10 +17,10 @@ public class TestVnptVerificationAdapter implements VnptVerificationPort {
 
     private static final Map<String, TestBinding> allowedBindings = new ConcurrentHashMap<>();
 
-    private record TestBinding(String sessionId, String serverIdNumber) {}
+    private record TestBinding(String sessionId, String serverIdNumber, String fullName, String dateOfBirth) {}
 
-    public static void allowTransaction(String txId, String sessionId, String serverIdNumber) {
-        allowedBindings.put(txId, new TestBinding(sessionId, serverIdNumber));
+    public static void allowTransaction(String txId, String sessionId, String serverIdNumber, String fullName, String dateOfBirth) {
+        allowedBindings.put(txId, new TestBinding(sessionId, serverIdNumber, fullName, dateOfBirth));
     }
 
     public static void clear() {
@@ -46,6 +46,8 @@ public class TestVnptVerificationAdapter implements VnptVerificationPort {
                     "SUCCESS",
                     Instant.now(),
                     binding.serverIdNumber(),
+                    binding.fullName(),
+                    binding.dateOfBirth(),
                     "ref-" + providerTransactionId
             );
         }

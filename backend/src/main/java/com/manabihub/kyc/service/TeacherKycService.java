@@ -90,7 +90,7 @@ public class TeacherKycService {
     private final SecurityAuditService securityAuditService;
     private final EntityManager entityManager;
     private final Path storageRoot;
-    private final ObjectProvider<TeacherKycService> selfProvider;
+    private final VnptVerificationCoordinator verificationCoordinator;
 
     public TeacherKycService(
             TeacherProfileRepository teacherProfileRepository,
@@ -104,7 +104,7 @@ public class TeacherKycService {
             VnptVerificationPort vnptVerificationPort,
             SecurityAuditService securityAuditService,
             EntityManager entityManager,
-            ObjectProvider<TeacherKycService> selfProvider,
+            VnptVerificationCoordinator verificationCoordinator,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
         this.teacherProfileRepository = teacherProfileRepository;
@@ -119,7 +119,7 @@ public class TeacherKycService {
         this.securityAuditService = securityAuditService;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
-        this.selfProvider = selfProvider;
+        this.verificationCoordinator = verificationCoordinator;
     }
 
     @Transactional
@@ -158,108 +158,18 @@ public class TeacherKycService {
             throw new BusinessException(MessageCodes.MSG_KYC_002, "Provider transaction ID and session ID are required");
         }
 
-        TeacherProfile teacherProfile = resolveTeacher(userId);
-        AppUser user = teacherProfile.getUser();
-        KycRequest latestRequest = findLatestRequest(teacherProfile);
-        validateIdentityAllowed(user, teacherProfile, latestRequest);
-
-        KycRequest kycRequest;
-
-        if (latestRequest != null && latestRequest.getStatus() == KycRequestStatus.DRAFT) {
-            String boundTx = latestRequest.getProviderTransactionId();
-            String boundSession = latestRequest.getProviderSessionId();
-
-            if (boundTx != null) {
-                if (incTxId.equals(boundTx) && incSessionId.equals(boundSession)) {
-                    IdentityVerificationStatus currentStatus = latestRequest.getIdentityStatus();
-                    if (currentStatus == IdentityVerificationStatus.VERIFIED) {
-                        return buildIdentityResponse(teacherProfile, latestRequest, false);
-                    }
-                    if (currentStatus == IdentityVerificationStatus.FAILED) {
-                        throw new BusinessException(MessageCodes.MSG_KYC_008, "Transaction failed. Must restart verification.", HttpStatus.CONFLICT);
-                    }
-                    if (currentStatus == IdentityVerificationStatus.PENDING_SERVER_VERIFICATION) {
-                        if (latestRequest.getServerVerificationAttemptCount() >= 3) {
-                             latestRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
-                             kycRequestRepository.saveAndFlush(latestRequest);
-                             throw new BusinessException(MessageCodes.MSG_KYC_008, "Max server verification attempts exceeded.", HttpStatus.CONFLICT);
-                        }
-
-                        confirmServerVerification(latestRequest, teacherProfile, user, ipAddress, userAgent);
-                        return buildIdentityResponse(teacherProfile, latestRequest, false);
-                    }
-                } else {
-                    securityAuditService.logMismatchBindingAudit(teacherProfile.getId(), user.getId(), ipAddress, userAgent);
-                    throw new BusinessException(MessageCodes.MSG_KYC_008, "Invalid transaction binding. Mismatch transaction or session.", HttpStatus.CONFLICT);
-                }
-            }
-            kycRequest = latestRequest;
-        } else {
-            kycRequest = new KycRequest();
-        }
-
         VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
-        boolean sdkPassed = sdkDecision.verified();
-        List<String> reasonCodes = sdkPassed ? List.of() : List.of("SDK_VALIDATION_FAILED");
 
-        if (sdkPassed && sdkDecision.identityOcr() != null) {
-            Map<String, String> ocr = sdkDecision.identityOcr();
-            try {
-                teacherIdentityClaimService.normalizeCccd(ocr.get("idNumber"));
-                parseSupportedDate(ocr.get("dateOfBirth"));
-            } catch (BusinessException ex) {
-                sdkPassed = false;
-                reasonCodes = List.of("INVALID_OCR_DATA");
-            }
-        }
+        VnptVerificationCoordinator.VerificationOutcome outcome = verificationCoordinator.orchestrate(
+            userId, request, sdkDecision, ipAddress, userAgent
+        );
 
-        Instant now = Instant.now();
-        IdentityVerificationStatus identityStatus = sdkPassed
-                ? IdentityVerificationStatus.PENDING_SERVER_VERIFICATION
-                : IdentityVerificationStatus.FAILED;
+        TeacherProfile teacherProfile = teacherProfileRepository.findById(outcome.teacherProfileId())
+                .orElseThrow();
+        KycRequest kycRequest = kycRequestRepository.findById(outcome.requestId())
+                .orElseThrow();
 
-        kycRequest.setStatus(KycRequestStatus.DRAFT);
-        kycRequest.setTeacherProfile(teacherProfile);
-        kycRequest.setEkycProvider(VNPT_PROVIDER);
-        kycRequest.setProviderSessionId(incSessionId);
-        kycRequest.setProviderTransactionId(incTxId);
-        kycRequest.setIdentityStatus(identityStatus);
-        kycRequest.setIdentityVerifiedAt(null);
-        kycRequest.setCertificateStatus(CertificateVerificationStatus.LOCKED);
-        kycRequest.setServerVerificationExpiresAt(sdkPassed ? now.plus(SERVER_VERIFICATION_TTL) : null);
-        kycRequest.setServerVerificationAttemptCount(0);
-        kycRequest.setVerificationPayload(Map.of(
-                "identityProvider", VNPT_PROVIDER,
-                "providerStatus", sdkPassed ? "SDK_PENDING_SERVER_CONFIRM" : "SDK_FAILED",
-                "reasonCodes", reasonCodes,
-                "certificateManualAuthenticityReviewRequired", true,
-                "autoApproval", false,
-                "serverVerificationRequired", sdkPassed,
-                "srs", srsTrace()
-        ));
-
-        KycRequest savedRequest;
-        try {
-            savedRequest = kycRequestRepository.saveAndFlush(kycRequest);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            if (isProviderTxUniqueConstraintViolation(e)) {
-                securityAuditService.logMismatchBindingAudit(teacherProfile.getId(), user.getId(), ipAddress, userAgent);
-                throw new BusinessException(
-                        MessageCodes.MSG_KYC_008,
-                        "Invalid or duplicate verification transaction",
-                        org.springframework.http.HttpStatus.CONFLICT
-                );
-            }
-            throw e;
-        }
-        savedRequest.setEkycReferenceId("VNPT-SDK-" + savedRequest.getId());
-        boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
-
-        if (sdkPassed) {
-            confirmServerVerification(savedRequest, teacherProfile, user, ipAddress, userAgent);
-        }
-
-        return buildIdentityResponse(teacherProfile, savedRequest, auditLogged);
+        return buildIdentityResponse(teacherProfile, kycRequest, outcome.auditLogged());
     }
 
     private KycIdentityVerificationResponse buildIdentityResponse(TeacherProfile teacherProfile, KycRequest request, boolean auditLogged) {
@@ -272,117 +182,6 @@ public class TeacherKycService {
                 auditLogged,
                 srsTrace()
         );
-    }
-
-    private boolean isProviderTxUniqueConstraintViolation(org.springframework.dao.DataIntegrityViolationException ex) {
-        Throwable cause = ex;
-        while (cause != null) {
-            if (cause instanceof org.hibernate.exception.ConstraintViolationException cve) {
-                if ("uq_kyc_requests_provider_tx".toLowerCase().equals(cve.getConstraintName().toLowerCase())) return true;
-            }
-            if (cause instanceof java.sql.SQLException sqlEx) {
-                String msg = sqlEx.getMessage();
-                if (msg != null && msg.toLowerCase().contains("uq_kyc_requests_provider_tx")) return true;
-            }
-            cause = cause.getCause();
-        }
-        return false;
-    }
-
-    /**
-     * Server-to-server verification of a VNPT eKYC transaction.
-     * <p>
-     * This method is the ONLY path to {@link IdentityVerificationStatus#VERIFIED}.
-     * It must be called after the SDK result has been evaluated and the request
-     * is in {@code PENDING_SERVER_VERIFICATION} status.
-     * <p>
-     * Security guarantees:
-     * <ul>
-     *   <li>Idempotent: already-VERIFIED requests are no-ops</li>
-     *   <li>Expiry: PENDING requests past TTL are rejected</li>
-     *   <li>Cross-user: transaction must belong to the requesting teacher</li>
-     *   <li>Replay: duplicate calls do not re-process identity claims</li>
-     * </ul>
-     */
-    private void confirmServerVerification(
-            KycRequest kycRequest,
-            TeacherProfile teacherProfile,
-            AppUser user,
-            String ipAddress,
-            String userAgent
-    ) {
-        if (kycRequest.getIdentityStatus() == IdentityVerificationStatus.VERIFIED) {
-            return;
-        }
-
-        if (kycRequest.getIdentityStatus() != IdentityVerificationStatus.PENDING_SERVER_VERIFICATION) {
-            return;
-        }
-
-        Instant expiresAt = kycRequest.getServerVerificationExpiresAt();
-        if (expiresAt != null && Instant.now().isAfter(expiresAt)) {
-            kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
-            kycRequestRepository.save(kycRequest);
-            return;
-        }
-
-        kycRequest.setServerVerificationAttemptCount(
-                kycRequest.getServerVerificationAttemptCount() + 1);
-
-        String txId = kycRequest.getProviderTransactionId();
-        String sessionId = kycRequest.getProviderSessionId();
-
-        VnptServerVerificationResult serverResult;
-        try {
-            serverResult = vnptVerificationPort.verifyTransaction(txId, sessionId);
-        } catch (Exception ex) {
-            kycRequestRepository.save(kycRequest);
-            return;
-        }
-
-        Instant now = Instant.now();
-
-        if (serverResult.verified()) {
-            if (!txId.equals(serverResult.confirmedTransactionId()) || !sessionId.equals(serverResult.confirmedSessionId())) {
-                kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
-                securityAuditService.logMismatchBindingAudit(teacherProfile.getId(), user.getId(), ipAddress, userAgent);
-            } else if (serverResult.providerVerifiedAt() == null || serverResult.providerVerifiedAt().isBefore(kycRequest.getSubmittedAt())) {
-                kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
-            } else if (!org.springframework.util.StringUtils.hasText(serverResult.serverIdNumber())) {
-                kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
-            } else {
-                kycRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
-                kycRequest.setIdentityVerifiedAt(now);
-                kycRequest.setServerVerifiedAt(now);
-                                kycRequest.setCertificateStatus(CertificateVerificationStatus.NOT_SUBMITTED);
-
-                java.util.Map<String, Object> currentPayload = new java.util.HashMap<>(kycRequest.getVerificationPayload());
-                currentPayload.put("providerStatus", serverResult.providerStatus());
-                if (serverResult.maskedReference() != null) {
-                    currentPayload.put("serverReference", serverResult.maskedReference());
-                }
-                kycRequest.setVerificationPayload(currentPayload);
-
-                String normalizedCccd = teacherIdentityClaimService.normalizeCccd(serverResult.serverIdNumber());
-                teacherIdentityClaimService.processIdentityClaim(
-                        teacherProfile.getId(),
-                        normalizedCccd,
-                        user,
-                        ipAddress,
-                        userAgent
-                );
-            }
-        } else {
-            kycRequest.setIdentityStatus(IdentityVerificationStatus.FAILED);
-            java.util.Map<String, Object> currentPayload = new java.util.HashMap<>(kycRequest.getVerificationPayload());
-            currentPayload.put("providerStatus", serverResult.providerStatus());
-            if (serverResult.reasonCode() != null) {
-                 currentPayload.put("reasonCodes", List.of(serverResult.reasonCode()));
-            }
-            kycRequest.setVerificationPayload(currentPayload);
-        }
-
-        kycRequestRepository.save(kycRequest);
     }
 
     @Transactional
@@ -1070,9 +869,8 @@ public class TeacherKycService {
             throw certificateMismatch("Only JLPT levels N1 through N5 are accepted");
         }
 
-        Map<String, String> identityOcr = extractOcrFromPayload(kycRequest.getVerificationPayload());
-        String identityFullName = identityOcr.get("fullName");
-        String identityDateOfBirth = identityOcr.get("dateOfBirth");
+        String identityFullName = kycRequest.getServerFullName();
+        String identityDateOfBirth = kycRequest.getServerDateOfBirth();
         if (!StringUtils.hasText(identityFullName) || !StringUtils.hasText(identityDateOfBirth)) {
             throw certificateMismatch(
                     "VNPT identity result is missing the name or date of birth required for matching"
@@ -1568,12 +1366,7 @@ public class TeacherKycService {
     private record ResultEntry(String key, Object value) {
     }
 
-    private record VnptSdkDecision(
-            boolean verified,
-            Map<String, String> identityOcr,
-            List<String> failureReasons
-    ) {
-    }
+
 
     private record CertificateEvidence(
             String holderName,

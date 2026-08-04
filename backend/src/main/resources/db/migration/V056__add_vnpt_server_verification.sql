@@ -1,14 +1,14 @@
 -- MHB-73: Add server-to-server VNPT verification support
 -- Adds PENDING_SERVER_VERIFICATION enum value and server verification tracking columns
 
--- Add new enum value for identity_status
-
-
 -- Add server verification tracking columns to kyc_requests
 ALTER TABLE kyc_requests
     ADD COLUMN IF NOT EXISTS server_verified_at TIMESTAMP WITH TIME ZONE,
     ADD COLUMN IF NOT EXISTS server_verification_attempt_count INTEGER NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS server_verification_expires_at TIMESTAMP WITH TIME ZONE;
+    ADD COLUMN IF NOT EXISTS server_verification_expires_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS server_verification_next_retry_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS server_full_name VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS server_date_of_birth VARCHAR(50);
 
 -- Index for finding pending verification requests that need server confirmation
 CREATE INDEX IF NOT EXISTS idx_kyc_requests_pending_server_verification

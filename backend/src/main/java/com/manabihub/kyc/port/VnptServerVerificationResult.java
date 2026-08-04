@@ -13,6 +13,8 @@ public record VnptServerVerificationResult(
         Instant providerVerifiedAt,
         String reasonCode,
         String serverIdNumber,
+        String serverFullName,
+        String serverDateOfBirth,
         String maskedReference
 ) {
     public static VnptServerVerificationResult success(
@@ -21,11 +23,13 @@ public record VnptServerVerificationResult(
             String providerStatus,
             Instant verifiedAt,
             String idNumber,
+            String fullName,
+            String dateOfBirth,
             String maskedReference
     ) {
         return new VnptServerVerificationResult(
                 txId, sessionId, true, providerStatus, verifiedAt,
-                null, idNumber, maskedReference
+                null, idNumber, fullName, dateOfBirth, maskedReference
         );
     }
 
@@ -37,7 +41,7 @@ public record VnptServerVerificationResult(
     ) {
         return new VnptServerVerificationResult(
                 txId, sessionId, false, providerStatus, null,
-                reasonCode, null, null
+                reasonCode, null, null, null, null
         );
     }
 }

@@ -109,6 +109,15 @@ public class KycRequest {
     @Column(name = "server_verification_expires_at")
     private Instant serverVerificationExpiresAt;
 
+    @Column(name = "server_verification_next_retry_at")
+    private Instant serverVerificationNextRetryAt;
+
+    @Column(name = "server_full_name")
+    private String serverFullName;
+
+    @Column(name = "server_date_of_birth")
+    private String serverDateOfBirth;
+
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
