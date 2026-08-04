@@ -72,7 +72,7 @@ public class FlywayMigrationIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
-    // ── Test 1: Clean build from V001 to V053 ──────────────────────────────
+    // ── Test 1: Clean build from V001 to V058 ──────────────────────────────
     @Test
     void cleanMigrationToLatestVersion() {
         assertThat(flyway).isNotNull();
@@ -89,13 +89,13 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("057");
+        assertThat(current).isEqualTo("058");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V057 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V058 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");
@@ -116,6 +116,7 @@ public class FlywayMigrationIntegrationTest {
         UUID teacherUserId  = UUID.randomUUID();
         UUID studentProfId  = UUID.randomUUID();
         UUID teacherProfId  = UUID.randomUUID();
+        UUID kycRequestId   = UUID.randomUUID();
         UUID courseId        = UUID.randomUUID();
         UUID moduleId        = UUID.randomUUID();
         UUID lessonId        = UUID.randomUUID();
@@ -134,6 +135,14 @@ public class FlywayMigrationIntegrationTest {
         lj.update("INSERT INTO " + s + ".app_users (id, email, full_name, created_at) VALUES (?, 'tu@test.com', 'TU', now())", teacherUserId);
         lj.update("INSERT INTO " + s + ".student_profiles (id, user_id, created_at) VALUES (?, ?, now())", studentProfId, studentUserId);
         lj.update("INSERT INTO " + s + ".teacher_profiles (id, user_id, created_at) VALUES (?, ?, now())", teacherProfId, teacherUserId);
+
+        // Legacy KYC request with an existing provider binding
+        lj.update("INSERT INTO " + s + ".kyc_requests "
+                        + "(id, teacher_id, status, ekyc_provider, provider_session_id, provider_transaction_id, "
+                        + "identity_status, certificate_status, created_at) "
+                        + "VALUES (?, ?, 'PENDING', 'VNPT_EKYC_WEB_SDK', 'legacy-session', 'legacy-tx', "
+                        + "'PROCESSING', 'LOCKED', now())",
+                kycRequestId, teacherProfId);
 
         // Course -> module -> legacy lesson -> legacy lesson_block
         lj.update("INSERT INTO " + s + ".courses (id, teacher_id, title, description, slug, status, created_at) VALUES (?, ?, 'C', 'D', 'slug-upgrade', 'DRAFT', now())", courseId, teacherProfId);
@@ -180,6 +189,7 @@ public class FlywayMigrationIntegrationTest {
         assertRowExists(lj, s, "wallets", walletId);
         assertRowExists(lj, s, "payment_transactions", paymentTxId);
         assertRowExists(lj, s, "audit_logs", auditLogId);
+        assertRowExists(lj, s, "kyc_requests", kycRequestId);
 
         // Verify wallet balance preserved
         Integer balance = lj.queryForObject(
@@ -191,6 +201,16 @@ public class FlywayMigrationIntegrationTest {
                 "SELECT provider_transaction_id FROM " + s + ".payment_transactions WHERE id = ?",
                 String.class, paymentTxId);
         assertThat(provTxn).isEqualTo("txn_123");
+
+        String kycProviderTxn = lj.queryForObject(
+                "SELECT provider_transaction_id FROM " + s + ".kyc_requests WHERE id = ?",
+                String.class, kycRequestId);
+        assertThat(kycProviderTxn).isEqualTo("legacy-tx");
+
+        Integer verificationAttempts = lj.queryForObject(
+                "SELECT server_verification_attempt_count FROM " + s + ".kyc_requests WHERE id = ?",
+                Integer.class, kycRequestId);
+        assertThat(verificationAttempts).isZero();
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
@@ -258,5 +278,34 @@ public class FlywayMigrationIntegrationTest {
                 "SELECT count(*) FROM information_schema.columns WHERE table_name = 'enrollments' AND column_name = 'protected_materials_fully_downloaded_at' AND table_schema = 'public'",
                 Integer.class);
         assertThat(colEpm).as("enrollments.protected_materials_fully_downloaded_at exists").isEqualTo(1);
+
+        // MHB-73 server-verification indexes
+        Integer pendingVerificationIndex = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_indexes "
+                        + "WHERE indexname = 'idx_kyc_requests_pending_server_verification' "
+                        + "AND schemaname = 'public'",
+                Integer.class);
+        assertThat(pendingVerificationIndex)
+                .as("idx_kyc_requests_pending_server_verification exists")
+                .isEqualTo(1);
+
+        Integer providerTransactionIndex = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_indexes "
+                        + "WHERE indexname = 'uq_kyc_requests_provider_tx' "
+                        + "AND schemaname = 'public'",
+                Integer.class);
+        assertThat(providerTransactionIndex)
+                .as("uq_kyc_requests_provider_tx exists")
+                .isEqualTo(1);
+
+        String identityStatusConstraint = jdbcTemplate.queryForObject(
+                "SELECT pg_get_constraintdef(c.oid) "
+                        + "FROM pg_constraint c "
+                        + "JOIN pg_namespace n ON n.oid = c.connamespace "
+                        + "WHERE c.conname = 'chk_kyc_identity_status' AND n.nspname = 'public'",
+                String.class);
+        assertThat(identityStatusConstraint)
+                .as("chk_kyc_identity_status allows pending server verification")
+                .contains("PENDING_SERVER_VERIFICATION");
     }
 }
