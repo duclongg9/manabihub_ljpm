@@ -30,6 +30,7 @@ import com.manabihub.payout.enums.PayoutTransferMethod;
 import com.manabihub.payout.enums.ReconciliationStatus;
 import com.manabihub.payout.enums.WithdrawalStatus;
 import com.manabihub.payout.repository.PayoutReconciliationLogRepository;
+import com.manabihub.payout.repository.PayoutQueueSpecification;
 import com.manabihub.payout.repository.PayoutSettlementRepository;
 import com.manabihub.payout.repository.WithdrawalRequestRepository;
 import com.manabihub.payout.security.PayoutSecurityService;
@@ -99,15 +100,8 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             Pageable pageable
     ) {
         requireFinanceAdmin();
-        String teacherKeyword = isBlank(filter.getTeacherKeyword())
-                ? null
-                : "%" + filter.getTeacherKeyword().trim().toLowerCase() + "%";
-        return withdrawalRequestRepository.findPayoutQueue(
-                filter.getStatus(),
-                filter.getReconciliationStatus(),
-                teacherKeyword,
-                filter.getRequestedFrom(),
-                filter.getRequestedTo(),
+        return withdrawalRequestRepository.findAll(
+                PayoutQueueSpecification.from(filter),
                 pageable
         ).map(this::toQueueItem);
     }
@@ -1343,8 +1337,9 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             sent = true;
         } catch (Exception exception) {
             log.warn(
-                    "Payout {} succeeded but its notification could not be created.",
-                    settlement.getId()
+                    "Payout {} succeeded but its notification could not be created: {}",
+                    settlement.getId(),
+                    exception.getClass().getSimpleName()
             );
         } finally {
             recordNotificationResult(settlement, sent);
