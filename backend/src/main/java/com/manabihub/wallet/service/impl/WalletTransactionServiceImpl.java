@@ -15,12 +15,11 @@ import com.manabihub.wallet.dto.request.WalletTransactionFilterRequest;
 import com.manabihub.wallet.dto.response.WalletTransactionDetailResponse;
 import com.manabihub.wallet.dto.response.WalletTransactionResponse;
 import com.manabihub.wallet.entity.EscrowLedger;
-import com.manabihub.wallet.entity.StudentWallet;
-import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
-import com.manabihub.wallet.repository.StudentWalletRepository;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import com.manabihub.wallet.repository.WalletTransactionSpecifications;
 import com.manabihub.wallet.service.WalletTransactionService;
@@ -62,8 +61,7 @@ public class WalletTransactionServiceImpl implements WalletTransactionService {
     private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt");
 
     private final WalletTransactionRepository walletTransactionRepository;
-    private final StudentWalletRepository studentWalletRepository;
-    private final TeacherWalletRepository teacherWalletRepository;
+    private final WalletRepository walletRepository;
     private final StudentProfileRepository studentProfileRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final OrderRepository orderRepository;
@@ -80,7 +78,7 @@ public class WalletTransactionServiceImpl implements WalletTransactionService {
             UUID userId, WalletTransactionFilterRequest filter, Pageable pageable) {
 
         StudentProfile student = requireStudent(userId);
-        Optional<StudentWallet> wallet = studentWalletRepository.findByStudentId(student.getId());
+        Optional<Wallet> wallet = walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, student.getId());
         if (wallet.isEmpty()) {
             // No wallet yet simply means no activity — an empty history, not an error.
             return PageResponse.from(Page.<WalletTransactionResponse>empty(sorted(pageable)));
@@ -99,7 +97,7 @@ public class WalletTransactionServiceImpl implements WalletTransactionService {
             UUID userId, WalletTransactionFilterRequest filter, Pageable pageable) {
 
         TeacherProfile teacher = requireTeacher(userId);
-        Optional<TeacherWallet> wallet = teacherWalletRepository.findByTeacherId(teacher.getId());
+        Optional<Wallet> wallet = walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId());
         if (wallet.isEmpty()) {
             return PageResponse.from(Page.<WalletTransactionResponse>empty(sorted(pageable)));
         }
@@ -131,7 +129,7 @@ public class WalletTransactionServiceImpl implements WalletTransactionService {
     @Transactional(readOnly = true)
     public WalletTransactionDetailResponse getStudentTransactionDetail(UUID userId, UUID transactionId) {
         StudentProfile student = requireStudent(userId);
-        StudentWallet wallet = studentWalletRepository.findByStudentId(student.getId())
+        Wallet wallet = walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, student.getId())
                 .orElseThrow(() -> walletNotFound("Student wallet was not found"));
 
         WalletTransaction transaction = requireOwnedTransaction(transactionId, wallet.getId());
@@ -142,7 +140,7 @@ public class WalletTransactionServiceImpl implements WalletTransactionService {
     @Transactional(readOnly = true)
     public WalletTransactionDetailResponse getTeacherTransactionDetail(UUID userId, UUID transactionId) {
         TeacherProfile teacher = requireTeacher(userId);
-        TeacherWallet wallet = teacherWalletRepository.findByTeacherId(teacher.getId())
+        Wallet wallet = walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId())
                 .orElseThrow(() -> walletNotFound("Teacher wallet was not found"));
 
         WalletTransaction transaction = requireOwnedTransaction(transactionId, wallet.getId());

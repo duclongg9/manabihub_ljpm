@@ -14,14 +14,13 @@ import com.manabihub.payout.repository.WithdrawalRequestRepository;
 import com.manabihub.wallet.dto.request.WalletTransactionFilterRequest;
 import com.manabihub.wallet.dto.response.WalletTransactionDetailResponse;
 import com.manabihub.wallet.dto.response.WalletTransactionResponse;
-import com.manabihub.wallet.entity.StudentWallet;
-import com.manabihub.wallet.entity.TeacherWallet;
+import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.enums.WalletTransactionType;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
-import com.manabihub.wallet.repository.StudentWalletRepository;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,8 +58,7 @@ import static org.mockito.Mockito.when;
 class WalletTransactionServiceImplTest {
 
     @Mock private WalletTransactionRepository walletTransactionRepository;
-    @Mock private StudentWalletRepository studentWalletRepository;
-    @Mock private TeacherWalletRepository teacherWalletRepository;
+    @Mock private WalletRepository walletRepository;
     @Mock private StudentProfileRepository studentProfileRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
     @Mock private OrderRepository orderRepository;
@@ -74,7 +72,7 @@ class WalletTransactionServiceImplTest {
     private UUID studentId;
     private UUID walletId;
     private StudentProfile student;
-    private StudentWallet wallet;
+    private Wallet wallet;
 
     @BeforeEach
     void setUp() {
@@ -85,9 +83,9 @@ class WalletTransactionServiceImplTest {
         student = mock(StudentProfile.class);
         when(student.getId()).thenReturn(studentId);
 
-        wallet = StudentWallet.builder()
+        wallet = Wallet.builder()
                 .id(walletId)
-                .studentId(studentId)
+                .ownerType(WalletOwnerType.STUDENT)
                 .balance(new BigDecimal("100000"))
                 .frozenBalance(BigDecimal.ZERO)
                 .currency("VND")
@@ -102,7 +100,7 @@ class WalletTransactionServiceImplTest {
 
     @Test
     void getStudentTransactions_returnsEmptyPage_whenWalletNotCreatedYet() {
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.empty());
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.empty());
 
         PageResponse<WalletTransactionResponse> result =
                 service.getStudentTransactions(userId, null, PageRequest.of(0, 20));
@@ -117,7 +115,7 @@ class WalletTransactionServiceImplTest {
         UUID orderId = UUID.randomUUID();
         WalletTransaction transaction = topUpTransaction(orderId);
 
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
         when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(transaction), PageRequest.of(0, 20), 1));
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order(orderId, "ORD-001")));
@@ -135,7 +133,7 @@ class WalletTransactionServiceImplTest {
 
     @Test
     void getStudentTransactions_appliesFiltersWithoutError() {
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
         when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
@@ -158,7 +156,7 @@ class WalletTransactionServiceImplTest {
 
     @Test
     void getStudentTransactions_blankReferenceCodeIsTreatedAsNoSearch() {
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
         when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
@@ -179,7 +177,7 @@ class WalletTransactionServiceImplTest {
         UUID orderId = UUID.randomUUID();
         WalletTransaction transaction = topUpTransaction(orderId);
 
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
         when(walletTransactionRepository.findByIdAndWalletId(transaction.getId(), walletId))
                 .thenReturn(Optional.of(transaction));
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order(orderId, "ORD-001")));
@@ -197,7 +195,7 @@ class WalletTransactionServiceImplTest {
     void getStudentTransactionDetail_rejectsTransactionOwnedByAnotherWallet() {
         UUID foreignTransactionId = UUID.randomUUID();
 
-        when(studentWalletRepository.findByStudentId(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
         when(walletTransactionRepository.findByIdAndWalletId(foreignTransactionId, walletId))
                 .thenReturn(Optional.empty());
 
@@ -217,14 +215,14 @@ class WalletTransactionServiceImplTest {
         when(teacher.getId()).thenReturn(teacherId);
         when(teacherProfileRepository.findByUserId(teacherUserId)).thenReturn(Optional.of(teacher));
 
-        TeacherWallet teacherWallet = TeacherWallet.builder()
+        Wallet teacherWallet = Wallet.builder()
                 .id(teacherWalletId)
-                .teacherId(teacherId)
+                .ownerType(WalletOwnerType.TEACHER)
                 .balance(new BigDecimal("500000"))
                 .frozenBalance(BigDecimal.ZERO)
                 .currency("VND")
                 .build();
-        when(teacherWalletRepository.findByTeacherId(teacherId)).thenReturn(Optional.of(teacherWallet));
+        when(walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacherId)).thenReturn(Optional.of(teacherWallet));
         when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
@@ -232,7 +230,7 @@ class WalletTransactionServiceImplTest {
                 service.getTeacherTransactions(teacherUserId, null, PageRequest.of(0, 20));
 
         assertNotNull(result);
-        verify(studentWalletRepository, never()).findByStudentId(any());
+        verify(walletRepository, never()).findByOwnerTypeAndStudent_Id(eq(WalletOwnerType.STUDENT), any());
     }
 
     // ──────────────────────────────────────────────
