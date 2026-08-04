@@ -57,6 +57,7 @@ export const ENDPOINTS = {
   },
   teacherWallet: {
     detail: '/v1/teacher/wallet',
+    escrow: '/v1/teacher/wallet/escrow',
     withdrawals: '/v1/teacher/withdrawals',
     withdrawalDetail: (id: string) => `/v1/teacher/withdrawals/${id}`,
     cancelWithdrawal: (id: string) => `/v1/teacher/withdrawals/${id}/cancel`,
