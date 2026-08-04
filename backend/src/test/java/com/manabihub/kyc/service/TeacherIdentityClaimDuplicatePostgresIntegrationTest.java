@@ -186,7 +186,7 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             KycIdentityVerificationRequest retryReqA = new KycIdentityVerificationRequest(
                     originalReqA.providerTransactionId(),
                     originalReqA.providerSessionId(),
-                    java.util.Map.of()
+                    originalReqA.sdkResult()
             );
             
             KycIdentityVerificationResponse retryRespA = teacherKycService.verifyIdentity(userAId, retryReqA, "127.0.0.1", "TestAgent");
