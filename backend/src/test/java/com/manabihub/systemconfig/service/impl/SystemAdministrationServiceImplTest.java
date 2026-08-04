@@ -11,6 +11,7 @@ import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.service.InternalAdminInvitationService;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.systemconfig.entity.SystemSetting;
 import com.manabihub.systemconfig.repository.SystemSettingRepository;
 import com.manabihub.systemconfig.service.CommercialPolicyService;
@@ -45,6 +46,7 @@ class SystemAdministrationServiceImplTest {
     @Mock private AuditLogService auditLogService;
     @Mock private InternalAdminInvitationService invitationService;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private NotificationService notificationService;
 
     private SystemAdministrationServiceImpl service;
     private UUID actorId;
@@ -60,7 +62,8 @@ class SystemAdministrationServiceImplTest {
                 new SystemSettingValidator(),
                 new CommercialPolicyService(settingRepository),
                 invitationService,
-                eventPublisher
+                eventPublisher,
+                notificationService
         );
         actorId = UUID.randomUUID();
         actor = account(actorId, "system@manabihub.local", RoleCode.SYSTEM_ADMIN);

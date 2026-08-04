@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   AppBar,
   Avatar,
+  Badge,
   Box,
   Button,
   Divider,
@@ -31,6 +32,7 @@ import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 import { logoutAdminSession } from '../auth/adminAuthApi';
 import { getHeaderBrand } from './headerBrand';
+import { useUnreadCount } from '../../features/notifications/hooks/useNotifications';
 
 interface HeaderProps {
   menuExpanded?: boolean;
@@ -60,6 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
   const primaryRole = session?.roles[0];
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
   const brandLabel = getHeaderBrand(session);
+  const { data: unreadCount = 0 } = useUnreadCount(Boolean(session));
 
   const handleLogout = async () => {
     if (!session) return;
@@ -119,7 +122,9 @@ export const Header: React.FC<HeaderProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Tooltip title="Thông báo">
                 <IconButton color="inherit" aria-label="Mở thông báo" onClick={() => navigate(notificationPath)} sx={{ color: 'text.secondary' }}>
-                  <NotificationsIcon />
+                  <Badge badgeContent={unreadCount} color="error" max={99}>
+                    <NotificationsIcon />
+                  </Badge>
                 </IconButton>
               </Tooltip>
               <Button

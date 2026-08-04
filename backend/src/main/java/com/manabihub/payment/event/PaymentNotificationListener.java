@@ -26,7 +26,8 @@ public class PaymentNotificationListener {
                     event.recipientEmail(),
                     event.title(),
                     event.message(),
-                    event.notificationType());
+                    event.notificationType(),
+                    event.actionUrl());
         } catch (RuntimeException exception) {
             log.error(
                     "Unable to deliver payment notification type={} for order={}",
@@ -37,6 +38,7 @@ public class PaymentNotificationListener {
     }
 
     private String dedupeKey(PaymentNotificationEvent event) {
-        return "payment:" + event.orderId() + ":" + event.notificationType();
+        return "payment:" + event.orderId() + ":" + event.recipientUserId()
+                + ":" + event.notificationType();
     }
 }

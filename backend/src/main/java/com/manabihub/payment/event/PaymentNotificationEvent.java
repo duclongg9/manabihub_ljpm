@@ -8,6 +8,7 @@ public record PaymentNotificationEvent(
         String recipientEmail,
         String title,
         String message,
-        String notificationType
+        String notificationType,
+        String actionUrl
 ) {
 }
