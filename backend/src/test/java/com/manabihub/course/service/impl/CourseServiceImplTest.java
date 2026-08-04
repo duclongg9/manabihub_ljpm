@@ -27,6 +27,8 @@ import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.review.service.CourseReviewService;
 import com.manabihub.systemconfig.service.SystemSettingValueService;
+import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.wallet.repository.EscrowLedgerRepository;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -73,6 +75,12 @@ class CourseServiceImplTest {
     @Mock
     private SystemSettingValueService settingValueService;
 
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
+
+    @Mock
+    private EscrowLedgerRepository escrowLedgerRepository;
+
     @InjectMocks
     private CourseServiceImpl courseService;
     private UUID userId;
@@ -89,7 +97,9 @@ class CourseServiceImplTest {
                 auditLogService,
                 notificationService,
                 courseReviewService,
-                settingValueService
+                settingValueService,
+                enrollmentRepository,
+                escrowLedgerRepository
         );
         org.mockito.Mockito.lenient()
                 .when(settingValueService.getInteger(any(String.class), any(Integer.class)))
@@ -325,8 +335,8 @@ class CourseServiceImplTest {
         assertNotNull(draft.getSubmittedAt());
         verify(notificationService).createNotificationForAdminRole(
                 "COURSE_MANAGER",
-                "Course submitted for review",
-                "Teacher submitted course \"JLPT N5 Foundation\" for review.",
+                "Khóa học mới đang chờ xét duyệt",
+                "Giảng viên đã gửi khóa học \"JLPT N5 Foundation\" để xét duyệt.",
                 "COURSE_REVIEW",
                 "/admin/courses/approvals/" + draftId
         );

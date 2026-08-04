@@ -12,14 +12,17 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.learning.service.EnrollmentProgressResetService;
 import com.manabihub.order.dto.response.OrderResponse;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.mapper.OrderMapper;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.order.service.OrderService;
+import com.manabihub.wallet.config.WalletPaymentProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
@@ -27,6 +30,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -45,15 +49,19 @@ public class OrderServiceImpl implements OrderService {
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Set<EnrollmentStatus> OWNED_STATUSES =
-            EnumSet.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED);
-
+            EnumSet.of(
+                    EnrollmentStatus.ACTIVE,
+                    EnrollmentStatus.COMPLETED,
+                    EnrollmentStatus.REVOKED);
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final EnrollmentProgressResetService enrollmentProgressResetService;
     private final StudentProfileRepository studentProfileRepository;
     private final CurrentUserService currentUserService;
     private final OrderMapper orderMapper;
+    private final WalletPaymentProperties walletPaymentProperties;
 
     @Override
     @Transactional
@@ -104,19 +112,51 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public Order createTopUpOrder(BigDecimal amount) {
+        StudentProfile student = resolveCurrentStudent();
+
+        boolean invalid = amount == null
+                || amount.compareTo(walletPaymentProperties.getTopUpMinAmount()) < 0
+                || amount.compareTo(walletPaymentProperties.getTopUpMaxAmount()) > 0
+                || amount.stripTrailingZeros().scale() > 0; // must be a whole number of VND
+        if (invalid) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Số tiền nạp phải là số nguyên trong khoảng "
+                            + walletPaymentProperties.getTopUpMinAmount().toPlainString()
+                            + "đ đến "
+                            + walletPaymentProperties.getTopUpMaxAmount().toPlainString()
+                            + "đ",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        return orderRepository.save(Order.builder()
+                .student(student)
+                .orderCode(generateOrderCode())
+                .totalAmount(amount)
+                .currency("VND")
+                .status(OrderStatus.PENDING)
+                .type(OrderType.WALLET_TOPUP)
+                .build());
+    }
+
+    @Override
+    @Transactional
     public void enrollFreeOrder(Order order) {
         StudentProfile student = order.getStudent();
         for (OrderItem item : orderItemRepository.findByOrder_Id(order.getId())) {
             Course course = item.getCourse();
-            boolean alreadyEnrolled = enrollmentRepository
-                    .findByStudent_IdAndCourse_Id(student.getId(), course.getId())
-                    .isPresent();
-            if (!alreadyEnrolled) {
+            Enrollment existing = enrollmentRepository
+                    .findByStudentIdAndCourseIdForUpdate(student.getId(), course.getId())
+                    .orElse(null);
+            if (existing == null) {
                 enrollmentRepository.save(Enrollment.builder()
                         .student(student)
                         .course(course)
                         .status(EnrollmentStatus.ACTIVE)
                         .build());
+            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED) {
+                enrollmentProgressResetService.resetForRepurchase(existing);
             }
         }
         order.setStatus(com.manabihub.order.enums.OrderStatus.PAID);

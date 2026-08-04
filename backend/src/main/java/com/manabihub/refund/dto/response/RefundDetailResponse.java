@@ -6,7 +6,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Map;
+import com.manabihub.refund.dto.RefundEligibilitySnapshot;
 import java.util.UUID;
 
 @Data
@@ -20,7 +20,7 @@ public class RefundDetailResponse {
     private String studentEmail;
     private RefundStatus status;
     private String reason;
-    private Map<String, Object> eligibilitySnapshot;
+    private RefundEligibilitySnapshot eligibilitySnapshot;
     private UUID orderItemId;
     private UUID courseId;
     private String courseTitle;

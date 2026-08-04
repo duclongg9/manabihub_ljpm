@@ -66,16 +66,14 @@ public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecif
     @org.springframework.data.jpa.repository.Query("SELECT c FROM Course c WHERE c.slug = :slug")
     Optional<Course> findBySlugWithDetails(@org.springframework.data.repository.query.Param("slug") String slug);
 
-    @org.springframework.data.jpa.repository.Query(value = "SELECT COUNT(*) FROM lesson_blocks lb " +
-            "JOIN lessons l ON lb.lesson_id = l.id " +
-            "JOIN course_modules cm ON l.module_id = cm.id " +
+    @org.springframework.data.jpa.repository.Query(value = "SELECT COUNT(*) FROM course_lesson_blocks clb " +
+            "JOIN course_modules cm ON clb.module_id = cm.id " +
             "WHERE cm.course_id = :courseId", nativeQuery = true)
     int countLessonBlocksByCourseId(@org.springframework.data.repository.query.Param("courseId") UUID courseId);
 
-    @org.springframework.data.jpa.repository.Query(value = "SELECT CASE WHEN COUNT(l.id) > 0 THEN true ELSE false END " +
-            "FROM lessons l " +
-            "JOIN course_modules cm ON l.module_id = cm.id " +
-            "WHERE cm.course_id = :courseId AND l.lesson_type = 'QUIZ'", nativeQuery = true)
+    @org.springframework.data.jpa.repository.Query(value = "SELECT EXISTS (" +
+            "SELECT 1 FROM final_tests " +
+            "WHERE course_id = :courseId)", nativeQuery = true)
     boolean hasFinalTestByCourseId(@org.springframework.data.repository.query.Param("courseId") UUID courseId);
 
     @org.springframework.data.jpa.repository.Query(value = "SELECT EXISTS (" +

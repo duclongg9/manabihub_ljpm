@@ -20,8 +20,9 @@ import com.manabihub.payout.service.WithdrawalService;
 import com.manabihub.payout.service.WithdrawalOtpService;
 import com.manabihub.payout.service.WithdrawalNotificationService;
 import com.manabihub.systemconfig.service.CommercialPolicyService;
-import com.manabihub.wallet.repository.TeacherWalletRepository;
+import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.service.WalletService;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -42,7 +43,7 @@ import java.util.UUID;
 public class WithdrawalServiceImpl implements WithdrawalService {
 
     private final WithdrawalRequestRepository withdrawalRepository;
-    private final TeacherWalletRepository teacherWalletRepository;
+    private final WalletRepository walletRepository;
     private final TeacherBankAccountRepository bankAccountRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final WalletService walletService;
@@ -64,7 +65,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         UUID teacherProfileId = resolveTeacherProfileId(userId);
 
         // Serialize withdrawal creation per teacher across all application instances.
-        teacherWalletRepository.findByTeacherIdForUpdate(teacherProfileId)
+        walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, teacherProfileId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.WALLET_NOT_FOUND,
                         "Wallet not found"
@@ -241,6 +242,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         notifyAfterCommit(
                 () -> notificationService.notifyTeacherCancellation(
                         UUID.fromString(userId),
+                        teacherEmail(teacherProfileId),
                         request.getRequestedAmount()
                 ),
                 "withdrawal cancellation " + withdrawalId
@@ -276,6 +278,12 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                         "Teacher profile not found"
                 ));
         return teacherProfile.getId();
+    }
+
+    private String teacherEmail(UUID teacherProfileId) {
+        return teacherProfileRepository.findById(teacherProfileId)
+                .map(profile -> profile.getUser().getEmail())
+                .orElse(null);
     }
 
     private void notifyAfterCommit(Runnable notification, String operation) {

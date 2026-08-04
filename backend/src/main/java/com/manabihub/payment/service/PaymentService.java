@@ -4,6 +4,7 @@ import com.manabihub.order.entity.Order;
 import com.manabihub.payment.dto.IpnAckResponse;
 
 import java.util.Map;
+import java.util.UUID;
 
 public interface PaymentService {
 
@@ -12,6 +13,24 @@ public interface PaymentService {
      * payment URL the browser should be redirected to.
      */
     String initiatePayment(Order order, String clientIp);
+
+    /**
+     * Pays a course order instantly from the student's wallet balance — debits the wallet,
+     * records a WALLET payment transaction, marks the order paid and fulfils it (enrollment +
+     * escrow), all in one transaction and with no payment gateway. The success
+     * notification is delivered only after that transaction commits.
+     *
+     * @throws com.manabihub.common.exception.BusinessException with
+     *         {@code WALLET_INSUFFICIENT_BALANCE} if the wallet balance is not enough
+     */
+    Order payWithWallet(UUID orderId);
+
+    /**
+     * Combined payment: uses as much of the student's wallet balance as available and charges
+     * the remainder via VNPay. Sets the order's wallet portion and returns the VNPay payment
+     * URL — or {@code null} if the wallet fully covered the order (already paid).
+     */
+    String initiateCombinedPayment(Order order, String clientIp);
 
     /**
      * Processes a provider webhook (VNPay IPN). This is the ONLY path that confirms a

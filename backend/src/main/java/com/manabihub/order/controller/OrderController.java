@@ -9,6 +9,7 @@ import com.manabihub.order.dto.response.OrderResponse;
 import com.manabihub.order.entity.Order;
 import com.manabihub.order.enums.OrderStatus;
 import com.manabihub.order.service.OrderService;
+import com.manabihub.payment.enums.PaymentMethod;
 import com.manabihub.payment.service.PaymentService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -61,6 +62,38 @@ public class OrderController {
                     null);
             // MSG-PAY-002: product unlocked immediately (no payment needed).
             return ApiResponse.success(MessageCodes.MSG_PAY_002, "Đã ghi danh khoá học miễn phí.", freeCheckout);
+        }
+
+        // Pay from wallet balance: debit + fulfil instantly, no gateway (paymentUrl null).
+        PaymentMethod method = request.paymentMethod() == null ? PaymentMethod.VNPAY : request.paymentMethod();
+        if (method == PaymentMethod.WALLET) {
+            order = paymentService.payWithWallet(order.getId()); // throws WALLET_INSUFFICIENT_BALANCE if not enough
+            CheckoutResponse walletCheckout = new CheckoutResponse(
+                    order.getId(),
+                    order.getOrderCode(),
+                    order.getTotalAmount(),
+                    order.getCurrency(),
+                    order.getStatus().name(),
+                    null);
+            return ApiResponse.success(MessageCodes.MSG_PAY_002, "Thanh toán bằng ví thành công.", walletCheckout);
+        }
+
+        // Combined: use wallet balance + VNPay for the remainder.
+        if (method == PaymentMethod.WALLET_VNPAY) {
+            String combinedUrl = paymentService.initiateCombinedPayment(order, resolveClientIp(httpRequest));
+            CheckoutResponse combined = new CheckoutResponse(
+                    order.getId(),
+                    order.getOrderCode(),
+                    order.getTotalAmount(),
+                    order.getCurrency(),
+                    order.getStatus().name(),
+                    combinedUrl);
+            if (combinedUrl == null) {
+                // Wallet fully covered it.
+                return ApiResponse.success(MessageCodes.MSG_PAY_002, "Thanh toán bằng ví thành công.", combined);
+            }
+            return ApiResponse.success(MessageCodes.MSG_PAY_001,
+                    "Đã dùng số dư ví, vui lòng thanh toán phần còn lại qua VNPay.", combined);
         }
 
         String paymentUrl = paymentService.initiatePayment(order, resolveClientIp(httpRequest));

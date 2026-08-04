@@ -175,9 +175,10 @@ export const InstructorTermsPage = () => (
 export const RefundPolicyPage = () => (
   <ArticleLayout article={getHelpArticle('refund-policy')}>
     <DraftScopeNotice>
-      Luồng học viên tự gửi yêu cầu hoàn tiền chưa được phát hành trong bản MVP hiện tại.
-      Trang này công bố quy tắc chuẩn để không diễn giải sai; trường hợp cần hỗ trợ phải dùng
-      <Link to={ROUTES.PUBLIC.ABOUT}> kênh liên hệ</Link> cho đến khi luồng yêu cầu được triển khai.
+      Học viên gửi yêu cầu cho từng khóa học tại{' '}
+      <Link to={ROUTES.STUDENT.PAYMENTS}>Lịch sử thanh toán</Link>. Yêu cầu đáp ứng đầy đủ
+      BR-REF-01 được tự động phê duyệt và hoàn vào ví; các trường hợp khác chuyển thành tranh chấp
+      hoặc chờ Finance xét duyệt thủ công.
     </DraftScopeNotice>
 
     <PolicyBoundary>
@@ -193,18 +194,19 @@ export const RefundPolicyPage = () => (
               thành công; đúng ngày cuối cùng vẫn nằm trong cửa sổ.
             </li>
             <li>
-              Tiến độ có thẩm quyền phải{' '}
-              <strong>thấp hơn {policy.refundProgressLimitPercent}%</strong>; đúng{' '}
-              <strong>{policy.refundProgressLimitPercent}% không đủ điều kiện tiêu chuẩn</strong>.
+              Tiến độ học phải{' '}
+              <strong>không vượt quá {policy.refundProgressLimitPercent}%</strong>; đúng{' '}
+              <strong>{policy.refundProgressLimitPercent}% vẫn đủ điều kiện tiêu chuẩn</strong>.
             </li>
-            <li>Không có yêu cầu đang hoạt động hoặc đã được duyệt cho cùng giao dịch.</li>
+            <li>Học viên chưa tải toàn bộ tài liệu học tập được bảo vệ.</li>
+            <li>Không có yêu cầu hoàn tiền đang hoạt động cho cùng đơn hàng.</li>
           </ul>
 
           <h2>2. Số tiền và ngoại lệ</h2>
           <p>
             {policy.refundProgressLimitPercent}% là ngưỡng tiến độ, không phải tỷ lệ tiền hoàn.
-            Khi được duyệt theo quy tắc chuẩn, số tiền là số tiền thực tế đã thanh toán và phân
-            bổ cho order item bị ảnh hưởng, không phải giá niêm yết.
+            Khi đủ điều kiện theo quy tắc chuẩn, toàn bộ số tiền thực tế đã thanh toán được tự động
+            hoàn vào ví học viên, không phải giá niêm yết.
           </p>
           <p>
             Thu trùng, lỗi thanh toán đã xác nhận hoặc lỗi nền tảng khiến học viên không truy
@@ -214,10 +216,10 @@ export const RefundPolicyPage = () => (
 
           <h2>3. Trạng thái xử lý</h2>
           <p>
-            Đủ điều kiện chỉ cho phép tạo yêu cầu; không đồng nghĩa tiền đã hoàn. Hệ thống chỉ
-            đánh dấu hoàn tất sau kết quả thành công có thể xác thực từ nhà cung cấp. Lỗi cổng
-            thanh toán hoặc lỗi hoàn tất kế toán phải chuyển sang đối soát, không báo thành công
-            giả. Quyền học chỉ thay đổi sau quyết định hoàn tiền hoàn tất an toàn.
+            Yêu cầu đủ điều kiện được tự động phê duyệt và chỉ hiển thị hoàn tất sau khi tiền đã được
+            ghi vào ví cùng các cập nhật enrollment, escrow và sổ cái liên quan. Yêu cầu không đủ
+            điều kiện tự động được chuyển sang tranh chấp/xét duyệt thủ công. Lỗi hoàn tất kế toán
+            phải chuyển sang đối soát, không báo thành công giả.
           </p>
           <p>
             Chính sách {policy.policyVersion}, hiệu lực từ{' '}

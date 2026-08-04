@@ -75,6 +75,8 @@ export const ENDPOINTS = {
     wishlist: '/v1/student/wishlist',
     wishlistCourse: (courseId: string) => `/v1/student/wishlist/${courseId}`,
     courseReview: (courseId: string) => `/v1/student/courses/${courseId}/review`,
+    wallet: '/v1/student/wallet',
+    walletTopUp: '/v1/student/wallet/top-up',
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>
@@ -119,6 +121,12 @@ export const ENDPOINTS = {
     create: '/v1/orders',
     list: '/v1/orders',
     detail: (orderId: string) => `/v1/orders/${orderId}`,
+  },
+  studentRefunds: {
+    create: '/v1/student/refunds',
+    list: '/v1/student/refunds',
+    detail: (id: string) => `/v1/student/refunds/${id}`,
+    cancel: (id: string) => `/v1/student/refunds/${id}/cancel`,
   },
   payments: {
     // Local dev simulator for the VNPay IPN callback (no tunnel needed).

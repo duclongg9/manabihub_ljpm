@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public interface WalletTransactionRepository extends JpaRepository<WalletTransaction, java.util.UUID> {
 
+    Optional<WalletTransaction> findByIdempotencyKey(String idempotencyKey);
+
     Optional<WalletTransaction> findByReferenceTypeAndReferenceIdAndTransactionType(
             String referenceType,
             UUID referenceId,

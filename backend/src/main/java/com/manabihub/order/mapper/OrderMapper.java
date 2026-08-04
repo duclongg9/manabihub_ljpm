@@ -21,8 +21,10 @@ public class OrderMapper {
                 order.getId(),
                 order.getOrderCode(),
                 order.getTotalAmount(),
+                order.getWalletAmount(),
                 order.getCurrency(),
                 order.getStatus().name(),
+                order.getType().name(),
                 order.getCreatedAt(),
                 itemResponses);
     }
@@ -30,6 +32,7 @@ public class OrderMapper {
     private OrderItemResponse toItemResponse(OrderItem item) {
         Course course = item.getCourse();
         return new OrderItemResponse(
+                item.getId(),
                 course.getId(),
                 course.getTitle(),
                 course.getThumbnailUrl(),

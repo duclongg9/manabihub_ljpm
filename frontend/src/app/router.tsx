@@ -49,6 +49,7 @@ import { ViolationDetailPage } from '../features/admin-violation/pages/Violation
 import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
+import { StudentWalletPage } from '../features/wallet/pages/StudentWalletPage';
 import { PublicTeacherProfilePage } from '../features/teacher-discovery/pages/PublicTeacherProfilePage';
 import { SystemSettingsPage } from '../features/system-administration/pages/SystemSettingsPage';
 import { InternalAdminAccountsPage } from '../features/system-administration/pages/InternalAdminAccountsPage';
@@ -197,6 +198,10 @@ export const router = createBrowserRouter([
         element: <StudentPaymentsPage />,
       },
       {
+        path: 'wallet',
+        element: <StudentWalletPage />,
+      },
+      {
         path: 'courses',
         element: <StudentCoursesPage />,
       },
@@ -313,20 +318,12 @@ export const router = createBrowserRouter([
         element: <KycDetailPage />,
       },
       {
-        path: 'tasks/queue',
-        element: <Navigate to="/admin/courses/approvals" replace />,
-      },
-      {
         path: 'courses/approvals',
         element: <CourseApprovalQueuePage />,
       },
       {
         path: 'courses/approvals/:id',
         element: <CourseApprovalDetailPage />,
-      },
-      {
-        path: 'finance',
-        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'refunds',

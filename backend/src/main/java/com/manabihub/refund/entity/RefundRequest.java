@@ -7,6 +7,8 @@ import com.manabihub.order.entity.OrderItem;
 import com.manabihub.refund.enums.RefundDecisionReason;
 import com.manabihub.refund.enums.RefundProviderStatus;
 import com.manabihub.refund.enums.RefundStatus;
+import com.manabihub.refund.enums.RefundSettlementMethod;
+import com.manabihub.refund.enums.RefundSettlementStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -29,8 +31,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
+import com.manabihub.refund.dto.RefundEligibilitySnapshot;
 
 @Entity
 @Table(name = "refund_requests")
@@ -66,8 +68,8 @@ public class RefundRequest {
     private String reason;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "eligibility_snapshot", columnDefinition = "jsonb")
-    private Map<String, Object> eligibilitySnapshot;
+    @Column(name = "eligibility_snapshot", columnDefinition = "jsonb", updatable = false)
+    private RefundEligibilitySnapshot eligibilitySnapshot;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "decided_by")
@@ -94,6 +96,20 @@ public class RefundRequest {
 
     @Column(name = "decided_at")
     private Instant decidedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "settlement_method", length = 30)
+    private RefundSettlementMethod settlementMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "settlement_status", length = 30)
+    private RefundSettlementStatus settlementStatus;
+
+    @Column(name = "settled_at")
+    private Instant settledAt;
+
+    @Column(name = "wallet_transaction_id")
+    private UUID walletTransactionId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

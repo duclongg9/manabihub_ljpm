@@ -148,9 +148,12 @@ public class VnPayGateway implements PaymentGateway {
         return params;
     }
 
-    /** VNPay amount is expressed in minor units (VND × 100), integer, no decimals. */
+    /**
+     * VNPay amount in minor units (VND × 100), integer. Uses the gateway portion
+     * (total minus any wallet-paid amount) so combined payments charge only the remainder.
+     */
     private String minorAmount(Order order) {
-        return String.valueOf(order.getTotalAmount().multiply(MINOR_UNIT_FACTOR).longValue());
+        return String.valueOf(order.getGatewayAmount().multiply(MINOR_UNIT_FACTOR).longValue());
     }
 
     private String orderInfo(Order order) {

@@ -3,11 +3,18 @@ import { ENDPOINTS } from '../../../shared/api/endpoints';
 import type { ApiResponse } from '../../../shared/types/api';
 import type { CheckoutResponse, IpnAck, OrderResponse } from '../types';
 
-/** Creates an order for a course and initiates payment, returning the VNPay payment URL. */
-export async function createCheckout(courseId: string): Promise<CheckoutResponse> {
+/**
+ * Creates an order for a course and initiates payment.
+ * - {@code VNPAY} (default): returns a payment URL to redirect to.
+ * - {@code WALLET}: pays instantly from wallet balance; returns paymentUrl null + status PAID.
+ */
+export async function createCheckout(
+  courseId: string,
+  paymentMethod: 'VNPAY' | 'WALLET' | 'WALLET_VNPAY' = 'VNPAY',
+): Promise<CheckoutResponse> {
   const response = await axiosClient.post<ApiResponse<CheckoutResponse>>(
     ENDPOINTS.orders.create,
-    { courseId },
+    { courseId, paymentMethod },
   );
   return response.data.data;
 }

@@ -27,9 +27,13 @@ import com.manabihub.payment.repository.PaymentTransactionRepository;
 import com.manabihub.refund.dto.request.RefundDecisionRequest;
 import com.manabihub.refund.entity.RefundProviderAttempt;
 import com.manabihub.refund.entity.RefundRequest;
+import com.manabihub.refund.enums.EligibilityResult;
 import com.manabihub.refund.enums.RefundDecisionReason;
 import com.manabihub.refund.enums.RefundProviderStatus;
+import com.manabihub.refund.enums.RefundSettlementMethod;
+import com.manabihub.refund.enums.RefundSettlementStatus;
 import com.manabihub.refund.enums.RefundStatus;
+import com.manabihub.refund.enums.StudentRefundType;
 import com.manabihub.refund.gateway.RefundGatewayResult;
 import com.manabihub.refund.repository.RefundProviderAttemptRepository;
 import com.manabihub.refund.repository.RefundRequestRepository;
@@ -38,6 +42,8 @@ import com.manabihub.wallet.entity.EscrowLedger;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
 import com.manabihub.wallet.service.EscrowService;
+import com.manabihub.wallet.entity.WalletTransaction;
+import com.manabihub.wallet.service.StudentWalletService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,6 +64,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -90,6 +97,8 @@ class RefundDecisionTransactionServiceTest {
     private AuditLogService auditLogService;
     @Mock
     private RefundAfterCommitNotifier afterCommitNotifier;
+    @Mock
+    private StudentWalletService studentWalletService;
 
     @InjectMocks
     private RefundDecisionTransactionService service;
@@ -143,16 +152,18 @@ class RefundDecisionTransactionServiceTest {
                 .status(RefundStatus.PENDING)
                 .providerStatus(RefundProviderStatus.NOT_REQUESTED)
                 .reason("Platform access failure")
-                .eligibilitySnapshot(Map.of(
-                        "orderId", order.getId().toString(),
-                        "orderItemId", refundedItem.getId().toString(),
-                        "paidAmount", money("1000000"),
-                        "policyVersion", "refund-policy-v1",
-                        "paymentTime", "2026-07-20T00:00:00Z",
-                        "requestTime", "2026-07-21T00:00:00Z",
-                        "progressPercent", 10,
-                        "eligible", true
-                ))
+                .eligibilitySnapshot(com.manabihub.refund.dto.RefundEligibilitySnapshot.builder()
+                        .orderId(order.getId())
+                        .orderItemId(refundedItem.getId())
+                        .actuallyPaidAmount(money("1000000"))
+                        .policyVersion("refund-policy-v1")
+                        .paymentSucceededAt(java.time.Instant.parse("2026-07-20T00:00:00Z"))
+                        .requestedAt(java.time.Instant.parse("2026-07-21T00:00:00Z"))
+                        .measuredProgressPercent(10.0)
+                        .refundType(StudentRefundType.STANDARD)
+                        .eligible(true)
+                        .eligibilityResult(EligibilityResult.STANDARD_ELIGIBLE)
+                        .build())
                 .build();
         payment = PaymentTransaction.builder()
                 .id(UUID.randomUUID())
@@ -161,6 +172,7 @@ class RefundDecisionTransactionServiceTest {
                 .providerTransactionId("VNP-001")
                 .amount(money("1500000"))
                 .status(PaymentStatus.SUCCESS)
+                .succeededAt(java.time.Instant.parse("2026-07-20T00:00:00Z"))
                 .build();
         enrollment = Enrollment.builder()
                 .id(UUID.randomUUID())
@@ -204,12 +216,9 @@ class RefundDecisionTransactionServiceTest {
                 .thenReturn(Optional.of(order));
         when(snapshotRepository.findByOrderItem_Id(refundedItem.getId()))
                 .thenReturn(Optional.of(financialSnapshot));
-        when(paymentTransactionRepository
-                .findFirstByOrder_IdAndStatusOrderByCreatedAtDesc(
-                        order.getId(),
-                        PaymentStatus.SUCCESS
-                ))
-                .thenReturn(Optional.of(payment));
+        when(paymentTransactionRepository.findByOrder_IdAndStatusInOrderByCreatedAtAsc(
+                order.getId(), List.of(PaymentStatus.SUCCESS)))
+                .thenReturn(List.of(payment));
         when(escrowLedgerRepository.findByOrderItemIdForUpdate(refundedItem.getId()))
                 .thenReturn(Optional.of(escrow));
         when(attemptRepository.findByRefundRequest_Id(refund.getId()))
@@ -303,6 +312,91 @@ class RefundDecisionTransactionServiceTest {
         verify(paymentTransactionRepository, never()).save(any());
         verify(afterCommitNotifier).schedule(
                 any(), any(), any(), any(), anyString(), anyString());
+    }
+
+    @Test
+    void approvalCreditsFullGrossAmountToWalletWithoutCallingProvider() {
+        WalletTransaction walletCredit = WalletTransaction.builder()
+                .id(UUID.randomUUID())
+                .build();
+        when(escrowService.reverseHeldAllocationForRefund(refundedItem.getId()))
+                .thenReturn(true);
+        when(studentWalletService.creditRefund(
+                eq(refund.getStudent().getId()),
+                eq(money("1000000")),
+                eq(refund.getId()),
+                anyString()))
+                .thenReturn(walletCredit);
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(
+                refund.getStudent().getId(), refundedItem.getCourse().getId()))
+                .thenReturn(Optional.of(enrollment));
+        when(orderItemRepository.findByOrder_Id(order.getId()))
+                .thenReturn(List.of(refundedItem, otherItem));
+
+        RefundStatus outcome = service.approveToStudentWallet(
+                refund.getId(), approvalDecision(), adminId);
+
+        assertEquals(RefundStatus.APPROVED, outcome);
+        assertEquals(RefundSettlementMethod.WALLET, refund.getSettlementMethod());
+        assertEquals(RefundSettlementStatus.COMPLETED, refund.getSettlementStatus());
+        assertEquals(walletCredit.getId(), refund.getWalletTransactionId());
+        assertEquals(RefundProviderStatus.NOT_REQUESTED, refund.getProviderStatus());
+        assertEquals(OrderItemRefundStatus.REFUNDED, refundedItem.getRefundStatus());
+        assertEquals(EnrollmentStatus.REFUNDED, enrollment.getStatus());
+        assertEquals(OrderStatus.PAID, order.getStatus());
+        verify(studentWalletService).creditRefund(
+                eq(refund.getStudent().getId()),
+                eq(money("1000000")),
+                eq(refund.getId()),
+                anyString());
+        verify(attemptRepository, never()).save(any());
+    }
+
+    @Test
+    void brRef01AutoApprovalCreditsFullGrossAmountToWalletWithoutAdmin() {
+        WalletTransaction walletCredit = WalletTransaction.builder()
+                .id(UUID.randomUUID())
+                .build();
+        when(escrowService.reverseHeldAllocationForRefund(refundedItem.getId()))
+                .thenReturn(true);
+        when(studentWalletService.creditRefund(
+                eq(refund.getStudent().getId()),
+                eq(money("1000000")),
+                eq(refund.getId()),
+                anyString()))
+                .thenReturn(walletCredit);
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(
+                refund.getStudent().getId(), refundedItem.getCourse().getId()))
+                .thenReturn(Optional.of(enrollment));
+        when(orderItemRepository.findByOrder_Id(order.getId()))
+                .thenReturn(List.of(refundedItem, otherItem));
+
+        RefundRequest result = service.autoApproveToStudentWallet(refund.getId());
+
+        assertEquals(refund, result);
+        assertEquals(RefundStatus.APPROVED, refund.getStatus());
+        assertEquals(RefundDecisionReason.STANDARD_ELIGIBLE, refund.getDecisionReasonCode());
+        assertEquals("Tự động phê duyệt theo BR-REF-01", refund.getDecisionNote());
+        assertEquals(null, refund.getDecidedBy());
+        assertEquals(RefundSettlementMethod.WALLET, refund.getSettlementMethod());
+        assertEquals(RefundSettlementStatus.COMPLETED, refund.getSettlementStatus());
+        assertEquals(walletCredit.getId(), refund.getWalletTransactionId());
+        verify(studentWalletService).creditRefund(
+                eq(refund.getStudent().getId()),
+                eq(money("1000000")),
+                eq(refund.getId()),
+                anyString());
+        verify(auditLogService).logUserAction(
+                eq(refund.getStudent().getUser().getId()),
+                eq("STUDENT"),
+                eq("AUTO_APPROVE_REFUND_TO_WALLET"),
+                eq("REFUND_REQUEST"),
+                eq(refund.getId()),
+                any(),
+                any(),
+                any());
+        verify(adminAccountRepository, never()).hasPermission(any(), anyString());
+        verify(attemptRepository, never()).save(any());
     }
 
     @Test

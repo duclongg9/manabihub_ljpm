@@ -5,16 +5,20 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Divider,
   Pagination,
   Stack,
   Typography,
 } from '@mui/material';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { ROUTES } from '../../../shared/constants/routes';
-import type { OrderResponse } from '../../checkout/types';
+import type { OrderItemResponse, OrderResponse } from '../../checkout/types';
+import { RefundRequestDialog } from '../../refunds/components/RefundRequestDialog';
+import { StudentRefundHistory } from '../../refunds/components/StudentRefundHistory';
+import { useStudentRefunds } from '../../refunds/hooks/useStudentRefunds';
+import type { StudentRefundResponse } from '../../refunds/types';
 import { useOrderHistory } from '../hooks/useOrderHistory';
 import type { OrderStatus } from '../services/orderHistoryService';
 
@@ -31,25 +35,12 @@ const FILTERS: FilterOption[] = [
   { label: 'Đã hoàn tiền', status: 'REFUNDED' },
 ];
 
-const STATUS_PRESENTATION: Record<
-  OrderStatus,
-  { label: string; background: string; color: string }
-> = {
-  PENDING: { label: 'Đang xử lý', background: '#FFF7E0', color: '#9A6700' },
-  PAID: { label: 'Đã thanh toán', background: '#EAF8F0', color: '#24724A' },
-  FAILED: { label: 'Thất bại', background: '#FDECEE', color: '#A71931' },
-  REFUNDED: { label: 'Đã hoàn tiền', background: '#EAF3FF', color: '#245EA8' },
-  CANCELLED: { label: 'Đã hủy', background: '#EEF1F4', color: '#596273' },
-};
-
-const DESKTOP_GRID = '1.35fr minmax(220px, 2.4fr) 1fr 1fr 1.2fr';
-
-const headerCellSx = {
-  color: '#667085',
-  fontSize: '0.72rem',
-  fontWeight: 800,
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
+const ORDER_STATUS: Record<OrderStatus, { label: string; color: 'default' | 'success' | 'warning' | 'error' | 'info' }> = {
+  PENDING: { label: 'Đang xử lý', color: 'warning' },
+  PAID: { label: 'Đã thanh toán', color: 'success' },
+  FAILED: { label: 'Thất bại', color: 'error' },
+  REFUNDED: { label: 'Đã hoàn tiền', color: 'info' },
+  CANCELLED: { label: 'Đã hủy', color: 'default' },
 };
 
 function formatMoney(amount: number, currency: string) {
@@ -64,333 +55,199 @@ export function StudentPaymentsPage() {
   const navigate = useNavigate();
   const [filterIndex, setFilterIndex] = useState(0);
   const [page, setPage] = useState(0);
+  const [dialogItem, setDialogItem] = useState<OrderItemResponse | null>(null);
+  const [dialogRefund, setDialogRefund] = useState<StudentRefundResponse | null>(null);
   const selectedFilter = FILTERS[filterIndex];
-  const { data, isLoading, isError, refetch, isFetching } = useOrderHistory({
-    page,
-    size: 10,
-    status: selectedFilter.status,
+  const ordersQuery = useOrderHistory({ page, size: 10, status: selectedFilter.status });
+  const refundsQuery = useStudentRefunds();
+  const orders = ordersQuery.data?.content ?? [];
+  const refunds = refundsQuery.data?.content ?? [];
+
+  const latestRefundByItem = new Map<string, StudentRefundResponse>();
+  refunds.forEach((refund) => {
+    if (!latestRefundByItem.has(refund.orderItemId)) {
+      latestRefundByItem.set(refund.orderItemId, refund);
+    }
   });
 
-  const selectFilter = (index: number) => {
-    setFilterIndex(index);
-    setPage(0);
+  const openNewRefund = (item: OrderItemResponse) => {
+    setDialogItem(item);
+    setDialogRefund(null);
   };
 
-  const orders = data?.content ?? [];
+  const openRefundDetail = (refund: StudentRefundResponse) => {
+    const item = orders.flatMap((order) => order.items)
+      .find((candidate) => candidate.id === refund.orderItemId) ?? {
+        id: refund.orderItemId,
+        courseId: refund.courseId,
+        courseTitle: refund.courseTitle,
+        price: refund.eligibilitySnapshot.actuallyPaidAmount,
+      };
+    setDialogItem(item);
+    setDialogRefund(refund);
+  };
 
   return (
-    <Box
-      component="main"
-      sx={{
-        minHeight: '100%',
-        bgcolor: '#FAF9F6',
-        px: { xs: 2, sm: 3, lg: 4 },
-        py: { xs: 3, md: 5 },
-        overflow: 'hidden',
-      }}
-    >
-      <Box sx={{ maxWidth: 1280, mx: 'auto', position: 'relative' }}>
-        <Typography
-          aria-hidden="true"
-          sx={{
-            position: 'absolute',
-            top: -60,
-            right: -25,
-            color: 'rgba(27, 42, 74, 0.035)',
-            fontSize: { xs: '8rem', md: '13rem' },
-            fontWeight: 900,
-            lineHeight: 1,
-            pointerEvents: 'none',
-            userSelect: 'none',
-          }}
-        >
-          履歴
-        </Typography>
+    <Box component="main" sx={{ minHeight: '100%', bgcolor: '#FAF9F6', px: { xs: 2, md: 4 }, py: { xs: 3, md: 5 } }}>
+      <Box sx={{ maxWidth: 1180, mx: 'auto' }}>
+        <PageHeader
+          title="Lịch sử thanh toán"
+          subtitle="購入履歴"
+          breadcrumbs={[{ label: 'Học viên' }, { label: 'Lịch sử thanh toán' }]}
+        />
 
-        <Box sx={{ position: 'relative' }}>
-          <PageHeader
-            title="Lịch sử thanh toán"
-            subtitle="購入履歴"
-            breadcrumbs={[{ label: 'Học viên' }, { label: 'Lịch sử thanh toán' }]}
-          />
-
-          <Box
-            sx={{
-              border: '1px solid #E1E5EA',
-              borderRadius: '8px',
-              bgcolor: '#FFFFFF',
-              boxShadow: '0 10px 28px rgba(15, 23, 42, 0.055)',
-              overflow: 'hidden',
-            }}
-          >
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              sx={{
-                justifyContent: 'space-between',
-                alignItems: { sm: 'center' },
-                gap: 2,
-                px: { xs: 2, md: 3 },
-                py: 2.5,
-                borderBottom: '1px solid #E8EBEF',
-              }}
-            >
-              <Box>
-                <Typography sx={{ color: '#172033', fontWeight: 900 }}>
-                  Đơn hàng của bạn
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#7A8391' }}>
-                  Theo dõi giao dịch và mở lại khóa học đã thanh toán.
-                </Typography>
-              </Box>
-
-              <Box
-                role="group"
-                aria-label="Lọc lịch sử thanh toán"
-                sx={{
-                  display: 'flex',
-                  maxWidth: '100%',
-                  gap: 0.5,
-                  p: 0.5,
-                  overflowX: 'auto',
-                  bgcolor: '#F1F4F7',
-                  borderRadius: '8px',
-                }}
-              >
-                {FILTERS.map((filter, index) => {
-                  const selected = filterIndex === index;
-                  return (
-                    <Button
-                      key={filter.label}
-                      aria-pressed={selected}
-                      onClick={() => selectFilter(index)}
-                      sx={{
-                        minWidth: 'max-content',
-                        px: 1.75,
-                        py: 0.75,
-                        color: selected ? '#C41E3A' : '#667085',
-                        bgcolor: selected ? '#FFFFFF' : 'transparent',
-                        borderRadius: '6px',
-                        fontSize: '0.82rem',
-                        fontWeight: selected ? 800 : 600,
-                        boxShadow: selected ? '0 1px 4px rgba(15, 23, 42, 0.1)' : 'none',
-                        '&:hover': { bgcolor: selected ? '#FFFFFF' : '#E8ECF1' },
-                      }}
-                    >
-                      {filter.label}
-                    </Button>
-                  );
-                })}
-              </Box>
+        <Box sx={{ border: '1px solid #E1E5EA', borderRadius: 2, bgcolor: '#fff', overflow: 'hidden' }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ p: 2.5, justifyContent: 'space-between', alignItems: { md: 'center' } }}>
+            <Box>
+              <Typography sx={{ fontWeight: 900 }}>Đơn hàng của bạn</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Theo dõi giao dịch mua khóa học, nạp ví và gửi yêu cầu hoàn tiền khi cần.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={0.5} sx={{ overflowX: 'auto' }}>
+              {FILTERS.map((filter, index) => (
+                <Button
+                  key={filter.label}
+                  variant={filterIndex === index ? 'contained' : 'text'}
+                  aria-pressed={filterIndex === index}
+                  onClick={() => { setFilterIndex(index); setPage(0); }}
+                  sx={{ minWidth: 'max-content' }}
+                >
+                  {filter.label}
+                </Button>
+              ))}
             </Stack>
+          </Stack>
+          <Divider />
 
-            {isError ? (
-              <Box sx={{ p: { xs: 2, md: 3 } }}>
-                <Alert
-                  severity="error"
-                  action={
-                    <Button color="inherit" size="small" onClick={() => refetch()}>
-                      Thử lại
-                    </Button>
-                  }
-                >
-                  Không thể tải lịch sử thanh toán. Vui lòng thử lại.
-                </Alert>
-              </Box>
-            ) : (
-              <Box aria-busy={isLoading || isFetching}>
-                <Box
-                  sx={{
-                    display: { xs: 'none', md: 'grid' },
-                    gridTemplateColumns: DESKTOP_GRID,
-                    gap: 2,
-                    px: 3,
-                    py: 1.75,
-                    bgcolor: '#F8FAFC',
-                    borderBottom: '1px solid #E8EBEF',
-                  }}
-                >
-                  <Typography sx={headerCellSx}>Mã đơn hàng</Typography>
-                  <Typography sx={headerCellSx}>Khóa học</Typography>
-                  <Typography sx={headerCellSx}>Ngày tạo</Typography>
-                  <Typography sx={{ ...headerCellSx, textAlign: 'right' }}>Số tiền</Typography>
-                  <Typography sx={{ ...headerCellSx, textAlign: 'right' }}>Trạng thái</Typography>
-                </Box>
+          {ordersQuery.isError && (
+            <Alert severity="error" sx={{ m: 2 }} action={<Button onClick={() => void ordersQuery.refetch()}>Thử lại</Button>}>
+              Không thể tải lịch sử thanh toán.
+            </Alert>
+          )}
+          {ordersQuery.isLoading && (
+            <Stack spacing={1.5} sx={{ minHeight: 260, alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress aria-label="Đang tải lịch sử thanh toán" />
+              <Typography color="text.secondary">Đang tải giao dịch…</Typography>
+            </Stack>
+          )}
+          {!ordersQuery.isLoading && !ordersQuery.isError && orders.length === 0 && (
+            <Stack spacing={1.5} sx={{ minHeight: 280, alignItems: 'center', justifyContent: 'center', p: 3, textAlign: 'center' }}>
+              <ReceiptLongOutlinedIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>Chưa có đơn hàng phù hợp</Typography>
+              <Button variant="contained" onClick={() => navigate(ROUTES.STUDENT.BROWSE_COURSES)}>
+                Khám phá khóa học
+              </Button>
+            </Stack>
+          )}
 
-                {isLoading ? (
-                  <Box sx={{ minHeight: 300, display: 'grid', placeItems: 'center' }}>
-                    <Stack spacing={2} sx={{ alignItems: 'center' }}>
-                      <CircularProgress
-                        aria-label="Đang tải lịch sử thanh toán"
-                        sx={{ color: '#C41E3A' }}
-                      />
-                      <Typography color="text.secondary">Đang tải giao dịch...</Typography>
-                    </Stack>
-                  </Box>
-                ) : orders.length === 0 ? (
-                  <Box sx={{ minHeight: 330, display: 'grid', placeItems: 'center', p: 4 }}>
-                    <Box sx={{ maxWidth: 440, textAlign: 'center' }}>
-                      <ReceiptLongOutlinedIcon sx={{ fontSize: 58, color: '#A6AFBC', mb: 1.5 }} />
-                      <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900, mb: 1 }}>
-                        Chưa có đơn hàng phù hợp
-                      </Typography>
-                      <Typography sx={{ color: '#667085', lineHeight: 1.6, mb: 3 }}>
-                        Giao dịch mua khóa học sẽ xuất hiện tại đây ngay khi bạn bắt đầu thanh toán.
-                      </Typography>
-                      <Button
-                        variant="contained"
-                        onClick={() => navigate(ROUTES.STUDENT.BROWSE_COURSES)}
-                        sx={{
-                          bgcolor: '#C41E3A',
-                          fontWeight: 800,
-                          '&:hover': { bgcolor: '#A71931' },
-                        }}
-                      >
-                        Khám phá khóa học
-                      </Button>
-                    </Box>
-                  </Box>
-                ) : (
-                  orders.map((order, index) => (
-                    <OrderHistoryRow
-                      key={order.id}
-                      order={order}
-                      showDivider={index < orders.length - 1}
-                    />
-                  ))
-                )}
-              </Box>
-            )}
+          <Stack divider={<Divider flexItem />}>
+            {orders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                latestRefundByItem={latestRefundByItem}
+                onRequestRefund={openNewRefund}
+                onOpenRefund={openRefundDetail}
+              />
+            ))}
+          </Stack>
 
-            {(data?.totalPages ?? 0) > 1 && !isError && (
-              <Box
-                sx={{
-                  py: 2.5,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  borderTop: '1px solid #E8EBEF',
-                }}
-              >
-                <Pagination
-                  count={data?.totalPages ?? 1}
-                  page={page + 1}
-                  onChange={(_, value) => setPage(value - 1)}
-                  sx={{
-                    '& .Mui-selected': {
-                      bgcolor: '#C41E3A !important',
-                      color: '#FFFFFF',
-                    },
-                  }}
-                />
-              </Box>
-            )}
-          </Box>
+          {(ordersQuery.data?.totalPages ?? 0) > 1 && (
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+              <Pagination
+                count={ordersQuery.data?.totalPages ?? 1}
+                page={page + 1}
+                onChange={(_, value) => setPage(value - 1)}
+              />
+            </Box>
+          )}
         </Box>
+
+        <StudentRefundHistory
+          refunds={refunds}
+          loading={refundsQuery.isLoading}
+          error={refundsQuery.isError}
+          onRetry={() => void refundsQuery.refetch()}
+          onOpen={openRefundDetail}
+        />
       </Box>
+
+      <RefundRequestDialog
+        open={dialogItem !== null}
+        orderItem={dialogItem}
+        existingRefund={dialogRefund}
+        onClose={() => { setDialogItem(null); setDialogRefund(null); }}
+      />
     </Box>
   );
 }
 
-function OrderHistoryRow({
+function OrderCard({
   order,
-  showDivider,
+  latestRefundByItem,
+  onRequestRefund,
+  onOpenRefund,
 }: {
   order: OrderResponse;
-  showDivider: boolean;
+  latestRefundByItem: Map<string, StudentRefundResponse>;
+  onRequestRefund: (item: OrderItemResponse) => void;
+  onOpenRefund: (refund: StudentRefundResponse) => void;
 }) {
-  const navigate = useNavigate();
-  const status = STATUS_PRESENTATION[order.status];
-  const course = order.items[0];
-  const additionalCourses = Math.max(0, order.items.length - 1);
+  const presentation = ORDER_STATUS[order.status];
+  const isWalletTopUp = order.type === 'WALLET_TOPUP';
 
   return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: 'minmax(0, 1fr) auto', md: DESKTOP_GRID },
-        gap: { xs: 1.5, md: 2 },
-        alignItems: 'center',
-        px: { xs: 2, md: 3 },
-        py: { xs: 2.25, md: 2 },
-        borderBottom: showDivider ? '1px solid #EEF0F3' : 'none',
-        transition: 'background-color 160ms ease',
-        '&:hover': { bgcolor: '#FCFCFD' },
-      }}
-    >
-      <Box>
-        <Typography variant="caption" sx={{ display: { md: 'none' }, color: '#7A8391' }}>
-          Mã đơn hàng
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#3D4654', fontWeight: 800 }}>
-          {order.orderCode}
-        </Typography>
-      </Box>
-
-      <Box
-        sx={{
-          minWidth: 0,
-          gridColumn: { xs: '1 / -1', md: 'auto' },
-          gridRow: { xs: 2, md: 'auto' },
-        }}
-      >
-        <Typography variant="caption" sx={{ display: { md: 'none' }, color: '#7A8391' }}>
-          Khóa học
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#172033', fontWeight: 800 }} noWrap>
-          {course?.courseTitle ?? 'Đơn hàng chưa có thông tin khóa học'}
-        </Typography>
-        {additionalCourses > 0 && (
-          <Typography variant="caption" sx={{ color: '#7A8391' }}>
-            và {additionalCourses} khóa học khác
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', mb: 2 }}>
+        <Box>
+          <Typography sx={{ fontWeight: 900 }}>{order.orderCode}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {new Date(order.createdAt).toLocaleDateString('vi-VN')} · {formatMoney(order.totalAmount, order.currency)}
           </Typography>
-        )}
-      </Box>
+        </Box>
+        <Chip label={presentation.label} color={presentation.color} size="small" />
+      </Stack>
 
-      <Box sx={{ gridRow: { xs: 3, md: 'auto' } }}>
-        <Typography variant="caption" sx={{ display: { md: 'none' }, color: '#7A8391' }}>
-          Ngày tạo
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#596273' }}>
-          {new Date(order.createdAt).toLocaleDateString('vi-VN')}
-        </Typography>
-      </Box>
-
-      <Box sx={{ textAlign: { xs: 'right', md: 'right' }, gridRow: { xs: 3, md: 'auto' } }}>
-        <Typography variant="caption" sx={{ display: { md: 'none' }, color: '#7A8391' }}>
-          Số tiền
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#172033', fontWeight: 900 }}>
-          {formatMoney(order.totalAmount, order.currency)}
-        </Typography>
-      </Box>
-
-      <Stack
-        direction="row"
-        sx={{
-          gridColumn: { xs: '1 / -1', md: 'auto' },
-          justifyContent: { xs: 'space-between', md: 'flex-end' },
-          alignItems: 'center',
-          gap: 1,
-        }}
-      >
-        <Chip
-          label={status.label}
-          size="small"
-          sx={{
-            bgcolor: status.background,
-            color: status.color,
-            borderRadius: '6px',
-            fontWeight: 800,
-          }}
-        />
-        {course && order.status === 'PAID' && (
-          <Button
-            size="small"
-            endIcon={<ArrowForwardIcon />}
-            onClick={() => navigate(ROUTES.STUDENT.COURSE_LEARN(course.courseId))}
-            sx={{ color: 'common.white', fontWeight: 800 }}
-          >
-            Vào học
-          </Button>
+      <Stack spacing={1.25}>
+        {isWalletTopUp ? (
+          <Stack sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1.5 }}>
+            <Typography sx={{ fontWeight: 800 }}>
+              Nạp {formatMoney(order.totalAmount, order.currency)} vào ví
+            </Typography>
+          </Stack>
+        ) : (
+          order.items.map((item) => {
+            const refund = latestRefundByItem.get(item.id);
+            const canSubmitAgain = refund?.status === 'REJECTED' || refund?.status === 'CANCELLED';
+            return (
+              <Stack
+                key={item.id}
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={1}
+                sx={{ p: 1.5, bgcolor: '#F8FAFC', borderRadius: 1.5, justifyContent: 'space-between', alignItems: { md: 'center' } }}
+              >
+                <Box>
+                  <Typography sx={{ fontWeight: 800 }}>{item.courseTitle}</Typography>
+                  <Typography variant="body2" color="text.secondary">{formatMoney(item.price, order.currency)}</Typography>
+                </Box>
+                {order.status === 'PAID' && item.price > 0 && (
+                  <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap' }}>
+                    {refund && (
+                      <Button size="small" variant="outlined" onClick={() => onOpenRefund(refund)}>
+                        Xem hoàn tiền
+                      </Button>
+                    )}
+                    {(!refund || canSubmitAgain) && (
+                      <Button size="small" variant="outlined" onClick={() => onRequestRefund(item)}>
+                        {canSubmitAgain ? 'Yêu cầu lại' : 'Yêu cầu hoàn tiền'}
+                      </Button>
+                    )}
+                  </Stack>
+                )}
+              </Stack>
+            );
+          })
         )}
       </Stack>
     </Box>

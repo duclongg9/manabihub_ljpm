@@ -28,7 +28,7 @@ const LABELS: Record<string, string> = {
   COURSE_PRICE_FLOOR: 'Giá khóa học tối thiểu (VND)',
   AI_SUPPORT_PRICE_FLOOR: 'Giá tối thiểu để dùng AI (VND)',
   REFUND_WINDOW_DAYS: 'Thời hạn hoàn tiền (ngày)',
-  REFUND_PROGRESS_LIMIT_PERCENT: 'Ngưỡng tiến độ hoàn tiền — phải thấp hơn (%)',
+  REFUND_PROGRESS_LIMIT_PERCENT: 'Ngưỡng tiến độ hoàn tiền — không vượt quá (%)',
   ESCROW_HOLDING_DAYS: 'Thời gian giữ escrow (ngày)',
   PAYOUT_THRESHOLD: 'Số dư tối thiểu để rút (VND)',
   AI_ENABLED: 'Bật toàn bộ tính năng AI',

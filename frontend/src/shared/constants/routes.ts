@@ -23,6 +23,7 @@ export const ROUTES = {
     WISHLIST: '/student/wishlist',
     COURSE_LEARN: (courseId: string) => `/student/courses/${courseId}/learn`,
     PAYMENTS: '/student/payments',
+    WALLET: '/student/wallet',
     NOTIFICATIONS: '/student/notifications',
     PROFILE: '/student/profile',
     AI_CHAT: (courseId: string, lessonBlockId: string) =>
@@ -48,10 +49,8 @@ export const ROUTES = {
     DASHBOARD: '/admin/dashboard',
     SYSTEM_SETTINGS: '/admin/settings',
     USERS: '/admin/users',
-    TASK_QUEUE: '/admin/tasks/queue',
     COURSE_APPROVAL: '/admin/courses/approvals',
     KYC_REVIEW: '/admin/kyc',
-    FINANCE: '/admin/finance',
     PAYOUTS: '/admin/payouts',
     VIOLATIONS: '/admin/violations',
     NOTIFICATIONS: '/admin/notifications',
