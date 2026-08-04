@@ -1,7 +1,6 @@
 package com.manabihub.kyc.port;
 
 import java.time.Instant;
-import java.util.List;
 
 /**
  * Result of a VNPT server-to-server verification call.
@@ -13,7 +12,6 @@ public record VnptServerVerificationResult(
         String providerStatus,
         Instant providerVerifiedAt,
         String reasonCode,
-        List<String> failureReasons,
         String serverIdNumber,
         String maskedReference
 ) {
@@ -27,7 +25,7 @@ public record VnptServerVerificationResult(
     ) {
         return new VnptServerVerificationResult(
                 txId, sessionId, true, providerStatus, verifiedAt,
-                null, List.of(), idNumber, maskedReference
+                null, idNumber, maskedReference
         );
     }
 
@@ -35,12 +33,11 @@ public record VnptServerVerificationResult(
             String txId,
             String sessionId,
             String providerStatus,
-            String reasonCode,
-            List<String> reasons
+            String reasonCode
     ) {
         return new VnptServerVerificationResult(
                 txId, sessionId, false, providerStatus, null,
-                reasonCode, reasons, null, null
+                reasonCode, null, null
         );
     }
 }

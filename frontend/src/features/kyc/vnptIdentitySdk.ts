@@ -41,19 +41,11 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
 
   const missingConfig = [
     { label: 'VITE_VNPT_EKYC_BACKEND_URL', value: env.backendUrl },
-    { label: 'VITE_VNPT_EKYC_TOKEN_ID', value: env.tokenId },
-    { label: 'VITE_VNPT_EKYC_TOKEN_KEY', value: env.tokenKey },
-    { label: 'VITE_VNPT_EKYC_ACCESS_TOKEN', value: env.accessToken },
   ].filter((item) => !item.value);
 
   if (missingConfig.length > 0) {
     throw new Error(`Thiếu cấu hình VNPT eKYC: ${missingConfig.map((item) => item.label).join(', ')}`);
   }
-
-  const handleDocumentResult: VnptSdkCallback = (sdkResult) => {
-    const normalizedResult = normalizeSdkResult(sdkResult);
-
-  };
 
   let finalResultHandled = false;
   const handleFinalResult: VnptSdkCallback = async (sdkResult) => {
@@ -75,12 +67,8 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
   // Config follows VNPT eKYC Web SDK 3.2.1 docs.
   const dataConfig = {
     BACKEND_URL: env.backendUrl,
-    TOKEN_KEY: env.tokenKey,
-    TOKEN_ID: env.tokenId,
-    ACCESS_TOKEN: env.accessToken,
     CALL_BACK: handleFinalResult,
     CALL_BACK_END_FLOW: handleFinalResult,
-    CALL_BACK_DOCUMENT_RESULT: handleDocumentResult,
     HAS_BACKGROUND_IMAGE: true,
     HAS_RESULT_SCREEN: true,
     SHOW_STEP: true,
@@ -112,12 +100,9 @@ export async function launchVnptIdentitySdk(onResult: (result: VnptIdentityResul
 
 function getVnptEnv() {
   return {
-    enabled: import.meta.env.VITE_VNPT_EKYC_ENABLED !== 'false',
+    enabled: import.meta.env.VITE_VNPT_EKYC_ENABLED === 'true',
     scriptUrls: resolveScriptUrls(import.meta.env.VITE_VNPT_EKYC_SDK_SCRIPT_URLS),
     backendUrl: normalizeBackendUrl(import.meta.env.VITE_VNPT_EKYC_BACKEND_URL),
-    tokenId: (import.meta.env.VITE_VNPT_EKYC_TOKEN_ID ?? '').trim(),
-    tokenKey: (import.meta.env.VITE_VNPT_EKYC_TOKEN_KEY ?? '').trim(),
-    accessToken: sanitizeAccessToken(import.meta.env.VITE_VNPT_EKYC_ACCESS_TOKEN),
   };
 }
 
@@ -213,21 +198,9 @@ function hasValue(value: unknown) {
   return value !== null && value !== undefined && String(value).trim().length > 0;
 }
 
-function saveDebugResult(key: string, value: Record<string, unknown>) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Debug storage is best-effort only; KYC flow must not fail because of browser storage.
-  }
-}
-
 function safeDebugConfig(config: Record<string, unknown>) {
   return {
     BACKEND_URL: config.BACKEND_URL,
-    TOKEN_ID_EXISTS: Boolean(config.TOKEN_ID),
-    TOKEN_KEY_EXISTS: Boolean(config.TOKEN_KEY),
-    ACCESS_TOKEN_EXISTS: Boolean(config.ACCESS_TOKEN),
-    ACCESS_TOKEN_HAS_BEARER_PREFIX: String(config.ACCESS_TOKEN ?? '').toLowerCase().startsWith('bearer '),
     SDK_FLOW: config.SDK_FLOW,
     FLOW_TAKEN: config.FLOW_TAKEN,
     USE_METHOD: config.USE_METHOD,
@@ -261,8 +234,4 @@ function resolveScriptUrls(value: string | undefined) {
 
 function normalizeBackendUrl(value: string | undefined) {
   return (value ?? '').trim().replace(/\/+$/, '');
-}
-
-function sanitizeAccessToken(value: string | undefined) {
-  return (value ?? '').trim().replace(/^bearer\s+/i, '');
 }

@@ -103,6 +103,7 @@ class TeacherKycServiceTest {
                 vnptVerificationPort,
                 securityAuditService,
                 entityManager,
+                org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class),
                 storageRoot.toString()
         );
 

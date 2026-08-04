@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -166,9 +167,11 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
             return userA.getId();
         });
 
-        // 2. Teacher A registers identity with formatted CCCD
+        // 2. Teacher A successfully verifies CCCD in TX 1
+        AtomicReference<KycIdentityVerificationRequest> reqARef = new AtomicReference<>();
         tx1.executeWithoutResult(status -> {
             KycIdentityVerificationRequest reqA = createMockSdkRequest(cccdRawWithSpaces, "Nguyen Van A");
+            reqARef.set(reqA);
             com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqA.providerTransactionId(), reqA.providerSessionId(), cccdNormalized);
             KycIdentityVerificationResponse respA = teacherKycService.verifyIdentity(userAId, reqA, "127.0.0.1", "TestAgent");
 
@@ -179,9 +182,14 @@ class TeacherIdentityClaimDuplicatePostgresIntegrationTest {
 
         // 3. Teacher A retries with same CCCD -> Idempotent success
         tx1.executeWithoutResult(status -> {
-            KycIdentityVerificationRequest reqA = createMockSdkRequest(cccdNormalized, "Nguyen Van A");
-            com.manabihub.kyc.service.impl.TestVnptVerificationAdapter.allowTransaction(reqA.providerTransactionId(), reqA.providerSessionId(), cccdNormalized);
-            KycIdentityVerificationResponse retryRespA = teacherKycService.verifyIdentity(userAId, reqA, "127.0.0.1", "TestAgent");
+            KycIdentityVerificationRequest originalReqA = reqARef.get();
+            KycIdentityVerificationRequest retryReqA = new KycIdentityVerificationRequest(
+                    originalReqA.providerTransactionId(),
+                    originalReqA.providerSessionId(),
+                    java.util.Map.of()
+            );
+            
+            KycIdentityVerificationResponse retryRespA = teacherKycService.verifyIdentity(userAId, retryReqA, "127.0.0.1", "TestAgent");
             assertNotNull(retryRespA);
         });
 

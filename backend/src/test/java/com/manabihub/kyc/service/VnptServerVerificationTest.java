@@ -64,6 +64,7 @@ class VnptServerVerificationTest {
     @Mock private EntityManager entityManager;
 
     private TeacherKycService service;
+    @Mock private org.springframework.beans.factory.ObjectProvider<TeacherKycService> selfProvider;
     private UUID userId;
     private UUID teacherId;
     private TeacherProfile teacherProfile;
@@ -83,8 +84,10 @@ class VnptServerVerificationTest {
                 vnptVerificationPort,
                 securityAuditService,
                 entityManager,
+                selfProvider,
                 "storage/kyc"
         );
+        lenient().when(selfProvider.getObject()).thenReturn(service);
 
         userId = UUID.randomUUID();
         teacherId = UUID.randomUUID();
@@ -190,7 +193,7 @@ class VnptServerVerificationTest {
 
         // Server verification fails
         when(vnptVerificationPort.verifyTransaction(any(), any()))
-                .thenReturn(VnptServerVerificationResult.failure("tx-123", "session-123", "FAILED", "TX_NOT_FOUND", List.of("Transaction not found")));
+                .thenReturn(VnptServerVerificationResult.failure("tx-123", "session-123", "FAILED", "TX_NOT_FOUND"));
 
         ArgumentCaptor<KycRequest> requestCaptor = ArgumentCaptor.forClass(KycRequest.class);
         org.mockito.stubbing.Answer<KycRequest> saveAnswer = inv -> {

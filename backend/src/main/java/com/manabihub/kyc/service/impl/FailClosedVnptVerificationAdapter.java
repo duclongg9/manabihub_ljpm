@@ -5,7 +5,7 @@ import com.manabihub.kyc.port.VnptVerificationPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
+
 
 public class FailClosedVnptVerificationAdapter implements VnptVerificationPort {
 
@@ -18,8 +18,7 @@ public class FailClosedVnptVerificationAdapter implements VnptVerificationPort {
                 providerTransactionId,
                 providerSessionId,
                 "NOT_CONFIGURED",
-                "PROVIDER_NOT_CONFIGURED",
-                List.of("VNPT verification provider is not configured.")
+                "PROVIDER_NOT_CONFIGURED"
         );
     }
 }

@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -35,8 +34,7 @@ public class TestVnptVerificationAdapter implements VnptVerificationPort {
                     providerTransactionId,
                     providerSessionId,
                     "BAD_REQUEST",
-                    "MISSING_PARAMS",
-                    List.of("Missing tx or session")
+                    "MISSING_PARAMS"
             );
         }
 
@@ -55,8 +53,7 @@ public class TestVnptVerificationAdapter implements VnptVerificationPort {
                 providerTransactionId,
                 providerSessionId,
                 "NOT_FOUND",
-                "TX_NOT_FOUND",
-                List.of("Transaction ID or Session ID mismatch.")
+                "TX_NOT_FOUND"
         );
     }
 }

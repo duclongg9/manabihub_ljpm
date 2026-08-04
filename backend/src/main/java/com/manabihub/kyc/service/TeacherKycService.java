@@ -61,6 +61,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 
 @Service
 public class TeacherKycService {
@@ -89,6 +90,7 @@ public class TeacherKycService {
     private final SecurityAuditService securityAuditService;
     private final EntityManager entityManager;
     private final Path storageRoot;
+    private final ObjectProvider<TeacherKycService> selfProvider;
 
     public TeacherKycService(
             TeacherProfileRepository teacherProfileRepository,
@@ -102,6 +104,7 @@ public class TeacherKycService {
             VnptVerificationPort vnptVerificationPort,
             SecurityAuditService securityAuditService,
             EntityManager entityManager,
+            ObjectProvider<TeacherKycService> selfProvider,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
         this.teacherProfileRepository = teacherProfileRepository;
@@ -116,6 +119,7 @@ public class TeacherKycService {
         this.securityAuditService = securityAuditService;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
+        this.selfProvider = selfProvider;
     }
 
     @Transactional
