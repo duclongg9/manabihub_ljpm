@@ -176,7 +176,7 @@ class PayoutReconciliationServiceImplTest {
                 .build();
         reservation = WalletTransaction.builder()
                 .walletId(walletId)
-                .amount(new BigDecimal("-200000.00"))
+                .amount(new BigDecimal("200000.00"))
                 .direction(WalletDirection.OUT)
                 .transactionType(WalletTransactionType.WITHDRAWAL_RESERVATION)
                 .build();

@@ -138,7 +138,7 @@ public class WalletServiceImpl implements WalletService {
         WalletTransaction transaction = WalletTransaction.builder()
                 .walletId(wallet.getId())
                 .transactionType(WalletTransactionType.WITHDRAWAL_RESERVATION)
-                .amount(amount.negate()) // negative for deduction from available
+                .amount(amount) // magnitude only; WalletDirection carries the sign
                 .direction(WalletDirection.OUT)
                 .referenceType("WITHDRAWAL_REQUEST")
                 .referenceId(UUID.fromString(withdrawalId))

@@ -148,7 +148,7 @@ class PayoutSettlementServiceImplTest {
         WalletTransaction reservation = WalletTransaction.builder()
                 .walletId(walletId)
                 .transactionType(WalletTransactionType.WITHDRAWAL_RESERVATION)
-                .amount(new BigDecimal("-1000000.00"))
+                .amount(new BigDecimal("1000000.00"))
                 .direction(WalletDirection.OUT)
                 .referenceType("WITHDRAWAL_REQUEST")
                 .referenceId(requestId)

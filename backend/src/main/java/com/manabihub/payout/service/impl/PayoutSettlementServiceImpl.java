@@ -1554,7 +1554,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         walletTransactionRepository.save(WalletTransaction.builder()
                 .walletId(wallet.getId())
                 .transactionType(WalletTransactionType.WITHDRAWAL_COMPLETED)
-                .amount(amount.negate())
+                .amount(amount)
                 .direction(WalletDirection.OUT)
                 .referenceType(WITHDRAWAL_REFERENCE)
                 .referenceId(request.getId())

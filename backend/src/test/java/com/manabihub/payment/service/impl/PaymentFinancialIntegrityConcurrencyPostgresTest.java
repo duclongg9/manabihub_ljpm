@@ -516,7 +516,7 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
                 SELECT COUNT(*) FROM wallet_transactions
                 WHERE wallet_id = ?
                   AND transaction_type = 'WITHDRAWAL_RESERVATION'
-                  AND amount = -200000.00
+                  AND amount = 200000.00
                 """, walletId));
     }
 
