@@ -8,6 +8,7 @@ import type {
   PayoutQueueParams,
   RejectPayoutPayload,
   ManualTransferPayload,
+  MockPayoutScenario,
 } from '../types/payout.types';
 
 export const adminPayoutService = {
@@ -36,6 +37,17 @@ export const adminPayoutService = {
   async approvePayout(withdrawalRequestId: string) {
     const response = await axiosClient.post<ApiResponse<PayoutDecision>>(
       ENDPOINTS.ADMIN_PAYOUT.APPROVE(withdrawalRequestId),
+    );
+    return response.data.data;
+  },
+
+  async approvePayoutWithMockResult(
+    withdrawalRequestId: string,
+    scenario: MockPayoutScenario,
+  ) {
+    const response = await axiosClient.post<ApiResponse<PayoutDecision>>(
+      ENDPOINTS.ADMIN_PAYOUT.MOCK_APPROVE(withdrawalRequestId),
+      { scenario },
     );
     return response.data.data;
   },

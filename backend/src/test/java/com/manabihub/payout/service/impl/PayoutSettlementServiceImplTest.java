@@ -7,6 +7,7 @@ import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -32,10 +33,11 @@ import com.manabihub.payout.service.PayoutReconciliationService;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.enums.WalletTransactionType;
 import com.manabihub.wallet.repository.WalletRepository;
-import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
+import com.manabihub.wallet.service.StudentWalletService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -77,6 +79,7 @@ class PayoutSettlementServiceImplTest {
     @Mock private WalletRepository walletRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
+    @Mock private StudentProfileRepository studentProfileRepository;
     @Mock private InternalAdminAccountRepository internalAdminAccountRepository;
     @Mock private CurrentUserService currentUserService;
     @Mock private PayoutReconciliationService reconciliationService;
@@ -86,6 +89,7 @@ class PayoutSettlementServiceImplTest {
     @Mock private PayoutProofStorageService proofStorageService;
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private PayoutSecurityService payoutSecurityService;
+    @Mock private StudentWalletService studentWalletService;
 
     private PayoutSettlementServiceImpl service;
     private UUID adminId;
@@ -144,7 +148,7 @@ class PayoutSettlementServiceImplTest {
         WalletTransaction reservation = WalletTransaction.builder()
                 .walletId(walletId)
                 .transactionType(WalletTransactionType.WITHDRAWAL_RESERVATION)
-                .amount(new BigDecimal("-1000000.00"))
+                .amount(new BigDecimal("1000000.00"))
                 .direction(WalletDirection.OUT)
                 .referenceType("WITHDRAWAL_REQUEST")
                 .referenceId(requestId)
@@ -194,6 +198,7 @@ class PayoutSettlementServiceImplTest {
                 walletRepository,
                 walletTransactionRepository,
                 teacherProfileRepository,
+                studentProfileRepository,
                 internalAdminAccountRepository,
                 currentUserService,
                 reconciliationService,
@@ -202,7 +207,8 @@ class PayoutSettlementServiceImplTest {
                 payoutGateway,
                 proofStorageService,
                 transactionTemplate,
-                payoutSecurityService
+                payoutSecurityService,
+                studentWalletService
         );
     }
 
@@ -224,6 +230,54 @@ class PayoutSettlementServiceImplTest {
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(notificationService, times(1))
                 .createNotification(any(), any(), any(), any(), eq("PAYOUT_SUCCESS"), any());
+    }
+
+    @Test
+    void approveStudentPayoutCapturesReservedRefundBalance() {
+        UUID studentId = UUID.randomUUID();
+        UUID studentUserId = UUID.randomUUID();
+        com.manabihub.identity.entity.AppUser studentUser =
+                com.manabihub.identity.entity.AppUser.builder()
+                        .id(studentUserId)
+                        .email("student@example.com")
+                        .fullName("Nguyen Student")
+                        .userStatus(AccountStatus.ACTIVE)
+                        .build();
+        com.manabihub.identity.entity.StudentProfile student =
+                com.manabihub.identity.entity.StudentProfile.builder()
+                        .id(studentId)
+                        .displayName("Nguyen Student")
+                        .user(studentUser)
+                        .build();
+        request.setOwnerType(WalletOwnerType.STUDENT);
+        request.setTeacherId(null);
+        request.setStudentId(studentId);
+        request.setWalletId(wallet.getId());
+        wallet.setOwnerType(WalletOwnerType.STUDENT);
+        wallet.setTeacher(null);
+        wallet.setStudent(student);
+        wallet.setWithdrawableBalance(request.getRequestedAmount());
+        wallet.setFrozenWithdrawableBalance(request.getRequestedAmount());
+
+        when(studentProfileRepository.findById(studentId)).thenReturn(Optional.of(student));
+        when(walletRepository.findByOwnerTypeAndStudent_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+        when(reconciliationService.reconcileStudent(request, wallet, student))
+                .thenReturn(matchedReconciliation());
+        when(payoutGateway.transfer(any())).thenReturn(PayoutGateway.PayoutGatewayResult.builder()
+                .success(true)
+                .providerReference("BANK-STUDENT-123")
+                .build());
+
+        var response = service.approvePayout(requestId);
+
+        assertEquals(WithdrawalStatus.EXECUTED, response.getWithdrawalStatus());
+        verify(studentWalletService).completeWithdrawal(
+                studentId,
+                requestId,
+                request.getRequestedAmount());
+        verify(walletTransactionRepository, never()).save(any(WalletTransaction.class));
+        verify(notificationService).createNotification(
+                eq(studentUserId), any(), any(), any(), eq("PAYOUT_SUCCESS"), eq("/student/wallet"));
     }
 
     @Test

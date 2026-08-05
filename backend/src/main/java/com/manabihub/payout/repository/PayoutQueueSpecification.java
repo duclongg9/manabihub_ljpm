@@ -1,5 +1,6 @@
 package com.manabihub.payout.repository;
 
+import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.payout.dto.request.PayoutQueueFilterRequest;
 import com.manabihub.payout.entity.PayoutSettlement;
@@ -38,13 +39,21 @@ public final class PayoutQueueSpecification {
                 ));
             }
 
-            String teacherKeyword = normalizeKeyword(filter.getTeacherKeyword());
-            if (teacherKeyword != null) {
-                predicates.add(teacherMatches(
-                        root,
-                        query.subquery(Integer.class),
-                        criteriaBuilder,
-                        teacherKeyword
+            String ownerKeyword = normalizeKeyword(filter.getTeacherKeyword());
+            if (ownerKeyword != null) {
+                predicates.add(criteriaBuilder.or(
+                        teacherMatches(
+                                root,
+                                query.subquery(Integer.class),
+                                criteriaBuilder,
+                                ownerKeyword
+                        ),
+                        studentMatches(
+                                root,
+                                query.subquery(Integer.class),
+                                criteriaBuilder,
+                                ownerKeyword
+                        )
                 ));
             }
             if (filter.getReconciliationStatus() != null) {
@@ -82,6 +91,34 @@ public final class PayoutQueueSpecification {
                         criteriaBuilder.like(
                                 criteriaBuilder.lower(criteriaBuilder.coalesce(teacher.get("user").get("email"), "")),
                                 teacherKeyword
+                        )
+                )
+        );
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private static Predicate studentMatches(
+            Root<WithdrawalRequest> withdrawal,
+            Subquery<Integer> subquery,
+            CriteriaBuilder criteriaBuilder,
+            String studentKeyword
+    ) {
+        Root<StudentProfile> student = subquery.from(StudentProfile.class);
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(
+                criteriaBuilder.equal(student.get("id"), withdrawal.get("studentId")),
+                criteriaBuilder.or(
+                        criteriaBuilder.like(
+                                criteriaBuilder.lower(criteriaBuilder.coalesce(student.get("displayName"), "")),
+                                studentKeyword
+                        ),
+                        criteriaBuilder.like(
+                                criteriaBuilder.lower(criteriaBuilder.coalesce(student.get("user").get("fullName"), "")),
+                                studentKeyword
+                        ),
+                        criteriaBuilder.like(
+                                criteriaBuilder.lower(criteriaBuilder.coalesce(student.get("user").get("email"), "")),
+                                studentKeyword
                         )
                 )
         );

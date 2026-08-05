@@ -1,6 +1,8 @@
 package com.manabihub.payout.service.impl;
 
 import com.manabihub.kyc.domain.AppUser;
+import com.manabihub.identity.entity.StudentProfile;
+import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.payout.entity.BankAccountSnapshot;
@@ -11,6 +13,7 @@ import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.enums.WalletDirection;
 import com.manabihub.wallet.enums.WalletTransactionType;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -28,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class PayoutReconciliationServiceImplTest {
 
     @Mock private WalletTransactionRepository walletTransactionRepository;
@@ -137,6 +143,53 @@ class PayoutReconciliationServiceImplTest {
         assertEquals(ReconciliationStatus.CRITICAL_MISMATCH, result.status());
         assertTrue(result.alerts().stream()
                 .anyMatch(alert -> "PAYOUT_WALLET_FROZEN".equals(alert.code())));
+    }
+
+    @Test
+    void studentReconciliationMatchesReservedWithdrawableBalance() {
+        UUID studentId = UUID.randomUUID();
+        UUID walletId = UUID.randomUUID();
+        com.manabihub.identity.entity.AppUser studentUser =
+                new com.manabihub.identity.entity.AppUser();
+        studentUser.setId(UUID.randomUUID());
+        studentUser.setUserStatus(AccountStatus.ACTIVE);
+        StudentProfile student = new StudentProfile();
+        student.setId(studentId);
+        student.setUser(studentUser);
+        request = WithdrawalRequest.builder()
+                .id(UUID.randomUUID())
+                .ownerType(WalletOwnerType.STUDENT)
+                .studentId(studentId)
+                .walletId(walletId)
+                .requestedAmount(new BigDecimal("200000.00"))
+                .bankAccountSnapshot(validBank())
+                .build();
+        wallet = Wallet.builder()
+                .id(walletId)
+                .ownerType(WalletOwnerType.STUDENT)
+                .student(student)
+                .balance(new BigDecimal("300000.00"))
+                .withdrawableBalance(new BigDecimal("300000.00"))
+                .frozenBalance(new BigDecimal("200000.00"))
+                .frozenWithdrawableBalance(new BigDecimal("200000.00"))
+                .currency("VND")
+                .build();
+        reservation = WalletTransaction.builder()
+                .walletId(walletId)
+                .amount(new BigDecimal("200000.00"))
+                .direction(WalletDirection.OUT)
+                .transactionType(WalletTransactionType.WITHDRAWAL_RESERVATION)
+                .build();
+        when(walletTransactionRepository.findByReferenceTypeAndReferenceIdAndTransactionType(
+                "WITHDRAWAL_REQUEST",
+                request.getId(),
+                WalletTransactionType.WITHDRAWAL_RESERVATION
+        )).thenReturn(Optional.of(reservation));
+
+        var result = service.reconcileStudent(request, wallet, student);
+
+        assertEquals(ReconciliationStatus.MATCHED, result.status());
+        assertTrue(result.alerts().isEmpty());
     }
 
     private BankAccountSnapshot validBank() {

@@ -449,6 +449,77 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
                 """, "wallet-refund:" + refundRequestId));
     }
 
+    @Test
+    void concurrentStudentWithdrawalsCannotReserveTheSameRefundBalanceTwice() throws Exception {
+        UUID studentId = createStudentProfile("student-withdrawal-race");
+        UUID walletId = UUID.randomUUID();
+        BigDecimal withdrawalAmount = new BigDecimal("200000.00");
+        jdbcTemplate.update("""
+                INSERT INTO wallets (
+                    id, owner_type, student_id, balance, frozen_balance,
+                    withdrawable_balance, frozen_withdrawable_balance, currency, frozen
+                ) VALUES (?, 'STUDENT', ?, 300000.00, 0, 300000.00, 0, 'VND', FALSE)
+                """, walletId, studentId);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<UUID>> futures = new ArrayList<>();
+
+        try {
+            for (int index = 0; index < 2; index++) {
+                UUID withdrawalId = UUID.randomUUID();
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return studentWalletService.reserveForWithdrawal(
+                            studentId,
+                            withdrawalId,
+                            withdrawalAmount).getId();
+                }));
+            }
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            int successfulReservations = 0;
+            int rejectedReservations = 0;
+            for (Future<UUID> future : futures) {
+                try {
+                    future.get(30, TimeUnit.SECONDS);
+                    successfulReservations++;
+                } catch (Exception exception) {
+                    Throwable cause = exception.getCause();
+                    if (cause instanceof BusinessException) {
+                        rejectedReservations++;
+                    } else {
+                        throw exception;
+                    }
+                }
+            }
+            assertEquals(1, successfulReservations);
+            assertEquals(1, rejectedReservations);
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+        }
+
+        assertEquals(0, new BigDecimal("200000.00").compareTo(jdbcTemplate.queryForObject(
+                "SELECT frozen_balance FROM wallets WHERE id = ?",
+                BigDecimal.class,
+                walletId)));
+        assertEquals(0, new BigDecimal("200000.00").compareTo(jdbcTemplate.queryForObject(
+                "SELECT frozen_withdrawable_balance FROM wallets WHERE id = ?",
+                BigDecimal.class,
+                walletId)));
+        assertEquals(1, count("""
+                SELECT COUNT(*) FROM wallet_transactions
+                WHERE wallet_id = ?
+                  AND transaction_type = 'WITHDRAWAL_RESERVATION'
+                  AND amount = 200000.00
+                """, walletId));
+    }
+
     private int count(String sql, Object... arguments) {
         return jdbcTemplate.queryForObject(sql, Integer.class, arguments);
     }

@@ -1,6 +1,7 @@
 package com.manabihub.payout.service;
 
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.payout.entity.WithdrawalRequest;
 import com.manabihub.payout.enums.ReconciliationStatus;
 import com.manabihub.wallet.entity.Wallet;
@@ -14,6 +15,12 @@ public interface PayoutReconciliationService {
             WithdrawalRequest request,
             Wallet wallet,
             TeacherProfile teacher
+    );
+
+    ReconciliationResult reconcileStudent(
+            WithdrawalRequest request,
+            Wallet wallet,
+            StudentProfile student
     );
 
     record ReconciliationAlert(String code, String severity, String message) {

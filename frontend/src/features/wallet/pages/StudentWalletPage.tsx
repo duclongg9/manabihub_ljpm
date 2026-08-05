@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { StudentWithdrawalPanel } from '../components/StudentWithdrawalPanel';
 import { WalletTransactionDetailModal } from '../components/WalletTransactionDetailModal';
 import { WalletTransactionFilters } from '../components/WalletTransactionFilters';
 import { WalletTransactionTable } from '../components/WalletTransactionTable';
 import { STUDENT_TRANSACTION_TYPES } from '../constants/transactionLabels';
+import { useCommercialPolicy } from '../../help-center/hooks/useCommercialPolicy';
 import { useStudentWalletTransactions } from '../hooks/useStudentWalletTransactions';
 import { getStudentWallet, topUpWallet } from '../services/studentWalletService';
 import type { StudentWalletResponse, WalletTransactionFilter } from '../types';
@@ -21,8 +23,14 @@ export const StudentWalletPage = () => {
   const [filter, setFilter] = useState<WalletTransactionFilter>({ page: 0, size: PAGE_SIZE });
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
+  const policyQuery = useCommercialPolicy();
   const historyQuery = useStudentWalletTransactions(filter);
   const history = historyQuery.data;
+
+  const loadWallet = useCallback(async () => {
+    const data = await getStudentWallet();
+    setWallet(data);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -118,6 +126,15 @@ export const StudentWalletPage = () => {
           Giao dịch chỉ được xác nhận qua cổng thanh toán (webhook), không qua trình duyệt.
         </p>
       </div>
+
+      <StudentWithdrawalPanel
+        wallet={wallet}
+        minimumAmount={policyQuery.data?.payoutThreshold ?? 100000}
+        onChanged={async () => {
+          await loadWallet();
+          await historyQuery.refetch();
+        }}
+      />
 
       {/* Transaction history (UC-17) */}
       <div className="bg-white rounded-2xl shadow border border-slate-200/60 mt-8 overflow-hidden">
