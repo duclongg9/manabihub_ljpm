@@ -1,6 +1,7 @@
 package com.manabihub.refund.service;
 
 import com.manabihub.notification.service.NotificationService;
+import com.manabihub.notification.NotificationTypes;
 import com.manabihub.refund.enums.RefundStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,7 +72,8 @@ public class RefundAfterCommitNotifier {
                     student.email(),
                     studentTitle,
                     studentMessage,
-                    "REFUND"
+                    NotificationTypes.REFUND,
+                    "/student/payments"
             );
 
             String teacherTitle = approved
@@ -88,7 +90,8 @@ public class RefundAfterCommitNotifier {
                     teacher.email(),
                     teacherTitle,
                     teacherMessage,
-                    "REFUND"
+                    NotificationTypes.REFUND,
+                    "/teacher/wallet"
             );
         } catch (RuntimeException exception) {
             log.error(

@@ -1,6 +1,7 @@
 package com.manabihub.payout.repository;
 
 import com.manabihub.common.mail.EmailService;
+import com.manabihub.payout.dto.request.PayoutQueueFilterRequest;
 import com.manabihub.payout.entity.WithdrawalRequest;
 import com.manabihub.payout.enums.ReconciliationStatus;
 import com.manabihub.payout.enums.WithdrawalStatus;
@@ -11,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -110,7 +112,7 @@ class PayoutQueueFilterPostgresTest {
 
     @Test
     void returnsEveryRequestWhenNoFilterIsSupplied() {
-        Page<WithdrawalRequest> page = withdrawalRequestRepository.findPayoutQueue(
+        Page<WithdrawalRequest> page = queue(
                 null, null, null, null, null, firstPage);
 
         assertEquals(3, page.getTotalElements());
@@ -121,7 +123,7 @@ class PayoutQueueFilterPostgresTest {
 
     @Test
     void filtersByStartDateOnly() {
-        Page<WithdrawalRequest> page = withdrawalRequestRepository.findPayoutQueue(
+        Page<WithdrawalRequest> page = queue(
                 null, null, null, LocalDateTime.of(2026, 3, 1, 0, 0), null, firstPage);
 
         assertEquals(Set.of(TEACHER_WITHDRAWAL_MARCH, STUDENT_WITHDRAWAL_MAY), idsOf(page));
@@ -130,7 +132,7 @@ class PayoutQueueFilterPostgresTest {
 
     @Test
     void filtersByEndDateOnly() {
-        Page<WithdrawalRequest> page = withdrawalRequestRepository.findPayoutQueue(
+        Page<WithdrawalRequest> page = queue(
                 null, null, null, null, LocalDateTime.of(2026, 3, 31, 23, 59, 59), firstPage);
 
         assertEquals(Set.of(TEACHER_WITHDRAWAL_JANUARY, TEACHER_WITHDRAWAL_MARCH), idsOf(page));
@@ -138,7 +140,7 @@ class PayoutQueueFilterPostgresTest {
 
     @Test
     void filtersByBothDates() {
-        Page<WithdrawalRequest> page = withdrawalRequestRepository.findPayoutQueue(
+        Page<WithdrawalRequest> page = queue(
                 null, null, null,
                 LocalDateTime.of(2026, 3, 1, 0, 0),
                 LocalDateTime.of(2026, 4, 1, 0, 0),
@@ -149,7 +151,7 @@ class PayoutQueueFilterPostgresTest {
 
     @Test
     void filtersByStatusWithoutDates() {
-        Page<WithdrawalRequest> page = withdrawalRequestRepository.findPayoutQueue(
+        Page<WithdrawalRequest> page = queue(
                 WithdrawalStatus.PENDING, null, null, null, null, firstPage);
 
         assertEquals(Set.of(TEACHER_WITHDRAWAL_JANUARY, STUDENT_WITHDRAWAL_MAY), idsOf(page));
@@ -157,7 +159,7 @@ class PayoutQueueFilterPostgresTest {
 
     @Test
     void filtersByReconciliationStatusWithoutDates() {
-        Page<WithdrawalRequest> page = withdrawalRequestRepository.findPayoutQueue(
+        Page<WithdrawalRequest> page = queue(
                 null, ReconciliationStatus.CRITICAL_MISMATCH, null, null, null, firstPage);
 
         assertEquals(Set.of(TEACHER_WITHDRAWAL_MARCH), idsOf(page));
@@ -165,7 +167,7 @@ class PayoutQueueFilterPostgresTest {
 
     @Test
     void combinesStatusReconciliationAndDateRange() {
-        Page<WithdrawalRequest> page = withdrawalRequestRepository.findPayoutQueue(
+        Page<WithdrawalRequest> page = queue(
                 WithdrawalStatus.APPROVED,
                 ReconciliationStatus.CRITICAL_MISMATCH,
                 null,
@@ -178,20 +180,20 @@ class PayoutQueueFilterPostgresTest {
 
     @Test
     void matchesTeacherAndStudentOwnersByKeyword() {
-        Page<WithdrawalRequest> teacherMatches = withdrawalRequestRepository.findPayoutQueue(
-                null, null, "%nguyen%", null, null, firstPage);
+        Page<WithdrawalRequest> teacherMatches = queue(
+                null, null, "nguyen", null, null, firstPage);
         assertEquals(
                 Set.of(TEACHER_WITHDRAWAL_JANUARY, TEACHER_WITHDRAWAL_MARCH),
                 idsOf(teacherMatches));
 
-        Page<WithdrawalRequest> studentMatches = withdrawalRequestRepository.findPayoutQueue(
-                null, null, "%queue-student%", null, null, firstPage);
+        Page<WithdrawalRequest> studentMatches = queue(
+                null, null, "queue-student", null, null, firstPage);
         assertEquals(Set.of(STUDENT_WITHDRAWAL_MAY), idsOf(studentMatches));
     }
 
     @Test
     void appliesSortAndPaginationWithoutFilters() {
-        Page<WithdrawalRequest> page = withdrawalRequestRepository.findPayoutQueue(
+        Page<WithdrawalRequest> page = queue(
                 null, null, null, null, null,
                 PageRequest.of(0, 2, Sort.by(Sort.Direction.DESC, "requestedAt")));
 
@@ -203,7 +205,7 @@ class PayoutQueueFilterPostgresTest {
 
     @Test
     void returnsEmptyPageWhenRangeExcludesEverything() {
-        Page<WithdrawalRequest> page = withdrawalRequestRepository.findPayoutQueue(
+        Page<WithdrawalRequest> page = queue(
                 null, null, null,
                 LocalDateTime.of(2027, 1, 1, 0, 0),
                 LocalDateTime.of(2027, 12, 31, 0, 0),
@@ -211,6 +213,25 @@ class PayoutQueueFilterPostgresTest {
 
         assertEquals(0, page.getTotalElements());
         assertTrue(page.getContent().isEmpty());
+    }
+
+    /** Runs the queue exactly the way the Finance endpoint does. */
+    private Page<WithdrawalRequest> queue(
+            WithdrawalStatus status,
+            ReconciliationStatus reconciliationStatus,
+            String ownerKeyword,
+            LocalDateTime requestedFrom,
+            LocalDateTime requestedTo,
+            Pageable pageable
+    ) {
+        PayoutQueueFilterRequest filter = new PayoutQueueFilterRequest();
+        filter.setStatus(status);
+        filter.setReconciliationStatus(reconciliationStatus);
+        filter.setTeacherKeyword(ownerKeyword);
+        filter.setRequestedFrom(requestedFrom);
+        filter.setRequestedTo(requestedTo);
+        return withdrawalRequestRepository.findAll(
+                PayoutQueueSpecification.from(filter), pageable);
     }
 
     private Set<UUID> idsOf(Page<WithdrawalRequest> page) {

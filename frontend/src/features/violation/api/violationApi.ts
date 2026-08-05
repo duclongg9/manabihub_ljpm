@@ -7,6 +7,6 @@ export interface ViolationReportRequest {
 }
 
 export const submitViolationReport = async (data: ViolationReportRequest) => {
-  const response = await axiosClient.post('/api/v1/violations', data);
+  const response = await axiosClient.post('/v1/violations', data);
   return response.data;
 };

@@ -53,12 +53,17 @@ export const ENDPOINTS = {
   profile: {
     student: '/v1/student/profile',
     teacher: '/v1/teacher/profile',
+    avatar: '/v1/users/avatar',
   },
   teacherDashboard: {
     stats: '/v1/teacher/dashboard',
   },
   teacherWallet: {
     detail: '/v1/teacher/wallet',
+    escrow: '/v1/teacher/wallet/escrow',
+    transactions: '/v1/teacher/wallet/transactions',
+    transactionDetail: (transactionId: string) =>
+      `/v1/teacher/wallet/transactions/${transactionId}`,
     withdrawals: '/v1/teacher/withdrawals',
     withdrawalDetail: (id: string) => `/v1/teacher/withdrawals/${id}`,
     cancelWithdrawal: (id: string) => `/v1/teacher/withdrawals/${id}/cancel`,
@@ -83,6 +88,9 @@ export const ENDPOINTS = {
     cancelWithdrawal: (id: string) => `/v1/student/withdrawals/${id}/cancel`,
     sendWithdrawalOtp: '/v1/student/withdrawals/send-otp',
     withdrawalBankAccounts: '/v1/student/withdrawals/bank-accounts',
+    walletTransactions: '/v1/student/wallet/transactions',
+    walletTransactionDetail: (transactionId: string) =>
+      `/v1/student/wallet/transactions/${transactionId}`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>

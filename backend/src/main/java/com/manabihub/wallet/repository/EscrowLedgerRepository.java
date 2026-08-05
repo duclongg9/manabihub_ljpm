@@ -29,6 +29,18 @@ public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID
 
     Optional<EscrowLedger> findByOrderItem_Id(UUID orderItemId);
 
+    /**
+     * Ids of the teacher's own escrow entries whose order code contains {@code code}
+     * (case-insensitive). Backs the reference-code search on the teacher wallet history (UC-17).
+     */
+    @Query("""
+            SELECT e.id FROM EscrowLedger e
+            WHERE e.teacher.id = :teacherId
+              AND UPPER(e.order.orderCode) LIKE UPPER(CONCAT('%', :code, '%'))
+            """)
+    List<UUID> findIdsByTeacherIdAndOrderCodeLike(@Param("teacherId") UUID teacherId,
+                                                  @Param("code") String code);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM EscrowLedger e WHERE e.id = :id")
     Optional<EscrowLedger> findByIdForUpdate(@Param("id") UUID id);

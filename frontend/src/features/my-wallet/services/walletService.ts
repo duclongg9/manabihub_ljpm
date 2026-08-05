@@ -1,6 +1,12 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import type { ApiResponse, PageResponse } from '../../../shared/types/api';
 import type { TeacherWallet, WithdrawalRequest, CreateWithdrawalPayload } from '../types/wallet.types';
+import type {
+  WalletTransaction,
+  WalletTransactionDetail,
+  WalletTransactionFilter,
+} from '../../wallet/types';
+import { toTransactionParams } from '../../wallet/services/walletTransactionParams';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 
 export const walletService = {
@@ -15,9 +21,25 @@ export const walletService = {
   },
 
   getTeacherEscrowLedger: async (params?: any): Promise<ApiResponse<PageResponse<import('../types/wallet.types').EscrowLedgerItem>>> => {
-    // The endpoint is /api/v1/teacher/wallet/escrow
-    // Wait, I should add it to ENDPOINTS or just hardcode it here.
-    const response = await axiosClient.get('/api/v1/teacher/wallet/escrow', { params });
+    const response = await axiosClient.get(ENDPOINTS.teacherWallet.escrow, { params });
+    return response.data;
+  },
+
+  /** UC-17: paginated + filterable revenue-wallet transaction history. */
+  getTeacherTransactions: async (
+    filter: WalletTransactionFilter = {},
+  ): Promise<ApiResponse<PageResponse<WalletTransaction>>> => {
+    const response = await axiosClient.get(ENDPOINTS.teacherWallet.transactions, {
+      params: toTransactionParams(filter),
+    });
+    return response.data;
+  },
+
+  /** UC-17 flow 6a: detail of one revenue-wallet transaction. */
+  getTeacherTransactionDetail: async (
+    transactionId: string,
+  ): Promise<ApiResponse<WalletTransactionDetail>> => {
+    const response = await axiosClient.get(ENDPOINTS.teacherWallet.transactionDetail(transactionId));
     return response.data;
   },
 

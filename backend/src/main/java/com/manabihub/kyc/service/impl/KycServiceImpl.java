@@ -26,10 +26,11 @@ import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.service.KycService;
-import com.manabihub.notification.entity.Notification;
-import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -60,7 +61,7 @@ public class KycServiceImpl implements KycService {
     private final TeacherProfileRepository teacherProfileRepository;
     private final KycDocumentRepository kycDocumentRepository;
     private final AuditLogRepository auditLogRepository;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final CourseRepository courseRepository;
     private final WalletRepository walletRepository;
     private final ObjectMapper objectMapper;
@@ -338,28 +339,29 @@ public class KycServiceImpl implements KycService {
             KycRequestStatus targetStatus,
             String decisionNote
     ) {
-        String title = "Teacher verification result";
+        String title = "Kết quả xác minh giảng viên";
         String message = switch (targetStatus) {
             case APPROVED ->
-                    "Your JLPT certificate has been verified. Your courses can now be submitted for publication.";
+                    "Chứng chỉ JLPT của bạn đã được xác minh. Bạn có thể gửi khóa học để xét duyệt xuất bản.";
             case REJECTED ->
-                    "Your JLPT certificate did not pass authenticity review. Reason: " + decisionNote;
+                    "Chứng chỉ JLPT chưa vượt qua bước xác minh tính xác thực. Lý do: " + decisionNote;
             case CORRECTION_REQUIRED ->
-                    "Your teacher application needs an updated JLPT certificate. Reason: " + decisionNote;
+                    "Hồ sơ giảng viên cần bổ sung hoặc cập nhật chứng chỉ JLPT. Nội dung cần sửa: " + decisionNote;
             case REVOKED ->
-                    "Teacher operations and payouts have been suspended after a confirmed trust case. "
-                            + "Existing learners keep access while the case is handled. Reason: " + decisionNote;
+                    "Quyền giảng dạy và rút tiền đã bị tạm dừng sau khi xác nhận vi phạm. "
+                            + "Học viên hiện tại vẫn được giữ quyền truy cập. Lý do: " + decisionNote;
             default -> throw new IllegalStateException("Unsupported KYC review decision");
         };
 
-        notificationRepository.save(Notification.builder()
-                .recipientUserId(request.getTeacherProfile().getUser().getId())
-                .title(title)
-                .message(message)
-                .notificationType("KYC_RESULT")
-                .actionUrl("/teacher/kyc")
-                .isRead(false)
-                .build());
+        AppUser teacherUser = request.getTeacherProfile().getUser();
+        notificationService.createNotification(
+                teacherUser.getId(),
+                teacherUser.getEmail(),
+                title,
+                message,
+                NotificationTypes.KYC_RESULT,
+                "/teacher/kyc"
+        );
     }
 
     private KycRequestResponse mapToResponse(KycRequest request) {
@@ -501,7 +503,7 @@ public class KycServiceImpl implements KycService {
             courseRepository.saveAll(coursesToRemove);
         }
 
-        boolean walletFrozen = walletRepository.findTeacherWalletForUpdate(teacher.getId())
+        boolean walletFrozen = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, teacher.getId())
                 .map(this::freezeWallet)
                 .orElse(false);
         return new SuspensionImpact(coursesToRemove.size(), walletFrozen);

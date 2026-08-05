@@ -163,7 +163,7 @@ class PayoutSettlementServiceImplTest {
         when(internalAdminAccountRepository.findById(adminId)).thenReturn(Optional.of(admin));
         when(withdrawalRequestRepository.findByIdWithLock(requestId)).thenReturn(Optional.of(request));
         when(teacherProfileRepository.findById(teacherId)).thenReturn(Optional.of(teacher));
-        when(walletRepository.findTeacherWalletForUpdate(teacherId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherId)).thenReturn(Optional.of(wallet));
         when(payoutSettlementRepository.findByWithdrawalRequestIdWithLock(requestId))
                 .thenAnswer(ignored -> Optional.ofNullable(settlementRef.get()));
         when(payoutSettlementRepository.findByIdWithLock(any()))
@@ -229,7 +229,7 @@ class PayoutSettlementServiceImplTest {
         verify(payoutGateway, times(1)).transfer(any());
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(notificationService, times(1))
-                .createNotification(any(), any(), any(), any(), eq("PAYOUT_SUCCESS"));
+                .createNotification(any(), any(), any(), any(), eq("PAYOUT_SUCCESS"), any());
     }
 
     @Test
@@ -260,7 +260,7 @@ class PayoutSettlementServiceImplTest {
         wallet.setFrozenWithdrawableBalance(request.getRequestedAmount());
 
         when(studentProfileRepository.findById(studentId)).thenReturn(Optional.of(student));
-        when(walletRepository.findStudentWalletForUpdate(studentId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByOwnerTypeAndStudent_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
         when(reconciliationService.reconcileStudent(request, wallet, student))
                 .thenReturn(matchedReconciliation());
         when(payoutGateway.transfer(any())).thenReturn(PayoutGateway.PayoutGatewayResult.builder()
@@ -277,7 +277,7 @@ class PayoutSettlementServiceImplTest {
                 request.getRequestedAmount());
         verify(walletTransactionRepository, never()).save(any(WalletTransaction.class));
         verify(notificationService).createNotification(
-                eq(studentUserId), any(), any(), any(), eq("PAYOUT_SUCCESS"));
+                eq(studentUserId), any(), any(), any(), eq("PAYOUT_SUCCESS"), eq("/student/wallet"));
     }
 
     @Test
@@ -294,6 +294,13 @@ class PayoutSettlementServiceImplTest {
         assertEquals(PayoutStatus.FAILED, settlementRef.get().getStatus());
         verify(payoutGateway, never()).transfer(any());
         assertEquals(0, wallet.getBalance().compareTo(new BigDecimal("2000000.00")));
+        verify(notificationService).createNotificationForAdminRole(
+                eq("FINANCE_MANAGER"),
+                any(),
+                any(),
+                eq("PAYOUT_ALERT"),
+                eq("/admin/payouts/" + requestId)
+        );
     }
 
     @Test
@@ -331,7 +338,7 @@ class PayoutSettlementServiceImplTest {
         assertEquals(0, wallet.getBalance().compareTo(new BigDecimal("2000000.00")));
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(notificationService, times(1))
-                .createNotification(any(), any(), any(), any(), eq("PAYOUT_REJECTED"));
+                .createNotification(any(), any(), any(), any(), eq("PAYOUT_REJECTED"), any());
     }
 
     @Test
@@ -372,7 +379,7 @@ class PayoutSettlementServiceImplTest {
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(reconciliationLogRepository, times(1)).save(any());
         verify(notificationService, times(1))
-                .createNotification(any(), any(), any(), any(), eq("PAYOUT_SUCCESS"));
+                .createNotification(any(), any(), any(), any(), eq("PAYOUT_SUCCESS"), any());
     }
 
     @Test

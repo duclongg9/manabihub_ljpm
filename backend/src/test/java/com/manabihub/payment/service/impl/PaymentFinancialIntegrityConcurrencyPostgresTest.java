@@ -168,7 +168,8 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
                   AND recipient_user_id = 'd0000000-0000-0000-0000-000000000001'
                   AND notification_type = 'PURCHASE_SUCCESS'
                   AND title = 'Mua khoá học thành công'
-                """, "payment:" + orderId + ":PURCHASE_SUCCESS"));
+                """, "payment:" + orderId
+                        + ":d0000000-0000-0000-0000-000000000001:PURCHASE_SUCCESS"));
     }
 
     @Test

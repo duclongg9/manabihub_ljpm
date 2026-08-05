@@ -21,9 +21,10 @@ import com.manabihub.kyc.repository.InternalAdminAccountRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
-import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,7 +70,7 @@ class KycServiceImplTest {
     @Mock
     private AuditLogRepository auditLogRepository;
     @Mock
-    private NotificationRepository notificationRepository;
+    private NotificationService notificationService;
     @Mock
     private CourseRepository courseRepository;
     @Mock
@@ -318,7 +319,7 @@ class KycServiceImplTest {
                 .teacher(teacherProfile)
                 .frozen(false)
                 .build();
-        when(walletRepository.findTeacherWalletForUpdate(teacherProfile.getId()))
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherProfile.getId()))
                 .thenReturn(Optional.of(wallet));
         KycReviewRequest request = new KycReviewRequest(
                 KycRequestStatus.REVOKED,

@@ -199,7 +199,7 @@ class StudentWithdrawalServiceImplTest {
     private void stubOwnerAndWallet() {
         when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
         when(studentWalletService.getOrCreateStudentWallet(student.getId())).thenReturn(wallet);
-        when(walletRepository.findStudentWalletForUpdate(student.getId()))
+        when(walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, student.getId()))
                 .thenReturn(Optional.of(wallet));
     }
 

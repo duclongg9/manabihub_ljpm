@@ -73,7 +73,7 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
 
         StudentProfile student = requireStudent(userId);
         studentWalletService.getOrCreateStudentWallet(student.getId());
-        Wallet wallet = walletRepository.findStudentWalletForUpdate(student.getId())
+        Wallet wallet = walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, student.getId())
                 .orElseThrow(this::walletNotFound);
         if (wallet.isFrozen()) {
             throw new BusinessException(

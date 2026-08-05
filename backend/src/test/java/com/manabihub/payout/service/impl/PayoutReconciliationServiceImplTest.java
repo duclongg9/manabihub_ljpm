@@ -55,19 +55,21 @@ class PayoutReconciliationServiceImplTest {
                 .requestedAmount(new BigDecimal("500000.00"))
                 .bankAccountSnapshot(validBank())
                 .build();
-        wallet = Wallet.builder()
-                .id(walletId)
-                .balance(new BigDecimal("1000000.00"))
-                .frozenBalance(new BigDecimal("500000.00"))
-                .currency("VND")
-                .build();
+
         AppUser user = new AppUser();
         user.setId(UUID.randomUUID());
         user.setUserStatus(UserStatus.ACTIVE);
         teacher = new TeacherProfile();
         teacher.setId(teacherId);
         teacher.setUser(user);
-        wallet.setTeacher(teacher);
+        wallet = Wallet.builder()
+                .id(walletId)
+                .teacher(teacher)
+                .ownerType(com.manabihub.wallet.enums.WalletOwnerType.TEACHER)
+                .balance(new BigDecimal("1000000.00"))
+                .frozenBalance(new BigDecimal("500000.00"))
+                .currency("VND")
+                .build();
         reservation = WalletTransaction.builder()
                 .walletId(walletId)
                 .amount(new BigDecimal("-500000.00"))

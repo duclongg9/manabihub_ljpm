@@ -15,8 +15,8 @@ import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseApprovalDecisionRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.AdminCourseApprovalService;
-import com.manabihub.notification.entity.Notification;
-import com.manabihub.notification.repository.NotificationRepository;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +34,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     private final CourseRepository courseRepository;
     private final CourseApprovalDecisionRepository decisionRepository;
     private final AuditLogRepository auditLogRepository;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
     private String requireReviewerRole(UUID adminId) {
@@ -104,8 +104,8 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
                 course.setRejectionReason(null);
                 decisionEnum = CourseApprovalDecisionEnum.APPROVED;
                 actionLog = "COURSE_APPROVED";
-                notificationMessage = "Your course '" + course.getTitle()
-                        + "' has been approved and is ready to be published.";
+                notificationMessage = "Khóa học \"" + course.getTitle()
+                        + "\" đã được phê duyệt và sẵn sàng để xuất bản.";
                 break;
             case "REJECT":
                 if (request.getReason() == null || request.getReason().isBlank()) {
@@ -115,8 +115,8 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
                 course.setRejectionReason(request.getReason());
                 decisionEnum = CourseApprovalDecisionEnum.REJECTED;
                 actionLog = "COURSE_REJECTED";
-                notificationMessage = "Your course '" + course.getTitle() + "' has been rejected. Reason: "
-                        + request.getReason();
+                notificationMessage = "Khóa học \"" + course.getTitle()
+                        + "\" đã bị từ chối. Lý do: " + request.getReason();
                 break;
             case "REQUEST_CORRECTION":
                 if (request.getReason() == null || request.getReason().isBlank()) {
@@ -126,8 +126,9 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
                 course.setRejectionReason(request.getReason());
                 decisionEnum = CourseApprovalDecisionEnum.CORRECTION_REQUIRED;
                 actionLog = "COURSE_CORRECTION_REQUESTED";
-                notificationMessage = "Your course '" + course.getTitle()
-                        + "' requires corrections before approval. Reason: " + request.getReason();
+                notificationMessage = "Khóa học \"" + course.getTitle()
+                        + "\" cần được chỉnh sửa trước khi phê duyệt. Nội dung cần sửa: "
+                        + request.getReason();
                 break;
             default:
                 throw new BusinessException("MSG-COM-004", "Invalid action");
@@ -145,14 +146,14 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
         decisionRepository.save(decision);
 
         // Create Notification
-        Notification notification = Notification.builder()
-                .recipientUserId(course.getTeacher().getUser().getId())
-                .title("Course Review Update")
-                .message(notificationMessage)
-                .notificationType("COURSE_APPROVAL")
-                .actionUrl("/teacher/courses")
-                .build();
-        notificationRepository.save(notification);
+        notificationService.createNotification(
+                course.getTeacher().getUser().getId(),
+                course.getTeacher().getUser().getEmail(),
+                "Cập nhật kết quả duyệt khóa học",
+                notificationMessage,
+                NotificationTypes.COURSE_APPROVAL,
+                "/teacher/courses"
+        );
 
         // Create Audit Log
         Map<String, Object> metadata = null;

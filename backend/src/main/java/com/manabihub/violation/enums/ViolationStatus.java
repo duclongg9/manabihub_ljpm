@@ -1,7 +1,12 @@
 package com.manabihub.violation.enums;
 
 public enum ViolationStatus {
-    PENDING,
-    RESOLVED,
-    REJECTED
+    PENDING_REVIEW,
+    IN_REVIEW,
+    PENDING_EVIDENCE,
+    CORRECTION_REQUIRED,
+    RESOLVED_UPHELD,
+    RESOLVED_NO_VIOLATION,
+    INVALID,
+    CANCELLED
 }

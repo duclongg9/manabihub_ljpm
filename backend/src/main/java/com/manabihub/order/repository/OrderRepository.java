@@ -38,4 +38,16 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM Order o WHERE o.id = :orderId")
     Optional<Order> findByIdForUpdate(@Param("orderId") UUID orderId);
+
+    /**
+     * Ids of the student's own orders whose code contains {@code code} (case-insensitive).
+     * Backs the reference-code search on the wallet transaction history (UC-17 step 6).
+     */
+    @Query("""
+            SELECT o.id FROM Order o
+            WHERE o.student.id = :studentId
+              AND UPPER(o.orderCode) LIKE UPPER(CONCAT('%', :code, '%'))
+            """)
+    java.util.List<UUID> findIdsByStudentIdAndOrderCodeLike(@Param("studentId") UUID studentId,
+                                                            @Param("code") String code);
 }

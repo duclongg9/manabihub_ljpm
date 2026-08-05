@@ -71,7 +71,7 @@ class WalletServiceImplTest {
     }
 
     @Test
-    void getTeacherWalletByUserId_resolvesTeacherProfileBeforeWalletLookup() {
+    void getTeacherWallet_resolvesTeacherProfileBeforeWalletLookup() {
         UUID userId = UUID.randomUUID();
         Wallet teacherWallet = Wallet.builder()
                 .id(UUID.randomUUID())
@@ -87,8 +87,8 @@ class WalletServiceImplTest {
                 .thenReturn(Optional.of(teacherWallet));
         when(walletMapper.toResponse(
                 eq(teacherWallet),
-                any(BigDecimal.class),
-                anyInt(),
+                eq(new BigDecimal("500000.00")),
+                eq(14),
                 any(LocalDate.class)))
                 .thenReturn(expected);
 
@@ -133,7 +133,7 @@ class WalletServiceImplTest {
     }
 
     @Test
-    void getOrCreateTeacherWallet_whenMissing_createsNewTeacherWallet() {
+    void getOrCreateTeacherWallet_whenMissing_createsNewWallet() {
         when(walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacher.getId()))
                 .thenReturn(Optional.empty());
         when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -155,7 +155,7 @@ class WalletServiceImplTest {
                 .frozenBalance(BigDecimal.ZERO)
                 .frozen(true)
                 .build();
-        when(walletRepository.findTeacherWalletForUpdate(teacher.getId()))
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, teacher.getId()))
                 .thenReturn(Optional.of(teacherWallet));
 
         BusinessException exception = assertThrows(

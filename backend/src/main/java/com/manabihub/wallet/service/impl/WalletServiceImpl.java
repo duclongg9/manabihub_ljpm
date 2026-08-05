@@ -29,6 +29,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WalletServiceImpl implements WalletService {
 
+
     private final TeacherProfileRepository teacherProfileRepository;
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository transactionRepository;
@@ -44,8 +45,7 @@ public class WalletServiceImpl implements WalletService {
                         "Teacher profile not found",
                         HttpStatus.NOT_FOUND));
 
-        Wallet wallet = walletRepository
-                .findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacherProfile.getId())
+        Wallet wallet = walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacherProfile.getId())
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         CommercialPolicy policy = commercialPolicyService.getCurrentPolicy();
@@ -113,7 +113,7 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void reserveBalance(String teacherId, BigDecimal amount, String withdrawalId) {
-        Wallet wallet = walletRepository.findTeacherWalletForUpdate(UUID.fromString(teacherId))
+        Wallet wallet = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, UUID.fromString(teacherId))
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         if (wallet.isFrozen()) {
@@ -150,7 +150,7 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void releaseBalance(String teacherId, BigDecimal amount, String withdrawalId) {
-        Wallet wallet = walletRepository.findTeacherWalletForUpdate(UUID.fromString(teacherId))
+        Wallet wallet = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, UUID.fromString(teacherId))
                 .orElseThrow(() -> new BusinessException(MessageCodes.WALLET_NOT_FOUND, "Teacher wallet not found"));
 
         if (wallet.getFrozenBalance().compareTo(amount) < 0) {
