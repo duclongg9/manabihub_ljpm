@@ -43,6 +43,10 @@ public class WalletPaymentReservation {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    @Builder.Default
+    @Column(name = "withdrawable_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal withdrawableAmount = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)
     private WalletReservationStatus status;

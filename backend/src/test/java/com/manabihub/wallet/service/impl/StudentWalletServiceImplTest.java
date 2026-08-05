@@ -106,6 +106,89 @@ class StudentWalletServiceImplTest {
     }
 
     @Test
+    void creditRefund_increasesWithdrawableBalanceButTopUpDoesNot() {
+        UUID refundId = UUID.randomUUID();
+        UUID topUpId = UUID.randomUUID();
+        stubExistingWallet();
+        when(walletTransactionRepository.findByIdempotencyKey(any()))
+                .thenReturn(Optional.empty());
+        when(walletTransactionRepository.save(any(WalletTransaction.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        service.creditTopUp(
+                studentId, new BigDecimal("50000.00"), topUpId, "Top up");
+        service.creditRefund(
+                studentId, new BigDecimal("80000.00"), refundId, "Refund");
+
+        assertEquals(new BigDecimal("230000.00"), wallet.getBalance());
+        assertEquals(new BigDecimal("80000.00"), wallet.getWithdrawableBalance());
+        assertEquals(new BigDecimal("80000.00"), wallet.getAvailableWithdrawableBalance());
+    }
+
+    @Test
+    void orderReservationConsumesNonWithdrawableFundsBeforeRefundFunds() {
+        UUID orderId = UUID.randomUUID();
+        wallet.setBalance(new BigDecimal("200000.00"));
+        wallet.setWithdrawableBalance(new BigDecimal("100000.00"));
+        stubExistingWallet();
+        when(reservationRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.empty());
+        when(reservationRepository.save(any(WalletPaymentReservation.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        WalletPaymentReservation reservation = service.reserveForOrder(
+                studentId,
+                orderId,
+                new BigDecimal("150000.00"),
+                Instant.now().plusSeconds(60));
+
+        assertEquals(new BigDecimal("50000.00"), reservation.getWithdrawableAmount());
+        assertEquals(new BigDecimal("150000.00"), wallet.getFrozenBalance());
+        assertEquals(new BigDecimal("50000.00"), wallet.getFrozenWithdrawableBalance());
+    }
+
+    @Test
+    void studentWithdrawalReserveReleaseAndCompleteAreCompositionSafe() {
+        UUID cancelledId = UUID.randomUUID();
+        UUID completedId = UUID.randomUUID();
+        wallet.setBalance(new BigDecimal("300000.00"));
+        wallet.setWithdrawableBalance(new BigDecimal("200000.00"));
+        stubExistingWallet();
+        when(walletTransactionRepository.findByIdempotencyKey(any()))
+                .thenReturn(Optional.empty());
+        when(walletTransactionRepository.save(any(WalletTransaction.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(walletRepository.reserveStudentWithdrawalBalance(eq(studentId), any()))
+                .thenAnswer(invocation -> {
+                    BigDecimal amount = invocation.getArgument(1);
+                    wallet.setFrozenBalance(wallet.getFrozenBalance().add(amount));
+                    wallet.setFrozenWithdrawableBalance(
+                            wallet.getFrozenWithdrawableBalance().add(amount));
+                    return 1;
+                });
+
+        service.reserveForWithdrawal(
+                studentId, cancelledId, new BigDecimal("50000.00"));
+        service.releaseWithdrawal(
+                studentId,
+                cancelledId,
+                new BigDecimal("50000.00"),
+                WalletTransactionType.WITHDRAWAL_CANCELLED,
+                "Cancelled");
+
+        assertEquals(BigDecimal.ZERO.setScale(2), wallet.getFrozenBalance());
+        assertEquals(BigDecimal.ZERO.setScale(2), wallet.getFrozenWithdrawableBalance());
+
+        service.reserveForWithdrawal(
+                studentId, completedId, new BigDecimal("100000.00"));
+        service.completeWithdrawal(
+                studentId, completedId, new BigDecimal("100000.00"));
+
+        assertEquals(new BigDecimal("200000.00"), wallet.getBalance());
+        assertEquals(new BigDecimal("100000.00"), wallet.getWithdrawableBalance());
+        assertEquals(BigDecimal.ZERO.setScale(2), wallet.getFrozenBalance());
+        assertEquals(BigDecimal.ZERO.setScale(2), wallet.getFrozenWithdrawableBalance());
+    }
+
+    @Test
     void reserveForOrder_freezesOnlyAvailableFunds() {
         UUID orderId = UUID.randomUUID();
         wallet.setFrozenBalance(new BigDecimal("20000.00"));

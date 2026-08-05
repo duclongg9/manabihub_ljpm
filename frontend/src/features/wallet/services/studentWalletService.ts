@@ -1,8 +1,14 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 import type { ApiResponse } from '../../../shared/types/api';
+import type { PageResponse } from '../../../shared/types/api';
 import type { CheckoutResponse } from '../../checkout/types';
-import type { StudentWalletResponse } from '../types';
+import type {
+  CreateStudentWithdrawalPayload,
+  StudentBankAccount,
+  StudentWalletResponse,
+  StudentWithdrawal,
+} from '../types';
 
 /** Fetches the current student's money-wallet overview (balance). */
 export async function getStudentWallet(): Promise<StudentWalletResponse> {
@@ -18,6 +24,42 @@ export async function topUpWallet(amount: number): Promise<CheckoutResponse> {
   const response = await axiosClient.post<ApiResponse<CheckoutResponse>>(
     ENDPOINTS.student.walletTopUp,
     { amount },
+  );
+  return response.data.data;
+}
+
+export async function getStudentWithdrawals(): Promise<PageResponse<StudentWithdrawal>> {
+  const response = await axiosClient.get<ApiResponse<PageResponse<StudentWithdrawal>>>(
+    ENDPOINTS.student.withdrawals,
+    { params: { page: 0, size: 100, sort: 'requestedAt,desc' } },
+  );
+  return response.data.data;
+}
+
+export async function getStudentBankAccounts(): Promise<StudentBankAccount[]> {
+  const response = await axiosClient.get<ApiResponse<StudentBankAccount[]>>(
+    ENDPOINTS.student.withdrawalBankAccounts,
+  );
+  return response.data.data;
+}
+
+export async function sendStudentWithdrawalOtp(): Promise<void> {
+  await axiosClient.post(ENDPOINTS.student.sendWithdrawalOtp);
+}
+
+export async function createStudentWithdrawal(
+  payload: CreateStudentWithdrawalPayload,
+): Promise<StudentWithdrawal> {
+  const response = await axiosClient.post<ApiResponse<StudentWithdrawal>>(
+    ENDPOINTS.student.withdrawals,
+    payload,
+  );
+  return response.data.data;
+}
+
+export async function cancelStudentWithdrawal(id: string): Promise<StudentWithdrawal> {
+  const response = await axiosClient.post<ApiResponse<StudentWithdrawal>>(
+    ENDPOINTS.student.cancelWithdrawal(id),
   );
   return response.data.data;
 }

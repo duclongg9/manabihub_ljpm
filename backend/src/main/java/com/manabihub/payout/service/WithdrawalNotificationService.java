@@ -31,6 +31,11 @@ public class WithdrawalNotificationService {
             UUID userId,
             BigDecimal amount
     ) {
+        notifyCancellation(userId, amount);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void notifyCancellation(UUID userId, BigDecimal amount) {
         notificationService.createNotification(
                 userId,
                 null,
@@ -39,4 +44,24 @@ public class WithdrawalNotificationService {
                 "PAYOUT_CANCELLED"
         );
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void notifyFinanceManager(
+            UUID withdrawalId,
+            BigDecimal amount,
+            String ownerType
+    ) {
+        if (!"STUDENT".equals(ownerType)) {
+            notifyFinanceManager(withdrawalId, amount);
+            return;
+        }
+        notificationService.createNotificationForAdminRole(
+                "FINANCE_MANAGER",
+                "Yeu cau rut tien hoc vien moi",
+                "Hoc vien vua yeu cau rut " + amount + " VND.",
+                "SYSTEM",
+                "/admin/payouts/" + withdrawalId
+        );
+    }
+
 }

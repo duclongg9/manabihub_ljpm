@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getStudentWallet, topUpWallet } from '../services/studentWalletService';
 import type { StudentWalletResponse } from '../types';
+import { StudentWithdrawalPanel } from '../components/StudentWithdrawalPanel';
+import { useCommercialPolicy } from '../../help-center/hooks/useCommercialPolicy';
 
 const MIN_TOPUP = 10000;
 const MAX_TOPUP = 100000000;
@@ -12,6 +14,12 @@ export const StudentWalletPage = () => {
   const [amount, setAmount] = useState<number>(100000);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const policyQuery = useCommercialPolicy();
+
+  const loadWallet = useCallback(async () => {
+    const data = await getStudentWallet();
+    setWallet(data);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -107,6 +115,12 @@ export const StudentWalletPage = () => {
           Giao dịch chỉ được xác nhận qua cổng thanh toán (webhook), không qua trình duyệt.
         </p>
       </div>
+
+      <StudentWithdrawalPanel
+        wallet={wallet}
+        minimumAmount={policyQuery.data?.payoutThreshold ?? 100000}
+        onChanged={loadWallet}
+      />
     </div>
   );
 };

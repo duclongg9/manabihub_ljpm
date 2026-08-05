@@ -5,6 +5,7 @@ import com.manabihub.payout.enums.PayoutNotificationStatus;
 import com.manabihub.payout.enums.PayoutTransferMethod;
 import com.manabihub.payout.enums.ReconciliationStatus;
 import com.manabihub.payout.enums.WithdrawalStatus;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import lombok.Builder;
 import lombok.Value;
 
@@ -19,6 +20,10 @@ import java.util.UUID;
 public class PayoutDetailResponse {
     UUID withdrawalRequestId;
     UUID settlementId;
+    WalletOwnerType ownerType;
+    UUID ownerId;
+    String ownerName;
+    String ownerAccountStatus;
     UUID teacherId;
     String teacherName;
     String teacherAccountStatus;

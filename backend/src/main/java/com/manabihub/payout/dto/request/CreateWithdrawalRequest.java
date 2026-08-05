@@ -33,6 +33,14 @@ public class CreateWithdrawalRequest {
     @Builder.Default
     private boolean saveAccount = false;
 
+    /**
+     * Temporary local/test acknowledgement used until the real identity and
+     * bank-account ownership provider is integrated. It is never trusted by
+     * non-local verification implementations.
+     */
+    @Builder.Default
+    private boolean ownershipConfirmed = false;
+
     @AssertTrue(message = "Provide exactly one of bankAccountId or bankAccount")
     public boolean isBankAccountSelectionValid() {
         boolean hasSavedAccount = bankAccountId != null && !bankAccountId.isBlank();

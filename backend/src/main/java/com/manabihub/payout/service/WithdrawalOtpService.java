@@ -38,15 +38,15 @@ public class WithdrawalOtpService {
     @Transactional
     public void sendOtp(String userId) {
         UUID userUuid = parseUserId(userId);
-        AppUser teacher = appUserRepository.findByIdForUpdate(userUuid)
+        AppUser user = appUserRepository.findByIdForUpdate(userUuid)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.COMMON_NOT_FOUND,
-                        "Teacher not found"
+                        "User not found"
                 ));
-        if (teacher.getEmail() == null || teacher.getEmail().isBlank()) {
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
             throw new BusinessException(
                     MessageCodes.PAYOUT_EMAIL_REQUIRED,
-                    "Teacher does not have an email address configured"
+                    "User does not have an email address configured"
             );
         }
 
@@ -77,10 +77,10 @@ public class WithdrawalOtpService {
         challengeRepository.saveAndFlush(challenge);
 
         emailService.sendEmail(
-                teacher.getEmail(),
-                "[ManabiHub] Mã xác thực rút tiền doanh thu",
+                user.getEmail(),
+                "[ManabiHub] Mã xác thực rút tiền",
                 "<p>Xin chào,</p>"
-                        + "<p>Bạn vừa yêu cầu rút tiền từ Ví Doanh Thu trên ManabiHub. "
+                        + "<p>Bạn vừa yêu cầu rút tiền từ ví trên ManabiHub. "
                         + "Mã xác thực (OTP) của bạn là:</p>"
                         + "<h2 style=\"color: #2563eb; letter-spacing: 5px;\">"
                         + code

@@ -88,7 +88,7 @@ export function PayoutQueuePage() {
     <Box>
       <PageHeader
         title="Quyết toán doanh thu"
-        subtitle="Đối soát và xử lý yêu cầu rút tiền của giáo viên"
+        subtitle="Đối soát và xử lý yêu cầu rút tiền của giáo viên và học viên"
         breadcrumbs={[
           { label: 'Finance' },
           { label: 'Quyết toán' },
@@ -149,8 +149,8 @@ export function PayoutQueuePage() {
         <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', p: { xs: 2, md: 3 } }}>
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.5}>
             <TextField
-              label="Tìm giáo viên"
-              placeholder="Tên hoặc email giáo viên"
+              label="Tìm chủ ví"
+              placeholder="Tên hoặc email giáo viên/học viên"
               size="small"
               value={draftFilters.teacherKeyword}
               onChange={(event) => setDraftFilters((current) => ({
@@ -269,7 +269,7 @@ export function PayoutQueuePage() {
             <Table sx={{ minWidth: 980 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                  <TableCell sx={headerCellSx}>Giáo viên</TableCell>
+                  <TableCell sx={headerCellSx}>Chủ ví</TableCell>
                   <TableCell sx={headerCellSx}>Số tiền</TableCell>
                   <TableCell sx={headerCellSx}>Yêu cầu</TableCell>
                   <TableCell sx={headerCellSx}>Quyết toán</TableCell>
@@ -307,7 +307,7 @@ export function PayoutQueuePage() {
                         <TableRow key={item.withdrawalRequestId} hover>
                           <TableCell>
                             <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                              {item.teacherName}
+                              {item.ownerName ?? item.teacherName}
                             </Typography>
                             <Typography
                               variant="caption"
@@ -315,7 +315,7 @@ export function PayoutQueuePage() {
                               sx={{ display: 'block', maxWidth: 180 }}
                               noWrap
                             >
-                              {item.teacherId}
+                              {item.ownerType === 'STUDENT' ? 'Học viên' : 'Giáo viên'} · {item.ownerId ?? item.teacherId}
                             </Typography>
                           </TableCell>
                           <TableCell>

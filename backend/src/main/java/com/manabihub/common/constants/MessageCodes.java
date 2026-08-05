@@ -311,6 +311,8 @@ public final class MessageCodes {
     public static final String PAYOUT_PROOF_INVALID = "PAYOUT_PROOF_INVALID";
     public static final String PAYOUT_RETRY_NOT_ALLOWED = "PAYOUT_RETRY_NOT_ALLOWED";
     public static final String PAYOUT_PROOF_NOT_FOUND = "PAYOUT_PROOF_NOT_FOUND";
+    public static final String PAYOUT_BANK_OWNERSHIP_REQUIRED = "PAYOUT_BANK_OWNERSHIP_REQUIRED";
+    public static final String PAYOUT_BANK_VERIFICATION_UNAVAILABLE = "PAYOUT_BANK_VERIFICATION_UNAVAILABLE";
     public static final String MSG_ADM_004 = "MSG-ADM-004";
     public static final String MSG_ADM_005 = "MSG-ADM-005";
 

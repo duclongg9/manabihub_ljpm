@@ -66,6 +66,14 @@ public class Wallet {
     private BigDecimal frozenBalance = BigDecimal.ZERO;
 
     @Builder.Default
+    @Column(name = "withdrawable_balance", nullable = false, precision = 12, scale = 2)
+    private BigDecimal withdrawableBalance = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "frozen_withdrawable_balance", nullable = false, precision = 12, scale = 2)
+    private BigDecimal frozenWithdrawableBalance = BigDecimal.ZERO;
+
+    @Builder.Default
     @Column(nullable = false)
     private boolean frozen = false;
 
@@ -83,6 +91,10 @@ public class Wallet {
 
     public BigDecimal getAvailableBalance() {
         return balance.subtract(frozenBalance);
+    }
+
+    public BigDecimal getAvailableWithdrawableBalance() {
+        return withdrawableBalance.subtract(frozenWithdrawableBalance);
     }
 
     public UUID getStudentId() {

@@ -20,6 +20,8 @@ export const ENDPOINTS = {
     DETAIL: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}`,
     RECONCILE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/reconcile`,
     APPROVE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/approve`,
+    MOCK_APPROVE: (withdrawalRequestId: string) =>
+      `/admin/payouts/${withdrawalRequestId}/mock-approve`,
     RETRY: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/retry`,
     REJECT: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/reject`,
     MANUAL_TRANSFER: (withdrawalRequestId: string) =>
@@ -76,6 +78,11 @@ export const ENDPOINTS = {
     courseReview: (courseId: string) => `/v1/student/courses/${courseId}/review`,
     wallet: '/v1/student/wallet',
     walletTopUp: '/v1/student/wallet/top-up',
+    withdrawals: '/v1/student/withdrawals',
+    withdrawalDetail: (id: string) => `/v1/student/withdrawals/${id}`,
+    cancelWithdrawal: (id: string) => `/v1/student/withdrawals/${id}/cancel`,
+    sendWithdrawalOtp: '/v1/student/withdrawals/send-otp',
+    withdrawalBankAccounts: '/v1/student/withdrawals/bank-accounts',
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>
