@@ -30,7 +30,11 @@ import com.manabihub.wallet.enums.WalletReservationStatus;
 import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.service.StudentWalletService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -54,6 +58,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit tests for {@link PaymentServiceImpl}.
+ * <p>
+ * Grouped with {@code @Nested} so Surefire reports one summary line per Report 5.1 sheet:
+ * <pre>
+ *   PaymentServiceImplTest$PayWithWallet -> sheet 40 payWithWallet
+ *   PaymentServiceImplTest$HandleIpn     -> sheet 41 handleIpn
+ * </pre>
+ */
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceImplTest {
 
@@ -101,361 +114,417 @@ class PaymentServiceImplTest {
                 success ? "00" : "24", success ? "00" : "02", success);
     }
 
-    @Test
-    void handleIpn_validSuccessfulCallback_confirmsOrderAndCreatesEnrollmentEscrowNotification() {
-        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
-        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
-        when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
-                order.getId(), "VNPAY"))
-                .thenReturn(Optional.of(PaymentTransaction.builder()
-                        .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build()));
-        when(orderItemRepository.findByOrder_Id(order.getId()))
-                .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
-        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any())).thenReturn(Optional.empty());
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 40 — payWithWallet (UC-08 Purchase Course) — 6 TC
+    // ══════════════════════════════════════════════════════════════════════
 
-        IpnAckResponse ack = service.handleIpn(params);
+    @Nested
+    @DisplayName("Sheet 40 - payWithWallet (UC-08)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class PayWithWallet {
 
-        assertEquals("00", ack.rspCode());
-        assertEquals(OrderStatus.PAID, order.getStatus());
+        @Test
+        @org.junit.jupiter.api.Order(1)
+        @DisplayName("UTCID01 (N) - enough balance -> PAID + enrollment + escrow + notification")
+        void payWithWallet_debitsWalletAndFulfilsCourseOrder() {
+            when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+            when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
+                    .thenReturn(WalletPaymentReservation.builder()
+                            .id(UUID.randomUUID())
+                            .orderId(order.getId())
+                            .amount(order.getTotalAmount())
+                            .status(WalletReservationStatus.RESERVED)
+                            .build());
+            when(studentWalletService.captureForOrder(eq(order.getId()), any(Instant.class)))
+                    .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
+            when(orderItemRepository.findByOrder_Id(order.getId()))
+                    .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
+            when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any())).thenReturn(Optional.empty());
 
-        ArgumentCaptor<PaymentTransaction> txCaptor = ArgumentCaptor.forClass(PaymentTransaction.class);
-        verify(paymentTransactionRepository).save(txCaptor.capture());
-        assertEquals(PaymentStatus.SUCCESS, txCaptor.getValue().getStatus());
-        assertEquals("99999", txCaptor.getValue().getProviderTransactionId());
+            Order paidOrder = service.payWithWallet(order.getId());
 
-        verify(enrollmentRepository).save(any(Enrollment.class));
-        verify(escrowService).holdForOrder(order);
-        verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
+            assertEquals(order, paidOrder);
+            assertEquals(OrderStatus.PAID, order.getStatus());
+            verify(studentWalletService).reserveForOrder(
+                    eq(order.getStudent().getId()), eq(order.getId()),
+                    eq(new BigDecimal("100.00")), any(Instant.class));
+            verify(studentWalletService).captureForOrder(eq(order.getId()), any(Instant.class));
+            ArgumentCaptor<PaymentTransaction> txCaptor = ArgumentCaptor.forClass(PaymentTransaction.class);
+            verify(paymentTransactionRepository).save(txCaptor.capture());
+            assertEquals("WALLET", txCaptor.getValue().getProvider());
+            assertEquals(PaymentStatus.SUCCESS, txCaptor.getValue().getStatus());
+            assertEquals(new BigDecimal("100.00"), txCaptor.getValue().getAmount());
+            org.junit.jupiter.api.Assertions.assertNotNull(txCaptor.getValue().getSucceededAt());
+            verify(enrollmentRepository).save(any(Enrollment.class));
+            verify(escrowService).holdForOrder(order);
+            ArgumentCaptor<PaymentNotificationEvent> eventCaptor =
+                    ArgumentCaptor.forClass(PaymentNotificationEvent.class);
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            assertEquals(order.getId(), eventCaptor.getValue().orderId());
+            assertEquals("student@test.dev", eventCaptor.getValue().recipientEmail());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(2)
+        @DisplayName("UTCID02 (N) - repurchase -> REFUNDED enrollment reset, not replaced")
+        void payWithWallet_repurchaseResetsRefundedEnrollmentWithoutReplacingIt() {
+            Instant protectedMaterialsDownloadedAt = Instant.parse("2026-07-20T00:00:00Z");
+            Enrollment refundedEnrollment = Enrollment.builder()
+                    .id(UUID.randomUUID())
+                    .student(order.getStudent())
+                    .course(course)
+                    .status(EnrollmentStatus.REFUNDED)
+                    .protectedMaterialsFullyDownloadedAt(protectedMaterialsDownloadedAt)
+                    .build();
+            UUID originalEnrollmentId = refundedEnrollment.getId();
+
+            when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+            when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
+                    .thenReturn(WalletPaymentReservation.builder()
+                            .id(UUID.randomUUID())
+                            .orderId(order.getId())
+                            .amount(order.getTotalAmount())
+                            .status(WalletReservationStatus.RESERVED)
+                            .build());
+            when(studentWalletService.captureForOrder(eq(order.getId()), any(Instant.class)))
+                    .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
+            when(orderItemRepository.findByOrder_Id(order.getId()))
+                    .thenReturn(List.of(OrderItem.builder()
+                            .order(order)
+                            .course(course)
+                            .price(order.getTotalAmount())
+                            .build()));
+            when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(
+                    order.getStudent().getId(), course.getId()))
+                    .thenReturn(Optional.of(refundedEnrollment));
+
+            service.payWithWallet(order.getId());
+
+            assertEquals(originalEnrollmentId, refundedEnrollment.getId());
+            verify(enrollmentProgressResetService).resetForRepurchase(refundedEnrollment);
+            verify(escrowService).holdForOrder(order);
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(3)
+        @DisplayName("UTCID03 (A) - order already PAID -> idempotent, no side effect")
+        void payWithWallet_alreadyPaidOrder_isIdempotent() {
+            order.setStatus(OrderStatus.PAID);
+            when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+            assertEquals(order, service.payWithWallet(order.getId()));
+
+            verify(studentWalletService, never()).reserveForOrder(any(), any(), any(), any());
+            verify(studentWalletService, never()).captureForOrder(any(), any());
+            verify(paymentTransactionRepository, never()).save(any());
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+            verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(4)
+        @DisplayName("UTCID04 (A) - unknown order id -> ORDER_NOT_FOUND")
+        void payWithWallet_orderNotFound_throwsNotFound() {
+            UUID unknownId = UUID.randomUUID();
+            when(orderRepository.findByIdForUpdate(unknownId)).thenReturn(Optional.empty());
+
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.payWithWallet(unknownId));
+
+            assertEquals(MessageCodes.ORDER_NOT_FOUND, error.getMessageCode());
+            verify(studentWalletService, never()).reserveForOrder(any(), any(), any(), any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(5)
+        @DisplayName("UTCID05 (A) - order FAILED -> COMMON_CONFLICT")
+        void payWithWallet_orderNoLongerPending_throwsConflict() {
+            order.setStatus(OrderStatus.FAILED);
+            when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.payWithWallet(order.getId()));
+
+            assertEquals(MessageCodes.COMMON_CONFLICT, error.getMessageCode());
+            verify(studentWalletService, never()).reserveForOrder(any(), any(), any(), any());
+            verify(escrowService, never()).holdForOrder(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(6)
+        @DisplayName("UTCID06 (A) - not enough balance -> WALLET_INSUFFICIENT_BALANCE")
+        void payWithWallet_insufficientWalletBalance_doesNotFulfilTheOrder() {
+            when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+            when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
+                    .thenThrow(new BusinessException(
+                            MessageCodes.WALLET_INSUFFICIENT_BALANCE,
+                            "Số dư khả dụng của ví không đủ để thanh toán"));
+
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.payWithWallet(order.getId()));
+
+            assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, error.getMessageCode());
+            verify(studentWalletService, never()).captureForOrder(any(), any());
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+        }
     }
 
-    @Test
-    void handleIpn_invalidSignature_returns97AndDoesNothing() {
-        when(paymentGateway.parseCallback(params)).thenReturn(result(false, true, 10_000L));
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 41 — handleIpn (UC-08 Purchase Course) — 10 TC
+    // ══════════════════════════════════════════════════════════════════════
 
-        IpnAckResponse ack = service.handleIpn(params);
+    @Nested
+    @DisplayName("Sheet 41 - handleIpn (UC-08)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class HandleIpn {
 
-        assertEquals("97", ack.rspCode());
-        verify(orderRepository, never()).findByOrderCodeForUpdate(anyString());
-        verify(enrollmentRepository, never()).save(any());
-        verify(escrowService, never()).holdForOrder(any());
+        @Test
+        @org.junit.jupiter.api.Order(1)
+        @DisplayName("UTCID01 (N) - valid COURSE callback -> PAID + enrollment + escrow + notify")
+        void handleIpn_validSuccessfulCallback_confirmsOrderAndCreatesEnrollmentEscrowNotification() {
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+            when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                    order.getId(), "VNPAY"))
+                    .thenReturn(Optional.of(PaymentTransaction.builder()
+                            .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build()));
+            when(orderItemRepository.findByOrder_Id(order.getId()))
+                    .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
+            when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any())).thenReturn(Optional.empty());
+
+            IpnAckResponse ack = service.handleIpn(params);
+
+            assertEquals("00", ack.rspCode());
+            assertEquals(OrderStatus.PAID, order.getStatus());
+
+            ArgumentCaptor<PaymentTransaction> txCaptor = ArgumentCaptor.forClass(PaymentTransaction.class);
+            verify(paymentTransactionRepository).save(txCaptor.capture());
+            assertEquals(PaymentStatus.SUCCESS, txCaptor.getValue().getStatus());
+            assertEquals("99999", txCaptor.getValue().getProviderTransactionId());
+
+            verify(enrollmentRepository).save(any(Enrollment.class));
+            verify(escrowService).holdForOrder(order);
+            verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(2)
+        @DisplayName("UTCID02 (N) - WALLET_TOPUP order -> wallet credited, no enrollment/escrow")
+        void handleIpn_walletTopUp_creditsStudentWalletNotEnrollment() {
+            Order topUp = Order.builder()
+                    .id(UUID.randomUUID())
+                    .orderCode("OD1")
+                    .totalAmount(new BigDecimal("100.00"))
+                    .currency("VND")
+                    .status(OrderStatus.PENDING)
+                    .student(order.getStudent())
+                    .type(OrderType.WALLET_TOPUP)
+                    .build();
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(topUp));
+            when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                    topUp.getId(), "VNPAY"))
+                    .thenReturn(Optional.of(PaymentTransaction.builder()
+                            .order(topUp).provider("VNPAY").status(PaymentStatus.PENDING).build()));
+
+            IpnAckResponse ack = service.handleIpn(params);
+
+            assertEquals("00", ack.rspCode());
+            assertEquals(OrderStatus.PAID, topUp.getStatus());
+            verify(studentWalletService).creditTopUp(
+                    eq(topUp.getStudent().getId()), eq(new BigDecimal("100.00")),
+                    eq(topUp.getId()), anyString());
+            // A top-up must never create enrollment or escrow.
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+            verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(3)
+        @DisplayName("UTCID03 (N) - combined wallet + gateway -> wallet share captured")
+        void handleIpn_combinedPayment_debitsWalletPortionAndConfirms() {
+            order.setWalletAmount(new BigDecimal("30.00")); // 30 from wallet → gateway charges 70.00
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 7_000L)); // 70.00 × 100
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+            PaymentTransaction gatewayPayment = PaymentTransaction.builder()
+                    .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build();
+            PaymentTransaction walletPayment = PaymentTransaction.builder()
+                    .order(order).provider("WALLET").amount(new BigDecimal("30.00"))
+                    .status(PaymentStatus.PENDING).build();
+            when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                    order.getId(), "VNPAY")).thenReturn(Optional.of(gatewayPayment));
+            when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                    order.getId(), "WALLET")).thenReturn(Optional.of(walletPayment));
+            when(studentWalletService.captureForOrder(eq(order.getId()), any(Instant.class)))
+                    .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
+            when(orderItemRepository.findByOrder_Id(order.getId()))
+                    .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
+            when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any())).thenReturn(Optional.empty());
+
+            IpnAckResponse ack = service.handleIpn(params);
+
+            assertEquals("00", ack.rspCode());
+            verify(studentWalletService).captureForOrder(eq(order.getId()), any(Instant.class));
+            assertEquals(PaymentStatus.SUCCESS, walletPayment.getStatus());
+            assertEquals(new BigDecimal("30.00"), walletPayment.getAmount());
+            org.junit.jupiter.api.Assertions.assertNotNull(walletPayment.getSucceededAt());
+            verify(enrollmentRepository).save(any(Enrollment.class));
+            verify(escrowService).holdForOrder(order);
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(4)
+        @DisplayName("UTCID04 (A) - invalid signature -> RspCode 97, nothing happens")
+        void handleIpn_invalidSignature_returns97AndDoesNothing() {
+            when(paymentGateway.parseCallback(params)).thenReturn(result(false, true, 10_000L));
+
+            IpnAckResponse ack = service.handleIpn(params);
+
+            assertEquals("97", ack.rspCode());
+            verify(orderRepository, never()).findByOrderCodeForUpdate(anyString());
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(5)
+        @DisplayName("UTCID05 (A) - order not found -> RspCode 01")
+        void handleIpn_orderNotFound_returns01() {
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.empty());
+
+            assertEquals("01", service.handleIpn(params).rspCode());
+            verify(enrollmentRepository, never()).save(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(6)
+        @DisplayName("UTCID06 (A) - amount 999 mismatches -> RspCode 04")
+        void handleIpn_amountMismatch_returns04() {
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 999L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+
+            assertEquals("04", service.handleIpn(params).rspCode());
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(7)
+        @DisplayName("UTCID07 (A) - order already PAID -> RspCode 02, replay safe")
+        void handleIpn_alreadyPaidOrder_isIdempotent_returns02() {
+            order.setStatus(OrderStatus.PAID);
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+
+            IpnAckResponse ack = service.handleIpn(params);
+
+            assertEquals("02", ack.rspCode());
+            // No side effects on a replayed callback.
+            verify(paymentTransactionRepository, never()).save(any());
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+            verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(8)
+        @DisplayName("UTCID08 (A) - provider response 24 -> order FAILED + failure notify")
+        void handleIpn_failedPaymentAtProvider_recordsFailedAndReturns00() {
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, false, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+            when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                    order.getId(), "VNPAY"))
+                    .thenReturn(Optional.of(PaymentTransaction.builder()
+                            .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build()));
+
+            IpnAckResponse ack = service.handleIpn(params);
+
+            assertEquals("00", ack.rspCode());
+            assertEquals(OrderStatus.FAILED, order.getStatus());
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+            verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(9)
+        @DisplayName("UTCID09 (B) - amount 9999 = expected - 1 -> RspCode 04")
+        void handleIpn_amountOneMinorUnitBelowExpected_returns04() {
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 9_999L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+
+            assertEquals("04", service.handleIpn(params).rspCode());
+            assertEquals(OrderStatus.PENDING, order.getStatus());
+            verify(escrowService, never()).holdForOrder(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(10)
+        @DisplayName("UTCID10 (B) - amount 10001 = expected + 1 -> RspCode 04")
+        void handleIpn_amountOneMinorUnitAboveExpected_returns04() {
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_001L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+
+            assertEquals("04", service.handleIpn(params).rspCode());
+            assertEquals(OrderStatus.PENDING, order.getStatus());
+            verify(escrowService, never()).holdForOrder(any());
+        }
     }
 
-    @Test
-    void handleIpn_orderNotFound_returns01() {
-        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
-        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.empty());
+    // ══════════════════════════════════════════════════════════════════════
+    // Not part of Report 5.1 — kept from the earlier iteration
+    // ══════════════════════════════════════════════════════════════════════
 
-        assertEquals("01", service.handleIpn(params).rspCode());
-        verify(enrollmentRepository, never()).save(any());
-    }
+    @Nested
+    @DisplayName("(khong thuoc sheet nao) - initiatePayment / initiateCombinedPayment")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class InitiatePayment {
 
-    @Test
-    void handleIpn_amountMismatch_returns04() {
-        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 999L));
-        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+        @Test
+        @org.junit.jupiter.api.Order(1)
+        void initiateCombinedPayment_partialBalance_setsWalletPortionAndChargesRemainder() {
+            when(studentWalletService.getOrCreateStudentWallet(any()))
+                    .thenReturn(Wallet.builder()
+                            .id(UUID.randomUUID())
+                            .balance(new BigDecimal("40.00"))
+                            .frozenBalance(BigDecimal.ZERO)
+                            .build());
+            when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
+                    .thenReturn(WalletPaymentReservation.builder()
+                            .id(UUID.randomUUID())
+                            .orderId(order.getId())
+                            .amount(new BigDecimal("40.00"))
+                            .status(WalletReservationStatus.RESERVED)
+                            .build());
+            when(paymentGateway.buildPaymentUrl(eq(order), anyString())).thenReturn("https://vnpay/pay");
 
-        assertEquals("04", service.handleIpn(params).rspCode());
-        verify(enrollmentRepository, never()).save(any());
-        verify(escrowService, never()).holdForOrder(any());
-    }
+            String url = service.initiateCombinedPayment(order, "1.2.3.4");
 
-    @Test
-    void handleIpn_alreadyPaidOrder_isIdempotent_returns02() {
-        order.setStatus(OrderStatus.PAID);
-        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
-        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+            assertEquals("https://vnpay/pay", url);
+            assertEquals(new BigDecimal("40.00"), order.getWalletAmount());
+            assertEquals(new BigDecimal("60.00"), order.getGatewayAmount());
+            verify(studentWalletService).reserveForOrder(
+                    eq(order.getStudent().getId()), eq(order.getId()),
+                    eq(new BigDecimal("40.00")), any(Instant.class));
+            verify(orderRepository).save(order);
+        }
 
-        IpnAckResponse ack = service.handleIpn(params);
+        @Test
+        @org.junit.jupiter.api.Order(2)
+        void initiatePayment_savesPendingTransactionAndReturnsPaymentUrl() {
+            when(paymentGateway.buildPaymentUrl(order, "1.2.3.4")).thenReturn("https://sandbox.vnpayment.vn/pay?x=1");
 
-        assertEquals("02", ack.rspCode());
-        // No side effects on a replayed callback.
-        verify(paymentTransactionRepository, never()).save(any());
-        verify(enrollmentRepository, never()).save(any());
-        verify(escrowService, never()).holdForOrder(any());
-        verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
-    }
+            String url = service.initiatePayment(order, "1.2.3.4");
 
-    @Test
-    void handleIpn_failedPaymentAtProvider_recordsFailedAndReturns00() {
-        when(paymentGateway.parseCallback(params)).thenReturn(result(true, false, 10_000L));
-        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
-        when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
-                order.getId(), "VNPAY"))
-                .thenReturn(Optional.of(PaymentTransaction.builder()
-                        .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build()));
-
-        IpnAckResponse ack = service.handleIpn(params);
-
-        assertEquals("00", ack.rspCode());
-        assertEquals(OrderStatus.FAILED, order.getStatus());
-        verify(enrollmentRepository, never()).save(any());
-        verify(escrowService, never()).holdForOrder(any());
-        verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
-    }
-
-    @Test
-    void handleIpn_walletTopUp_creditsStudentWalletNotEnrollment() {
-        Order topUp = Order.builder()
-                .id(UUID.randomUUID())
-                .orderCode("OD1")
-                .totalAmount(new BigDecimal("100.00"))
-                .currency("VND")
-                .status(OrderStatus.PENDING)
-                .student(order.getStudent())
-                .type(OrderType.WALLET_TOPUP)
-                .build();
-        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
-        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(topUp));
-        when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
-                topUp.getId(), "VNPAY"))
-                .thenReturn(Optional.of(PaymentTransaction.builder()
-                        .order(topUp).provider("VNPAY").status(PaymentStatus.PENDING).build()));
-
-        IpnAckResponse ack = service.handleIpn(params);
-
-        assertEquals("00", ack.rspCode());
-        assertEquals(OrderStatus.PAID, topUp.getStatus());
-        verify(studentWalletService).creditTopUp(
-                eq(topUp.getStudent().getId()), eq(new BigDecimal("100.00")),
-                eq(topUp.getId()), anyString());
-        // A top-up must never create enrollment or escrow.
-        verify(enrollmentRepository, never()).save(any());
-        verify(escrowService, never()).holdForOrder(any());
-        verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
-    }
-
-    @Test
-    void payWithWallet_debitsWalletAndFulfilsCourseOrder() {
-        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
-        when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
-                .thenReturn(WalletPaymentReservation.builder()
-                        .id(UUID.randomUUID())
-                        .orderId(order.getId())
-                        .amount(order.getTotalAmount())
-                        .status(WalletReservationStatus.RESERVED)
-                        .build());
-        when(studentWalletService.captureForOrder(eq(order.getId()), any(Instant.class)))
-                .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
-        when(orderItemRepository.findByOrder_Id(order.getId()))
-                .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
-        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any())).thenReturn(Optional.empty());
-
-        Order paidOrder = service.payWithWallet(order.getId());
-
-        assertEquals(order, paidOrder);
-        assertEquals(OrderStatus.PAID, order.getStatus());
-        verify(studentWalletService).reserveForOrder(
-                eq(order.getStudent().getId()), eq(order.getId()),
-                eq(new BigDecimal("100.00")), any(Instant.class));
-        verify(studentWalletService).captureForOrder(eq(order.getId()), any(Instant.class));
-        ArgumentCaptor<PaymentTransaction> txCaptor = ArgumentCaptor.forClass(PaymentTransaction.class);
-        verify(paymentTransactionRepository).save(txCaptor.capture());
-        assertEquals("WALLET", txCaptor.getValue().getProvider());
-        assertEquals(PaymentStatus.SUCCESS, txCaptor.getValue().getStatus());
-        assertEquals(new BigDecimal("100.00"), txCaptor.getValue().getAmount());
-        org.junit.jupiter.api.Assertions.assertNotNull(txCaptor.getValue().getSucceededAt());
-        verify(enrollmentRepository).save(any(Enrollment.class));
-        verify(escrowService).holdForOrder(order);
-        ArgumentCaptor<PaymentNotificationEvent> eventCaptor =
-                ArgumentCaptor.forClass(PaymentNotificationEvent.class);
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
-        assertEquals(order.getId(), eventCaptor.getValue().orderId());
-        assertEquals("student@test.dev", eventCaptor.getValue().recipientEmail());
-    }
-
-    @Test
-    void payWithWallet_alreadyPaidOrder_isIdempotent() {
-        order.setStatus(OrderStatus.PAID);
-        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
-
-        assertEquals(order, service.payWithWallet(order.getId()));
-
-        verify(studentWalletService, never()).reserveForOrder(any(), any(), any(), any());
-        verify(studentWalletService, never()).captureForOrder(any(), any());
-        verify(paymentTransactionRepository, never()).save(any());
-        verify(enrollmentRepository, never()).save(any());
-        verify(escrowService, never()).holdForOrder(any());
-        verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
-    }
-
-    @Test
-    void payWithWallet_repurchaseResetsRefundedEnrollmentWithoutReplacingIt() {
-        Instant protectedMaterialsDownloadedAt = Instant.parse("2026-07-20T00:00:00Z");
-        Enrollment refundedEnrollment = Enrollment.builder()
-                .id(UUID.randomUUID())
-                .student(order.getStudent())
-                .course(course)
-                .status(EnrollmentStatus.REFUNDED)
-                .protectedMaterialsFullyDownloadedAt(protectedMaterialsDownloadedAt)
-                .build();
-        UUID originalEnrollmentId = refundedEnrollment.getId();
-
-        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
-        when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
-                .thenReturn(WalletPaymentReservation.builder()
-                        .id(UUID.randomUUID())
-                        .orderId(order.getId())
-                        .amount(order.getTotalAmount())
-                        .status(WalletReservationStatus.RESERVED)
-                        .build());
-        when(studentWalletService.captureForOrder(eq(order.getId()), any(Instant.class)))
-                .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
-        when(orderItemRepository.findByOrder_Id(order.getId()))
-                .thenReturn(List.of(OrderItem.builder()
-                        .order(order)
-                        .course(course)
-                        .price(order.getTotalAmount())
-                        .build()));
-        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(
-                order.getStudent().getId(), course.getId()))
-                .thenReturn(Optional.of(refundedEnrollment));
-
-        service.payWithWallet(order.getId());
-
-        assertEquals(originalEnrollmentId, refundedEnrollment.getId());
-        verify(enrollmentProgressResetService).resetForRepurchase(refundedEnrollment);
-        verify(escrowService).holdForOrder(order);
-    }
-
-    @Test
-    void handleIpn_combinedPayment_debitsWalletPortionAndConfirms() {
-        order.setWalletAmount(new BigDecimal("30.00")); // 30 from wallet → gateway charges 70.00
-        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 7_000L)); // 70.00 × 100
-        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
-        PaymentTransaction gatewayPayment = PaymentTransaction.builder()
-                .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build();
-        PaymentTransaction walletPayment = PaymentTransaction.builder()
-                .order(order).provider("WALLET").amount(new BigDecimal("30.00"))
-                .status(PaymentStatus.PENDING).build();
-        when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
-                order.getId(), "VNPAY")).thenReturn(Optional.of(gatewayPayment));
-        when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
-                order.getId(), "WALLET")).thenReturn(Optional.of(walletPayment));
-        when(studentWalletService.captureForOrder(eq(order.getId()), any(Instant.class)))
-                .thenReturn(WalletTransaction.builder().id(UUID.randomUUID()).build());
-        when(orderItemRepository.findByOrder_Id(order.getId()))
-                .thenReturn(List.of(OrderItem.builder().order(order).course(course).price(new BigDecimal("100.00")).build()));
-        when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any())).thenReturn(Optional.empty());
-
-        IpnAckResponse ack = service.handleIpn(params);
-
-        assertEquals("00", ack.rspCode());
-        verify(studentWalletService).captureForOrder(eq(order.getId()), any(Instant.class));
-        assertEquals(PaymentStatus.SUCCESS, walletPayment.getStatus());
-        assertEquals(new BigDecimal("30.00"), walletPayment.getAmount());
-        org.junit.jupiter.api.Assertions.assertNotNull(walletPayment.getSucceededAt());
-        verify(enrollmentRepository).save(any(Enrollment.class));
-        verify(escrowService).holdForOrder(order);
-    }
-
-    @Test
-    void initiateCombinedPayment_partialBalance_setsWalletPortionAndChargesRemainder() {
-        when(studentWalletService.getOrCreateStudentWallet(any()))
-                .thenReturn(Wallet.builder()
-                        .id(UUID.randomUUID())
-                        .balance(new BigDecimal("40.00"))
-                        .frozenBalance(BigDecimal.ZERO)
-                        .build());
-        when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
-                .thenReturn(WalletPaymentReservation.builder()
-                        .id(UUID.randomUUID())
-                        .orderId(order.getId())
-                        .amount(new BigDecimal("40.00"))
-                        .status(WalletReservationStatus.RESERVED)
-                        .build());
-        when(paymentGateway.buildPaymentUrl(eq(order), anyString())).thenReturn("https://vnpay/pay");
-
-        String url = service.initiateCombinedPayment(order, "1.2.3.4");
-
-        assertEquals("https://vnpay/pay", url);
-        assertEquals(new BigDecimal("40.00"), order.getWalletAmount());
-        assertEquals(new BigDecimal("60.00"), order.getGatewayAmount());
-        verify(studentWalletService).reserveForOrder(
-                eq(order.getStudent().getId()), eq(order.getId()),
-                eq(new BigDecimal("40.00")), any(Instant.class));
-        verify(orderRepository).save(order);
-    }
-
-    @Test
-    void initiatePayment_savesPendingTransactionAndReturnsPaymentUrl() {
-        when(paymentGateway.buildPaymentUrl(order, "1.2.3.4")).thenReturn("https://sandbox.vnpayment.vn/pay?x=1");
-
-        String url = service.initiatePayment(order, "1.2.3.4");
-
-        assertEquals("https://sandbox.vnpayment.vn/pay?x=1", url);
-        ArgumentCaptor<PaymentTransaction> txCaptor = ArgumentCaptor.forClass(PaymentTransaction.class);
-        verify(paymentTransactionRepository).save(txCaptor.capture());
-        assertEquals(PaymentStatus.PENDING, txCaptor.getValue().getStatus());
-        assertEquals(new BigDecimal("100.00"), txCaptor.getValue().getAmount());
-    }
-
-    // ──────────────────────────────────────────────
-    // UC-08 Purchase Course — payWithWallet exceptions
-    // ──────────────────────────────────────────────
-
-    @Test
-    void payWithWallet_orderNotFound_throwsNotFound() {
-        UUID unknownId = UUID.randomUUID();
-        when(orderRepository.findByIdForUpdate(unknownId)).thenReturn(Optional.empty());
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service.payWithWallet(unknownId));
-
-        assertEquals(MessageCodes.ORDER_NOT_FOUND, error.getMessageCode());
-        verify(studentWalletService, never()).reserveForOrder(any(), any(), any(), any());
-    }
-
-    @Test
-    void payWithWallet_orderNoLongerPending_throwsConflict() {
-        order.setStatus(OrderStatus.FAILED);
-        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service.payWithWallet(order.getId()));
-
-        assertEquals(MessageCodes.COMMON_CONFLICT, error.getMessageCode());
-        verify(studentWalletService, never()).reserveForOrder(any(), any(), any(), any());
-        verify(escrowService, never()).holdForOrder(any());
-    }
-
-    @Test
-    void payWithWallet_insufficientWalletBalance_doesNotFulfilTheOrder() {
-        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
-        when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
-                .thenThrow(new BusinessException(
-                        MessageCodes.WALLET_INSUFFICIENT_BALANCE,
-                        "Số dư khả dụng của ví không đủ để thanh toán"));
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service.payWithWallet(order.getId()));
-
-        assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, error.getMessageCode());
-        verify(studentWalletService, never()).captureForOrder(any(), any());
-        verify(enrollmentRepository, never()).save(any());
-        verify(escrowService, never()).holdForOrder(any());
-    }
-
-    // ──────────────────────────────────────────────
-    // UC-08 Purchase Course — handleIpn amount boundaries
-    // ──────────────────────────────────────────────
-
-    @Test
-    void handleIpn_amountOneMinorUnitBelowExpected_returns04() {
-        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 9_999L));
-        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
-
-        assertEquals("04", service.handleIpn(params).rspCode());
-        assertEquals(OrderStatus.PENDING, order.getStatus());
-        verify(escrowService, never()).holdForOrder(any());
-    }
-
-    @Test
-    void handleIpn_amountOneMinorUnitAboveExpected_returns04() {
-        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_001L));
-        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
-
-        assertEquals("04", service.handleIpn(params).rspCode());
-        assertEquals(OrderStatus.PENDING, order.getStatus());
-        verify(escrowService, never()).holdForOrder(any());
+            assertEquals("https://sandbox.vnpayment.vn/pay?x=1", url);
+            ArgumentCaptor<PaymentTransaction> txCaptor = ArgumentCaptor.forClass(PaymentTransaction.class);
+            verify(paymentTransactionRepository).save(txCaptor.capture());
+            assertEquals(PaymentStatus.PENDING, txCaptor.getValue().getStatus());
+            assertEquals(new BigDecimal("100.00"), txCaptor.getValue().getAmount());
+        }
     }
 }

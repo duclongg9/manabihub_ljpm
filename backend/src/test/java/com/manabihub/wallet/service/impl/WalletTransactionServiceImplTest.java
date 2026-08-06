@@ -23,7 +23,11 @@ import com.manabihub.wallet.repository.EscrowLedgerRepository;
 import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -53,6 +57,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit tests for {@link WalletTransactionServiceImpl}.
+ * <p>
+ * Grouped with {@code @Nested} so Surefire reports one summary line per Report 5.1 sheet:
+ * <pre>
+ *   WalletTransactionServiceImplTest$GetStudentTransactions -> sheet 44 getStudentTransactions
+ * </pre>
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class WalletTransactionServiceImplTest {
@@ -94,155 +106,180 @@ class WalletTransactionServiceImplTest {
         when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
     }
 
-    // ──────────────────────────────────────────────
-    // History
-    // ──────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 44 — getStudentTransactions (UC-17 Manage My Wallet) — 5 TC
+    // ══════════════════════════════════════════════════════════════════════
 
-    @Test
-    void getStudentTransactions_returnsEmptyPage_whenWalletNotCreatedYet() {
-        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.empty());
+    @Nested
+    @DisplayName("Sheet 44 - getStudentTransactions (UC-17)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class GetStudentTransactions {
 
-        PageResponse<WalletTransactionResponse> result =
-                service.getStudentTransactions(userId, null, PageRequest.of(0, 20));
+        @Test
+        @org.junit.jupiter.api.Order(1)
+        @DisplayName("UTCID01 (N) - maps the ledger line and resolves the order code")
+        void getStudentTransactions_mapsLedgerLinesAndResolvesOrderCode() {
+            UUID orderId = UUID.randomUUID();
+            WalletTransaction transaction = topUpTransaction(orderId);
 
-        assertTrue(result.getContent().isEmpty());
-        assertEquals(0, result.getTotalElements());
-        verify(walletTransactionRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+            when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+            when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(transaction), PageRequest.of(0, 20), 1));
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order(orderId, "ORD-001")));
+
+            PageResponse<WalletTransactionResponse> result =
+                    service.getStudentTransactions(userId, null, PageRequest.of(0, 20));
+
+            assertEquals(1, result.getContent().size());
+            WalletTransactionResponse line = result.getContent().get(0);
+            assertEquals(WalletTransactionType.TOP_UP, line.transactionType());
+            assertEquals(WalletDirection.IN, line.direction());
+            assertEquals("ORD-001", line.referenceCode());
+            assertEquals("VND", line.currency());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(2)
+        @DisplayName("UTCID02 (N) - type / direction / date / reference-code filter applied")
+        void getStudentTransactions_appliesFiltersWithoutError() {
+            when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+            when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+            WalletTransactionFilterRequest filter = new WalletTransactionFilterRequest(
+                    List.of(WalletTransactionType.TOP_UP),
+                    WalletDirection.IN,
+                    LocalDate.of(2026, 8, 1),
+                    LocalDate.of(2026, 8, 31),
+                    "ORD-001");
+
+            when(orderRepository.findIdsByStudentIdAndOrderCodeLike(eq(studentId), eq("ORD-001")))
+                    .thenReturn(List.of(UUID.randomUUID()));
+
+            PageResponse<WalletTransactionResponse> result =
+                    service.getStudentTransactions(userId, filter, PageRequest.of(0, 20));
+
+            assertNotNull(result);
+            verify(orderRepository).findIdsByStudentIdAndOrderCodeLike(studentId, "ORD-001");
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(3)
+        @DisplayName("UTCID03 (B) - wallet not created yet -> empty page, no ledger query")
+        void getStudentTransactions_returnsEmptyPage_whenWalletNotCreatedYet() {
+            when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.empty());
+
+            PageResponse<WalletTransactionResponse> result =
+                    service.getStudentTransactions(userId, null, PageRequest.of(0, 20));
+
+            assertTrue(result.getContent().isEmpty());
+            assertEquals(0, result.getTotalElements());
+            verify(walletTransactionRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(4)
+        @DisplayName("UTCID04 (B) - blank reference code -> treated as no search")
+        void getStudentTransactions_blankReferenceCodeIsTreatedAsNoSearch() {
+            when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+            when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+            WalletTransactionFilterRequest filter =
+                    new WalletTransactionFilterRequest(null, null, null, null, "   ");
+
+            service.getStudentTransactions(userId, filter, PageRequest.of(0, 20));
+
+            verify(orderRepository, never()).findIdsByStudentIdAndOrderCodeLike(any(), any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(5)
+        @DisplayName("UTCID05 (A) - no student profile -> LEARNING_STUDENT_PROFILE_NOT_FOUND")
+        void getStudentTransactions_studentProfileMissing_throws() {
+            UUID strangerUserId = UUID.randomUUID();
+            when(studentProfileRepository.findByUser_Id(strangerUserId)).thenReturn(Optional.empty());
+
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> service.getStudentTransactions(strangerUserId, null, PageRequest.of(0, 20)));
+
+            assertEquals(MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND, exception.getMessageCode());
+            verify(walletTransactionRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+        }
     }
 
-    @Test
-    void getStudentTransactions_mapsLedgerLinesAndResolvesOrderCode() {
-        UUID orderId = UUID.randomUUID();
-        WalletTransaction transaction = topUpTransaction(orderId);
+    // ══════════════════════════════════════════════════════════════════════
+    // Not part of Report 5.1 — kept from the earlier iteration
+    // ══════════════════════════════════════════════════════════════════════
 
-        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
-        when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(transaction), PageRequest.of(0, 20), 1));
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order(orderId, "ORD-001")));
+    @Nested
+    @DisplayName("(khong thuoc sheet nao) - transaction detail / teacher ledger")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class DetailAndOwnership {
 
-        PageResponse<WalletTransactionResponse> result =
-                service.getStudentTransactions(userId, null, PageRequest.of(0, 20));
+        @Test
+        @org.junit.jupiter.api.Order(1)
+        void getStudentTransactionDetail_returnsDetailWithRelatedOrder() {
+            UUID orderId = UUID.randomUUID();
+            WalletTransaction transaction = topUpTransaction(orderId);
 
-        assertEquals(1, result.getContent().size());
-        WalletTransactionResponse line = result.getContent().get(0);
-        assertEquals(WalletTransactionType.TOP_UP, line.transactionType());
-        assertEquals(WalletDirection.IN, line.direction());
-        assertEquals("ORD-001", line.referenceCode());
-        assertEquals("VND", line.currency());
-    }
+            when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+            when(walletTransactionRepository.findByIdAndWalletId(transaction.getId(), walletId))
+                    .thenReturn(Optional.of(transaction));
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order(orderId, "ORD-001")));
 
-    @Test
-    void getStudentTransactions_appliesFiltersWithoutError() {
-        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
-        when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+            WalletTransactionDetailResponse detail =
+                    service.getStudentTransactionDetail(userId, transaction.getId());
 
-        WalletTransactionFilterRequest filter = new WalletTransactionFilterRequest(
-                List.of(WalletTransactionType.TOP_UP),
-                WalletDirection.IN,
-                LocalDate.of(2026, 8, 1),
-                LocalDate.of(2026, 8, 31),
-                "ORD-001");
+            assertEquals("ORD-001", detail.referenceCode());
+            assertNotNull(detail.relatedRecord());
+            assertEquals("WALLET_TOPUP", detail.relatedRecord().kind());
+            assertEquals(OrderStatus.PAID.name(), detail.relatedRecord().status());
+        }
 
-        when(orderRepository.findIdsByStudentIdAndOrderCodeLike(eq(studentId), eq("ORD-001")))
-                .thenReturn(List.of(UUID.randomUUID()));
+        @Test
+        @org.junit.jupiter.api.Order(2)
+        void getStudentTransactionDetail_rejectsTransactionOwnedByAnotherWallet() {
+            UUID foreignTransactionId = UUID.randomUUID();
 
-        PageResponse<WalletTransactionResponse> result =
-                service.getStudentTransactions(userId, filter, PageRequest.of(0, 20));
+            when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+            when(walletTransactionRepository.findByIdAndWalletId(foreignTransactionId, walletId))
+                    .thenReturn(Optional.empty());
 
-        assertNotNull(result);
-        verify(orderRepository).findIdsByStudentIdAndOrderCodeLike(studentId, "ORD-001");
-    }
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> service.getStudentTransactionDetail(userId, foreignTransactionId));
 
-    @Test
-    void getStudentTransactions_blankReferenceCodeIsTreatedAsNoSearch() {
-        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
-        when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+            assertEquals(MessageCodes.WALLET_TRANSACTION_NOT_FOUND, exception.getMessageCode());
+        }
 
-        WalletTransactionFilterRequest filter =
-                new WalletTransactionFilterRequest(null, null, null, null, "   ");
+        @Test
+        @org.junit.jupiter.api.Order(3)
+        void getTeacherTransactions_usesTeacherWalletAndNeverTheStudentOne() {
+            UUID teacherUserId = UUID.randomUUID();
+            UUID teacherId = UUID.randomUUID();
+            UUID teacherWalletId = UUID.randomUUID();
 
-        service.getStudentTransactions(userId, filter, PageRequest.of(0, 20));
+            TeacherProfile teacher = mock(TeacherProfile.class);
+            when(teacher.getId()).thenReturn(teacherId);
+            when(teacherProfileRepository.findByUserId(teacherUserId)).thenReturn(Optional.of(teacher));
 
-        verify(orderRepository, never()).findIdsByStudentIdAndOrderCodeLike(any(), any());
-    }
+            Wallet teacherWallet = Wallet.builder()
+                    .id(teacherWalletId)
+                    .ownerType(WalletOwnerType.TEACHER)
+                    .balance(new BigDecimal("500000"))
+                    .frozenBalance(BigDecimal.ZERO)
+                    .currency("VND")
+                    .build();
+            when(walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacherId)).thenReturn(Optional.of(teacherWallet));
+            when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-    @Test
-    void getStudentTransactions_studentProfileMissing_throws() {
-        UUID strangerUserId = UUID.randomUUID();
-        when(studentProfileRepository.findByUser_Id(strangerUserId)).thenReturn(Optional.empty());
+            PageResponse<WalletTransactionResponse> result =
+                    service.getTeacherTransactions(teacherUserId, null, PageRequest.of(0, 20));
 
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> service.getStudentTransactions(strangerUserId, null, PageRequest.of(0, 20)));
-
-        assertEquals(MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND, exception.getMessageCode());
-        verify(walletTransactionRepository, never()).findAll(any(Specification.class), any(Pageable.class));
-    }
-
-    // ──────────────────────────────────────────────
-    // Detail / ownership
-    // ──────────────────────────────────────────────
-
-    @Test
-    void getStudentTransactionDetail_returnsDetailWithRelatedOrder() {
-        UUID orderId = UUID.randomUUID();
-        WalletTransaction transaction = topUpTransaction(orderId);
-
-        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
-        when(walletTransactionRepository.findByIdAndWalletId(transaction.getId(), walletId))
-                .thenReturn(Optional.of(transaction));
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order(orderId, "ORD-001")));
-
-        WalletTransactionDetailResponse detail =
-                service.getStudentTransactionDetail(userId, transaction.getId());
-
-        assertEquals("ORD-001", detail.referenceCode());
-        assertNotNull(detail.relatedRecord());
-        assertEquals("WALLET_TOPUP", detail.relatedRecord().kind());
-        assertEquals(OrderStatus.PAID.name(), detail.relatedRecord().status());
-    }
-
-    @Test
-    void getStudentTransactionDetail_rejectsTransactionOwnedByAnotherWallet() {
-        UUID foreignTransactionId = UUID.randomUUID();
-
-        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
-        when(walletTransactionRepository.findByIdAndWalletId(foreignTransactionId, walletId))
-                .thenReturn(Optional.empty());
-
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> service.getStudentTransactionDetail(userId, foreignTransactionId));
-
-        assertEquals(MessageCodes.WALLET_TRANSACTION_NOT_FOUND, exception.getMessageCode());
-    }
-
-    @Test
-    void getTeacherTransactions_usesTeacherWalletAndNeverTheStudentOne() {
-        UUID teacherUserId = UUID.randomUUID();
-        UUID teacherId = UUID.randomUUID();
-        UUID teacherWalletId = UUID.randomUUID();
-
-        TeacherProfile teacher = mock(TeacherProfile.class);
-        when(teacher.getId()).thenReturn(teacherId);
-        when(teacherProfileRepository.findByUserId(teacherUserId)).thenReturn(Optional.of(teacher));
-
-        Wallet teacherWallet = Wallet.builder()
-                .id(teacherWalletId)
-                .ownerType(WalletOwnerType.TEACHER)
-                .balance(new BigDecimal("500000"))
-                .frozenBalance(BigDecimal.ZERO)
-                .currency("VND")
-                .build();
-        when(walletRepository.findByOwnerTypeAndTeacher_Id(WalletOwnerType.TEACHER, teacherId)).thenReturn(Optional.of(teacherWallet));
-        when(walletTransactionRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-
-        PageResponse<WalletTransactionResponse> result =
-                service.getTeacherTransactions(teacherUserId, null, PageRequest.of(0, 20));
-
-        assertNotNull(result);
-        verify(walletRepository, never()).findByOwnerTypeAndStudent_Id(eq(WalletOwnerType.STUDENT), any());
+            assertNotNull(result);
+            verify(walletRepository, never()).findByOwnerTypeAndStudent_Id(eq(WalletOwnerType.STUDENT), any());
+        }
     }
 
     // ──────────────────────────────────────────────
