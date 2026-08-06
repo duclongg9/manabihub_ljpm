@@ -1,7 +1,10 @@
 package com.manabihub.wallet.service.impl;
 
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.wallet.dto.response.StudentWalletResponse;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletPaymentReservation;
 import com.manabihub.wallet.entity.WalletTransaction;
@@ -279,6 +282,108 @@ class StudentWalletServiceImplTest {
         assertEquals(new BigDecimal("0.00"), wallet.getFrozenBalance());
         assertEquals(WalletReservationStatus.RELEASED, reservation.getStatus());
         verify(walletRepository).save(wallet);
+    }
+
+    // ──────────────────────────────────────────────
+    // UC-17 Manage My Wallet — getWalletOverview
+    // ──────────────────────────────────────────────
+
+    @Test
+    void getWalletOverview_existingWallet_returnsEveryBalanceOfTheOwnStudent() {
+        UUID userId = UUID.randomUUID();
+        wallet.setBalance(new BigDecimal("300000.00"));
+        wallet.setFrozenBalance(new BigDecimal("50000.00"));
+        wallet.setWithdrawableBalance(new BigDecimal("120000.00"));
+        wallet.setFrozenWithdrawableBalance(new BigDecimal("20000.00"));
+        when(studentProfileRepository.findByUser_Id(userId))
+                .thenReturn(Optional.of(StudentProfile.builder().id(studentId).build()));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId))
+                .thenReturn(Optional.of(wallet));
+
+        StudentWalletResponse overview = service.getWalletOverview(userId);
+
+        assertEquals(new BigDecimal("300000.00"), overview.balance());
+        assertEquals(new BigDecimal("50000.00"), overview.frozenBalance());
+        assertEquals(new BigDecimal("250000.00"), overview.availableBalance());
+        assertEquals(new BigDecimal("120000.00"), overview.withdrawableBalance());
+        assertEquals(new BigDecimal("100000.00"), overview.availableWithdrawableBalance());
+        assertEquals("VND", overview.currency());
+    }
+
+    @Test
+    void getWalletOverview_walletNotCreatedYet_returnsZeroBalancesInsteadOfFailing() {
+        UUID userId = UUID.randomUUID();
+        when(studentProfileRepository.findByUser_Id(userId))
+                .thenReturn(Optional.of(StudentProfile.builder().id(studentId).build()));
+        when(walletRepository.findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, studentId))
+                .thenReturn(Optional.empty());
+
+        StudentWalletResponse overview = service.getWalletOverview(userId);
+
+        assertEquals(BigDecimal.ZERO, overview.balance());
+        assertEquals(BigDecimal.ZERO, overview.frozenBalance());
+        assertEquals(BigDecimal.ZERO, overview.availableBalance());
+        assertEquals(BigDecimal.ZERO, overview.withdrawableBalance());
+        assertEquals(BigDecimal.ZERO, overview.availableWithdrawableBalance());
+        assertEquals("VND", overview.currency());
+    }
+
+    @Test
+    void getWalletOverview_studentProfileMissing_throws() {
+        UUID userId = UUID.randomUUID();
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.getWalletOverview(userId));
+
+        assertEquals(MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND, error.getMessageCode());
+        verify(walletRepository, never()).findByOwnerTypeAndStudent_Id(any(), any());
+    }
+
+    // ──────────────────────────────────────────────
+    // UC-17 Manage My Wallet — creditTopUp
+    // ──────────────────────────────────────────────
+
+    @Test
+    void creditTopUp_replayOfTheSameOrder_returnsExistingLedgerWithoutCreditingTwice() {
+        UUID orderId = UUID.randomUUID();
+        WalletTransaction existing = WalletTransaction.builder().id(UUID.randomUUID()).build();
+        when(walletTransactionRepository.findByIdempotencyKey("wallet-topup:" + orderId))
+                .thenReturn(Optional.of(existing));
+
+        assertSame(existing, service.creditTopUp(
+                studentId, new BigDecimal("50000.00"), orderId, "Top up"));
+
+        assertEquals(new BigDecimal("100000.00"), wallet.getBalance());
+        verify(walletRepository, never()).save(any());
+    }
+
+    @Test
+    void creditTopUp_nullAmount_throws() {
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.creditTopUp(studentId, null, UUID.randomUUID(), "Top up"));
+
+        assertEquals(MessageCodes.COMMON_BAD_REQUEST, error.getMessageCode());
+        verify(walletTransactionRepository, never()).save(any());
+    }
+
+    @Test
+    void creditTopUp_zeroAmount_throws() {
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.creditTopUp(studentId, BigDecimal.ZERO, UUID.randomUUID(), "Top up"));
+
+        assertEquals(MessageCodes.COMMON_BAD_REQUEST, error.getMessageCode());
+        verify(walletTransactionRepository, never()).save(any());
+    }
+
+    @Test
+    void creditTopUp_negativeAmount_throws() {
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.creditTopUp(
+                        studentId, new BigDecimal("-1000.00"), UUID.randomUUID(), "Top up"));
+
+        assertEquals(MessageCodes.COMMON_BAD_REQUEST, error.getMessageCode());
+        verify(walletTransactionRepository, never()).save(any());
     }
 
     private void stubExistingWallet() {

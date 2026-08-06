@@ -1,6 +1,8 @@
 package com.manabihub.payment.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
@@ -43,6 +45,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -384,5 +387,75 @@ class PaymentServiceImplTest {
         verify(paymentTransactionRepository).save(txCaptor.capture());
         assertEquals(PaymentStatus.PENDING, txCaptor.getValue().getStatus());
         assertEquals(new BigDecimal("100.00"), txCaptor.getValue().getAmount());
+    }
+
+    // ──────────────────────────────────────────────
+    // UC-08 Purchase Course — payWithWallet exceptions
+    // ──────────────────────────────────────────────
+
+    @Test
+    void payWithWallet_orderNotFound_throwsNotFound() {
+        UUID unknownId = UUID.randomUUID();
+        when(orderRepository.findByIdForUpdate(unknownId)).thenReturn(Optional.empty());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.payWithWallet(unknownId));
+
+        assertEquals(MessageCodes.ORDER_NOT_FOUND, error.getMessageCode());
+        verify(studentWalletService, never()).reserveForOrder(any(), any(), any(), any());
+    }
+
+    @Test
+    void payWithWallet_orderNoLongerPending_throwsConflict() {
+        order.setStatus(OrderStatus.FAILED);
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.payWithWallet(order.getId()));
+
+        assertEquals(MessageCodes.COMMON_CONFLICT, error.getMessageCode());
+        verify(studentWalletService, never()).reserveForOrder(any(), any(), any(), any());
+        verify(escrowService, never()).holdForOrder(any());
+    }
+
+    @Test
+    void payWithWallet_insufficientWalletBalance_doesNotFulfilTheOrder() {
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(studentWalletService.reserveForOrder(any(), any(), any(), any()))
+                .thenThrow(new BusinessException(
+                        MessageCodes.WALLET_INSUFFICIENT_BALANCE,
+                        "Số dư khả dụng của ví không đủ để thanh toán"));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.payWithWallet(order.getId()));
+
+        assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, error.getMessageCode());
+        verify(studentWalletService, never()).captureForOrder(any(), any());
+        verify(enrollmentRepository, never()).save(any());
+        verify(escrowService, never()).holdForOrder(any());
+    }
+
+    // ──────────────────────────────────────────────
+    // UC-08 Purchase Course — handleIpn amount boundaries
+    // ──────────────────────────────────────────────
+
+    @Test
+    void handleIpn_amountOneMinorUnitBelowExpected_returns04() {
+        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 9_999L));
+        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+
+        assertEquals("04", service.handleIpn(params).rspCode());
+        assertEquals(OrderStatus.PENDING, order.getStatus());
+        verify(escrowService, never()).holdForOrder(any());
+    }
+
+    @Test
+    void handleIpn_amountOneMinorUnitAboveExpected_returns04() {
+        when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_001L));
+        when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+
+        assertEquals("04", service.handleIpn(params).rspCode());
+        assertEquals(OrderStatus.PENDING, order.getStatus());
+        verify(escrowService, never()).holdForOrder(any());
     }
 }

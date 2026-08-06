@@ -16,6 +16,7 @@ import com.manabihub.order.entity.Order;
 import com.manabihub.order.entity.OrderItem;
 import com.manabihub.order.dto.response.OrderResponse;
 import com.manabihub.order.enums.OrderStatus;
+import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.mapper.OrderMapper;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
@@ -269,5 +270,223 @@ class OrderServiceImplTest {
         assertEquals(orderId, result.getContent().getFirst().id());
         verify(orderRepository).findByStudent_IdAndStatus(student.getId(), OrderStatus.PAID, pageable);
         verify(orderItemRepository).findByOrder_IdIn(List.of(orderId));
+    }
+
+    // ──────────────────────────────────────────────
+    // UC-08 Purchase Course — createOrder
+    // ──────────────────────────────────────────────
+
+    @Test
+    void createOrder_studentProfileMissing_throws() {
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class, () -> service.createOrder(course.getId()));
+        verify(courseRepository, never()).findById(any());
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_zeroPriceCourse_createsZeroAmountOrder() {
+        course.setPrice(BigDecimal.ZERO);
+        when(courseRepository.findById(course.getId())).thenReturn(Optional.of(course));
+        when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId()))
+                .thenReturn(Optional.empty());
+        when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order created = service.createOrder(course.getId());
+
+        assertEquals(0, created.getTotalAmount().compareTo(BigDecimal.ZERO));
+        assertEquals(OrderStatus.PENDING, created.getStatus());
+        verify(orderItemRepository).save(any(OrderItem.class));
+    }
+
+    // ──────────────────────────────────────────────
+    // UC-08 Purchase Course — createTopUpOrder
+    // ──────────────────────────────────────────────
+
+    @Test
+    void createTopUpOrder_normalAmount_createsPendingTopUpOrderWithoutItem() {
+        when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order created = service.createTopUpOrder(new BigDecimal("50000"));
+
+        assertEquals(OrderType.WALLET_TOPUP, created.getType());
+        assertEquals(OrderStatus.PENDING, created.getStatus());
+        assertEquals("VND", created.getCurrency());
+        assertEquals(new BigDecimal("50000"), created.getTotalAmount());
+        verify(orderItemRepository, never()).save(any());
+    }
+
+    @Test
+    void createTopUpOrder_acceptsConfiguredMinimum() {
+        when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order created = service.createTopUpOrder(new BigDecimal("10000"));
+
+        assertEquals(new BigDecimal("10000"), created.getTotalAmount());
+    }
+
+    @Test
+    void createTopUpOrder_rejectsAmountBelowConfiguredMinimum() {
+        assertThrows(BusinessException.class,
+                () -> service.createTopUpOrder(new BigDecimal("9999")));
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createTopUpOrder_rejectsNullAmount() {
+        assertThrows(BusinessException.class, () -> service.createTopUpOrder(null));
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createTopUpOrder_rejectsFractionalAmount() {
+        assertThrows(BusinessException.class,
+                () -> service.createTopUpOrder(new BigDecimal("10000.50")));
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    // ──────────────────────────────────────────────
+    // UC-09 View Purchase History — getOrderForCurrentStudent
+    // ──────────────────────────────────────────────
+
+    @Test
+    void getOrderForCurrentStudent_ownOrder_returnsDetailWithItems() {
+        Order order = paidOrder();
+        OrderItem item = OrderItem.builder().order(order).course(course).price(course.getPrice()).build();
+        OrderResponse expected = response(order);
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItemRepository.findByOrder_Id(order.getId())).thenReturn(List.of(item));
+        when(orderMapper.toResponse(order, List.of(item))).thenReturn(expected);
+
+        OrderResponse actual = service.getOrderForCurrentStudent(order.getId());
+
+        assertEquals(expected, actual);
+        verify(orderItemRepository).findByOrder_Id(order.getId());
+    }
+
+    @Test
+    void getOrderForCurrentStudent_orderOwnedByAnotherStudent_isHiddenAsNotFound() {
+        Order order = paidOrder();
+        order.setStudent(StudentProfile.builder().id(UUID.randomUUID()).build());
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+
+        assertThrows(BusinessException.class,
+                () -> service.getOrderForCurrentStudent(order.getId()));
+        verify(orderMapper, never()).toResponse(any(), any());
+    }
+
+    @Test
+    void getOrderForCurrentStudent_orderNotFound_throws() {
+        UUID unknownId = UUID.randomUUID();
+        when(orderRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class,
+                () -> service.getOrderForCurrentStudent(unknownId));
+        verify(orderMapper, never()).toResponse(any(), any());
+    }
+
+    @Test
+    void getOrderForCurrentStudent_studentProfileMissing_throws() {
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class,
+                () -> service.getOrderForCurrentStudent(UUID.randomUUID()));
+        verify(orderRepository, never()).findById(any());
+    }
+
+    // ──────────────────────────────────────────────
+    // UC-09 View Purchase History — getOrdersForCurrentStudent
+    // ──────────────────────────────────────────────
+
+    @Test
+    void getOrdersForCurrentStudent_nullStatus_listsEveryOrderOfTheStudent() {
+        Order order = paidOrder();
+        OrderItem item = OrderItem.builder().order(order).course(course).price(course.getPrice()).build();
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(orderRepository.findByStudent_Id(student.getId(), pageable))
+                .thenReturn(new PageImpl<>(List.of(order), pageable, 1));
+        when(orderItemRepository.findByOrder_IdIn(List.of(order.getId()))).thenReturn(List.of(item));
+        when(orderMapper.toResponse(order, List.of(item))).thenReturn(response(order));
+
+        PageResponse<OrderResponse> result = service.getOrdersForCurrentStudent(null, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        verify(orderRepository).findByStudent_Id(student.getId(), pageable);
+        verify(orderRepository, never()).findByStudent_IdAndStatus(any(), any(), any());
+    }
+
+    @Test
+    void getOrdersForCurrentStudent_batchesItemsOfEveryOrderInOneQuery() {
+        Order first = paidOrder();
+        Order second = paidOrder();
+        OrderItem firstItem = OrderItem.builder().order(first).course(course).price(course.getPrice()).build();
+        OrderItem secondItem = OrderItem.builder().order(second).course(course).price(course.getPrice()).build();
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(orderRepository.findByStudent_Id(student.getId(), pageable))
+                .thenReturn(new PageImpl<>(List.of(first, second), pageable, 2));
+        when(orderItemRepository.findByOrder_IdIn(List.of(first.getId(), second.getId())))
+                .thenReturn(List.of(firstItem, secondItem));
+        when(orderMapper.toResponse(first, List.of(firstItem))).thenReturn(response(first));
+        when(orderMapper.toResponse(second, List.of(secondItem))).thenReturn(response(second));
+
+        PageResponse<OrderResponse> result = service.getOrdersForCurrentStudent(null, pageable);
+
+        assertEquals(2, result.getTotalElements());
+        verify(orderItemRepository).findByOrder_IdIn(List.of(first.getId(), second.getId()));
+    }
+
+    @Test
+    void getOrdersForCurrentStudent_emptyPage_skipsItemBatchLookup() {
+        PageRequest pageable = PageRequest.of(0, 10);
+        when(orderRepository.findByStudent_IdAndStatus(student.getId(), OrderStatus.REFUNDED, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        PageResponse<OrderResponse> result =
+                service.getOrdersForCurrentStudent(OrderStatus.REFUNDED, pageable);
+
+        assertEquals(0, result.getTotalElements());
+        assertEquals(List.of(), result.getContent());
+        verify(orderItemRepository, never()).findByOrder_IdIn(any());
+    }
+
+    @Test
+    void getOrdersForCurrentStudent_studentProfileMissing_throws() {
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class,
+                () -> service.getOrdersForCurrentStudent(null, PageRequest.of(0, 10)));
+        verify(orderRepository, never()).findByStudent_Id(any(), any());
+    }
+
+    private Order paidOrder() {
+        return Order.builder()
+                .id(UUID.randomUUID())
+                .student(student)
+                .orderCode("OD202608060001")
+                .totalAmount(course.getPrice())
+                .currency("VND")
+                .status(OrderStatus.PAID)
+                .createdAt(Instant.parse("2026-08-06T00:00:00Z"))
+                .build();
+    }
+
+    private OrderResponse response(Order order) {
+        return new OrderResponse(
+                order.getId(),
+                order.getOrderCode(),
+                order.getTotalAmount(),
+                order.getWalletAmount(),
+                order.getCurrency(),
+                order.getStatus().name(),
+                order.getType().name(),
+                order.getCreatedAt(),
+                List.of());
     }
 }
