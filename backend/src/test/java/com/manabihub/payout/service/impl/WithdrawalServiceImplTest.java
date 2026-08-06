@@ -23,7 +23,12 @@ import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.service.WalletService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -89,7 +94,38 @@ class WithdrawalServiceImplTest {
                 .build();
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 58 — createWithdrawalRequest (UC-27 Withdraw Teacher Revenue) — 9 TC
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Sheet 58 - createWithdrawalRequest (UC-27)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class CreateWithdrawal {
+
+    /** Stubs everything a request needs to reach the happy path. */
+    private void stubAcceptedRequest(UUID withdrawalId) {
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(
+                WalletOwnerType.TEACHER, teacherProfileId)).thenReturn(Optional.of(wallet));
+        when(withdrawalRepository.countByTeacherIdAndStatus(
+                teacherProfileId, WithdrawalStatus.PENDING)).thenReturn(0L);
+        when(withdrawalRepository.countByTeacherIdAndCreatedAtAfter(
+                eq(teacherProfileId), any(LocalDateTime.class))).thenReturn(0L);
+        when(securityService.encryptAccountNumber("123456789"))
+                .thenReturn("enc:v1:encrypted-account");
+        when(withdrawalRepository.saveAndFlush(any(WithdrawalRequest.class)))
+                .thenAnswer(invocation -> {
+                    WithdrawalRequest saved = invocation.getArgument(0);
+                    saved.setId(withdrawalId);
+                    return saved;
+                });
+        when(withdrawalMapper.toResponse(any(WithdrawalRequest.class)))
+                .thenReturn(new WithdrawalRequestResponse());
+    }
+
     @Test
+    @Order(1)
+    @DisplayName("UTCID01 (N) - new bank account -> PENDING, balance reserved, finance notified")
     void createWithdrawalRequest_SerializesAndSecuresFinancialRequest() {
         CreateWithdrawalRequest request = newRequest();
         UUID withdrawalId = UUID.randomUUID();
@@ -138,6 +174,8 @@ class WithdrawalServiceImplTest {
     }
 
     @Test
+    @Order(2)
+    @DisplayName("UTCID02 (N) - saved account -> reuses the stored encrypted number")
     void createWithdrawalRequest_WithSavedAccount_UsesOwnedEncryptedAccount() {
         UUID accountId = UUID.randomUUID();
         TeacherBankAccount account = TeacherBankAccount.builder()
@@ -185,6 +223,41 @@ class WithdrawalServiceImplTest {
     }
 
     @Test
+    @Order(3)
+    @DisplayName("UTCID03 (B) - amount 500.000 = exactly the threshold -> accepted")
+    void createWithdrawalRequest_AmountExactlyAtThreshold_IsAccepted() {
+        CreateWithdrawalRequest request = newRequest();
+        request.setAmount(minimumPayout);
+        UUID withdrawalId = UUID.randomUUID();
+        stubAcceptedRequest(withdrawalId);
+
+        withdrawalService.createWithdrawalRequest(userIdString, request);
+
+        verify(otpService).consumeOtp(userIdString, "123456");
+        verify(walletService).reserveBalance(
+                teacherProfileId.toString(), minimumPayout, withdrawalId.toString());
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("UTCID04 (B) - amount 499.999 = threshold - 1 -> PAYOUT_AMOUNT_BELOW_MINIMUM")
+    void createWithdrawalRequest_AmountOneUnitBelowThreshold_IsRejected() {
+        CreateWithdrawalRequest request = newRequest();
+        request.setAmount(minimumPayout.subtract(BigDecimal.ONE));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> withdrawalService.createWithdrawalRequest(userIdString, request)
+        );
+
+        assertEquals(MessageCodes.PAYOUT_AMOUNT_BELOW_MINIMUM, exception.getMessageCode());
+        verifyNoInteractions(otpService, walletService);
+        verify(withdrawalRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("UTCID05 (A) - amount far below the threshold -> OTP is not consumed")
     void createWithdrawalRequest_AmountBelowMinimum_DoesNotConsumeOtp() {
         CreateWithdrawalRequest request = newRequest();
         request.setAmount(new BigDecimal("100000"));
@@ -200,6 +273,8 @@ class WithdrawalServiceImplTest {
     }
 
     @Test
+    @Order(6)
+    @DisplayName("UTCID06 (A) - runtime threshold 700.000 beats the request -> rejected early")
     void createWithdrawalRequest_UsesRuntimePayoutThresholdBeforeOtp() {
         CreateWithdrawalRequest request = newRequest();
         request.setAmount(new BigDecimal("600000"));
@@ -218,6 +293,8 @@ class WithdrawalServiceImplTest {
     }
 
     @Test
+    @Order(7)
+    @DisplayName("UTCID07 (A) - wallet not found -> WALLET_NOT_FOUND, OTP untouched")
     void createWithdrawalRequest_WalletNotFound_DoesNotConsumeOtp() {
         CreateWithdrawalRequest request = newRequest();
         when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherProfileId))
@@ -233,6 +310,60 @@ class WithdrawalServiceImplTest {
     }
 
     @Test
+    @Order(8)
+    @DisplayName("UTCID08 (A) - a PENDING request already exists -> PAYOUT_PENDING_REQUEST_EXISTS")
+    void createWithdrawalRequest_WhenAPendingRequestExists_IsRejected() {
+        CreateWithdrawalRequest request = newRequest();
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(
+                WalletOwnerType.TEACHER, teacherProfileId)).thenReturn(Optional.of(wallet));
+        when(withdrawalRepository.countByTeacherIdAndStatus(
+                teacherProfileId, WithdrawalStatus.PENDING)).thenReturn(1L);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> withdrawalService.createWithdrawalRequest(userIdString, request)
+        );
+
+        assertEquals(MessageCodes.PAYOUT_PENDING_REQUEST_EXISTS, exception.getMessageCode());
+        verifyNoInteractions(otpService, walletService);
+        verify(withdrawalRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("UTCID09 (A) - 2 requests already made this month -> PAYOUT_MONTHLY_LIMIT_EXCEEDED")
+    void createWithdrawalRequest_WhenMonthlyLimitIsReached_IsRejected() {
+        CreateWithdrawalRequest request = newRequest();
+        when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(
+                WalletOwnerType.TEACHER, teacherProfileId)).thenReturn(Optional.of(wallet));
+        when(withdrawalRepository.countByTeacherIdAndStatus(
+                teacherProfileId, WithdrawalStatus.PENDING)).thenReturn(0L);
+        when(withdrawalRepository.countByTeacherIdAndCreatedAtAfter(
+                eq(teacherProfileId), any(LocalDateTime.class))).thenReturn(2L);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> withdrawalService.createWithdrawalRequest(userIdString, request)
+        );
+
+        assertEquals(MessageCodes.PAYOUT_MONTHLY_LIMIT_EXCEEDED, exception.getMessageCode());
+        verifyNoInteractions(otpService, walletService);
+        verify(withdrawalRepository, never()).saveAndFlush(any());
+    }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 59 — cancelWithdrawal (UC-27 Withdraw Teacher Revenue) — 3 TC
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Sheet 59 - cancelWithdrawal (UC-27)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class CancelWithdrawal {
+
+    @Test
+    @Order(1)
+    @DisplayName("UTCID01 (N) - PENDING -> CANCELLED, balance released, teacher notified")
     void cancelWithdrawal_LocksRequestAndNotifiesOnlyRequestingTeacher() {
         UUID withdrawalId = UUID.randomUUID();
         WithdrawalRequest request = WithdrawalRequest.builder()
@@ -259,6 +390,50 @@ class WithdrawalServiceImplTest {
                 null,
                 request.getRequestedAmount()
         );
+    }
+
+    @Test
+    @Order(2)
+    @DisplayName("UTCID02 (A) - request not found for this teacher -> PAYOUT_WITHDRAWAL_NOT_FOUND")
+    void cancelWithdrawal_WhenRequestIsNotFound_IsRejected() {
+        UUID withdrawalId = UUID.randomUUID();
+        when(withdrawalRepository.findByIdAndTeacherIdWithLock(withdrawalId, teacherProfileId))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> withdrawalService.cancelWithdrawal(userIdString, withdrawalId.toString())
+        );
+
+        assertEquals(MessageCodes.PAYOUT_WITHDRAWAL_NOT_FOUND, exception.getMessageCode());
+        verifyNoInteractions(walletService);
+        verify(withdrawalRepository, never()).save(any());
+    }
+
+    @Test
+    @Order(3)
+    @DisplayName("UTCID03 (A) - request already APPROVED -> PAYOUT_CANNOT_CANCEL")
+    void cancelWithdrawal_WhenRequestIsNoLongerPending_IsRejected() {
+        UUID withdrawalId = UUID.randomUUID();
+        WithdrawalRequest request = WithdrawalRequest.builder()
+                .id(withdrawalId)
+                .teacherId(teacherProfileId)
+                .requestedAmount(new BigDecimal("1000000"))
+                .status(WithdrawalStatus.APPROVED)
+                .build();
+        when(withdrawalRepository.findByIdAndTeacherIdWithLock(withdrawalId, teacherProfileId))
+                .thenReturn(Optional.of(request));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> withdrawalService.cancelWithdrawal(userIdString, withdrawalId.toString())
+        );
+
+        assertEquals("PAYOUT_CANNOT_CANCEL", exception.getMessageCode());
+        assertEquals(WithdrawalStatus.APPROVED, request.getStatus());
+        verifyNoInteractions(walletService);
+        verify(withdrawalRepository, never()).save(any());
+    }
     }
 
     private CreateWithdrawalRequest newRequest() {
