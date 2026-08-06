@@ -13,7 +13,11 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.TeacherProfile;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class CourseValidationServiceImplTest {
 
     private static final String THUMBNAIL_URL_ERROR_CODE = "MSG-COURSE-021";
@@ -63,6 +68,8 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    @Order(1)
+    @DisplayName("UTCID01 (N) - thumbnail is an uploaded asset path -> accepted")
     void validateCourse_WhenThumbnailUsesUploadedAssetPath_ShouldAcceptThumbnailUrl() {
         ValidationResultResponse result = validate(
                 "/uploads/course-thumbnails/course-thumbnail-1234.png");
@@ -71,6 +78,8 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    @Order(2)
+    @DisplayName("UTCID02 (N) - thumbnail is an external https URL -> accepted")
     void validateCourse_WhenThumbnailUsesExternalHttpsUrl_ShouldAcceptThumbnailUrl() {
         ValidationResultResponse result = validate(
                 "https://cdn.example.com/course-thumbnail.png");
@@ -79,6 +88,8 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    @Order(5)
+    @DisplayName("UTCID05 (A) - thumbnail is an unknown relative path -> rejected")
     void validateCourse_WhenThumbnailUsesUnknownRelativePath_ShouldRejectThumbnailUrl() {
         ValidationResultResponse result = validate("/images/course-thumbnail.png");
 
@@ -86,6 +97,8 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    @Order(3)
+    @DisplayName("UTCID03 (N) - quiz options as a string array, answer matches -> valid")
     void validateQuizBlock_WhenOptionsAreStringArray_ShouldAcceptMatchingAnswer() {
         List<ValidationError> errors = validateQuizOptions(
                 """
@@ -98,6 +111,8 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    @Order(4)
+    @DisplayName("UTCID04 (N) - quiz options in the legacy object form -> valid")
     void validateQuizBlock_WhenOptionsUseLegacyObjects_ShouldAcceptMatchingAnswer() {
         List<ValidationError> errors = validateQuizOptions(
                 """
@@ -110,6 +125,8 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    @Order(6)
+    @DisplayName("UTCID06 (A) - quiz options JSON is malformed -> validation error")
     void validateQuizBlock_WhenOptionsJsonIsInvalid_ShouldReturnValidationError() {
         List<ValidationError> errors = validateQuizOptions("[invalid-json", "answer");
 
@@ -118,6 +135,8 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    @Order(7)
+    @DisplayName("UTCID07 (A) - quiz options missing -> validation error")
     void validateQuizBlock_WhenOptionsAreMissing_ShouldReturnValidationError() {
         List<ValidationError> errors = validateQuizOptions(null, "answer");
 
@@ -126,6 +145,8 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    @Order(8)
+    @DisplayName("UTCID08 (A) - course has no module -> rejected")
     void validateHierarchy_WhenCourseHasNoModules_ShouldRejectCourse() {
         Course course = Course.builder()
                 .id(courseId)
@@ -145,6 +166,8 @@ class CourseValidationServiceImplTest {
     }
 
     @Test
+    @Order(9)
+    @DisplayName("UTCID09 (A) - flashcard JSON is malformed -> validation error")
     void validateFlashcardBlock_WhenJsonIsInvalid_ShouldReturnValidationError() {
         LessonBlock block = LessonBlock.builder()
                 .id(UUID.randomUUID())
