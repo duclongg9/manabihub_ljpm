@@ -168,6 +168,18 @@ class WalletTransactionServiceImplTest {
         verify(orderRepository, never()).findIdsByStudentIdAndOrderCodeLike(any(), any());
     }
 
+    @Test
+    void getStudentTransactions_studentProfileMissing_throws() {
+        UUID strangerUserId = UUID.randomUUID();
+        when(studentProfileRepository.findByUser_Id(strangerUserId)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.getStudentTransactions(strangerUserId, null, PageRequest.of(0, 20)));
+
+        assertEquals(MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND, exception.getMessageCode());
+        verify(walletTransactionRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+    }
+
     // ──────────────────────────────────────────────
     // Detail / ownership
     // ──────────────────────────────────────────────
