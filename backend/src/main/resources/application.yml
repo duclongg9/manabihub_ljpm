@@ -35,6 +35,9 @@ management:
 manabihub:
   kyc:
     identity-secret: ${KYC_IDENTITY_SECRET:}
+    # SERVER is the production-safe default. DIRECT_SDK_MOCK is an explicit
+    # demo/UAT mode that uses the browser SDK result plus the synthetic registry.
+    identity-verification-mode: ${KYC_IDENTITY_VERIFICATION_MODE:server}
   payout:
     security-secret: ${PAYOUT_SECURITY_SECRET:}
   ai:

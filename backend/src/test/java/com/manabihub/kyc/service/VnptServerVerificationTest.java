@@ -14,6 +14,7 @@ import com.manabihub.kyc.port.VnptVerificationPort;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.notification.service.NotificationService;
@@ -63,6 +64,7 @@ class VnptServerVerificationTest {
     @Mock private PublicJwtTokenService publicJwtTokenService;
     @Mock private VnptVerificationPort vnptVerificationPort;
     @Mock private com.manabihub.audit.service.SecurityAuditService securityAuditService;
+    @Mock private MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
     @Mock private EntityManager entityManager;
 
     private VnptVerificationCoordinator coordinator;
@@ -99,9 +101,11 @@ class VnptServerVerificationTest {
                 publicJwtTokenService,
                 vnptVerificationPort,
                 securityAuditService,
+                mockNationalIdRegistryRepository,
                 entityManager,
                 coordinator,
-                "storage/kyc"
+                "storage/kyc",
+                "server"
         );
         lenient().when(selfProvider.getObject()).thenReturn(service);
 
