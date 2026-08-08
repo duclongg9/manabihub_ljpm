@@ -1160,7 +1160,9 @@ public class TeacherKycService {
         }
 
         List<ResultEntry> entries = flattenResult(sdkResult);
-        boolean hasExplicitInvalid = entries.stream().anyMatch(this::isExplicitInvalidValue);
+        boolean hasInvalidProviderSignal = entries.stream().anyMatch(this::isExplicitInvalidValue)
+                || hasNonEmptyCollection(entries, "generalwarning", "warning")
+                || hasAffirmativeSignal(entries, "masked");
         Map<String, String> identityOcr = extractIdentityOcr(entries);
         boolean hasRequiredOcr = StringUtils.hasText(identityOcr.get("idNumber"))
                 && StringUtils.hasText(identityOcr.get("fullName"))
@@ -1168,7 +1170,7 @@ public class TeacherKycService {
         boolean hasFaceVerification = hasAcceptedFaceVerification(entries);
 
         java.util.ArrayList<String> failureReasons = new java.util.ArrayList<>();
-        if (hasExplicitInvalid) {
+        if (hasInvalidProviderSignal) {
             failureReasons.add("VNPT validation returned invalid document, mismatch, failed, or null result");
         }
         if (!hasRequiredOcr) {
@@ -1214,12 +1216,7 @@ public class TeacherKycService {
         String normalizedKey = normalizeKey(key);
 
         if (isDecisionKey(key) && value instanceof Boolean booleanValue) {
-            boolean isNegativeKey = normalizedKey.contains("fake")
-                    || normalizedKey.contains("spoof")
-                    || normalizedKey.contains("tamper")
-                    || normalizedKey.contains("multiple")
-                    || normalizedKey.contains("warning")
-                    || normalizedKey.contains("swapping");
+            boolean isNegativeKey = isNegativeDecisionKey(normalizedKey);
             if (isNegativeKey) {
                 if (booleanValue) return true; // Fake is true -> Invalid
             } else {
@@ -1227,12 +1224,12 @@ public class TeacherKycService {
             }
         }
 
-        if (isVerificationScoreKey(key) && value instanceof Number numberValue) {
-            return !isAcceptedScore(numberValue.doubleValue());
+        if (isNegativeDecisionKey(normalizedKey) && isAffirmativeFlagValue(value)) {
+            return true;
         }
 
         if (isDecisionKey(key) && value instanceof String text) {
-            String normalized = normalizeSearchText(text);
+            String normalized = normalizeSearchText(text).trim();
             return normalized.contains("khong hop le")
                     || normalized.contains("khong cung loai")
                     || normalized.contains("khong trung khop")
@@ -1251,6 +1248,74 @@ public class TeacherKycService {
                     || normalized.contains("null%");
         }
 
+        return false;
+    }
+
+    private boolean isNegativeDecisionKey(String normalizedKey) {
+        return normalizedKey.contains("fake")
+                || normalizedKey.contains("spoof")
+                || normalizedKey.contains("tamper")
+                || normalizedKey.contains("multiple")
+                || normalizedKey.contains("warning")
+                || normalizedKey.contains("swapping");
+    }
+
+    private boolean hasNonEmptyCollection(List<ResultEntry> entries, String... aliases) {
+        Set<String> normalizedAliases = java.util.Arrays.stream(aliases)
+                .map(this::normalizeKey)
+                .collect(java.util.stream.Collectors.toSet());
+
+        return entries.stream()
+                .filter(entry -> normalizedAliases.contains(normalizeKey(lastPathSegment(entry.key()))))
+                .map(ResultEntry::value)
+                .anyMatch(value -> {
+                    if (value instanceof Iterable<?> iterable) {
+                        return iterable.iterator().hasNext();
+                    }
+                    return value != null && value.getClass().isArray()
+                            && java.lang.reflect.Array.getLength(value) > 0;
+                });
+    }
+
+    private boolean hasAffirmativeSignal(List<ResultEntry> entries, String... aliases) {
+        Set<String> normalizedAliases = java.util.Arrays.stream(aliases)
+                .map(this::normalizeKey)
+                .collect(java.util.stream.Collectors.toSet());
+
+        return entries.stream()
+                .filter(entry -> normalizedAliases.contains(normalizeKey(lastPathSegment(entry.key()))))
+                .anyMatch(entry -> isAffirmativeValue(entry.value()));
+    }
+
+    private boolean isAffirmativeValue(Object value) {
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+        if (value instanceof Number numberValue) {
+            return numberValue.doubleValue() > 0.0D;
+        }
+        if (value instanceof String text) {
+            String normalized = normalizeSearchText(text).trim();
+            return normalized.equals("true")
+                    || normalized.equals("yes")
+                    || normalized.equals("1")
+                    || normalized.equals("co")
+                    || normalized.equals("có");
+        }
+        return false;
+    }
+
+    private boolean isAffirmativeFlagValue(Object value) {
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+        if (value instanceof String text) {
+            String normalized = normalizeSearchText(text).trim();
+            return normalized.equals("true")
+                    || normalized.equals("yes")
+                    || normalized.equals("1")
+                    || normalized.equals("co");
+        }
         return false;
     }
 
