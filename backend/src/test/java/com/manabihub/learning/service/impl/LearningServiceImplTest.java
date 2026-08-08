@@ -721,6 +721,68 @@ class LearningServiceImplTest {
     // --- Writing Assignment & AI Tests ---
 
     @Test
+    @DisplayName("saveWritingDraft creates a DRAFT without completing the lesson")
+    void testSaveWritingDraftCreatesDraft() {
+        UUID writingBlockId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId)
+                .type(LessonBlockType.WRITING)
+                .title("Writing")
+                .module(courseModule)
+                .build();
+
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        mockActiveEnrollment();
+        when(writingSubmissionRepository.findByEnrollmentIdAndLessonBlockIdForUpdate(enrollmentId, writingBlockId))
+                .thenReturn(Optional.empty());
+        when(writingSubmissionRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = learningService.saveWritingDraft(
+                writingBlockId,
+                new com.manabihub.writing.dto.request.WritingDraftRequest("draft content"));
+
+        assertEquals(com.manabihub.writing.enums.WritingSubmissionStatus.DRAFT, response.status());
+        assertEquals("draft content", response.content());
+        verify(lessonBlockProgressRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("submitWriting promotes an existing DRAFT instead of inserting a duplicate row")
+    void testSubmitWritingPromotesExistingDraft() {
+        UUID writingBlockId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId)
+                .type(LessonBlockType.WRITING)
+                .title("Writing")
+                .module(courseModule)
+                .build();
+        var draft = com.manabihub.writing.entity.WritingSubmission.builder()
+                .id(UUID.randomUUID())
+                .enrollment(enrollment)
+                .student(studentProfile)
+                .lessonBlockId(writingBlockId)
+                .content("old draft")
+                .status(com.manabihub.writing.enums.WritingSubmissionStatus.DRAFT)
+                .submittedAt(Instant.now())
+                .build();
+
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        mockActiveEnrollment();
+        when(writingSubmissionRepository.findByEnrollmentIdAndLessonBlockIdForUpdate(enrollmentId, writingBlockId))
+                .thenReturn(Optional.of(draft));
+        when(writingSubmissionRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = learningService.submitWriting(
+                writingBlockId,
+                new com.manabihub.writing.dto.request.WritingSubmissionRequest("final content"));
+
+        assertEquals(com.manabihub.writing.enums.WritingSubmissionStatus.SUBMITTED, response.status());
+        assertEquals("final content", response.content());
+        verify(writingSubmissionRepository).saveAndFlush(draft);
+        verify(lessonBlockProgressRepository).save(any());
+    }
+
+    @Test
     @DisplayName("getWritingSubmission returns distinct non-official AI suggestion and official teacher feedback")
     void testGetWritingSubmission_ReturnsBothFeedbackSources() {
         UUID writingBlockId = UUID.randomUUID();

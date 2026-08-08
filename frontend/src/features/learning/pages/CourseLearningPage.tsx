@@ -55,8 +55,49 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
+import {
+  isClipboardShortcut,
+  isSingleCharacterMutation,
+  readLocalStorageValue,
+  removeLocalStorageValue,
+  writeLocalStorageValue,
+} from '../utils/learningInputGuard';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
+const COURSE_SELECTION_STORAGE_PREFIX = 'manabihub:course-selection:';
+const WRITING_DRAFT_STORAGE_PREFIX = 'manabihub:writing-draft:';
+const QUIZ_ANSWERS_STORAGE_PREFIX = 'manabihub:quiz-answers:';
+const FINAL_TEST_STORAGE_PREFIX = 'manabihub:final-test:';
+
+interface LocalWritingDraft {
+  content: string;
+  savedAt: number;
+}
+
+function publicStorageScope() {
+  return getAuthSession('public')?.subject ?? 'anonymous';
+}
+
+function courseSelectionStorageKey(courseId: string) {
+  return `${COURSE_SELECTION_STORAGE_PREFIX}${publicStorageScope()}:${courseId}`;
+}
+
+function writingDraftStorageKey(blockId: string) {
+  return `${WRITING_DRAFT_STORAGE_PREFIX}${publicStorageScope()}:${blockId}`;
+}
+
+function quizAnswersStorageKey(blockId: string) {
+  return `${QUIZ_ANSWERS_STORAGE_PREFIX}${publicStorageScope()}:${blockId}`;
+}
+
+function finalTestStorageKey(courseId: string) {
+  return `${FINAL_TEST_STORAGE_PREFIX}${publicStorageScope()}:${courseId}`;
+}
+
+interface LocalFinalTestState {
+  attempt: FinalTestAttempt;
+  answers: Record<string, string[]>;
+}
 
 export function CourseLearningPage() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -80,7 +121,13 @@ export function CourseLearningPage() {
       .then((data) => {
         if (!active) return;
         setLearning(data);
-        setSelectedBlockId(data.currentLessonBlockId ?? data.modules[0]?.blocks[0]?.id ?? null);
+        const availableBlockIds = new Set(data.modules.flatMap((module) => module.blocks.map((block) => block.id)));
+        const savedBlockId = readLocalStorageValue<string>(courseSelectionStorageKey(data.courseId));
+        setSelectedBlockId(
+          savedBlockId && availableBlockIds.has(savedBlockId)
+            ? savedBlockId
+            : data.currentLessonBlockId ?? data.modules[0]?.blocks[0]?.id ?? null,
+        );
       })
       .catch((err) => {
         if (!active) return;
@@ -99,6 +146,11 @@ export function CourseLearningPage() {
       active = false;
     };
   }, [courseId, navigate]);
+
+  useEffect(() => {
+    if (!courseId || !selectedBlockId) return;
+    writeLocalStorageValue(courseSelectionStorageKey(courseId), selectedBlockId);
+  }, [courseId, selectedBlockId]);
 
   const allBlocks = useMemo(
     () => (learning ? learning.modules.flatMap((module) => module.blocks) : []),
@@ -602,10 +654,21 @@ function QuizBlock({
   questions: QuizQuestion[];
   onProgressSaved: BlockContentProps['onQuizProgressSaved'];
 }) {
-  const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ''));
+  const [answers, setAnswers] = useState<string[]>(() => {
+    const savedAnswers = readLocalStorageValue<unknown>(quizAnswersStorageKey(blockId));
+    if (Array.isArray(savedAnswers) && savedAnswers.length === questions.length) {
+      return savedAnswers.map((answer) => typeof answer === 'string' ? answer : '');
+    }
+    return questions.map(() => '');
+  });
   const [result, setResult] = useState<QuizSubmissionResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (result) return;
+    writeLocalStorageValue(quizAnswersStorageKey(blockId), answers);
+  }, [answers, blockId, result]);
 
   if (questions.length === 0) {
     return <Alert severity="info">Bài trắc nghiệm chưa có câu hỏi.</Alert>;
@@ -618,6 +681,7 @@ function QuizBlock({
     try {
       const nextResult = await learningService.submitQuiz(blockId, answers);
       setResult(nextResult);
+      removeLocalStorageValue(quizAnswersStorageKey(blockId));
       onProgressSaved(blockId, nextResult.progressStatus);
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -715,8 +779,14 @@ function FinalTestPanel({
   const [eligibility, setEligibility] = useState<FinalTestEligibility | null>(null);
   const [progressSummary, setProgressSummary] = useState<CourseProgressSummary | null>(null);
   const [certificate, setCertificate] = useState<LearningCertificate | null>(null);
-  const [attempt, setAttempt] = useState<FinalTestAttempt | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [attempt, setAttempt] = useState<FinalTestAttempt | null>(() => {
+    const saved = readLocalStorageValue<LocalFinalTestState>(finalTestStorageKey(courseId));
+    return saved?.attempt ?? null;
+  });
+  const [answers, setAnswers] = useState<Record<string, string[]>>(() => {
+    const saved = readLocalStorageValue<LocalFinalTestState>(finalTestStorageKey(courseId));
+    return saved?.answers ?? {};
+  });
   const [result, setResult] = useState<FinalTestSubmissionResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -733,6 +803,11 @@ function FinalTestPanel({
       setEligibility(finalTestValue);
       setProgressSummary(progressValue);
       setCertificate(certificateValue);
+      if (!finalTestValue.eligible || finalTestValue.passed) {
+        setAttempt(null);
+        setAnswers({});
+        removeLocalStorageValue(finalTestStorageKey(courseId));
+      }
     } catch {
       setErrorMsg('Không thể kiểm tra điều kiện làm Final Test.');
     } finally {
@@ -761,8 +836,19 @@ function FinalTestPanel({
 
     setErrorMsg('Lượt thi đã hết thời gian. Hãy bắt đầu lượt tiếp theo nếu vẫn còn lượt.');
     setAttempt(null);
+    setAnswers({});
+    removeLocalStorageValue(finalTestStorageKey(courseId));
     void loadEligibility();
-  }, [attempt, loadEligibility, result, secondsLeft]);
+  }, [attempt, courseId, loadEligibility, result, secondsLeft]);
+
+  useEffect(() => {
+    if (!attempt || result) {
+      removeLocalStorageValue(finalTestStorageKey(courseId));
+      return;
+    }
+    if (new Date(attempt.expiresAt).getTime() <= Date.now()) return;
+    writeLocalStorageValue(finalTestStorageKey(courseId), { attempt, answers } satisfies LocalFinalTestState);
+  }, [answers, attempt, courseId, result]);
 
   const handleStart = async () => {
     setWorking(true);
@@ -811,6 +897,7 @@ function FinalTestPanel({
         })),
       );
       setResult(value);
+      removeLocalStorageValue(finalTestStorageKey(courseId));
       await loadEligibility();
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -1248,27 +1335,114 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [aiRequesting, setAiRequesting] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftSaveState, setDraftSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const acceptedContentRef = useRef('');
+  const latestContentRef = useRef('');
+  const draftSaveQueueRef = useRef(Promise.resolve());
+  const composingRef = useRef(false);
+
+  const draftKey = writingDraftStorageKey(block.id);
+  const submissionStatus = submission?.status;
 
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setDraftReady(false);
+    setSubmission(null);
+    setContent('');
+    acceptedContentRef.current = '';
+    latestContentRef.current = '';
+    setDraftSaveState('idle');
     learningService
       .getWritingSubmission(block.id)
       .then((data) => {
         if (!active) return;
+        const localDraft = readLocalStorageValue<LocalWritingDraft>(draftKey);
+
+        if (data && data.status !== 'DRAFT') {
+          removeLocalStorageValue(draftKey);
+          setSubmission(data);
+          return;
+        }
+
+        const restoredContent = localDraft?.content ?? data?.content ?? '';
         setSubmission(data);
+        setContent(restoredContent);
+        acceptedContentRef.current = restoredContent;
+        latestContentRef.current = restoredContent;
       })
       .catch((err) => {
         if (!active) return;
         console.error('Fetch submission error', err);
+        const localDraft = readLocalStorageValue<LocalWritingDraft>(draftKey);
+        const restoredContent = localDraft?.content ?? '';
+        setContent(restoredContent);
+        acceptedContentRef.current = restoredContent;
+        latestContentRef.current = restoredContent;
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setDraftReady(true);
+          setLoading(false);
+        }
       });
     return () => {
       active = false;
     };
-  }, [block.id]);
+  }, [block.id, draftKey]);
+
+  useEffect(() => {
+    latestContentRef.current = content;
+    if (!draftReady || submission?.status !== 'DRAFT' && submission?.status !== undefined) return;
+
+    if (content.trim()) {
+      writeLocalStorageValue(draftKey, { content, savedAt: Date.now() } satisfies LocalWritingDraft);
+    } else {
+      removeLocalStorageValue(draftKey);
+    }
+  }, [content, draftKey, draftReady, submission?.status]);
+
+  useEffect(() => {
+    if (!draftReady || !content.trim() || (submissionStatus && submissionStatus !== 'DRAFT')) return;
+
+    setDraftSaveState('saving');
+    const contentToSave = content;
+    const timer = window.setTimeout(() => {
+      draftSaveQueueRef.current = draftSaveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (latestContentRef.current !== contentToSave) return;
+          try {
+            const savedDraft = await learningService.saveWritingDraft(block.id, contentToSave);
+            if (latestContentRef.current === contentToSave) {
+              setSubmission(savedDraft);
+              setDraftSaveState('saved');
+            }
+          } catch {
+            if (latestContentRef.current === contentToSave) setDraftSaveState('failed');
+          }
+        });
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [block.id, content, draftReady, submissionStatus]);
+
+  const handleContentChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const nextContent = event.target.value;
+    if (composingRef.current || isSingleCharacterMutation(acceptedContentRef.current, nextContent)) {
+      acceptedContentRef.current = nextContent;
+      setContent(nextContent);
+    }
+  };
+
+  const blockClipboardAction = (event: React.ClipboardEvent | React.DragEvent | React.MouseEvent) => {
+    event.preventDefault();
+  };
+
+  const handleWritingKeyDown = (event: React.KeyboardEvent) => {
+    if (isClipboardShortcut(event)) event.preventDefault();
+  };
 
   const handleSubmit = async () => {
     if (!content.trim() || content.length > 10000) return;
@@ -1277,6 +1451,8 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
     try {
       const data = await learningService.submitWriting(block.id, content);
       setSubmission(data);
+      removeLocalStorageValue(draftKey);
+      setDraftSaveState('saved');
       onProgressSaved(); // mark COMPLETED
     } catch (err) {
       if (axios.isAxiosError(err)) {
@@ -1288,6 +1464,8 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
       setSubmitting(false);
     }
   };
+
+  const submittedSubmission = submission && submission.status !== 'DRAFT' ? submission : null;
 
   const handleRequestAi = async () => {
     if (!submission) return;
@@ -1332,7 +1510,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
 
       {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
 
-      {!submission ? (
+      {!submittedSubmission ? (
         <Stack spacing={2}>
           <TextField
             multiline
@@ -1341,11 +1519,30 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
             fullWidth
             placeholder="Viết câu trả lời của bạn ở đây..."
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
+            onKeyDown={handleWritingKeyDown}
+            onCopy={blockClipboardAction}
+            onCut={blockClipboardAction}
+            onPaste={blockClipboardAction}
+            onDrop={blockClipboardAction}
+            onDragStart={blockClipboardAction}
+            onContextMenu={blockClipboardAction}
+            onCompositionStart={() => { composingRef.current = true; }}
+            onCompositionEnd={(event) => {
+              composingRef.current = false;
+              const composedContent = (event.target as HTMLTextAreaElement).value;
+              acceptedContentRef.current = composedContent;
+              setContent(composedContent);
+            }}
             disabled={submitting}
             error={content.length > 10000}
             helperText={content.length > 10000 ? 'Bài viết quá dài (tối đa 10,000 ký tự).' : `${content.length}/10,000`}
           />
+          <Typography variant="caption" color={draftSaveState === 'failed' ? 'error.main' : 'text.secondary'}>
+            {draftSaveState === 'saving' && 'Đang tự động lưu nháp...'}
+            {draftSaveState === 'saved' && 'Đã lưu nháp an toàn.'}
+            {draftSaveState === 'failed' && 'Chưa đồng bộ được lên máy chủ; bản lưu trên thiết bị vẫn còn.'}
+          </Typography>
           <Box>
             <Button
               variant="contained"
@@ -1364,7 +1561,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                 Bài làm của bạn (đã nộp)
               </Typography>
               <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                {submission.content}
+                {submittedSubmission.content}
               </Typography>
             </CardContent>
           </Card>
@@ -1375,14 +1572,14 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
               Gợi ý từ AI
             </Typography>
 
-            {submission.status === 'SUGGESTION_PROCESSING' ? (
+            {submittedSubmission.status === 'SUGGESTION_PROCESSING' ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Typography variant="body2" color="text.secondary">
                   AI đang phân tích bài viết của bạn. Vui lòng đợi trong giây lát...
                 </Typography>
                 <CircularProgress size={24} />
               </Stack>
-            ) : !submission.aiSuggestion ? (
+            ) : !submittedSubmission.aiSuggestion ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Typography variant="body2" color="text.secondary">
                   Bạn có thể yêu cầu AI hỗ trợ nhận xét sơ bộ và đưa ra gợi ý cải thiện cho bài viết của mình.
@@ -1395,7 +1592,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   {aiRequesting ? 'Đang phân tích...' : 'Yêu cầu AI hỗ trợ'}
                 </Button>
               </Stack>
-            ) : submission.aiSuggestion.status === 'FAILED' ? (
+            ) : submittedSubmission.aiSuggestion.status === 'FAILED' ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Alert severity="error">Phân tích bằng AI thất bại. Bạn có muốn thử lại?</Alert>
                 <Button variant="outlined" onClick={handleRequestAi} disabled={aiRequesting}>
@@ -1410,18 +1607,18 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   </Typography>
                 </Alert>
 
-                {submission.aiSuggestion.revisionGuidance && (
+                {submittedSubmission.aiSuggestion.revisionGuidance && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Nhận xét sơ bộ</Typography>
-                    <Typography variant="body2">{submission.aiSuggestion.revisionGuidance}</Typography>
+                    <Typography variant="body2">{submittedSubmission.aiSuggestion.revisionGuidance}</Typography>
                   </Box>
                 )}
 
-                {submission.aiSuggestion.grammarSuggestions?.length > 0 && (
+                {submittedSubmission.aiSuggestion.grammarSuggestions?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Ngữ pháp</Typography>
                     <List dense>
-                      {submission.aiSuggestion.grammarSuggestions.map((item, i) => (
+                      {submittedSubmission.aiSuggestion.grammarSuggestions.map((item, i) => (
                         <ListItem key={i} disableGutters>
                           <ListItemText
                             primary={
@@ -1438,11 +1635,11 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   </Box>
                 )}
 
-                {submission.aiSuggestion.vocabularySuggestions?.length > 0 && (
+                {submittedSubmission.aiSuggestion.vocabularySuggestions?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Từ vựng</Typography>
                     <List dense>
-                      {submission.aiSuggestion.vocabularySuggestions.map((item, i) => (
+                      {submittedSubmission.aiSuggestion.vocabularySuggestions.map((item, i) => (
                         <ListItem key={i} disableGutters>
                           <ListItemText
                             primary={
@@ -1458,11 +1655,11 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   </Box>
                 )}
 
-                {submission.aiSuggestion.structureSuggestions?.length > 0 && (
+                {submittedSubmission.aiSuggestion.structureSuggestions?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Cấu trúc & Mạch văn</Typography>
                     <List dense>
-                      {submission.aiSuggestion.structureSuggestions.map((item, i) => (
+                      {submittedSubmission.aiSuggestion.structureSuggestions.map((item, i) => (
                         <ListItem key={i} disableGutters>
                           <ListItemText
                             primary={<Typography variant="body2">Vấn đề: {item.issue}</Typography>}
@@ -1483,24 +1680,24 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
               <SchoolOutlinedIcon color="primary" />
               <Typography variant="h6">Đánh giá chính thức từ giáo viên</Typography>
-              {submission.teacherFeedback?.official && (
+              {submittedSubmission.teacherFeedback?.official && (
                 <Chip label="Chính thức" size="small" color="primary" variant="outlined" />
               )}
             </Stack>
 
-            {!submission.teacherFeedback ? (
+            {!submittedSubmission.teacherFeedback ? (
               <Typography variant="body2" color="text.secondary">
                 Giáo viên chưa gửi đánh giá chính thức cho bài viết này.
               </Typography>
             ) : (
               <Paper variant="outlined" sx={{ p: 2, borderLeft: 4, borderLeftColor: 'primary.main' }}>
-                {submission.teacherFeedback.score != null && (
+                {submittedSubmission.teacherFeedback.score != null && (
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                    Điểm: {submission.teacherFeedback.score}
+                    Điểm: {submittedSubmission.teacherFeedback.score}
                   </Typography>
                 )}
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {submission.teacherFeedback.comment || 'Giáo viên chưa để lại nhận xét.'}
+                  {submittedSubmission.teacherFeedback.comment || 'Giáo viên chưa để lại nhận xét.'}
                 </Typography>
               </Paper>
             )}
