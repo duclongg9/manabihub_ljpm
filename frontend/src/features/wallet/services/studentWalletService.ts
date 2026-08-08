@@ -52,10 +52,10 @@ export async function getStudentWalletTransactionDetail(
   return response.data.data;
 }
 
-export async function getStudentWithdrawals(): Promise<PageResponse<StudentWithdrawal>> {
+export async function getStudentWithdrawals(page: number = 0, size: number = 10): Promise<PageResponse<StudentWithdrawal>> {
   const response = await axiosClient.get<ApiResponse<PageResponse<StudentWithdrawal>>>(
     ENDPOINTS.student.withdrawals,
-    { params: { page: 0, size: 100, sort: 'requestedAt,desc' } },
+    { params: { page, size, sort: 'requestedAt,desc' } },
   );
   return response.data.data;
 }
