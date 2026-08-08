@@ -1056,11 +1056,12 @@ public class TeacherKycService {
     private boolean isExplicitInvalidValue(ResultEntry entry) {
         Object value = entry.value();
         String key = entry.key();
+        String normalizedKey = normalizeKey(key);
 
-        if (isValidationKey(key) && value instanceof Boolean booleanValue) {
-            String normalizedKey = normalizeKey(key);
+        if (isDecisionKey(key) && value instanceof Boolean booleanValue) {
             boolean isNegativeKey = normalizedKey.contains("fake")
                     || normalizedKey.contains("spoof")
+                    || normalizedKey.contains("tamper")
                     || normalizedKey.contains("multiple")
                     || normalizedKey.contains("warning")
                     || normalizedKey.contains("swapping");
@@ -1071,7 +1072,11 @@ public class TeacherKycService {
             }
         }
 
-        if (value instanceof String text) {
+        if (isVerificationScoreKey(key) && value instanceof Number numberValue) {
+            return !isAcceptedScore(numberValue.doubleValue());
+        }
+
+        if (isDecisionKey(key) && value instanceof String text) {
             String normalized = normalizeSearchText(text);
             return normalized.contains("khong hop le")
                     || normalized.contains("khong cung loai")
@@ -1107,18 +1112,26 @@ public class TeacherKycService {
         Object value = entry.value();
         String key = entry.key();
 
-        if (isValidationKey(key) && value instanceof Boolean booleanValue) {
+        if (isDecisionKey(key) && value instanceof Boolean booleanValue) {
             return booleanValue;
         }
 
-        if (value instanceof Number numberValue && isFaceVerificationKey(key)) {
-            return numberValue.doubleValue() >= 80.0D;
+        if (value instanceof Number numberValue && isVerificationScoreKey(key)) {
+            return isAcceptedScore(numberValue.doubleValue());
         }
 
         if (value instanceof String text) {
             String normalized = normalizeSearchText(text);
-            if (isFaceVerificationKey(key) && normalized.matches(".*\\b(8\\d|9\\d|100)(\\.\\d+)?\\s*%?.*")) {
-                return true;
+            if (isVerificationScoreKey(key)) {
+                if (normalized.matches(".*\\b(8\\d|9\\d|100)(\\.\\d+)?\\s*%?.*")) {
+                    return true;
+                }
+
+                try {
+                    return isAcceptedScore(Double.parseDouble(normalized.replace("%", "").trim()));
+                } catch (NumberFormatException ignored) {
+                    // Fall through to the textual success values below.
+                }
             }
 
             return normalized.equals("valid")
@@ -1132,6 +1145,33 @@ public class TeacherKycService {
         }
 
         return false;
+    }
+
+    private boolean isDecisionKey(String key) {
+        String normalizedKey = normalizeKey(key);
+        return isValidationKey(key)
+                || normalizedKey.endsWith("msg")
+                || normalizedKey.endsWith("message")
+                || normalizedKey.contains("fake")
+                || normalizedKey.contains("spoof")
+                || normalizedKey.contains("tamper");
+    }
+
+    private boolean isScoreKey(String key) {
+        String normalizedKey = normalizeKey(key);
+        return normalizedKey.contains("prob")
+                || normalizedKey.contains("score")
+                || normalizedKey.contains("similarity")
+                || normalizedKey.contains("confidence")
+                || normalizedKey.contains("percentage");
+    }
+
+    private boolean isVerificationScoreKey(String key) {
+        return isFaceVerificationKey(key) && isScoreKey(key);
+    }
+
+    private boolean isAcceptedScore(double value) {
+        return (value >= 0.0D && value <= 1.0D && value >= 0.8D) || value >= 80.0D;
     }
 
     private Map<String, String> extractIdentityOcr(List<ResultEntry> entries) {
@@ -1161,7 +1201,8 @@ public class TeacherKycService {
                 .filter(StringUtils::hasText)
                 .findFirst()
                 .orElseGet(() -> entries.stream()
-                        .filter(entry -> normalizedAliases.stream().anyMatch(alias -> normalizeKey(entry.key()).endsWith(alias)))
+                        .filter(entry -> normalizedAliases.stream()
+                                .anyMatch(alias -> alias.length() > 2 && normalizeKey(entry.key()).endsWith(alias)))
                         .map(entry -> displayScalar(entry.value()))
                         .filter(StringUtils::hasText)
                         .findFirst()
