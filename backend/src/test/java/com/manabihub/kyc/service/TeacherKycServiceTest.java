@@ -216,6 +216,54 @@ class TeacherKycServiceTest {
         assertEquals("VERIFIED", response.request().identityStatus());
         verify(verificationCoordinator).orchestrate(eq(user.getId()), any(), any(), eq("127.0.0.1"), eq("JUnit"));
     }
+
+    @Test
+    void verifyIdentity_acceptsRealVnptNestedCallbackPayload() {
+        when(teacherProfileRepository.findById(teacher.getId())).thenReturn(Optional.of(teacher));
+        KycRequest mockRequest = new KycRequest();
+        mockRequest.setId(UUID.randomUUID());
+        mockRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
+        mockRequest.setEkycProvider("VNPT_EKYC_WEB_SDK");
+        when(kycRequestRepository.findById(mockRequest.getId())).thenReturn(Optional.of(mockRequest));
+        when(verificationCoordinator.orchestrate(any(), any(), any(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    VnptSdkDecision decision = invocation.getArgument(2);
+                    assertTrue(decision.verified());
+                    assertEquals("0272400402711", decision.identityOcr().get("idNumber"));
+                    assertEquals("NGUYEN XUAN DAT", decision.identityOcr().get("fullName"));
+                    assertEquals("31/08/2004", decision.identityOcr().get("dateOfBirth"));
+                    return new VnptVerificationCoordinator.VerificationOutcome(
+                            mockRequest.getId(), teacher.getId(), user.getId(), IdentityVerificationStatus.VERIFIED, true
+                    );
+                });
+
+        Map<String, Object> sdkResult = Map.of(
+                "type_document", 9,
+                "ocr", Map.of("object", Map.of(
+                        "back_type_id", 9,
+                        "id", "0272400402711",
+                        "name", "NGUYEN XUAN DAT",
+                        "birth_day", "31/08/2004",
+                        "quality_front", Map.of("blur_score", 0.2D, "bright_spot_score", 0.1D),
+                        "general_warning", List.of()
+                )),
+                "liveness_card_front", Map.of("object", Map.of("liveness", "success")),
+                "liveness_card_back", Map.of("object", Map.of("liveness", "success")),
+                "liveness_face", Map.of("object", Map.of("liveness", "success")),
+                "compare", Map.of("object", Map.of("result", "", "prob", 0.9778D)),
+                "masked", Map.of("object", Map.of("masked", "false"))
+        );
+
+        var response = teacherKycService.verifyIdentity(
+                user.getId(),
+                new KycIdentityVerificationRequest("session", "transaction", sdkResult),
+                "127.0.0.1",
+                "JUnit"
+        );
+
+        assertEquals("VERIFIED", response.request().identityStatus());
+    }
+
     @Test
     void submitCertificate_entersManualReviewAndGrantsTeacherWorkspace() {
         prepareCertificateSubmission();
