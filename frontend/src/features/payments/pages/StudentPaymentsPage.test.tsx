@@ -23,6 +23,22 @@ vi.mock('../../refunds/hooks/useStudentRefunds', () => ({
   })),
 }));
 
+vi.mock('../../wallet/services/studentWalletService', () => ({
+  getStudentWallet: vi.fn(() => Promise.resolve({
+    availableBalance: 500000,
+    availableWithdrawableBalance: 500000,
+    escrowBalance: 0,
+    currency: 'VND',
+  })),
+  getStudentWithdrawals: vi.fn(() => Promise.resolve({
+    content: [],
+    page: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+  })),
+}));
+
 vi.mock('../../help-center/hooks/useCommercialPolicy', () => ({
   useCommercialPolicy: vi.fn(() => ({
     data: {
@@ -98,7 +114,7 @@ describe('StudentPaymentsPage', () => {
     expect(screen.getByRole('button', { name: /Yêu cầu hoàn tiền/i })).toBeInTheDocument();
   });
 
-  it('renders the top-up amount instead of a missing-course fallback', () => {
+  it('filters out top-up orders from course order history', () => {
     vi.mocked(useOrderHistory).mockReturnValue({
       data: {
         content: [
@@ -132,11 +148,11 @@ describe('StudentPaymentsPage', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/Nạp.*100\.000.*vào ví/)).toBeInTheDocument();
-    expect(screen.queryByText('Đơn hàng chưa có thông tin khóa học')).not.toBeInTheDocument();
+    expect(screen.getByText('Chưa có đơn hàng nào')).toBeInTheDocument();
+    expect(screen.queryByText('MHB-TOPUP-001')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Vào học/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Yêu cầu hoàn tiền/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Xem hoàn tiền/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Xem chi tiết hoàn tiền/i })).not.toBeInTheDocument();
   });
 
   it('does not offer refund actions for a free course', () => {
@@ -181,7 +197,7 @@ describe('StudentPaymentsPage', () => {
     );
 
     const courseTitle = screen.getByText('Free Japanese Course');
-    const freeCourseRow = courseTitle.closest('.MuiStack-root');
+    const freeCourseRow = courseTitle.closest('.MuiBox-root');
 
     expect(screen.getByText('MHB-FREE-001')).toBeInTheDocument();
     expect(freeCourseRow).not.toBeNull();
