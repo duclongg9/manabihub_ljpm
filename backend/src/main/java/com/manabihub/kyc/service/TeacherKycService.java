@@ -227,7 +227,6 @@ public class TeacherKycService {
                     verified = crossCheckMockNationalId(
                             normalizedCccd,
                             identityOcr,
-                            user,
                             failureReasons
                     ) && verified;
                 }
@@ -282,7 +281,6 @@ public class TeacherKycService {
     private boolean crossCheckMockNationalId(
             String normalizedCccd,
             Map<String, String> identityOcr,
-            AppUser user,
             List<String> failureReasons
     ) {
         MockNationalIdRegistryRecord registryRecord = mockNationalIdRegistryRepository
@@ -298,11 +296,6 @@ public class TeacherKycService {
             failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia mô phỏng");
             matches = false;
         }
-        if (!normalizePersonName(identityOcr.get("fullName")).equals(normalizePersonName(user.getFullName()))) {
-            failureReasons.add("Họ và tên trên CCCD không khớp với thông tin tài khoản");
-            matches = false;
-        }
-
         try {
             LocalDate ocrDateOfBirth = parseSupportedDate(identityOcr.get("dateOfBirth"));
             if (!ocrDateOfBirth.equals(registryRecord.getDateOfBirth())) {

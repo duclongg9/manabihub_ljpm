@@ -278,6 +278,7 @@ class TeacherKycServiceTest {
     @Test
     void verifyIdentity_directSdkMockMode_crossChecksSyntheticNationalIdRegistry() {
         teacherKycService = newTeacherKycService("direct-sdk-mock");
+        user.setFullName("Display Alias");
         when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacher.getId()))
                 .thenReturn(Optional.empty());
