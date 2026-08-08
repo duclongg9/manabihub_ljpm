@@ -13,8 +13,6 @@ import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.kyc.dto.KycCertificateSubmissionResponse;
 import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
 import com.manabihub.kyc.dto.KycStatusResponse;
-import com.manabihub.kyc.port.VnptServerVerificationResult;
-import com.manabihub.kyc.port.VnptVerificationPort;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
@@ -46,6 +44,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -76,9 +75,6 @@ class TeacherKycServiceTest {
     private Query countQuery;
     @Mock
     private Query insertQuery;
-    @Mock private VnptVerificationPort vnptVerificationPort;
-    @Mock private com.manabihub.audit.service.SecurityAuditService securityAuditService;
-    @Mock private VnptVerificationCoordinator verificationCoordinator;
     @TempDir
     private Path storageRoot;
     private TeacherKycService teacherKycService;
@@ -97,10 +93,7 @@ class TeacherKycServiceTest {
                 teacherIdentityClaimService,
                 teacherCertificateClaimService,
                 publicJwtTokenService,
-                vnptVerificationPort,
-                securityAuditService,
                 entityManager,
-                verificationCoordinator,
                 storageRoot.toString()
         );
         user = new AppUser();
@@ -121,8 +114,6 @@ class TeacherKycServiceTest {
         identityVerifiedRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
         identityVerifiedRequest.setCertificateStatus(CertificateVerificationStatus.NOT_SUBMITTED);
         identityVerifiedRequest.setIdentityVerifiedAt(Instant.now());
-        identityVerifiedRequest.setServerFullName("Nguyen Van A");
-        identityVerifiedRequest.setServerDateOfBirth("1990-01-02");
         identityVerifiedRequest.setVerificationPayload(Map.of(
                 "providerStatus", "SDK_VERIFIED",
                 "identityOcr", Map.of(
@@ -194,48 +185,16 @@ class TeacherKycServiceTest {
         assertFalse(response.canPublishCourse());
     }
     @Test
-    void verifyIdentity_delegatesToCoordinatorAndReturnsResponse() {
-        // when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
-        when(teacherProfileRepository.findById(teacher.getId())).thenReturn(Optional.of(teacher));
-        KycRequest mockRequest = new KycRequest();
-        mockRequest.setId(UUID.randomUUID());
-        mockRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
-        mockRequest.setEkycProvider("VNPT_EKYC_WEB_SDK");
-        when(kycRequestRepository.findById(mockRequest.getId())).thenReturn(Optional.of(mockRequest));
-        when(verificationCoordinator.orchestrate(any(), any(), any(), anyString(), anyString()))
-                .thenReturn(new VnptVerificationCoordinator.VerificationOutcome(
-                        mockRequest.getId(), teacher.getId(), user.getId(), IdentityVerificationStatus.VERIFIED, true
-                ));
-        Map<String, Object> sdkResult = Map.of("object", Map.of("idNumber", "123"));
-        var response = teacherKycService.verifyIdentity(
-                user.getId(),
-                new KycIdentityVerificationRequest("session", "transaction", sdkResult),
-                "127.0.0.1",
-                "JUnit"
-        );
-        assertEquals("VERIFIED", response.request().identityStatus());
-        verify(verificationCoordinator).orchestrate(eq(user.getId()), any(), any(), eq("127.0.0.1"), eq("JUnit"));
-    }
-
-    @Test
-    void verifyIdentity_acceptsRealVnptNestedCallbackPayload() {
-        when(teacherProfileRepository.findById(teacher.getId())).thenReturn(Optional.of(teacher));
-        KycRequest mockRequest = new KycRequest();
-        mockRequest.setId(UUID.randomUUID());
-        mockRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
-        mockRequest.setEkycProvider("VNPT_EKYC_WEB_SDK");
-        when(kycRequestRepository.findById(mockRequest.getId())).thenReturn(Optional.of(mockRequest));
-        when(verificationCoordinator.orchestrate(any(), any(), any(), anyString(), anyString()))
-                .thenAnswer(invocation -> {
-                    VnptSdkDecision decision = invocation.getArgument(2);
-                    assertTrue(decision.verified());
-                    assertEquals("0272400402711", decision.identityOcr().get("idNumber"));
-                    assertEquals("NGUYEN XUAN DAT", decision.identityOcr().get("fullName"));
-                    assertEquals("31/08/2004", decision.identityOcr().get("dateOfBirth"));
-                    return new VnptVerificationCoordinator.VerificationOutcome(
-                            mockRequest.getId(), teacher.getId(), user.getId(), IdentityVerificationStatus.VERIFIED, true
-                    );
-                });
+    void verifyIdentity_acceptsRealVnptNestedCallbackWithoutServerVerification() {
+        when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
+        when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacher.getId()))
+                .thenReturn(Optional.empty());
+        when(teacherIdentityClaimService.normalizeCccd("0272400402711")).thenReturn("0272400402711");
+        when(kycRequestRepository.save(any())).thenAnswer(invocation -> {
+            KycRequest saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            return saved;
+        });
 
         Map<String, Object> sdkResult = Map.of(
                 "type_document", 9,
@@ -256,12 +215,22 @@ class TeacherKycServiceTest {
 
         var response = teacherKycService.verifyIdentity(
                 user.getId(),
-                new KycIdentityVerificationRequest("session", "transaction", sdkResult),
+                new KycIdentityVerificationRequest(null, null, sdkResult),
                 "127.0.0.1",
                 "JUnit"
         );
 
         assertEquals("VERIFIED", response.request().identityStatus());
+        verify(teacherIdentityClaimService).processIdentityClaim(
+                eq(teacher.getId()), eq("0272400402711"), eq(user), eq("127.0.0.1"), eq("JUnit")
+        );
+        var requestCaptor = forClass(KycRequest.class);
+        verify(kycRequestRepository).save(requestCaptor.capture());
+        assertEquals("SDK_VERIFIED", requestCaptor.getValue().getVerificationPayload().get("providerStatus"));
+        assertEquals(
+                "NGUYEN XUAN DAT",
+                ((Map<?, ?>) requestCaptor.getValue().getVerificationPayload().get("identityOcr")).get("fullName")
+        );
     }
 
     @Test

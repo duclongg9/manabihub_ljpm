@@ -4,7 +4,6 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.audit.entity.AuditLog;
-import com.manabihub.audit.service.SecurityAuditService;
 import com.manabihub.kyc.domain.CertificateVerificationStatus;
 import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.KycDocument;
@@ -22,8 +21,6 @@ import com.manabihub.kyc.dto.KycModuleStatusResponse;
 import com.manabihub.kyc.dto.KycRequestResponse;
 import com.manabihub.kyc.dto.KycRestartVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
-import com.manabihub.kyc.port.VnptServerVerificationResult;
-import com.manabihub.kyc.port.VnptVerificationPort;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
@@ -34,8 +31,6 @@ import com.manabihub.notification.NotificationTypes;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.security.service.PublicJwtTokenService;
 import jakarta.persistence.EntityManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -50,7 +45,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -63,12 +57,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.ObjectProvider;
 
 @Service
 public class TeacherKycService {
-
-    private static final Logger log = LoggerFactory.getLogger(TeacherKycService.class);
 
     private static final long MAX_FILE_SIZE_BYTES = 5L * 1024L * 1024L;
     private static final int MAX_OCR_TEXT_LENGTH = 20_000;
@@ -77,8 +68,6 @@ public class TeacherKycService {
     private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
     private static final String REVIEW_ETA =
             "1-2 business days, excluding Saturdays, Sundays, and public holidays";
-    /** Server verification must complete within this duration after SDK result is submitted. */
-    private static final Duration SERVER_VERIFICATION_TTL = Duration.ofMinutes(30);
 
     private final TeacherProfileRepository teacherProfileRepository;
     private final KycRequestRepository kycRequestRepository;
@@ -89,11 +78,8 @@ public class TeacherKycService {
     private final TeacherIdentityClaimService teacherIdentityClaimService;
     private final TeacherCertificateClaimService teacherCertificateClaimService;
     private final PublicJwtTokenService publicJwtTokenService;
-    private final VnptVerificationPort vnptVerificationPort;
-    private final SecurityAuditService securityAuditService;
     private final EntityManager entityManager;
     private final Path storageRoot;
-    private final VnptVerificationCoordinator verificationCoordinator;
 
     public TeacherKycService(
             TeacherProfileRepository teacherProfileRepository,
@@ -105,10 +91,7 @@ public class TeacherKycService {
             TeacherIdentityClaimService teacherIdentityClaimService,
             TeacherCertificateClaimService teacherCertificateClaimService,
             PublicJwtTokenService publicJwtTokenService,
-            VnptVerificationPort vnptVerificationPort,
-            SecurityAuditService securityAuditService,
             EntityManager entityManager,
-            VnptVerificationCoordinator verificationCoordinator,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
     ) {
         this.teacherProfileRepository = teacherProfileRepository;
@@ -120,11 +103,8 @@ public class TeacherKycService {
         this.teacherIdentityClaimService = teacherIdentityClaimService;
         this.teacherCertificateClaimService = teacherCertificateClaimService;
         this.publicJwtTokenService = publicJwtTokenService;
-        this.vnptVerificationPort = vnptVerificationPort;
-        this.securityAuditService = securityAuditService;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
-        this.verificationCoordinator = verificationCoordinator;
     }
 
     @Transactional
@@ -157,33 +137,80 @@ public class TeacherKycService {
             throw new BusinessException(MessageCodes.MSG_KYC_002, "VNPT eKYC SDK result is required");
         }
 
-        String incTxId = blankToNull(request.providerTransactionId());
-        String incSessionId = blankToNull(request.providerSessionId());
-        if (incTxId == null || incSessionId == null) {
-            throw new BusinessException(MessageCodes.MSG_KYC_002, "Provider transaction ID and session ID are required");
+        TeacherProfile teacherProfile = resolveTeacher(userId);
+        AppUser user = teacherProfile.getUser();
+        KycRequest latestRequest = findLatestRequest(teacherProfile);
+        validateIdentityAllowed(user, teacherProfile, latestRequest);
+
+        KycRequest kycRequest = findReusableRealtimeRequest(teacherProfile, latestRequest);
+        VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
+        boolean verified = sdkDecision.verified();
+        List<String> failureReasons = new ArrayList<>(sdkDecision.failureReasons());
+
+        if (verified && sdkDecision.identityOcr() != null) {
+            Map<String, String> ocr = sdkDecision.identityOcr();
+            String rawIdNumber = ocr.get("idNumber");
+            String ocrDob = ocr.get("dateOfBirth");
+
+            String normalizedCccd = null;
+            try {
+                normalizedCccd = teacherIdentityClaimService.normalizeCccd(rawIdNumber);
+            } catch (BusinessException ex) {
+                verified = false;
+                failureReasons.add(ex.getMessage());
+            }
+
+            if (verified && normalizedCccd != null) {
+                try {
+                    parseSupportedDate(ocrDob);
+                } catch (BusinessException exception) {
+                    verified = false;
+                    failureReasons.add(exception.getMessage());
+                }
+
+                if (verified) {
+                    teacherIdentityClaimService.processIdentityClaim(
+                            teacherProfile.getId(),
+                            normalizedCccd,
+                            user,
+                            ipAddress,
+                            userAgent
+                    );
+                }
+            }
         }
 
-        VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
+        Instant now = Instant.now();
 
-        VnptVerificationCoordinator.VerificationOutcome outcome = verificationCoordinator.orchestrate(
-            userId, request, sdkDecision, ipAddress, userAgent
-        );
+        kycRequest.setStatus(KycRequestStatus.DRAFT);
+        kycRequest.setTeacherProfile(teacherProfile);
+        kycRequest.setEkycProvider(VNPT_PROVIDER);
+        kycRequest.setProviderSessionId(blankToNull(request.providerSessionId()));
+        kycRequest.setProviderTransactionId(blankToNull(request.providerTransactionId()));
+        kycRequest.setIdentityStatus(verified ? IdentityVerificationStatus.VERIFIED : IdentityVerificationStatus.FAILED);
+        kycRequest.setIdentityVerifiedAt(verified ? now : null);
+        kycRequest.setCertificateStatus(verified ? CertificateVerificationStatus.NOT_SUBMITTED : CertificateVerificationStatus.LOCKED);
+        kycRequest.setVerificationPayload(Map.of(
+                "identityProvider", VNPT_PROVIDER,
+                "providerResult", request.sdkResult(),
+                "providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED",
+                "identityOcr", sdkDecision.identityOcr(),
+                "failureReasons", failureReasons,
+                "certificateManualAuthenticityReviewRequired", true,
+                "autoApproval", false,
+                "srs", srsTrace()
+        ));
 
-        TeacherProfile teacherProfile = teacherProfileRepository.findById(outcome.teacherProfileId())
-                .orElseThrow();
-        KycRequest kycRequest = kycRequestRepository.findById(outcome.requestId())
-                .orElseThrow();
+        KycRequest savedRequest = kycRequestRepository.save(kycRequest);
+        savedRequest.setEkycReferenceId("VNPT-SDK-" + savedRequest.getId());
+        boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
 
-        return buildIdentityResponse(teacherProfile, kycRequest, outcome.auditLogged());
-    }
-
-    private KycIdentityVerificationResponse buildIdentityResponse(TeacherProfile teacherProfile, KycRequest request, boolean auditLogged) {
         return new KycIdentityVerificationResponse(
                 teacherProfile.getId(),
                 teacherProfile.getKycStatus().name(),
-                toRequestResponse(request),
-                identityModuleStatus(teacherProfile, request),
-                certificateModuleStatus(teacherProfile, request),
+                toRequestResponse(savedRequest),
+                identityModuleStatus(teacherProfile, savedRequest),
+                certificateModuleStatus(teacherProfile, savedRequest),
                 auditLogged,
                 srsTrace()
         );
@@ -416,8 +443,7 @@ public class TeacherKycService {
     private KycRequest findReusableRealtimeRequest(TeacherProfile teacherProfile, KycRequest latestRequest) {
         return java.util.Optional.ofNullable(latestRequest)
                 .filter(request -> request.getStatus() == KycRequestStatus.DRAFT
-                        && request.getIdentityStatus() == IdentityVerificationStatus.NOT_STARTED
-                        && request.getProviderTransactionId() == null)
+                        || request.getIdentityStatus() == IdentityVerificationStatus.FAILED)
                 .orElseGet(KycRequest::new);
     }
 
@@ -867,8 +893,9 @@ public class TeacherKycService {
             throw certificateMismatch("Only JLPT levels N1 through N5 are accepted");
         }
 
-        String identityFullName = kycRequest.getServerFullName();
-        String identityDateOfBirth = kycRequest.getServerDateOfBirth();
+        Map<String, String> identityOcr = extractOcrFromPayload(kycRequest.getVerificationPayload());
+        String identityFullName = identityOcr.get("fullName");
+        String identityDateOfBirth = identityOcr.get("dateOfBirth");
         if (!StringUtils.hasText(identityFullName) || !StringUtils.hasText(identityDateOfBirth)) {
             throw certificateMismatch(
                     "VNPT identity result is missing the name or date of birth required for matching"
@@ -1325,7 +1352,7 @@ public class TeacherKycService {
         return switch (status) {
             case NOT_STARTED -> "Chưa xác thực danh tính";
             case PROCESSING -> "Đang xác thực danh tính";
-            case PENDING_SERVER_VERIFICATION -> "Đang xác nhận với VNPT";
+            case PENDING_SERVER_VERIFICATION -> "Đang xác thực danh tính";
             case VERIFIED -> "Xác thực danh tính thành công";
             case FAILED -> "Xác thực danh tính thất bại";
         };
@@ -1335,7 +1362,7 @@ public class TeacherKycService {
         return switch (status) {
             case NOT_STARTED -> "Bắt đầu VNPT eKYC để chụp CCCD và kiểm tra liveness khuôn mặt.";
             case PROCESSING -> "VNPT eKYC đang xử lý phiên xác thực realtime.";
-            case PENDING_SERVER_VERIFICATION -> "Hệ thống đang xác nhận kết quả với máy chủ VNPT. Vui lòng chờ.";
+            case PENDING_SERVER_VERIFICATION -> "VNPT eKYC đang xử lý phiên xác thực realtime.";
             case VERIFIED -> "CCCD và liveness khuôn mặt đã được xác thực qua VNPT eKYC.";
             case FAILED -> "Kết quả VNPT eKYC không hợp lệ. Giáo viên có thể thực hiện lại ngay.";
         };
