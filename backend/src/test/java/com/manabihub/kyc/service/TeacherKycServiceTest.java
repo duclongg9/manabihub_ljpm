@@ -258,9 +258,22 @@ class TeacherKycServiceTest {
                         "quality_front", Map.of("blur_score", 0.2D, "bright_spot_score", 0.1D),
                         "general_warning", List.of()
                 )),
-                "liveness_card_front", Map.of("object", Map.of("liveness", "success")),
-                "liveness_card_back", Map.of("object", Map.of("liveness", "success")),
-                "liveness_face", Map.of("object", Map.of("liveness", "success")),
+                "liveness_card_front", Map.of("object", Map.of(
+                        "liveness", "success",
+                        "fake_liveness", false,
+                        "fake_liveness_prob", 0.05D
+                )),
+                "liveness_card_back", Map.of("object", Map.of(
+                        "liveness", "success",
+                        "fake_print_photo", false,
+                        "fake_print_photo_prob", 0.04D
+                )),
+                "liveness_face", Map.of("object", Map.of(
+                        "liveness", "success",
+                        "blur_face", "no",
+                        "blur_face_score", 0.12D,
+                        "liveness_prob", 0.97D
+                )),
                 "compare", Map.of("object", Map.of("result", "", "prob", 0.9778D)),
                 "masked", Map.of("object", Map.of("masked", "false"))
         );

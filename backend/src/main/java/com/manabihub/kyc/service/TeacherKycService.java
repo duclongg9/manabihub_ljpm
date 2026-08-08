@@ -1243,6 +1243,8 @@ public class TeacherKycService {
                     || normalized.contains("not valid")
                     || normalized.contains("not same")
                     || normalized.contains("not match")
+                    || normalized.contains("nomatch")
+                    || normalized.equals("nothing")
                     || normalized.contains("mismatch")
                     || normalized.contains("failed")
                     || normalized.contains("failure")
@@ -1322,7 +1324,21 @@ public class TeacherKycService {
     }
 
     private boolean isVerificationScoreKey(String key) {
-        return isFaceVerificationKey(key) && isScoreKey(key);
+        if (!isFaceVerificationKey(key) || !isScoreKey(key)) {
+            return false;
+        }
+
+        // VNPT uses low values for quality/anti-spoof indicators where a low
+        // value is a good result (for example blur_face_score and
+        // fake_liveness_prob). Those are not confidence scores and must not be
+        // evaluated with the face-match threshold below.
+        String normalizedKey = normalizeKey(key);
+        return !normalizedKey.contains("blur")
+                && !normalizedKey.contains("fake")
+                && !normalizedKey.contains("spoof")
+                && !normalizedKey.contains("tamper")
+                && !normalizedKey.contains("swapping")
+                && !normalizedKey.contains("masked");
     }
 
     private boolean isAcceptedScore(double value) {
