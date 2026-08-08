@@ -1,5 +1,6 @@
 package com.manabihub.identity.mapper;
 
+import com.manabihub.common.util.PhoneNumberNormalizer;
 import com.manabihub.identity.dto.request.UpdateStudentProfileRequest;
 import com.manabihub.identity.dto.response.StudentProfileResponse;
 import com.manabihub.identity.entity.AppUser;
@@ -52,7 +53,7 @@ public class StudentProfileMapper {
     ) {
 
         user.setFullName(request.getFullName());
-        user.setPhoneNumber(request.getPhoneNumber());
+        user.setPhoneNumber(PhoneNumberNormalizer.normalize(request.getPhoneNumber()));
         if (request.getAvatarUrl() != null) {
             user.setAvatarUrl(request.getAvatarUrl());
         }
