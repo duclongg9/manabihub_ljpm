@@ -19,6 +19,35 @@ class VnPayProductionConfigurationValidatorTest {
         ));
     }
 
+    @Test
+    void validateProperties_RequiresMerchantCredentials() {
+        VnPayProperties properties = new VnPayProperties();
+        properties.setReturnUrl(FRONTEND_URL + "/checkout/return");
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> VnPayProductionConfigurationValidator.validate(properties, FRONTEND_URL)
+        );
+
+        properties.setTmnCode("TEST-TMN");
+        assertThrows(
+                IllegalStateException.class,
+                () -> VnPayProductionConfigurationValidator.validate(properties, FRONTEND_URL)
+        );
+    }
+
+    @Test
+    void validateProperties_AcceptsConfiguredMerchantCredentials() {
+        VnPayProperties properties = new VnPayProperties();
+        properties.setReturnUrl(FRONTEND_URL + "/checkout/return");
+        properties.setTmnCode("TEST-TMN");
+        properties.setHashSecret("test-hash-secret");
+
+        assertDoesNotThrow(
+                () -> VnPayProductionConfigurationValidator.validate(properties, FRONTEND_URL)
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
             "",
