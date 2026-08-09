@@ -415,7 +415,7 @@ function TeacherKycPageContent() {
         : 'Bắt đầu xác minh danh tính';
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} sx={{ minWidth: 0 }}>
       {/* Page header */}
       <Paper
         elevation={0}
@@ -427,8 +427,8 @@ function TeacherKycPageContent() {
           p: { xs: 2.5, md: 3.5 },
         }}
       >
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' }, justifyContent: 'space-between' }}>
-          <Box>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' }, justifyContent: 'space-between', minWidth: 0 }}>
+          <Box sx={{ minWidth: 0 }}>
             <Typography component="h2" sx={{ color: 'text.primary', fontSize: { xs: 24, md: 30 }, fontWeight: 700, letterSpacing: '0.005em', mt: 0.5 }}>
               Xác minh giáo viên
             </Typography>
@@ -848,6 +848,8 @@ function TeacherKycPageContent() {
             id="ekyc_sdk_intergrated"
             sx={{ 
               flexGrow: 1, 
+              minWidth: 0,
+              minHeight: 0,
               width: '100%', 
               position: 'relative',
               /* Push SDK language dropdown away from close button */
@@ -888,14 +890,14 @@ function ModuleCard({
   return (
     <Card variant="outlined" sx={{ borderColor: KYC_COLORS.primaryBorder, borderRadius: 2 }}>
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', mb: 2 }}>
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', mb: 2, minWidth: 0 }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0 }}>
             {icon}
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <Typography sx={{ color: 'primary.main', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 {index}
               </Typography>
-              <Typography component="h3" sx={{ color: 'text.primary', fontSize: 20, fontWeight: 700, letterSpacing: '0.004em' }}>
+              <Typography component="h3" sx={{ color: 'text.primary', fontSize: 20, fontWeight: 700, letterSpacing: '0.004em', overflowWrap: 'anywhere' }}>
                 {title}
               </Typography>
             </Box>

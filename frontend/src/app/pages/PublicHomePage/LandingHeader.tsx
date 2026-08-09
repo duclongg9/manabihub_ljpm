@@ -70,13 +70,13 @@ export const LandingHeader: React.FC = () => {
         transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
-      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', px: { xs: 2, md: 4 }, py: 1 }}>
+      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', minWidth: 0, px: { xs: 1.5, md: 4 }, py: 1 }}>
         {/* Left Section: Logo & Categories */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <Box component={Link} to={ROUTES.PUBLIC.HOME} sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
             <Box
               sx={{
-                height: 54,
+                height: { xs: 48, sm: 54 },
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -88,7 +88,7 @@ export const LandingHeader: React.FC = () => {
                 component="img"
                 src="/manabihub-header-logo.svg"
                 alt="ManabiHub"
-                sx={{ display: 'block', height: 54, width: 'auto' }}
+                sx={{ display: 'block', height: { xs: 48, sm: 54 }, width: 'auto' }}
               />
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.5px', display: { xs: 'none', sm: 'block' }, color: '#1A1A2E' }}>
@@ -245,10 +245,12 @@ export const LandingHeader: React.FC = () => {
               sx={{
                 textTransform: 'none',
                 fontWeight: 600,
+                whiteSpace: 'nowrap',
                 bgcolor: '#1B2A4A',
                 color: 'white',
                 borderRadius: 2,
-                px: 3,
+                px: { xs: 1.5, sm: 3 },
+                fontSize: { xs: '0.8rem', sm: '0.875rem' },
                 transition: 'all 0.3s ease',
                 '&:hover': { bgcolor: '#2A3F6A', transform: 'translateY(-1px)', boxShadow: '0 4px 12px rgba(27, 42, 74, 0.3)' }
               }}

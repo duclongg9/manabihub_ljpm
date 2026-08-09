@@ -48,20 +48,20 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, breadcr
       )}
 
       {/* Title row: Main title + JP subtitle inline + action on the right */}
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: { xs: 0.5, md: 1.5 } }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 800, color: '#0f172a', lineHeight: 1.3 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.5, sm: 0 }} sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'flex-start' }, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', minWidth: 0, gap: { xs: 0.5, md: 1.5 } }}>
+          <Typography variant="h4" component="h1" sx={{ minWidth: 0, fontWeight: 800, color: '#0f172a', lineHeight: 1.3, overflowWrap: 'anywhere' }}>
             {title}
           </Typography>
           {subtitle && (
-            <Typography component="span" sx={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 500, whiteSpace: 'nowrap' }}>
+            <Typography component="span" sx={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: 500, whiteSpace: { xs: 'normal', sm: 'nowrap' }, overflowWrap: 'anywhere' }}>
               {subtitle}
             </Typography>
           )}
         </Box>
 
         {action && (
-          <Box sx={{ display: 'flex', gap: 2, flexShrink: 0, ml: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, flexShrink: 0, ml: { xs: 0, sm: 2 }, flexWrap: 'wrap' }}>
             {action}
           </Box>
         )}
