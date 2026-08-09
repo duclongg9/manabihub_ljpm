@@ -390,7 +390,6 @@ export function StudentWithdrawalModal({
                 slotProps={{
                   htmlInput: { maxLength: 6 },
                 }}
-                placeholder="123456"
                 disabled={processing}
                 autoFocus
               />
