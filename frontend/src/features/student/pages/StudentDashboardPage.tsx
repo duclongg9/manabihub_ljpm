@@ -20,6 +20,7 @@ import { StudentCourseCard } from '../components/StudentCourseCard';
 import { useStudentCourses } from '../hooks/useStudentCourses';
 import { useStudentStats } from '../hooks/useStudentStats';
 import { StudyGoalsWidget } from '../components/StudyGoalsWidget';
+import { StudyCalendar } from '../components/StudyCalendar';
 
 const BRAND_COLORS = {
   red: '#C41E3A',
@@ -220,7 +221,7 @@ export function StudentDashboardPage() {
           </Stack>
         </Paper>
 
-        <Grid container spacing={2.5} sx={{ position: 'relative', mb: 5 }}>
+        <Grid container spacing={2.5} sx={{ position: 'relative', mb: 5 }} data-testid="student-stats">
           {statCards.map(({ label, value, helper, icon: Icon, color, tint }) => (
             <Grid size={{ xs: 12, sm: 4 }} key={label}>
               <Paper
@@ -271,6 +272,12 @@ export function StudentDashboardPage() {
             </Grid>
           ))}
         </Grid>
+
+        <Box sx={{ mb: 4 }}>
+          <StudyCalendar
+            courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
+          />
+        </Box>
 
         <Grid container spacing={3.5} sx={{ alignItems: 'stretch' }}>
           <Grid size={{ xs: 12, lg: 8.5 }}>
