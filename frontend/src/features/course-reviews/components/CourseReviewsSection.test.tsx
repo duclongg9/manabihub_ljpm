@@ -8,12 +8,14 @@ vi.mock('../services/courseReviewService', () => ({
     getPublicReviews: vi.fn(),
     getMyReview: vi.fn(),
     upsertMyReview: vi.fn(),
+    replyToReview: vi.fn(),
   },
 }));
 
 const getPublicReviewsMock = vi.mocked(courseReviewService.getPublicReviews);
 const getMyReviewMock = vi.mocked(courseReviewService.getMyReview);
 const upsertMyReviewMock = vi.mocked(courseReviewService.upsertMyReview);
+const replyToReviewMock = vi.mocked(courseReviewService.replyToReview);
 
 const publicReview = {
   id: 'review-1',
@@ -58,6 +60,11 @@ describe('CourseReviewsSection', () => {
       reviewText: 'Khóa học có nội dung rõ ràng và hữu ích.',
       authorDisplayName: 'Học viên hiện tại',
       updatedAt: '2026-07-28T00:00:00Z',
+    });
+    replyToReviewMock.mockResolvedValue({
+      ...publicReview,
+      teacherReplyText: 'Cảm ơn em đã chia sẻ nhận xét.',
+      teacherRepliedAt: '2026-08-10T10:05:00Z',
     });
   });
 
@@ -150,5 +157,29 @@ describe('CourseReviewsSection', () => {
 
     expect(await screen.findByText('Chưa thể tải danh sách đánh giá.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Thử lại' })).toBeInTheDocument();
+  });
+
+  it('allows the course owner to reply and renders the teacher response', async () => {
+    render(
+      <CourseReviewsSection
+        courseId="course-1"
+        courseIdentifier="course-slug"
+        isEnrolled={false}
+        canTeacherReply
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Phản hồi bình luận' }));
+    fireEvent.change(screen.getByLabelText('Phản hồi học viên'), {
+      target: { value: 'Cảm ơn em đã chia sẻ nhận xét.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi phản hồi' }));
+
+    await waitFor(() => expect(replyToReviewMock).toHaveBeenCalledWith(
+      'review-1',
+      { replyText: 'Cảm ơn em đã chia sẻ nhận xét.' },
+    ));
+    expect(await screen.findByText('Phản hồi từ giảng viên')).toBeInTheDocument();
+    expect(screen.getByText('Cảm ơn em đã chia sẻ nhận xét.')).toBeInTheDocument();
   });
 });

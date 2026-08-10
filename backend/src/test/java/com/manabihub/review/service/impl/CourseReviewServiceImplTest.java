@@ -12,6 +12,11 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.kyc.domain.TeacherKycStatus;
+import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
+import com.manabihub.review.dto.request.TeacherCourseReviewReplyRequest;
 import com.manabihub.review.dto.request.UpsertCourseReviewRequest;
 import com.manabihub.review.dto.response.CourseReviewResponse;
 import com.manabihub.review.entity.CourseReview;
@@ -44,6 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -70,12 +76,15 @@ class CourseReviewServiceImplTest {
     private CourseRepository courseRepository;
     @Mock
     private CurrentUserService currentUserService;
+    @Mock
+    private NotificationService notificationService;
 
     private CourseReviewServiceImpl service;
     private UUID currentUserId;
     private StudentProfile student;
     private Course course;
     private Enrollment enrollment;
+    private com.manabihub.kyc.domain.AppUser teacherUser;
 
     @BeforeEach
     void setUp() {
@@ -84,7 +93,8 @@ class CourseReviewServiceImplTest {
                 enrollmentRepository,
                 studentProfileRepository,
                 courseRepository,
-                currentUserService
+                currentUserService,
+                notificationService
         );
         currentUserId = UUID.randomUUID();
         AppUser user = AppUser.builder()
@@ -98,8 +108,19 @@ class CourseReviewServiceImplTest {
                 .user(user)
                 .displayName("Học viên An")
                 .build();
+        teacherUser = new com.manabihub.kyc.domain.AppUser();
+        teacherUser.setId(UUID.randomUUID());
+        teacherUser.setEmail("teacher@example.test");
+        TeacherProfile teacher = new TeacherProfile();
+        teacher.setId(UUID.randomUUID());
+        teacher.setUser(teacherUser);
+        teacher.setDisplayName("Cô An");
+        teacher.setKycStatus(TeacherKycStatus.APPROVED);
         course = Course.builder()
                 .id(UUID.randomUUID())
+                .teacher(teacher)
+                .title("Tiếng Nhật nhập môn")
+                .slug("tieng-nhat-nhap-mon")
                 .status(CourseStatus.PUBLISHED)
                 .build();
         enrollment = Enrollment.builder()
@@ -177,6 +198,22 @@ class CourseReviewServiceImplTest {
             verify(enrollmentRepository).findByStudentIdAndCourseIdForReview(
                     student.getId(),
                     course.getId()
+            );
+            verify(notificationService).createNotification(
+                    eq(teacherUser.getId()),
+                    eq(teacherUser.getEmail()),
+                    eq("Khóa học có đánh giá mới"),
+                    contains("5/5 sao"),
+                    eq(NotificationTypes.STUDENT_COURSE_RATING),
+                    eq("/courses/tieng-nhat-nhap-mon#course-reviews")
+            );
+            verify(notificationService).createNotification(
+                    eq(teacherUser.getId()),
+                    eq(teacherUser.getEmail()),
+                    eq("Khóa học có bình luận mới"),
+                    contains("Tiếng Nhật nhập môn"),
+                    eq(NotificationTypes.STUDENT_COURSE_COMMENT),
+                    eq("/courses/tieng-nhat-nhap-mon#course-reviews")
             );
         }
 
@@ -400,6 +437,35 @@ class CourseReviewServiceImplTest {
 
             assertEquals(MessageCodes.COURSE_REVIEW_INVALID, exception.getMessageCode());
             verify(courseReviewRepository, never()).saveAndFlush(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Teacher replies to course comments")
+    class ReplyToReview {
+
+        @Test
+        void reply_savesReplyAndNotifiesStudent() {
+            CourseReview existing = review(CourseReviewStatus.APPROVED);
+            when(courseReviewRepository.findByIdForTeacherReply(existing.getId()))
+                    .thenReturn(Optional.of(existing));
+            when(currentUserService.getCurrentUserId()).thenReturn(teacherUser.getId());
+            when(courseReviewRepository.saveAndFlush(existing)).thenReturn(existing);
+
+            CourseReviewResponse response = service.replyToReview(
+                    existing.getId(),
+                    new TeacherCourseReviewReplyRequest("Em đã nhận xét rất đúng trọng tâm.")
+            );
+
+            assertEquals("Em đã nhận xét rất đúng trọng tâm.", response.teacherReplyText());
+            verify(notificationService).createNotification(
+                    eq(student.getUser().getId()),
+                    eq(student.getUser().getEmail()),
+                    eq("Giảng viên đã phản hồi bình luận của bạn"),
+                    contains("Tiếng Nhật nhập môn"),
+                    eq(NotificationTypes.TEACHER_REVIEW_REPLY),
+                    eq("/courses/tieng-nhat-nhap-mon#course-reviews")
+            );
         }
     }
 

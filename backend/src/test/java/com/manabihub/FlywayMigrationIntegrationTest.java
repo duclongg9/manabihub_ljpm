@@ -72,7 +72,7 @@ public class FlywayMigrationIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
-    // ── Test 1: Clean build from V001 to V063 ──────────────────────────────
+    // ── Test 1: Clean build from V001 to V064 ──────────────────────────────
     @Test
     void cleanMigrationToLatestVersion() {
         assertThat(flyway).isNotNull();
@@ -89,13 +89,13 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("063");
+        assertThat(current).isEqualTo("064");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V063 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V064 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");

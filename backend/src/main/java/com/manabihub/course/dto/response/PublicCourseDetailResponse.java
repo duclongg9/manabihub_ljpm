@@ -33,6 +33,7 @@ public class PublicCourseDetailResponse {
 
     // Enrollment is resolved from the authenticated public session when present.
     private Boolean isEnrolled;
+    private Boolean isTeacherOwner;
 
     // Aggregation
     private Integer totalDurationMinutes;

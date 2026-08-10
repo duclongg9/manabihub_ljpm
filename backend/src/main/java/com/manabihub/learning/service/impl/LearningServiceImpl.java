@@ -34,6 +34,8 @@ import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.LearningService;
 import com.manabihub.learning.service.CertificateEligibilityService;
 import com.manabihub.learning.service.StudentAssessmentService;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.writing.entity.WritingSubmission;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
 import com.manabihub.writing.entity.AiWritingSuggestion;
@@ -103,6 +105,7 @@ public class LearningServiceImpl implements LearningService {
     private final AiWritingAssistanceProvider aiWritingAssistanceProvider;
     private final StudentAssessmentService studentAssessmentService;
     private final CertificateEligibilityService certificateEligibilityService;
+    private final NotificationService notificationService;
 
     @Override
     public CourseLearningResponse openOrResumeCourse(UUID courseId) {
@@ -644,7 +647,39 @@ public class LearningServiceImpl implements LearningService {
         }
         lessonBlockProgressRepository.save(progress);
 
+        notifyTeacherOfWritingSubmission(submission, block);
+
         return mapToWritingSubmissionDetailResponse(submission);
+    }
+
+    private void notifyTeacherOfWritingSubmission(
+            WritingSubmission submission,
+            LessonBlock block
+    ) {
+        Course course = submission.getEnrollment().getCourse();
+        if (course.getTeacher() == null || course.getTeacher().getUser() == null) {
+            return;
+        }
+
+        var teacherUser = course.getTeacher().getUser();
+        StudentProfile student = submission.getStudent();
+        String studentName = student != null && student.getDisplayName() != null
+                && !student.getDisplayName().isBlank()
+                ? student.getDisplayName().trim()
+                : "Học viên ManabiHub";
+        String lessonTitle = block.getTitle() == null || block.getTitle().isBlank()
+                ? "Bài viết"
+                : block.getTitle().trim();
+
+        notificationService.createNotification(
+                teacherUser.getId(),
+                teacherUser.getEmail(),
+                "Có bài viết mới cần phản hồi",
+                studentName + " đã hoàn thành bài \"" + lessonTitle
+                        + "\" trong khóa học \"" + course.getTitle() + "\".",
+                NotificationTypes.WRITING_SUBMITTED,
+                "/teacher/writing-reviews/" + submission.getId()
+        );
     }
 
     @Override

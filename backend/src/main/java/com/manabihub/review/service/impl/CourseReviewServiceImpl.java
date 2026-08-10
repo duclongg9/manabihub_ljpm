@@ -11,6 +11,9 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.learning.entity.Enrollment;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
+import com.manabihub.review.dto.request.TeacherCourseReviewReplyRequest;
 import com.manabihub.review.dto.request.UpsertCourseReviewRequest;
 import com.manabihub.review.dto.response.CourseReviewAggregateResponse;
 import com.manabihub.review.dto.response.CourseReviewResponse;
@@ -50,6 +53,7 @@ public class CourseReviewServiceImpl implements CourseReviewService {
     private final StudentProfileRepository studentProfileRepository;
     private final CourseRepository courseRepository;
     private final CurrentUserService currentUserService;
+    private final NotificationService notificationService;
 
     @Override
     public CourseReviewResponse getMyReview(UUID courseId) {
@@ -80,8 +84,9 @@ public class CourseReviewServiceImpl implements CourseReviewService {
                 courseReviewRepository.findByEnrollment_Id(enrollment.getId());
         if (existingReview.isPresent()) {
             CourseReview review = existingReview.get();
-            if (review.getRating() == request.rating()
-                    && review.getReviewText().equals(normalizedText)) {
+            boolean ratingChanged = review.getRating() != request.rating();
+            boolean commentChanged = !review.getReviewText().equals(normalizedText);
+            if (!ratingChanged && !commentChanged) {
                 return toResponse(review);
             }
             review.setRating(request.rating());
@@ -90,7 +95,9 @@ public class CourseReviewServiceImpl implements CourseReviewService {
             if (review.getStatus() != CourseReviewStatus.HIDDEN) {
                 review.setStatus(CourseReviewStatus.APPROVED);
             }
-            return toResponse(courseReviewRepository.saveAndFlush(review));
+            CourseReview savedReview = courseReviewRepository.saveAndFlush(review);
+            notifyTeacher(savedReview, ratingChanged, commentChanged);
+            return toResponse(savedReview);
         }
 
         CourseReview review = CourseReview.builder()
@@ -99,7 +106,60 @@ public class CourseReviewServiceImpl implements CourseReviewService {
                 .reviewText(normalizedText)
                 .status(CourseReviewStatus.APPROVED)
                 .build();
-        return toResponse(courseReviewRepository.saveAndFlush(review));
+        CourseReview savedReview = courseReviewRepository.saveAndFlush(review);
+        notifyTeacher(savedReview, true, true);
+        return toResponse(savedReview);
+    }
+
+    @Override
+    @Transactional
+    public CourseReviewResponse replyToReview(
+            UUID reviewId,
+            TeacherCourseReviewReplyRequest request
+    ) {
+        CourseReview review = courseReviewRepository.findByIdForTeacherReply(reviewId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COMMON_NOT_FOUND,
+                        "Không tìm thấy đánh giá khóa học.",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        Course course = review.getEnrollment().getCourse();
+        if (course.getTeacher() == null
+                || course.getTeacher().getUser() == null
+                || !currentUserId.equals(course.getTeacher().getUser().getId())) {
+            throw new BusinessException(
+                    MessageCodes.AUTH_FORBIDDEN,
+                    "Bạn chỉ có thể phản hồi bình luận trong khóa học của mình.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        if (review.getStatus() != CourseReviewStatus.APPROVED) {
+            throw new BusinessException(
+                    MessageCodes.COURSE_REVIEW_INVALID,
+                    "Không thể phản hồi đánh giá đang bị ẩn hoặc chờ kiểm duyệt.",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        String normalizedReply = normalizePlainText(request.replyText());
+        if (normalizedReply.length() < 2 || normalizedReply.length() > 2000) {
+            throw new BusinessException(
+                    MessageCodes.COURSE_REVIEW_INVALID,
+                    "Nội dung phản hồi phải có từ 2 đến 2.000 ký tự.",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (normalizedReply.equals(review.getTeacherReplyText())) {
+            return toResponse(review);
+        }
+
+        review.setTeacherReplyText(normalizedReply);
+        review.setTeacherRepliedAt(java.time.Instant.now());
+        CourseReview savedReview = courseReviewRepository.saveAndFlush(review);
+        notifyStudentOfTeacherReply(savedReview);
+        return toResponse(savedReview);
     }
 
     @Override
@@ -218,8 +278,82 @@ public class CourseReviewServiceImpl implements CourseReviewService {
                 review.getReviewText(),
                 displayName,
                 avatarUrl,
-                review.getUpdatedAt()
+                review.getUpdatedAt(),
+                review.getTeacherReplyText(),
+                review.getTeacherRepliedAt()
         );
+    }
+
+    private void notifyTeacher(
+            CourseReview review,
+            boolean ratingChanged,
+            boolean commentChanged
+    ) {
+        if (review.getStatus() != CourseReviewStatus.APPROVED) {
+            return;
+        }
+        Course course = review.getEnrollment().getCourse();
+        if (course.getTeacher() == null || course.getTeacher().getUser() == null) {
+            return;
+        }
+
+        var teacherUser = course.getTeacher().getUser();
+        String studentName = resolveStudentDisplayName(review.getEnrollment().getStudent());
+        String actionUrl = courseActionUrl(course);
+        if (ratingChanged) {
+            notificationService.createNotification(
+                    teacherUser.getId(),
+                    teacherUser.getEmail(),
+                    "Khóa học có đánh giá mới",
+                    studentName + " đã đánh giá " + review.getRating()
+                            + "/5 sao cho khóa học \"" + course.getTitle() + "\".",
+                    NotificationTypes.STUDENT_COURSE_RATING,
+                    actionUrl
+            );
+        }
+        if (commentChanged) {
+            notificationService.createNotification(
+                    teacherUser.getId(),
+                    teacherUser.getEmail(),
+                    "Khóa học có bình luận mới",
+                    studentName + " vừa bình luận về khóa học \""
+                            + course.getTitle() + "\".",
+                    NotificationTypes.STUDENT_COURSE_COMMENT,
+                    actionUrl
+            );
+        }
+    }
+
+    private void notifyStudentOfTeacherReply(CourseReview review) {
+        StudentProfile student = review.getEnrollment().getStudent();
+        if (student == null || student.getUser() == null) {
+            return;
+        }
+        Course course = review.getEnrollment().getCourse();
+        notificationService.createNotification(
+                student.getUser().getId(),
+                student.getUser().getEmail(),
+                "Giảng viên đã phản hồi bình luận của bạn",
+                "Giảng viên khóa học \"" + course.getTitle()
+                        + "\" vừa phản hồi bình luận của bạn.",
+                NotificationTypes.TEACHER_REVIEW_REPLY,
+                courseActionUrl(course)
+        );
+    }
+
+    private String resolveStudentDisplayName(StudentProfile student) {
+        if (student != null && student.getDisplayName() != null
+                && !student.getDisplayName().isBlank()) {
+            return student.getDisplayName().trim();
+        }
+        return PRIVATE_AUTHOR_FALLBACK;
+    }
+
+    private String courseActionUrl(Course course) {
+        String identifier = course.getSlug() == null || course.getSlug().isBlank()
+                ? course.getId().toString()
+                : course.getSlug();
+        return "/courses/" + identifier + "#course-reviews";
     }
 
     private String normalizePlainText(String value) {

@@ -2,6 +2,7 @@ package com.manabihub.review;
 
 import com.manabihub.review.dto.response.CourseReviewAggregateResponse;
 import com.manabihub.review.dto.response.CourseReviewResponse;
+import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.review.service.CourseReviewService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,35 @@ class CourseReviewPostgresIntegrationTest {
     private TransactionTemplate transactionTemplate;
     @Autowired
     private CourseReviewService courseReviewService;
+    @Autowired
+    private CourseReviewRepository courseReviewRepository;
+
+    @Test
+    void teacherReplyLockQueryLoadsReviewOnPostgres() {
+        Fixture fixture = transactionTemplate.execute(status -> createBaseFixture());
+        assertNotNull(fixture);
+        UUID reviewId = UUID.randomUUID();
+        jdbcTemplate.update(
+                """
+                INSERT INTO course_reviews
+                    (id, enrollment_id, rating, review_text, review_status)
+                VALUES (?, ?, 5, ?, 'APPROVED')
+                """,
+                reviewId,
+                fixture.activeEnrollmentId(),
+                "Bình luận cần giảng viên phản hồi."
+        );
+
+        Boolean loaded = transactionTemplate.execute(status -> {
+            var review = courseReviewRepository.findByIdForTeacherReply(reviewId).orElseThrow();
+            assertEquals(reviewId, review.getId());
+            assertNotNull(review.getEnrollment().getCourse().getTeacher().getUser());
+            assertNotNull(review.getEnrollment().getStudent().getUser());
+            return true;
+        });
+
+        assertTrue(Boolean.TRUE.equals(loaded));
+    }
 
     @Test
     void publicQueriesIncludeOnlyApprovedReviewsFromEligibleEnrollments() {

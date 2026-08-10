@@ -449,6 +449,7 @@ public class CourseServiceImpl implements CourseService {
                                 && course.getTeacher().getUser().getUserStatus() == UserStatus.ACTIVE)
                         .build())
                 .isEnrolled(isEnrolled)
+                .isTeacherOwner(isAuthor)
                 .totalDurationMinutes(totalDurationMinutes)
                 .totalLessons(totalLessons)
                 .averageRating(reviewAggregate.averageRating())
