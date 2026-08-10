@@ -117,6 +117,7 @@ export function CourseLearningPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [selectedContentLoading, setSelectedContentLoading] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
 
   const session = getAuthSession('public');
@@ -130,14 +131,19 @@ export function CourseLearningPage() {
       .openCourse(courseId)
       .then((data) => {
         if (!active) return;
-        setLearning(data);
-        const availableBlockIds = new Set(data.modules.flatMap((module) => module.blocks.map((block) => block.id)));
+        // Derive sequential access locally as a defensive guard for older
+        // deployments or cached responses that omit the `locked` flag.
+        const modules = applySequentialLocks(data.modules);
+        const availableBlockIds = new Set(modules.flatMap((module) => module.blocks.map((block) => block.id)));
         const savedBlockId = readLocalStorageValue<string>(courseSelectionStorageKey(data.courseId));
-        setSelectedBlockId(
+        const initialBlockId =
           savedBlockId && availableBlockIds.has(savedBlockId)
             ? savedBlockId
-            : data.currentLessonBlockId ?? data.modules[0]?.blocks[0]?.id ?? null,
-        );
+            : data.currentLessonBlockId ?? modules[0]?.blocks[0]?.id ?? null;
+        const initialBlock = modules.flatMap((module) => module.blocks).find((block) => block.id === initialBlockId);
+        setLearning({ ...data, modules });
+        setSelectedBlockId(initialBlockId);
+        setSelectedContentLoading(initialBlock?.type === 'VIDEO');
       })
       .catch((err) => {
         if (!active) return;
@@ -196,7 +202,7 @@ export function CourseLearningPage() {
   }, []);
 
   const handleMarkComplete = async () => {
-    if (!selectedBlock || completing) return;
+    if (!selectedBlock || completing || selectedContentLoading || selectedBlock.locked) return;
     setCompleting(true);
     try {
       const progress = await learningService.markLessonComplete(selectedBlock.id);
@@ -214,6 +220,12 @@ export function CourseLearningPage() {
       setCompleting(false);
     }
   };
+
+  const handleSelectBlock = useCallback((block: LearningLessonBlock) => {
+    if (completing || selectedContentLoading || block.locked) return;
+    setSelectedContentLoading(block.type === 'VIDEO');
+    setSelectedBlockId(block.id);
+  }, [completing, selectedContentLoading]);
 
   const handleVideoProgressSaved = useCallback(
     (
@@ -358,7 +370,7 @@ export function CourseLearningPage() {
       />
 
       <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
-        <Paper variant="outlined" sx={{ width: { xs: '100%', md: 320 }, flexShrink: 0, alignSelf: 'flex-start' }}>
+        <Paper variant="outlined" sx={{ width: { xs: '100%', md: 360 }, flexShrink: 0, alignSelf: 'flex-start' }}>
           {learning.modules.map((module) => (
             <Box key={module.id}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, px: 2, pt: 2, pb: 1, color: 'text.secondary' }}>
@@ -369,10 +381,9 @@ export function CourseLearningPage() {
                   <ListItemButton
                     key={block.id}
                     selected={block.id === selectedBlockId}
-                    disabled={block.locked}
-                    onClick={() => {
-                      if (!block.locked) setSelectedBlockId(block.id);
-                    }}
+                    disabled={block.locked || completing || selectedContentLoading}
+                    onClick={() => handleSelectBlock(block)}
+                    sx={{ alignItems: 'flex-start', py: 1.25 }}
                   >
                     <ListItemIcon sx={{ minWidth: 34 }}>
                       {block.locked ? (
@@ -388,9 +399,11 @@ export function CourseLearningPage() {
                     <ListItemText
                       disableTypography
                       primary={
-                        <Typography variant="body2" noWrap>
-                          {block.title}
-                        </Typography>
+                        <Tooltip title={block.title} placement="top-start">
+                          <Typography variant="body2" sx={{ whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.3 }}>
+                            {block.title}
+                          </Typography>
+                        </Tooltip>
                       }
                       secondary={
                         <Typography variant="caption" color="text.secondary" component="div">
@@ -411,8 +424,8 @@ export function CourseLearningPage() {
             <Card variant="outlined">
               <CardContent>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 2 }}>
-                  <Chip size="small" label={selectedBlock.type} variant="outlined" />
-                  <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }} noWrap>
+                  <Chip size="small" label={blockTypeLabel(selectedBlock)} color={blockTypeColor(selectedBlock)} />
+                  <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, overflowWrap: 'anywhere' }}>
                     {selectedBlock.title}
                   </Typography>
                   {canReport && (
@@ -436,6 +449,7 @@ export function CourseLearningPage() {
                 ) : (
                   <BlockContent
                     block={selectedBlock}
+                    onContentLoadingChange={setSelectedContentLoading}
                     onVideoProgressSaved={handleVideoProgressSaved}
                     onQuizProgressSaved={handleQuizProgressSaved}
                     onFlashcardProgressSaved={handleFlashcardProgressSaved}
@@ -444,11 +458,22 @@ export function CourseLearningPage() {
                 )}
 
                 <Divider sx={{ my: 2 }} />
-                <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between' }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{
+                    justifyContent: 'space-between',
+                    position: 'sticky',
+                    bottom: 0,
+                    zIndex: 2,
+                    py: 1,
+                    backgroundColor: 'background.paper',
+                  }}
+                >
                   <Button
                     startIcon={<ArrowBackIcon />}
-                    disabled={selectedIndex <= 0}
-                    onClick={() => setSelectedBlockId(allBlocks[selectedIndex - 1].id)}
+                    disabled={selectedIndex <= 0 || completing || selectedContentLoading}
+                    onClick={() => handleSelectBlock(allBlocks[selectedIndex - 1])}
                   >
                     Bài trước
                   </Button>
@@ -458,6 +483,7 @@ export function CourseLearningPage() {
                     startIcon={<CheckCircleIcon />}
                     disabled={
                       completing ||
+                      selectedContentLoading ||
                       selectedBlock.progressStatus === 'COMPLETED' ||
                       ['VIDEO', 'QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
                     }
@@ -475,11 +501,10 @@ export function CourseLearningPage() {
                       selectedIndex < 0
                       || selectedIndex >= allBlocks.length - 1
                       || allBlocks[selectedIndex + 1].locked
+                      || completing
+                      || selectedContentLoading
                     }
-                    onClick={() => {
-                      const next = allBlocks[selectedIndex + 1];
-                      if (next && !next.locked) setSelectedBlockId(next.id);
-                    }}
+                    onClick={() => handleSelectBlock(allBlocks[selectedIndex + 1])}
                   >
                     Bài sau
                   </Button>
@@ -521,7 +546,24 @@ function blockTypeLabel(block: LearningLessonBlock): string {
   }
 }
 
-function applySequentialLocks(modules: LearningModule[]): LearningModule[] {
+function blockTypeColor(block: LearningLessonBlock): 'primary' | 'success' | 'warning' | 'info' | 'secondary' {
+  switch (block.type) {
+    case 'VIDEO':
+      return 'primary';
+    case 'TEXT':
+      return 'info';
+    case 'QUIZ':
+      return 'warning';
+    case 'FLASHCARD':
+      return 'success';
+    case 'WRITING':
+      return 'secondary';
+    default:
+      return 'primary';
+  }
+}
+
+export function applySequentialLocks(modules: LearningModule[]): LearningModule[] {
   let waitingForCompletion = false;
   return modules.map((module) => ({
     ...module,
@@ -535,6 +577,7 @@ function applySequentialLocks(modules: LearningModule[]): LearningModule[] {
 
 interface BlockContentProps {
   block: LearningLessonBlock;
+  onContentLoadingChange: (loading: boolean) => void;
   onVideoProgressSaved: (
     blockId: string,
     positionSeconds: number,
@@ -556,6 +599,7 @@ interface BlockContentProps {
 
 function BlockContent({
   block,
+  onContentLoadingChange,
   onVideoProgressSaved,
   onQuizProgressSaved,
   onFlashcardProgressSaved,
@@ -563,7 +607,14 @@ function BlockContent({
 }: BlockContentProps) {
   switch (block.type) {
     case 'VIDEO':
-      return <VideoBlock key={block.id} block={block} onProgressSaved={onVideoProgressSaved} />;
+      return (
+        <VideoBlock
+          key={block.id}
+          block={block}
+          onProgressSaved={onVideoProgressSaved}
+          onLoadingChange={onContentLoadingChange}
+        />
+      );
     case 'TEXT':
       return (
         <Box
@@ -592,10 +643,13 @@ function BlockContent({
 function VideoBlock({
   block,
   onProgressSaved,
+  onLoadingChange,
 }: {
   block: LearningLessonBlock;
   onProgressSaved: BlockContentProps['onVideoProgressSaved'];
+  onLoadingChange: BlockContentProps['onContentLoadingChange'];
 }) {
+  const [playerLoading, setPlayerLoading] = useState(true);
   const playerRef = useRef<HTMLVideoElement>(null);
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
   const watchedSecondsRef = useRef(block.watchedVideoSeconds ?? 0);
@@ -606,6 +660,12 @@ function VideoBlock({
 
   const pendingPositionRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
+
+  useEffect(() => {
+    setPlayerLoading(true);
+    onLoadingChange(true);
+    return () => onLoadingChange(false);
+  }, [block.id, onLoadingChange]);
 
   const savePosition = useCallback(
     (positionSeconds: number) => {
@@ -667,6 +727,23 @@ function VideoBlock({
       video.currentTime = Math.min(block.lastVideoPositionSeconds, video.duration || block.lastVideoPositionSeconds);
     }
     if (video) lastObservedTimeRef.current = video.currentTime;
+    setPlayerLoading(false);
+    onLoadingChange(false);
+  };
+
+  const handleWaiting = () => {
+    setPlayerLoading(true);
+    onLoadingChange(true);
+  };
+
+  const handlePlaying = () => {
+    setPlayerLoading(false);
+    onLoadingChange(false);
+  };
+
+  const handleError = () => {
+    setPlayerLoading(false);
+    onLoadingChange(false);
   };
 
   const handlePlay = () => {
@@ -733,6 +810,24 @@ function VideoBlock({
         onContextMenu={(event) => event.preventDefault()}
         onDragStart={(event) => event.preventDefault()}
       >
+        {playerLoading && (
+          <Stack
+            spacing={1}
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'common.white',
+              bgcolor: 'rgba(0, 0, 0, 0.55)',
+              pointerEvents: 'all',
+            }}
+          >
+            <CircularProgress color="inherit" size={28} aria-label="Đang tải video" />
+            <Typography variant="body2">Đang tải bài học…</Typography>
+          </Stack>
+        )}
         <ReactPlayer
           ref={playerRef}
           src={block.videoUrl}
@@ -740,7 +835,11 @@ function VideoBlock({
           width="100%"
           height="100%"
           style={{ position: 'absolute', top: 0, left: 0 }}
+          onReady={handleReady}
           onLoadedMetadata={handleReady}
+          onWaiting={handleWaiting}
+          onPlaying={handlePlaying}
+          onError={handleError}
           onPlay={handlePlay}
           onSeeking={handleSeeking}
           onSeeked={handleSeeked}
