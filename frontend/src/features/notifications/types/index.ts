@@ -65,11 +65,23 @@ export const NOTIFICATION_TYPES: Record<string, NotificationTypeConfig> = {
   TEACHER_SALE: {
     label: 'Doanh thu mới', color: '#047857', bgColor: '#D1FAE5', icon: '📈', important: true,
   },
+  STUDENT_COURSE_COMMENT: {
+    label: 'Bình luận mới', color: '#1D4ED8', bgColor: '#DBEAFE', icon: '💬', important: true,
+  },
+  STUDENT_COURSE_RATING: {
+    label: 'Đánh giá mới', color: '#B45309', bgColor: '#FEF3C7', icon: '⭐', important: true,
+  },
+  TEACHER_REVIEW_REPLY: {
+    label: 'Giảng viên phản hồi', color: '#047857', bgColor: '#D1FAE5', icon: '↩️', important: true,
+  },
   TEACHER_WRITING_FEEDBACK: {
     label: 'Phản hồi bài viết',
     color: '#1565C0',
     bgColor: '#E3F2FD',
     icon: '✨',
+  },
+  WRITING_SUBMITTED: {
+    label: 'Bài viết mới', color: '#7C3AED', bgColor: '#EDE9FE', icon: '✍️', important: true,
   },
   REFUND: {
     label: 'Hoàn tiền',

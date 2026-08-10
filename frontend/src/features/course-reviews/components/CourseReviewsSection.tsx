@@ -25,6 +25,7 @@ interface CourseReviewsSectionProps {
   courseId: string;
   courseIdentifier: string;
   isEnrolled: boolean;
+  canTeacherReply?: boolean;
   averageRating?: number;
   reviewCount?: number;
 }
@@ -43,6 +44,7 @@ export const CourseReviewsSection = ({
   courseId,
   courseIdentifier,
   isEnrolled,
+  canTeacherReply = false,
   averageRating,
   reviewCount = 0,
 }: CourseReviewsSectionProps) => {
@@ -56,6 +58,10 @@ export const CourseReviewsSection = ({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [replyingReviewId, setReplyingReviewId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [replySaving, setReplySaving] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
 
   const canReview = useMemo(() => {
     const session = getAuthSession('public');
@@ -135,8 +141,42 @@ export const CourseReviewsSection = ({
     }
   };
 
+  const startReply = (review: CourseReview) => {
+    setReplyingReviewId(review.id);
+    setReplyText(review.teacherReplyText ?? '');
+    setReplyError(null);
+  };
+
+  const handleReply = async (reviewId: string) => {
+    const normalizedReply = replyText.replace(/\s+/g, ' ').trim();
+    if (normalizedReply.length < 2 || normalizedReply.length > 2000) {
+      setReplyError('Nội dung phản hồi phải có từ 2 đến 2.000 ký tự.');
+      return;
+    }
+
+    setReplySaving(true);
+    setReplyError(null);
+    try {
+      const updatedReview = await courseReviewService.replyToReview(reviewId, {
+        replyText: normalizedReply,
+      });
+      setPage((current) => ({
+        ...current,
+        content: current.content.map((review) => (
+          review.id === reviewId ? updatedReview : review
+        )),
+      }));
+      setReplyingReviewId(null);
+      setReplyText('');
+    } catch {
+      setReplyError('Không thể lưu phản hồi. Vui lòng thử lại.');
+    } finally {
+      setReplySaving(false);
+    }
+  };
+
   return (
-    <Box component="section" aria-labelledby="course-reviews-title" sx={{ mt: 6 }}>
+    <Box id="course-reviews" component="section" aria-labelledby="course-reviews-title" sx={{ mt: 6 }}>
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={1.5}
@@ -275,6 +315,84 @@ export const CourseReviewsSection = ({
                   <Typography sx={{ mt: 1.25, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
                     {review.reviewText}
                   </Typography>
+                  {review.teacherReplyText && (
+                    <Box
+                      sx={{
+                        mt: 2,
+                        ml: { sm: 2 },
+                        p: 2,
+                        bgcolor: 'grey.50',
+                        borderLeft: '3px solid',
+                        borderColor: 'primary.main',
+                        borderRadius: 1.5,
+                      }}
+                    >
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={0.5}
+                        sx={{ justifyContent: 'space-between', mb: 0.5 }}
+                      >
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                          Phản hồi từ giảng viên
+                        </Typography>
+                        {review.teacherRepliedAt && (
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(review.teacherRepliedAt).toLocaleDateString('vi-VN')}
+                          </Typography>
+                        )}
+                      </Stack>
+                      <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                        {review.teacherReplyText}
+                      </Typography>
+                    </Box>
+                  )}
+                  {canTeacherReply && (
+                    replyingReviewId === review.id ? (
+                      <Stack spacing={1.25} sx={{ mt: 2 }}>
+                        <TextField
+                          label="Phản hồi học viên"
+                          value={replyText}
+                          onChange={(event) => setReplyText(event.target.value)}
+                          multiline
+                          minRows={3}
+                          fullWidth
+                          autoFocus
+                          slotProps={{ htmlInput: { maxLength: 2000 } }}
+                          helperText={`${replyText.trim().length}/2000 ký tự`}
+                        />
+                        {replyError && <Alert severity="error">{replyError}</Alert>}
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            variant="contained"
+                            onClick={() => void handleReply(review.id)}
+                            disabled={replySaving}
+                          >
+                            {replySaving ? 'Đang lưu…' : 'Gửi phản hồi'}
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            onClick={() => {
+                              setReplyingReviewId(null);
+                              setReplyText('');
+                              setReplyError(null);
+                            }}
+                            disabled={replySaving}
+                          >
+                            Hủy
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    ) : (
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => startReply(review)}
+                        sx={{ mt: 1.25 }}
+                      >
+                        {review.teacherReplyText ? 'Chỉnh sửa phản hồi' : 'Phản hồi bình luận'}
+                      </Button>
+                    )
+                  )}
                 </Box>
               </Stack>
             </Box>

@@ -4,6 +4,7 @@ import type { ApiResponse } from '../../../shared/types/api';
 import type {
   CourseReview,
   CourseReviewPage,
+  TeacherCourseReviewReply,
   UpsertCourseReview,
 } from '../types/courseReviewTypes';
 
@@ -33,6 +34,17 @@ export const courseReviewService = {
   ): Promise<CourseReview> => {
     const response = await axiosClient.put<ApiResponse<CourseReview>>(
       ENDPOINTS.student.courseReview(courseId),
+      payload,
+    );
+    return response.data.data;
+  },
+
+  replyToReview: async (
+    reviewId: string,
+    payload: TeacherCourseReviewReply,
+  ): Promise<CourseReview> => {
+    const response = await axiosClient.put<ApiResponse<CourseReview>>(
+      ENDPOINTS.teacherCourseReviews.reply(reviewId),
       payload,
     );
     return response.data.data;

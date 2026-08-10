@@ -46,6 +46,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,6 +72,7 @@ class LearningServiceImplTest {
     @Mock private com.manabihub.ai.provider.AiWritingAssistanceProvider aiWritingAssistanceProvider;
     @Mock private com.manabihub.learning.service.StudentAssessmentService studentAssessmentService;
     @Mock private com.manabihub.learning.service.CertificateEligibilityService certificateEligibilityService;
+    @Mock private com.manabihub.notification.service.NotificationService notificationService;
 
     @InjectMocks
     private LearningServiceImpl learningService;
@@ -879,5 +881,55 @@ class LearningServiceImplTest {
         verify(writingSubmissionRepository, atLeastOnce()).save(any());
         verify(aiWritingSuggestionRepository, atLeastOnce()).save(any());
         verify(aiUsageLogService).record(any(), any(), any(), any(), any(), eq(com.manabihub.ai.enums.AiUsageRequestStatus.SUCCESS), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("submitWriting - notifies the course teacher with the submission link")
+    void submitWriting_notifiesTeacher() {
+        UUID writingBlockId = UUID.randomUUID();
+        LessonBlock writingBlock = LessonBlock.builder()
+                .id(writingBlockId)
+                .type(LessonBlockType.WRITING)
+                .title("Viết đoạn giới thiệu bản thân")
+                .orderIndex(4)
+                .module(courseModule)
+                .build();
+        com.manabihub.kyc.domain.AppUser teacherUser = new com.manabihub.kyc.domain.AppUser();
+        teacherUser.setId(UUID.randomUUID());
+        teacherUser.setEmail("teacher@example.test");
+        com.manabihub.kyc.domain.TeacherProfile teacher = new com.manabihub.kyc.domain.TeacherProfile();
+        teacher.setId(UUID.randomUUID());
+        teacher.setUser(teacherUser);
+        course.setTeacher(teacher);
+        studentProfile.setDisplayName("Học viên An");
+
+        when(lessonBlockRepository.findById(writingBlockId)).thenReturn(Optional.of(writingBlock));
+        mockActiveEnrollment();
+        when(writingSubmissionRepository.saveAndFlush(any()))
+                .thenAnswer(invocation -> {
+                    com.manabihub.writing.entity.WritingSubmission submission = invocation.getArgument(0);
+                    submission.setId(UUID.randomUUID());
+                    return submission;
+                });
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(
+                enrollment.getId(), writingBlockId
+        )).thenReturn(Optional.empty());
+
+        com.manabihub.writing.dto.response.StudentWritingSubmissionResponse response =
+                learningService.submitWriting(
+                        writingBlockId,
+                        new com.manabihub.writing.dto.request.WritingSubmissionRequest(
+                                "Đây là bài viết hoàn chỉnh của học viên."
+                        )
+                );
+
+        verify(notificationService).createNotification(
+                eq(teacherUser.getId()),
+                eq(teacherUser.getEmail()),
+                eq("Có bài viết mới cần phản hồi"),
+                contains("Viết đoạn giới thiệu bản thân"),
+                eq(com.manabihub.notification.NotificationTypes.WRITING_SUBMITTED),
+                eq("/teacher/writing-reviews/" + response.id())
+        );
     }
 }

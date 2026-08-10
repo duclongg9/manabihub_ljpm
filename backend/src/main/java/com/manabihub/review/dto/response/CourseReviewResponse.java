@@ -13,6 +13,18 @@ public record CourseReviewResponse(
         String reviewText,
         String authorDisplayName,
         String authorAvatarUrl,
-        Instant updatedAt
+        Instant updatedAt,
+        String teacherReplyText,
+        Instant teacherRepliedAt
 ) {
+    public CourseReviewResponse(
+            UUID id,
+            int rating,
+            String reviewText,
+            String authorDisplayName,
+            String authorAvatarUrl,
+            Instant updatedAt
+    ) {
+        this(id, rating, reviewText, authorDisplayName, authorAvatarUrl, updatedAt, null, null);
+    }
 }

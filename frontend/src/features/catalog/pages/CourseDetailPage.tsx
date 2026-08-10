@@ -135,6 +135,7 @@ export const CourseDetailPage = () => {
               courseId={course.id}
               courseIdentifier={course.slug || course.id}
               isEnrolled={course.isEnrolled}
+              canTeacherReply={Boolean(course.isTeacherOwner)}
               averageRating={course.averageRating}
               reviewCount={course.reviewCount}
             />

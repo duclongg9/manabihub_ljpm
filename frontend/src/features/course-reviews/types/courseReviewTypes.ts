@@ -7,11 +7,17 @@ export interface CourseReview {
   authorDisplayName: string;
   authorAvatarUrl?: string;
   updatedAt: string;
+  teacherReplyText?: string;
+  teacherRepliedAt?: string;
 }
 
 export interface UpsertCourseReview {
   rating: number;
   reviewText: string;
+}
+
+export interface TeacherCourseReviewReply {
+  replyText: string;
 }
 
 export type CourseReviewPage = PageResponse<CourseReview>;

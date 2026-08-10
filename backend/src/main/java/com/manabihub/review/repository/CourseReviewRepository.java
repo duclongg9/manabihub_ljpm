@@ -33,6 +33,10 @@ public interface CourseReviewRepository extends JpaRepository<CourseReview, UUID
     @Query("SELECT review FROM CourseReview review WHERE review.id = :reviewId")
     Optional<CourseReview> findByIdForModeration(@Param("reviewId") UUID reviewId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT review FROM CourseReview review WHERE review.id = :reviewId")
+    Optional<CourseReview> findByIdForTeacherReply(@Param("reviewId") UUID reviewId);
+
     @EntityGraph(attributePaths = {
             "enrollment",
             "enrollment.student",

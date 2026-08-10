@@ -39,6 +39,7 @@ export interface PublicCourseDetail {
   aiSupported: boolean;
   teacher: PublicTeacherProfile;
   isEnrolled: boolean;
+  isTeacherOwner?: boolean;
   totalDurationMinutes: number;
   totalLessons: number;
   averageRating?: number;

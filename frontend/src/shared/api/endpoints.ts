@@ -75,6 +75,9 @@ export const ENDPOINTS = {
     detail: (submissionId: string) => `/v1/teacher/writing-submissions/${submissionId}`,
     feedback: (submissionId: string) => `/v1/teacher/writing-submissions/${submissionId}/feedback`,
   },
+  teacherCourseReviews: {
+    reply: (reviewId: string) => `/v1/teacher/course-reviews/${reviewId}/reply`,
+  },
   student: {
     dashboardStats: '/v1/student/dashboard/stats',
     courses: '/v1/student/courses',

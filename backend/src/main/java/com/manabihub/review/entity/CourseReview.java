@@ -53,6 +53,12 @@ public class CourseReview {
     @Column(name = "review_text", nullable = false, length = 2000)
     private String reviewText;
 
+    @Column(name = "teacher_reply_text", length = 2000)
+    private String teacherReplyText;
+
+    @Column(name = "teacher_replied_at")
+    private Instant teacherRepliedAt;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "review_status", nullable = false, length = 20)
