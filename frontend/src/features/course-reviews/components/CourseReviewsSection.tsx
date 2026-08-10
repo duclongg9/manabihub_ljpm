@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { getAuthSession } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
@@ -28,6 +29,7 @@ interface CourseReviewsSectionProps {
   canTeacherReply?: boolean;
   averageRating?: number;
   reviewCount?: number;
+  onReviewChanged?: () => Promise<unknown> | unknown;
 }
 
 const emptyPage: CourseReviewPage = {
@@ -47,6 +49,7 @@ export const CourseReviewsSection = ({
   canTeacherReply = false,
   averageRating,
   reviewCount = 0,
+  onReviewChanged,
 }: CourseReviewsSectionProps) => {
   const [page, setPage] = useState<CourseReviewPage>(emptyPage);
   const [pageIndex, setPageIndex] = useState(0);
@@ -132,6 +135,12 @@ export const CourseReviewsSection = ({
       setReviewText(review.reviewText);
       setSaved(true);
       await loadReviews(0);
+      try {
+        await onReviewChanged?.();
+      } catch {
+        // The review is already persisted; a later manual refresh can update
+        // the course aggregate if the detail request is temporarily unavailable.
+      }
     } catch {
       setSaveError(
         'Không thể lưu đánh giá. Hãy kiểm tra trạng thái ghi danh và thử lại.',
@@ -198,6 +207,20 @@ export const CourseReviewsSection = ({
             </Stack>
           )}
         </Box>
+        <Button
+          variant="outlined"
+          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+          disabled={loading}
+          onClick={() => {
+            void Promise.all([
+              loadReviews(pageIndex),
+              onReviewChanged?.(),
+            ]);
+          }}
+          sx={{ textTransform: 'none', fontWeight: 700, alignSelf: { xs: 'flex-start', sm: 'center' } }}
+        >
+          Tải lại đánh giá
+        </Button>
       </Stack>
 
       {canReview && (

@@ -163,5 +163,16 @@ class EscrowLedgerRepositoryTest {
         
         // Ensure gross revenue excludes REFUNDED ledgers
         assertEquals(0, new BigDecimal("1000").compareTo(grossRevenue));
+
+        var revenue = escrowLedgerRepository.summarizeTeacherRevenueByCourse(profile.getId());
+        assertEquals(1, revenue.size());
+        var courseRevenue = revenue.get(0);
+        assertEquals(2L, courseRevenue.getPurchaseCount());
+        assertEquals(1L, courseRevenue.getRefundedCount());
+        assertEquals(0, new BigDecimal("1000").compareTo(courseRevenue.getGrossRevenue()));
+        assertEquals(0, new BigDecimal("1000").compareTo(courseRevenue.getTeacherNetRevenue()));
+        assertEquals(0, new BigDecimal("1000").compareTo(courseRevenue.getHeldAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(courseRevenue.getReleasedAmount()));
+        assertEquals(0, new BigDecimal("1000").compareTo(courseRevenue.getRefundedAmount()));
     }
 }

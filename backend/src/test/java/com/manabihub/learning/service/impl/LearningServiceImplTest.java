@@ -394,6 +394,24 @@ class LearningServiceImplTest {
     }
 
     @Test
+    @DisplayName("saveVideoProgress auto-completes only after the watched duration is reached")
+    void testSaveVideoProgress_AutoCompletesAtDuration() {
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+        mockActiveEnrollment();
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LessonProgressResponse response = learningService.saveVideoProgress(
+                blockVideoId,
+                new SaveVideoProgressRequest(300, 300)
+        );
+
+        assertEquals(LessonProgressStatus.COMPLETED, response.status());
+        assertEquals(300, response.watchedVideoSeconds());
+        assertNotNull(response.completedAt());
+    }
+
+    @Test
     @Order(207)
     @DisplayName("UTC07: Resume video - update existing IN_PROGRESS (SRS 5b)")
     void testSaveVideoProgress_UTC07_UpdateInProgress() {
@@ -456,16 +474,15 @@ class LearningServiceImplTest {
 
     @Test
     @Order(303)
-    @DisplayName("UTC03: Complete for the first time (no progress yet)")
+    @DisplayName("UTC03: Reject video completion before the full duration was watched")
     void testMarkLessonComplete_UTC03_CreateNew() {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
         when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
-        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        LessonProgressResponse response = learningService.markLessonComplete(blockVideoId);
-        assertEquals(LessonProgressStatus.COMPLETED, response.status());
-        assertNotNull(response.completedAt());
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> learningService.markLessonComplete(blockVideoId));
+        assertEquals(MessageCodes.COMMON_BAD_REQUEST, exception.getMessageCode());
     }
 
     @Test
@@ -475,7 +492,7 @@ class LearningServiceImplTest {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
         LessonBlockProgress existing = LessonBlockProgress.builder().id(UUID.randomUUID()).enrollmentId(enrollment.getId()).lessonBlockId(videoBlock.getId())
-                .status(LessonProgressStatus.IN_PROGRESS).build();
+                .status(LessonProgressStatus.IN_PROGRESS).watchedVideoSeconds(300).build();
         when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.of(existing));
         when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -523,6 +540,7 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         when(lessonBlockRepository.findById(blockTextId)).thenReturn(Optional.of(textBlock));
         mockActiveEnrollment();
+        when(lessonBlockProgressRepository.findByEnrollmentId(enrollmentId)).thenReturn(List.of(completedProgress(videoBlock)));
         when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockTextId)).thenReturn(Optional.empty());
         when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
         // removed unnecessary stubbing
@@ -543,7 +561,9 @@ class LearningServiceImplTest {
         courseModule.addBlock(textBlock);
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
-        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.of(
+                LessonBlockProgress.builder().id(UUID.randomUUID()).enrollmentId(enrollmentId).lessonBlockId(blockVideoId)
+                        .status(LessonProgressStatus.IN_PROGRESS).watchedVideoSeconds(300).build()));
         when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
         // removed unnecessary stubbing
 

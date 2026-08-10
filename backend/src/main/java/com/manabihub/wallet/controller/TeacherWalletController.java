@@ -5,11 +5,13 @@ import com.manabihub.common.response.ApiResponse;
 import com.manabihub.common.response.PageResponse;
 import com.manabihub.wallet.dto.request.WalletTransactionFilterRequest;
 import com.manabihub.wallet.dto.response.TeacherWalletResponse;
+import com.manabihub.wallet.dto.response.TeacherRevenueSummaryResponse;
 import com.manabihub.wallet.dto.response.WalletTransactionDetailResponse;
 import com.manabihub.wallet.dto.response.WalletTransactionResponse;
 import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.service.WalletService;
 import com.manabihub.wallet.service.WalletTransactionService;
+import com.manabihub.wallet.service.TeacherRevenueService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class TeacherWalletController {
     private final WalletService walletService;
     private final EscrowService escrowService;
     private final WalletTransactionService walletTransactionService;
+    private final TeacherRevenueService teacherRevenueService;
 
     @GetMapping
     @PreAuthorize("hasRole('TEACHER')")
@@ -41,6 +44,17 @@ public class TeacherWalletController {
         UUID userId = UUID.fromString(authentication.getName());
         TeacherWalletResponse response = walletService.getTeacherWalletByUserId(userId);
         return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "Success", response);
+    }
+
+    @GetMapping("/revenue-summary")
+    @PreAuthorize("hasRole('TEACHER')")
+    @Operation(summary = "Get reconciled teacher revenue by course")
+    public ApiResponse<TeacherRevenueSummaryResponse> getRevenueSummary(Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ApiResponse.success(
+                MessageCodes.COMMON_SUCCESS,
+                "Revenue summary retrieved successfully.",
+                teacherRevenueService.getRevenueSummary(userId));
     }
 
     @GetMapping("/escrow")

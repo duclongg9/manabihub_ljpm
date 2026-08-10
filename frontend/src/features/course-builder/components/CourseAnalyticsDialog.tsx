@@ -112,7 +112,7 @@ export function CourseAnalyticsDialog({ courseId, courseTitle, onClose }: Course
           </Box>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Thống kê khóa học
+              Doanh thu & thống kê khóa học
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {courseTitle}

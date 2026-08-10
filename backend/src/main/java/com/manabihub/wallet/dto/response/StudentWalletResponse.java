@@ -11,7 +11,8 @@ public record StudentWalletResponse(
         BigDecimal availableBalance,
         BigDecimal withdrawableBalance,
         BigDecimal availableWithdrawableBalance,
-        String currency
+        String currency,
+        BigDecimal minimumPayoutAmount
 ) {
     public StudentWalletResponse(
             BigDecimal balance,
@@ -25,7 +26,20 @@ public record StudentWalletResponse(
                 availableBalance,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
-                currency
+                currency,
+                BigDecimal.ZERO
         );
+    }
+
+    public StudentWalletResponse(
+            BigDecimal balance,
+            BigDecimal frozenBalance,
+            BigDecimal availableBalance,
+            BigDecimal withdrawableBalance,
+            BigDecimal availableWithdrawableBalance,
+            String currency
+    ) {
+        this(balance, frozenBalance, availableBalance, withdrawableBalance,
+                availableWithdrawableBalance, currency, BigDecimal.ZERO);
     }
 }
