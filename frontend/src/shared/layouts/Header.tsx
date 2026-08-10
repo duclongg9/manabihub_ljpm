@@ -10,10 +10,13 @@ import {
   ListItemIcon,
   Menu,
   MenuItem,
+  Stack,
   Toolbar,
   Tooltip,
   Typography,
 } from '@mui/material';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import ArrowForwardIosOutlinedIcon from '@mui/icons-material/ArrowForwardIosOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -33,6 +36,11 @@ import { ROUTES } from '../constants/routes';
 import { logoutAdminSession } from '../auth/adminAuthApi';
 import { getHeaderBrand } from './headerBrand';
 import { useUnreadCount } from '../../features/notifications/hooks/useNotifications';
+import { useQuery } from '@tanstack/react-query';
+import { getStudentWallet } from '../../features/wallet/services/studentWalletService';
+import { walletService } from '../../features/my-wallet/services/walletService';
+import type { StudentWalletResponse } from '../../features/wallet/types';
+import type { TeacherWallet } from '../../features/my-wallet/types/wallet.types';
 
 interface HeaderProps {
   menuExpanded?: boolean;
@@ -64,6 +72,22 @@ export const Header: React.FC<HeaderProps> = ({
   const brandLabel = getHeaderBrand(session);
   const isAdminPortal = session?.kind === 'admin';
   const { data: unreadCount = 0 } = useUnreadCount(Boolean(session));
+  const isStudentAccount = session?.kind === 'public' && primaryRole === ROLES.STUDENT;
+  const isTeacherAccount = session?.kind === 'public' && primaryRole === ROLES.TEACHER;
+  const studentWalletQuery = useQuery<StudentWalletResponse>({
+    queryKey: ['account-menu-student-wallet'],
+    queryFn: getStudentWallet,
+    enabled: Boolean(accountAnchor) && isStudentAccount,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const teacherWalletQuery = useQuery<TeacherWallet>({
+    queryKey: ['account-menu-teacher-wallet'],
+    queryFn: async () => (await walletService.getTeacherWallet()).data,
+    enabled: Boolean(accountAnchor) && isTeacherAccount,
+    staleTime: 60_000,
+    retry: false,
+  });
 
   const brandContent = (
     <>
@@ -173,7 +197,7 @@ export const Header: React.FC<HeaderProps> = ({
           anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
           transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         >
-          <Box sx={{ maxWidth: 260, minWidth: 220, px: 2, py: 1 }}>
+          <Box sx={{ maxWidth: 320, minWidth: 260, px: 2, py: 1.25 }}>
             <Typography noWrap variant="body2" sx={{ fontWeight: 700 }}>
               {session.email || `Tài khoản ${brandLabel}`}
             </Typography>
@@ -184,12 +208,30 @@ export const Header: React.FC<HeaderProps> = ({
           <Divider />
           <MenuItem onClick={() => { setAccountAnchor(null); navigate(getDefaultRoute(session)); }}>
             <ListItemIcon><SpaceDashboardIcon fontSize="small" /></ListItemIcon>
-            Bảng điều khiển
+            {getDashboardLabel(session)}
           </MenuItem>
+          {isStudentAccount && (
+            <AccountWalletSummary
+              kind="student"
+              loading={studentWalletQuery.isLoading}
+              error={studentWalletQuery.isError}
+              wallet={studentWalletQuery.data}
+              onOpen={() => { setAccountAnchor(null); navigate(ROUTES.STUDENT.PAYMENTS); }}
+            />
+          )}
+          {isTeacherAccount && (
+            <AccountWalletSummary
+              kind="teacher"
+              loading={teacherWalletQuery.isLoading}
+              error={teacherWalletQuery.isError}
+              wallet={teacherWalletQuery.data}
+              onOpen={() => { setAccountAnchor(null); navigate(ROUTES.TEACHER.WALLET); }}
+            />
+          )}
           {profilePath && (
             <MenuItem onClick={() => { setAccountAnchor(null); navigate(profilePath); }}>
               <ListItemIcon><AccountCircleIcon fontSize="small" /></ListItemIcon>
-              Hồ sơ
+              Hồ sơ cá nhân
             </MenuItem>
           )}
           {session.kind === 'admin' && (
@@ -211,6 +253,68 @@ export const Header: React.FC<HeaderProps> = ({
   );
 };
 
+type AccountWalletSummaryProps = {
+  kind: 'student' | 'teacher';
+  loading: boolean;
+  error: boolean;
+  wallet?: StudentWalletResponse | TeacherWallet;
+  onOpen: () => void;
+};
+
+function AccountWalletSummary({ kind, loading, error, wallet, onOpen }: AccountWalletSummaryProps) {
+  const isStudent = kind === 'student';
+  const studentWallet = isStudent ? wallet as StudentWalletResponse | undefined : undefined;
+  const teacherWallet = !isStudent ? wallet as TeacherWallet | undefined : undefined;
+  const currency = (amount: number | undefined) => amount == null
+    ? '—'
+    : new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount);
+
+  return (
+    <Box sx={{ px: 2, py: 1.25, bgcolor: '#F8FAFC' }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.75 }}>
+        <AccountBalanceWalletOutlinedIcon fontSize="small" sx={{ color: '#C41E3A' }} />
+        <Typography variant="caption" sx={{ fontWeight: 800, color: '#475467' }}>
+          {isStudent ? 'Ví & Thanh toán' : 'Ví doanh thu'}
+        </Typography>
+      </Stack>
+      {loading ? (
+        <Typography variant="caption" color="text.secondary">Đang cập nhật số dư…</Typography>
+      ) : error ? (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+          Chưa tải được số dư. Mở ví để thử lại.
+        </Typography>
+      ) : (
+        <Stack direction="row" spacing={2} sx={{ mb: 0.75 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              {isStudent ? 'Số dư mua khóa học' : 'Số dư khả dụng'}
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+              {currency(isStudent ? studentWallet?.availableBalance : teacherWallet?.availableBalance)}
+            </Typography>
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              {isStudent ? 'Có thể rút' : 'Đang đối soát'}
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+              {currency(isStudent ? studentWallet?.availableWithdrawableBalance : teacherWallet?.pendingBalance)}
+            </Typography>
+          </Box>
+        </Stack>
+      )}
+      <Button
+        size="small"
+        onClick={onOpen}
+        endIcon={<ArrowForwardIosOutlinedIcon sx={{ fontSize: '0.75rem !important' }} />}
+        sx={{ p: 0, minWidth: 0, textTransform: 'none', fontWeight: 800, color: '#C41E3A' }}
+      >
+        {isStudent ? 'Mở Ví & Thanh toán' : 'Mở ví doanh thu'}
+      </Button>
+    </Box>
+  );
+}
+
 function getNotificationPath(session: AuthSession) {
   if (session.kind === 'admin') return ROUTES.ADMIN.NOTIFICATIONS;
   if (session.roles.includes(ROLES.TEACHER)) return ROUTES.TEACHER.NOTIFICATIONS;
@@ -221,4 +325,10 @@ function getProfilePath(session: AuthSession) {
   if (session.kind === 'admin') return null;
   if (session.roles.includes(ROLES.TEACHER)) return ROUTES.TEACHER.PROFILE;
   return ROUTES.STUDENT.PROFILE;
+}
+
+function getDashboardLabel(session: AuthSession) {
+  if (session.kind === 'admin') return 'Tổng quan quản trị';
+  if (session.roles.includes(ROLES.TEACHER)) return 'Tổng quan giảng viên';
+  return 'Khóa học của tôi';
 }
