@@ -10,6 +10,8 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -29,6 +31,10 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendEmailSynchronously(String to, String subject, String body) {
+        if (isNonRoutableLocalAddress(to)) {
+            log.info("Skipped email delivery to a non-routable .local address");
+            return;
+        }
         try {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -44,5 +50,17 @@ public class EmailServiceImpl implements EmailService {
         } catch (RuntimeException exception) {
             throw new IllegalStateException("Email delivery failed", exception);
         }
+    }
+
+    private boolean isNonRoutableLocalAddress(String recipient) {
+        if (recipient == null) {
+            return false;
+        }
+        int separatorIndex = recipient.lastIndexOf('@');
+        if (separatorIndex < 0 || separatorIndex == recipient.length() - 1) {
+            return false;
+        }
+        String domain = recipient.substring(separatorIndex + 1).trim().toLowerCase(Locale.ROOT);
+        return domain.equals("local") || domain.endsWith(".local");
     }
 }
