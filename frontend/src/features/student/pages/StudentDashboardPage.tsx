@@ -79,7 +79,19 @@ export function StudentDashboardPage() {
   const stats = statsQuery.data;
   const courses = coursesQuery.data?.content ?? [];
   const profile = profileQuery.data;
-  const jlptGoal = profile?.jlptGoal || 'chưa thiết lập';
+  const goalLevel = profile?.jlptGoal?.match(/\bN[1-5]\b/i)?.[0].toUpperCase() || 'N3';
+  const currentLevel = courses
+    .map((course) => course.courseTitle.match(/\bN[1-5]\b/i)?.[0].toUpperCase())
+    .find(Boolean) || 'N5';
+  const currentNumber = Number(currentLevel.replace('N', '')) || 5;
+  const goalNumber = Number(goalLevel.replace('N', '')) || 3;
+  const roadmapDirection = currentNumber === goalNumber ? 0 : currentNumber > goalNumber ? -1 : 1;
+  const roadmapLevels = [currentLevel];
+  let roadmapNumber = currentNumber;
+  while (roadmapNumber !== goalNumber && roadmapLevels.length < 5) {
+    roadmapNumber += roadmapDirection;
+    roadmapLevels.push(`N${roadmapNumber}`);
+  }
   const statCards = [
     {
       label: 'Khóa học đã ghi danh',
@@ -160,7 +172,7 @@ export function StudentDashboardPage() {
               Chào {profile?.displayName || 'bạn'}
             </Typography>
             <Typography sx={{ color: '#5B6472', fontSize: { xs: '0.95rem', md: '1.05rem' } }}>
-              Tiếp tục lộ trình JLPT {jlptGoal} từ nơi bạn đã dừng lại.
+              Mục tiêu: JLPT {goalLevel} · Trình độ hiện tại: {currentLevel}
             </Typography>
           </Box>
           <Button
@@ -179,6 +191,34 @@ export function StudentDashboardPage() {
             Xem tất cả khóa học
           </Button>
         </Stack>
+
+        <Paper
+          data-testid="mini-roadmap"
+          elevation={0}
+          sx={{ p: { xs: 2, sm: 2.5 }, mb: 4, border: '1px solid #E4E7EC', borderRadius: '8px', bgcolor: '#FFFFFF' }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', gap: 1, mb: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ color: '#172033', fontWeight: 900 }}>Lộ trình JLPT của bạn</Typography>
+            <Typography variant="caption" sx={{ color: '#667085' }}>Đang học {currentLevel} · Mục tiêu {goalLevel}</Typography>
+          </Stack>
+          <Stack direction="row" sx={{ alignItems: 'center', width: '100%' }}>
+            {roadmapLevels.map((level, index) => {
+              const isCurrent = index === 0;
+              const isTarget = index === roadmapLevels.length - 1;
+              return (
+                <Box key={`${level}-${index}`} sx={{ display: 'flex', alignItems: 'center', flex: index === roadmapLevels.length - 1 ? '0 0 auto' : 1 }}>
+                  <Stack spacing={0.35} sx={{ alignItems: 'center', minWidth: { xs: 42, sm: 64 } }}>
+                    <Box sx={{ width: 30, height: 30, borderRadius: '50%', display: 'grid', placeItems: 'center', bgcolor: isCurrent ? '#DCFCE7' : isTarget ? '#FFF1C2' : '#F1F5F9', color: isCurrent ? '#15803D' : isTarget ? '#A16207' : '#94A3B8', fontWeight: 900, fontSize: 13 }}>
+                      {isTarget ? '🏆' : isCurrent ? '●' : '○'}
+                    </Box>
+                    <Typography variant="caption" sx={{ fontWeight: isCurrent || isTarget ? 900 : 700, color: isCurrent ? '#15803D' : isTarget ? '#A16207' : '#667085' }}>{level}{isCurrent ? ' (Đang học)' : isTarget ? ' (Mục tiêu)' : ''}</Typography>
+                  </Stack>
+                  {index < roadmapLevels.length - 1 && <Box sx={{ height: 2, flex: 1, mx: { xs: 0.5, sm: 1 }, bgcolor: '#D7DEE8' }} />}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Paper>
 
         <Grid container spacing={2.5} sx={{ position: 'relative', mb: 5 }}>
           {statCards.map(({ label, value, helper, icon: Icon, color, tint }) => (
@@ -305,7 +345,7 @@ export function StudentDashboardPage() {
 
           <Grid size={{ xs: 12, lg: 3.5 }}>
             <StudyGoalsWidget
-              jlptGoal={profile?.jlptGoal}
+              jlptGoal={goalLevel}
               courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
             />
           </Grid>
