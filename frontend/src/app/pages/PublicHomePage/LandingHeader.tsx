@@ -91,9 +91,9 @@ export const LandingHeader: React.FC = () => {
                 sx={{ display: 'block', height: { xs: 48, sm: 54 }, width: 'auto' }}
               />
             </Box>
-            <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.5px', display: { xs: 'none', sm: 'block' }, color: '#1A1A2E' }}>
+            {/* <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.5px', display: { xs: 'none', sm: 'block' }, color: '#1A1A2E' }}>
               ManabiHub
-            </Typography>
+            </Typography> */}
           </Box>
 
           <Box>

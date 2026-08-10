@@ -1,7 +1,6 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 import type { ApiResponse, PageResponse } from '../../../shared/types/api';
-import type { CheckoutResponse } from '../../checkout/types';
 import type {
   CreateStudentWithdrawalPayload,
   StudentBankAccount,
@@ -16,18 +15,6 @@ import { toTransactionParams } from './walletTransactionParams';
 /** Fetches the current student's money-wallet overview (balance). */
 export async function getStudentWallet(): Promise<StudentWalletResponse> {
   const response = await axiosClient.get<ApiResponse<StudentWalletResponse>>(ENDPOINTS.student.wallet);
-  return response.data.data;
-}
-
-/**
- * Creates a wallet top-up order and initiates payment; returns the VNPay payment URL.
- * Confirmation happens only via the backend IPN — the frontend never marks it paid.
- */
-export async function topUpWallet(amount: number): Promise<CheckoutResponse> {
-  const response = await axiosClient.post<ApiResponse<CheckoutResponse>>(
-    ENDPOINTS.student.walletTopUp,
-    { amount },
-  );
   return response.data.data;
 }
 
@@ -52,10 +39,10 @@ export async function getStudentWalletTransactionDetail(
   return response.data.data;
 }
 
-export async function getStudentWithdrawals(): Promise<PageResponse<StudentWithdrawal>> {
+export async function getStudentWithdrawals(page: number = 0, size: number = 10): Promise<PageResponse<StudentWithdrawal>> {
   const response = await axiosClient.get<ApiResponse<PageResponse<StudentWithdrawal>>>(
     ENDPOINTS.student.withdrawals,
-    { params: { page: 0, size: 100, sort: 'requestedAt,desc' } },
+    { params: { page, size, sort: 'requestedAt,desc' } },
   );
   return response.data.data;
 }

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Box, Container, Grid, Typography, Stack, Divider } from '@mui/material';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 
@@ -52,21 +51,33 @@ export const LandingFooter: React.FC = () => {
         <Grid container spacing={8} sx={{ mb: 10 }}>
           {/* Logo & Description */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+            <Box
+              component={Link}
+              to={ROUTES.PUBLIC.HOME}
+              aria-label="Về trang chủ ManabiHub"
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                mb: 3,
+                borderRadius: 2,
+                bgcolor: '#ffffff',
+                px: 1.25,
+                py: 0.5,
+                textDecoration: 'none',
+                boxShadow: '0 4px 15px rgba(196, 30, 58, 0.2)',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 20px rgba(196, 30, 58, 0.28)',
+                },
+              }}
+            >
               <Box
-                sx={{
-                  width: 40, height: 40,
-                  background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)',
-                  borderRadius: 2,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 4px 15px rgba(196, 30, 58, 0.3)'
-                }}
-              >
-                <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
-              </Box>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: '#ffffff', letterSpacing: '-0.5px' }}>
-                ManabiHub
-              </Typography>
+                component="img"
+                src="/manabihub-header-logo.svg"
+                alt="ManabiHub"
+                sx={{ display: 'block', height: 64, width: 'auto' }}
+              />
             </Box>
             <Typography variant="body1" sx={{ color: '#94a3b8', lineHeight: 1.8, pr: { md: 4 }, mb: 4, fontWeight: 300 }}>
               Nền tảng học tiếng Nhật trực tuyến, kết nối học viên với giảng viên và

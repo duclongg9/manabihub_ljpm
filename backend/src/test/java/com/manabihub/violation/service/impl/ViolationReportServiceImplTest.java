@@ -2,6 +2,8 @@ package com.manabihub.violation.service.impl;
 
 import com.manabihub.course.entity.Course;
 import com.manabihub.identity.entity.AppUser;
+import com.manabihub.moderation.entity.ViolationEvidence;
+import com.manabihub.moderation.repository.ViolationEvidenceRepository;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.violation.dto.ViolationReportRequest;
 import com.manabihub.violation.dto.ViolationReportResponse;
@@ -10,6 +12,7 @@ import com.manabihub.violation.enums.ViolationStatus;
 import com.manabihub.violation.enums.ViolationTargetType;
 import com.manabihub.violation.mapper.ViolationReportMapper;
 import com.manabihub.violation.repository.ViolationReportRepository;
+import com.manabihub.violation.service.ViolationEvidenceStorageService;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.LessonBlock;
@@ -27,8 +30,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -62,6 +67,12 @@ class ViolationReportServiceImplTest {
     @Mock
     private EntityManager entityManager;
 
+    @Mock
+    private ViolationEvidenceRepository evidenceRepository;
+
+    @Mock
+    private ViolationEvidenceStorageService evidenceStorageService;
+
     @InjectMocks
     private ViolationReportServiceImpl violationReportService;
 
@@ -80,6 +91,7 @@ class ViolationReportServiceImplTest {
         request.setTargetType(targetType);
         request.setTargetId(targetId);
         request.setReason("Misleading course content");
+        request.setDescription("The course video does not match the public description.");
         return request;
     }
 
@@ -110,7 +122,30 @@ class ViolationReportServiceImplTest {
         when(violationReportMapper.toResponse(any(ViolationReport.class)))
                 .thenReturn(new ViolationReportResponse());
 
-        violationReportService.submitReport(request, reporterId);
+        MockMultipartFile evidenceFile = new MockMultipartFile(
+                "evidence",
+                "screenshot.png",
+                "image/png",
+                new byte[]{1, 2, 3}
+        );
+        com.manabihub.moderation.entity.ViolationReport moderationReport =
+                com.manabihub.moderation.entity.ViolationReport.builder().id(reportId).build();
+        when(entityManager.getReference(
+                com.manabihub.moderation.entity.ViolationReport.class,
+                reportId
+        )).thenReturn(moderationReport);
+        when(evidenceStorageService.store(reportId, evidenceFile)).thenReturn(
+                new ViolationEvidenceStorageService.StoredEvidence(
+                        reportId + "/evidence.png",
+                        "screenshot.png",
+                        "image/png",
+                        "IMAGE"
+                )
+        );
+        when(evidenceStorageService.toStoredReference(reportId + "/evidence.png"))
+                .thenReturn("private:violation-evidence:" + reportId + "/evidence.png");
+
+        violationReportService.submitReport(request, List.of(evidenceFile), reporterId);
 
         verify(notificationService).createNotificationForAdminRole(
                 eq("COURSE_MANAGER"),
@@ -119,6 +154,11 @@ class ViolationReportServiceImplTest {
                 eq("VIOLATION_REPORT"),
                 eq("/admin/violations/" + reportId)
         );
+        ArgumentCaptor<ViolationEvidence> savedEvidence = ArgumentCaptor.forClass(ViolationEvidence.class);
+        verify(evidenceRepository).save(savedEvidence.capture());
+        assertEquals("screenshot.png", savedEvidence.getValue().getDisplayName());
+        assertEquals("IMAGE", savedEvidence.getValue().getEvidenceType());
+        assertEquals(reporter, savedEvidence.getValue().getSubmittedBy());
     }
 
     @Test
@@ -152,6 +192,7 @@ class ViolationReportServiceImplTest {
         verify(violationReportRepository).save(saved.capture());
         assertEquals(ViolationStatus.PENDING_REVIEW, saved.getValue().getStatus());
         assertEquals(ViolationTargetType.LESSON_BLOCK, saved.getValue().getTargetType());
+        assertEquals(request.getDescription(), saved.getValue().getDescription());
     }
 
     @Test

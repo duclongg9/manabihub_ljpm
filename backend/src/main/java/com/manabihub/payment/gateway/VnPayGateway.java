@@ -144,7 +144,8 @@ public class VnPayGateway implements PaymentGateway {
         params.put("vnp_ReturnUrl", buildReturnUrl(order));
         params.put("vnp_IpAddr", clientIp == null || clientIp.isBlank() ? "127.0.0.1" : clientIp);
         params.put("vnp_CreateDate", VNP_TIME.format(now));
-        params.put("vnp_ExpireDate", VNP_TIME.format(now.plus(Duration.ofMinutes(15))));
+        params.put("vnp_ExpireDate", VNP_TIME.format(
+                now.plus(Duration.ofMinutes(Math.max(1, properties.getPaymentExpiryMinutes())))));
         return params;
     }
 

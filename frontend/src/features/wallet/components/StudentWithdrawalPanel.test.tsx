@@ -53,6 +53,8 @@ describe('StudentWithdrawalPanel', () => {
           currency: 'VND',
         }}
         minimumAmount={100000}
+        identityVerified
+        onVerifyIdentity={vi.fn()}
         onChanged={onChanged}
       />,
     );
@@ -68,11 +70,13 @@ describe('StudentWithdrawalPanel', () => {
     fireEvent.change(screen.getByLabelText('Tên chủ tài khoản'), {
       target: { value: 'Nguyen Van A' },
     });
-    fireEvent.click(screen.getByLabelText('Đã xác minh chính chủ'));
     fireEvent.click(screen.getByRole('button', { name: 'Gửi OTP xác nhận' }));
 
     await waitFor(() => expect(sendStudentWithdrawalOtp).toHaveBeenCalledTimes(1));
-    fireEvent.change(screen.getByPlaceholderText('Nhập mã OTP gồm 6 số'), {
+    // The OTP input only mounts once the awaited send call resolves and flips otpSent,
+    // so wait for the element itself rather than the mock call — a sync query here is a
+    // race that happens to win on fast machines and loses on slower CI runners.
+    fireEvent.change(await screen.findByPlaceholderText('Nhập mã OTP gồm 6 số'), {
       target: { value: '123456' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Xác nhận rút tiền' }));
@@ -105,6 +109,8 @@ describe('StudentWithdrawalPanel', () => {
           currency: 'VND',
         }}
         minimumAmount={100000}
+        identityVerified={false}
+        onVerifyIdentity={vi.fn()}
         onChanged={vi.fn().mockResolvedValue(undefined)}
       />,
     );

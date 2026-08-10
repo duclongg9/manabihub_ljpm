@@ -4,7 +4,6 @@ import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 
 export const STUDENT_MENU = [
   {
@@ -23,17 +22,12 @@ export const STUDENT_MENU = [
     icon: FavoriteBorderIcon,
   },
   {
-    title: 'Ví của tôi',
-    path: ROUTES.STUDENT.WALLET,
-    icon: AccountBalanceWalletIcon,
-  },
-  {
     title: 'Lịch sử thanh toán',
     path: ROUTES.STUDENT.PAYMENTS,
     icon: ReceiptLongIcon,
   },
   {
-    title: "Hồ sơ cá nhân",
+    title: 'Hồ sơ cá nhân',
     path: ROUTES.STUDENT.PROFILE,
     icon: AccountCircleIcon,
   },

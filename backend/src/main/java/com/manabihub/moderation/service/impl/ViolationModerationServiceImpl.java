@@ -41,6 +41,7 @@ import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.violation.service.ViolationEvidenceStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -94,6 +95,7 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
     private final OrderItemRepository orderItemRepository;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ViolationEvidenceStorageService evidenceStorageService;
 
     @Override
     @Transactional(readOnly = true)
@@ -707,6 +709,17 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
     }
 
     private Optional<ViolationEvidenceResponse> toEvidenceResponse(ViolationEvidence evidence) {
+        if (isPrivateEvidence(evidence.getExternalUrl())) {
+            return Optional.of(ViolationEvidenceResponse.builder()
+                    .evidenceId(evidence.getId())
+                    .evidenceType(evidence.getEvidenceType())
+                    .displayName(evidence.getDisplayName())
+                    .accessUrl("/v1/admin/violations/" + evidence.getViolationReport().getId()
+                            + "/evidence/" + evidence.getId())
+                    .contentType(evidence.getContentType())
+                    .submittedAt(evidence.getCreatedAt())
+                    .build());
+        }
         String safeUrl = safeExternalUrl(evidence.getExternalUrl());
         if (safeUrl == null) {
             return Optional.empty();
@@ -719,6 +732,35 @@ public class ViolationModerationServiceImpl implements ViolationModerationServic
                 .contentType(evidence.getContentType())
                 .submittedAt(evidence.getCreatedAt())
                 .build());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ViolationEvidenceDownload getViolationEvidence(
+            UUID reportId,
+            UUID evidenceId,
+            UUID adminId
+    ) {
+        requirePermission(adminId, PERMISSION_RESOLVE, MessageCodes.ADMIN_PERMISSION_DENIED);
+        ViolationEvidence evidence = evidenceRepository
+                .findByIdAndViolationReport_Id(evidenceId, reportId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COMMON_NOT_FOUND,
+                        "Không tìm thấy tệp bằng chứng.",
+                        HttpStatus.NOT_FOUND
+                ));
+        String storageKey = evidenceStorageService.parseStorageKey(evidence.getExternalUrl());
+        return new ViolationEvidenceDownload(
+                evidence.getDisplayName(),
+                StringUtils.hasText(evidence.getContentType())
+                        ? evidence.getContentType()
+                        : "application/octet-stream",
+                evidenceStorageService.load(storageKey)
+        );
+    }
+
+    private boolean isPrivateEvidence(String value) {
+        return value != null && value.startsWith(ViolationEvidenceStorageService.STORAGE_PREFIX);
     }
 
     private List<ModerationActionType> availableActions(

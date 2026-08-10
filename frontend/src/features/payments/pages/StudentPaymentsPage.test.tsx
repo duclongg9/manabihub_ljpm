@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useOrderHistory } from '../hooks/useOrderHistory';
@@ -20,6 +20,29 @@ vi.mock('../../refunds/hooks/useStudentRefunds', () => ({
     reset: vi.fn(),
     mutateAsync: vi.fn(),
     isPending: false,
+  })),
+}));
+
+vi.mock('../../wallet/services/studentWalletService', () => ({
+  getStudentWallet: vi.fn(() => Promise.resolve({
+    availableBalance: 500000,
+    availableWithdrawableBalance: 500000,
+    escrowBalance: 0,
+    currency: 'VND',
+  })),
+  getStudentWithdrawals: vi.fn(() => Promise.resolve({
+    content: [],
+    page: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+  })),
+}));
+
+vi.mock('../../wallet/services/studentIdentityVerificationService', () => ({
+  getStudentIdentityVerificationStatus: vi.fn(() => Promise.resolve({
+    verified: false,
+    status: 'NOT_VERIFIED',
   })),
 }));
 
@@ -91,14 +114,20 @@ describe('StudentPaymentsPage', () => {
     );
 
     expect(screen.getByText('MHB-20260729-001')).toBeInTheDocument();
+    expect(screen.getByTestId('decorative-kanji-watermark')).toHaveTextContent('履歴');
     expect(screen.getByText('JLPT N2 chuyên sâu')).toBeInTheDocument();
     expect(screen.getAllByText(/799\.000/).length).toBeGreaterThan(0);
     expect(screen.getByText('Đã thanh toán')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Vào học/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Yêu cầu hoàn tiền/i })).toBeInTheDocument();
+    expect(screen.getByText('Ví học viên')).toBeInTheDocument();
+    expect(screen.getByText('Rút tiền hoàn')).toBeInTheDocument();
+    expect(screen.getByText('Tiền hoàn dùng để mua khóa học')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Nạp tiền/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Xác minh CCCD để rút tiền' })).toBeInTheDocument();
   });
 
-  it('renders the top-up amount instead of a missing-course fallback', () => {
+  it('filters out top-up orders from course order history', () => {
     vi.mocked(useOrderHistory).mockReturnValue({
       data: {
         content: [
@@ -132,11 +161,11 @@ describe('StudentPaymentsPage', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/Nạp.*100\.000.*vào ví/)).toBeInTheDocument();
-    expect(screen.queryByText('Đơn hàng chưa có thông tin khóa học')).not.toBeInTheDocument();
+    expect(screen.getByText('Chưa có đơn hàng nào')).toBeInTheDocument();
+    expect(screen.queryByText('MHB-TOPUP-001')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Vào học/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Yêu cầu hoàn tiền/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Xem hoàn tiền/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Xem chi tiết hoàn tiền/i })).not.toBeInTheDocument();
   });
 
   it('does not offer refund actions for a free course', () => {
@@ -181,10 +210,23 @@ describe('StudentPaymentsPage', () => {
     );
 
     const courseTitle = screen.getByText('Free Japanese Course');
-    const freeCourseRow = courseTitle.closest('.MuiStack-root');
+    const freeCourseRow = courseTitle.closest('.MuiBox-root');
 
     expect(screen.getByText('MHB-FREE-001')).toBeInTheDocument();
     expect(freeCourseRow).not.toBeNull();
     expect(within(freeCourseRow as HTMLElement).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('renders withdrawal history when the withdrawal tab is selected', async () => {
+    render(
+      <MemoryRouter>
+        <StudentPaymentsPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Lịch sử rút tiền' }));
+
+    expect(await screen.findByText('Chưa có yêu cầu rút tiền về ngân hàng nào.')).toBeInTheDocument();
+    expect(screen.queryByText('MHB-20260729-001')).not.toBeInTheDocument();
   });
 });

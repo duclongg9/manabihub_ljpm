@@ -26,4 +26,28 @@ export const adminViolationService = {
     );
     return response.data.data;
   },
+
+  downloadEvidence: async (accessUrl: string, fileName: string) => {
+    if (/^https?:\/\//i.test(accessUrl)) {
+      window.open(accessUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const response = await axiosClient.get<Blob>(accessUrl, { responseType: 'blob' });
+    const objectUrl = URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  },
+
+  loadEvidencePreview: async (accessUrl: string) => {
+    if (/^https?:\/\//i.test(accessUrl)) {
+      return { url: accessUrl, shouldRevoke: false };
+    }
+    const response = await axiosClient.get<Blob>(accessUrl, { responseType: 'blob' });
+    return { url: URL.createObjectURL(response.data), shouldRevoke: true };
+  },
 };

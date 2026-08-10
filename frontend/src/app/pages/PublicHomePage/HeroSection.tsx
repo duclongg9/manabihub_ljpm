@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Container, Typography, Button } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -10,6 +11,32 @@ import { getAsset } from '../../../shared/utils/assets';
 // Japanese wave pattern as inline SVG data URI
 const WAVE_PATTERN = `url("data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21.184 20c.357-.13.72-.264 1.088-.402l1.768-.661C33.64 15.347 39.647 14 50 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072h6.225c-2.51-.73-5.139-1.691-8.233-2.928C65.888 13.278 60.562 12 50 12c-10.626 0-16.855 1.397-26.66 5.063l-1.767.662c-2.475.923-4.66 1.674-6.724 2.275h6.335zm0-20C13.258 2.892 8.077 4 0 4V2c5.744 0 9.951-.574 14.85-2h6.334zM77.38 0C85.239 2.966 90.502 4 100 4V2c-6.842 0-11.386-.542-16.396-2h-6.225zM0 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072H21.18c-.358-.13-.72-.264-1.088-.402l-1.768-.661C9.73 15.347 3.723 14 0 14v0z' fill='%23ffffff' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E")`;
 
+// Shared geometry for the two hero CTAs so they always render at the same size —
+// they differ only in colour and hover treatment. Width comes from the grid column
+// they sit in (see HERO_CTA_GROUP_SX), never from their own label, so the two stay
+// equal even though one label is longer and only the other carries an icon.
+const HERO_BUTTON_BASE_SX: SxProps<Theme> = {
+  py: 1.8,
+  px: 5,
+  width: '100%',
+  borderRadius: '12px',
+  color: '#ffffff',
+  fontWeight: 700,
+  textTransform: 'none',
+  fontSize: '1.1rem',
+  transition: 'all 0.3s ease',
+};
+
+// A single grid column sized to the widest button: `max-content` measures the longest
+// label, then both buttons stretch to fill that column, so they match without hard-coding
+// a width that would break the moment a label changes. The minmax(0, …) lower bound lets
+// the column shrink on narrow screens instead of overflowing the viewport.
+const HERO_CTA_GROUP_SX: SxProps<Theme> = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, max-content)',
+  gap: 2,
+};
+
 export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
 
@@ -18,6 +45,10 @@ export const HeroSection: React.FC = () => {
       sx={{
         position: 'relative',
         minHeight: { xs: '75vh', md: '85vh' },
+        // StatsBar deliberately overlaps this section by 48px (xs) / 64px (md) via a
+        // negative margin. Reserve more than that here so hero content — especially the
+        // CTA row once it wraps — never ends up underneath (and unclickable behind) it.
+        pb: { xs: 10, md: 14 },
         display: 'flex',
         alignItems: 'center',
         overflow: 'hidden',
@@ -143,28 +174,24 @@ export const HeroSection: React.FC = () => {
                 công cụ AI hỗ trợ học tập và quy trình xác thực giảng viên trước khi xuất bản.
               </Typography>
 
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={HERO_CTA_GROUP_SX}>
                 <Button
                   variant="contained"
                   size="large"
                   onClick={() => navigate(ROUTES.PUBLIC.COURSE_BROWSE)}
                   endIcon={<AutoStoriesIcon />}
-                  sx={{
-                    py: 1.8, px: 5,
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)',
-                    color: '#ffffff',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    fontSize: '1.1rem',
-                    boxShadow: '0 8px 24px rgba(196, 30, 58, 0.35)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #A8182F 0%, #D13A24 100%)',
-                      transform: 'translateY(-3px)',
-                      boxShadow: '0 16px 32px rgba(196, 30, 58, 0.45)'
+                  sx={[
+                    HERO_BUTTON_BASE_SX,
+                    {
+                      background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)',
+                      boxShadow: '0 8px 24px rgba(196, 30, 58, 0.35)',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #A8182F 0%, #D13A24 100%)',
+                        transform: 'translateY(-3px)',
+                        boxShadow: '0 16px 32px rgba(196, 30, 58, 0.45)'
+                      }
                     }
-                  }}
+                  ]}
                 >
                   Khám phá khóa học
                 </Button>
@@ -173,22 +200,18 @@ export const HeroSection: React.FC = () => {
                   variant="outlined"
                   size="large"
                   onClick={() => navigate(ROUTES.TEACHER.KYC)}
-                  sx={{
-                    py: 1.8, px: 5,
-                    borderRadius: '12px',
-                    borderColor: '#ffffff',
-                    borderWidth: '2px',
-                    color: '#ffffff',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    fontSize: '1.1rem',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      borderColor: 'rgba(196, 30, 58, 0.6)',
-                      bgcolor: 'rgba(196, 30, 58, 0.08)',
-                      transform: 'translateY(-3px)'
+                  sx={[
+                    HERO_BUTTON_BASE_SX,
+                    {
+                      borderColor: '#ffffff',
+                      borderWidth: '2px',
+                      '&:hover': {
+                        borderColor: 'rgba(196, 30, 58, 0.6)',
+                        bgcolor: 'rgba(196, 30, 58, 0.08)',
+                        transform: 'translateY(-3px)'
+                      }
                     }
-                  }}
+                  ]}
                 >
                   Trở thành giảng viên
                 </Button>

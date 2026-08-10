@@ -1,19 +1,28 @@
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useRef } from 'react';
 import { useCourseDetail } from '../hooks/useCourseDetail';
 import { CourseHero } from '../components/CourseHero';
-import { CourseStickyCard } from '../components/CourseStickyCard';
+import { CourseStickyCard, type CourseStickyCardHandle } from '../components/CourseStickyCard';
 import { CurriculumAccordion } from '../components/CurriculumAccordion';
 import { TeacherProfile } from '../components/TeacherProfile';
 import { CourseStickyHeader } from '../components/CourseStickyHeader';
 import { Helmet } from 'react-helmet-async';
-import { Target, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Target, CheckCircle2 } from 'lucide-react';
 import { CourseReviewsSection } from '../../course-reviews/components/CourseReviewsSection';
 import { RichTextContent } from '../../../shared/components/RichTextContent/RichTextContent';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 
 export const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const { data: course, isLoading, isError } = useCourseDetail(id || '');
+  const navigate = useNavigate();
+  const stickyCardRef = useRef<CourseStickyCardHandle>(null);
+  const {
+    data: course,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useCourseDetail(id || '');
 
   if (isLoading) {
     return (
@@ -80,10 +89,25 @@ export const CourseDetailPage = () => {
         {thumbnailUrl && <meta name="twitter:image" content={thumbnailUrl} />}
       </Helmet>
 
-      <CourseStickyHeader course={course} />
+      <CourseStickyHeader
+        course={course}
+        onPurchase={() => stickyCardRef.current?.openPurchaseOptions()}
+        onContinueLearning={() => navigate(`/student/courses/${course.id}/learn`)}
+      />
       <CourseHero course={course} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex justify-end mb-4">
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-red-200 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Đang tải...' : 'Tải lại khóa học'}
+          </button>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 relative">
 
           {/* Left Column: Main Content */}
@@ -135,15 +159,17 @@ export const CourseDetailPage = () => {
               courseId={course.id}
               courseIdentifier={course.slug || course.id}
               isEnrolled={course.isEnrolled}
+              canTeacherReply={Boolean(course.isTeacherOwner)}
               averageRating={course.averageRating}
               reviewCount={course.reviewCount}
+              onReviewChanged={refetch}
             />
           </div>
 
           {/* Right Column: Sticky Card */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              <CourseStickyCard course={course} />
+              <CourseStickyCard ref={stickyCardRef} course={course} />
             </div>
           </div>
 

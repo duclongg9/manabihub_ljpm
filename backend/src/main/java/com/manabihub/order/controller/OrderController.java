@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,6 +46,7 @@ public class OrderController {
      * payment URL the browser must be redirected to.
      */
     @PostMapping
+    @Transactional
     public ApiResponse<CheckoutResponse> checkout(@Valid @RequestBody CreateOrderRequest request,
                                                   HttpServletRequest httpRequest) {
         Order order = orderService.createOrder(request.courseId());
@@ -114,6 +116,18 @@ public class OrderController {
         return ApiResponse.success(
                 MessageCodes.ORDER_RETRIEVED,
                 "Order retrieved successfully.",
+                orderService.getOrderForCurrentStudent(orderId));
+    }
+
+    @PostMapping("/{orderId}/cancel")
+    public ApiResponse<OrderResponse> cancelOrder(@PathVariable UUID orderId) {
+        // Resolve through the student-scoped order service before cancelling so a student
+        // cannot cancel another student's order by guessing its UUID.
+        orderService.getOrderForCurrentStudent(orderId);
+        paymentService.cancelPendingOrder(orderId);
+        return ApiResponse.success(
+                MessageCodes.ORDER_CANCELLED,
+                "Order cancelled successfully.",
                 orderService.getOrderForCurrentStudent(orderId));
     }
 

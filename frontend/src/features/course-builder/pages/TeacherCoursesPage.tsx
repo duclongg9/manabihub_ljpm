@@ -828,7 +828,7 @@ function CourseDraftRow({
                 sx={{ textTransform: 'none', fontWeight: 700 }}
                 startIcon={<AssessmentIcon />}
               >
-                Xem Analytics
+                Doanh thu & Analytics
               </Button>
               <Button
                 variant="outlined"

@@ -41,6 +41,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -137,6 +138,12 @@ public class LearningServiceConcurrencyPostgresTest {
                         .writingPrompt("Test Prompt")
                         .build()
         );
+
+        // The production learning flow is sequential.  This concurrency fixture
+        // appends isolated blocks to the demo course, so mark any pre-existing
+        // blocks as completed; otherwise the new sequential-unlock guard would
+        // (correctly) reject the first operation in every test.
+        markEarlierBlocksCompleted(enrollment, Set.of(flashcardBlock.getId(), writingBlock.getId()));
 
         when(currentUserService.getCurrentUserId()).thenReturn(DEMO_USER_ID);
         when(aiChatSettingsService.getSettings()).thenReturn(new com.manabihub.ai.service.AiChatSettingsService.AiChatSettings(
@@ -289,6 +296,8 @@ public class LearningServiceConcurrencyPostgresTest {
                         .build()
         );
 
+        markEarlierBlocksCompleted(enrollment2, Set.of(flashcardBlock.getId(), writingBlock.getId()));
+
         when(currentUserService.getCurrentUserId()).thenReturn(user2.getId());
         learningService.reviewFlashcard(flashcardBlock.getId(), new ReviewFlashcardRequest(0, FlashcardStatus.REMEMBERED));
 
@@ -302,6 +311,7 @@ public class LearningServiceConcurrencyPostgresTest {
     @Test
     @DisplayName("Concurrent writing submissions produce exactly 1 row and duplicate errors")
     void testConcurrentWritingSubmission() throws Exception {
+        markBlockCompleted(enrollment, flashcardBlock);
         int threads = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         List<Future<com.manabihub.writing.dto.response.StudentWritingSubmissionResponse>> futures = new ArrayList<>();
@@ -362,6 +372,7 @@ public class LearningServiceConcurrencyPostgresTest {
     @Test
     @DisplayName("Provider failure durability on PostgreSQL")
     void testProviderFailureDurability() {
+        markBlockCompleted(enrollment, flashcardBlock);
         learningService.submitWriting(writingBlock.getId(), new WritingSubmissionRequest("Test content"));
         com.manabihub.writing.entity.WritingSubmission submission = writingSubmissionRepository
                 .findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).orElseThrow();
@@ -394,6 +405,7 @@ public class LearningServiceConcurrencyPostgresTest {
     @Test
     @DisplayName("Concurrent AI requests for same submission only call provider once")
     void testConcurrentAiRequestsForSameSubmission() throws Exception {
+        markBlockCompleted(enrollment, flashcardBlock);
         learningService.submitWriting(writingBlock.getId(), new WritingSubmissionRequest("Test content"));
         com.manabihub.writing.entity.WritingSubmission submission = writingSubmissionRepository
                 .findByEnrollmentIdAndLessonBlockId(enrollment.getId(), writingBlock.getId()).orElseThrow();
@@ -445,5 +457,40 @@ public class LearningServiceConcurrencyPostgresTest {
             startLatch.countDown();
             executor.shutdownNow();
         }
+    }
+
+    private void markEarlierBlocksCompleted(Enrollment targetEnrollment, Set<UUID> excludedBlockIds) {
+        List<CourseModule> modules = courseModuleRepository.findByCourse_IdOrderByOrderIndexAsc(course.getId());
+        for (CourseModule courseModule : modules) {
+            for (LessonBlock block : lessonBlockRepository.findByModule_IdOrderByOrderIndexAsc(courseModule.getId())) {
+                if (excludedBlockIds.contains(block.getId())) {
+                    continue;
+                }
+                if (lessonBlockProgressRepository
+                        .findByEnrollmentIdAndLessonBlockId(targetEnrollment.getId(), block.getId())
+                        .isEmpty()) {
+                    lessonBlockProgressRepository.save(
+                            LessonBlockProgress.builder()
+                                    .enrollmentId(targetEnrollment.getId())
+                                    .lessonBlockId(block.getId())
+                                    .status(LessonProgressStatus.COMPLETED)
+                                    .completedAt(java.time.Instant.now())
+                                    .build()
+                    );
+                }
+            }
+        }
+        lessonBlockProgressRepository.flush();
+    }
+
+    private void markBlockCompleted(Enrollment targetEnrollment, LessonBlock block) {
+        lessonBlockProgressRepository.saveAndFlush(
+                LessonBlockProgress.builder()
+                        .enrollmentId(targetEnrollment.getId())
+                        .lessonBlockId(block.getId())
+                        .status(LessonProgressStatus.COMPLETED)
+                        .completedAt(java.time.Instant.now())
+                        .build()
+        );
     }
 }

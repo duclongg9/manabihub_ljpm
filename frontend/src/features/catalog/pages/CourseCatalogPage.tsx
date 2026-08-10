@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   Box,
+  Button,
   Grid,
   Pagination,
   Stack,
@@ -8,8 +9,10 @@ import {
   Chip,
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
+import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeKanjiWatermark/DecorativeKanjiWatermark';
 import { CourseCatalogCard } from '../components/CourseCatalogCard';
 import { CourseCatalogFiltersBar } from '../components/CourseCatalogFilters';
 import { useCourseCatalog } from '../hooks/useCourseCatalog';
@@ -177,10 +180,7 @@ export const CourseCatalogPage: React.FC = () => {
   return (
     <Box component="main" sx={{ minHeight: '100vh', minWidth: 0, overflowX: 'hidden', flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#FAF9F6', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
       <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', minWidth: 0, position: 'relative', flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
-        {/* Background Watermark */}
-        <Typography variant="h1" sx={{ position: 'absolute', top: -40, right: -20, fontSize: '15rem', fontWeight: 900, color: 'rgba(0,0,0,0.025)', userSelect: 'none', pointerEvents: 'none', zIndex: 0, writingMode: 'vertical-rl' }}>
-          探求
-        </Typography>
+        <DecorativeKanjiWatermark text="探求" />
         <PageHeader
           title="Khám phá khóa học"
           subtitle="コースを探す"
@@ -229,6 +229,16 @@ export const CourseCatalogPage: React.FC = () => {
               Đang cập nhật...
             </Typography>
           )}
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            disabled={isFetching}
+            onClick={() => void refetch()}
+            sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
+          >
+            Tải lại danh sách
+          </Button>
         </Stack>
 
         {isLoading && (

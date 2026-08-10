@@ -34,6 +34,8 @@ import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.learning.service.LearningService;
 import com.manabihub.learning.service.CertificateEligibilityService;
 import com.manabihub.learning.service.StudentAssessmentService;
+import com.manabihub.notification.NotificationTypes;
+import com.manabihub.notification.service.NotificationService;
 import com.manabihub.writing.entity.WritingSubmission;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
 import com.manabihub.writing.entity.AiWritingSuggestion;
@@ -104,6 +106,7 @@ public class LearningServiceImpl implements LearningService {
     private final AiWritingAssistanceProvider aiWritingAssistanceProvider;
     private final StudentAssessmentService studentAssessmentService;
     private final CertificateEligibilityService certificateEligibilityService;
+    private final NotificationService notificationService;
 
     @Override
     public CourseLearningResponse openOrResumeCourse(UUID courseId) {
@@ -180,6 +183,8 @@ public class LearningServiceImpl implements LearningService {
             );
         }
 
+        ensureBlockUnlocked(enrollment, block);
+
         if (!StringUtils.hasText(block.getVideoUrl())) {
             log.warn("[{}] Video content missing for lesson block {}", MessageCodes.LEARNING_LESSON_CONTENT_UNAVAILABLE, lessonBlockId);
             throw new BusinessException(
@@ -189,7 +194,8 @@ public class LearningServiceImpl implements LearningService {
             );
         }
 
-        if (block.getDurationMinutes() != null && request.positionSeconds() > block.getDurationMinutes() * 60) {
+        int durationSeconds = videoDurationSeconds(block);
+        if (request.positionSeconds() > durationSeconds) {
             throw new BusinessException(
                     MessageCodes.LEARNING_INVALID_VIDEO_POSITION,
                     "Video position exceeds the lesson duration",
@@ -199,8 +205,25 @@ public class LearningServiceImpl implements LearningService {
 
         LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
         progress.setLastVideoPositionSeconds(request.positionSeconds());
+        int reportedWatchedSeconds = request.watchedSeconds() == null ? 0 : request.watchedSeconds();
+        if (reportedWatchedSeconds > durationSeconds) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_INVALID_VIDEO_POSITION,
+                    "Watched video time exceeds the lesson duration",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        int watchedSeconds = Math.max(
+                progress.getWatchedVideoSeconds() == null ? 0 : progress.getWatchedVideoSeconds(),
+                reportedWatchedSeconds
+        );
+        progress.setWatchedVideoSeconds(watchedSeconds);
         if (progress.getStatus() == LessonProgressStatus.NOT_STARTED) {
             progress.setStatus(LessonProgressStatus.IN_PROGRESS);
+        }
+        if (watchedSeconds >= durationSeconds && progress.getStatus() != LessonProgressStatus.COMPLETED) {
+            progress.setStatus(LessonProgressStatus.COMPLETED);
+            progress.setCompletedAt(Instant.now());
         }
 
         lessonBlockProgressRepository.save(progress);
@@ -216,6 +239,8 @@ public class LearningServiceImpl implements LearningService {
         if (block.getType() != LessonBlockType.FLASHCARD) {
             throw new BusinessException(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Block is not a flashcard", HttpStatus.BAD_REQUEST);
         }
+
+        ensureBlockUnlocked(enrollment, block);
 
         List<FlashcardItemResponse> flashcards = readJsonList(block.getFlashcardsJson(), FLASHCARDS_TYPE);
         int totalCards = flashcards.size();
@@ -260,8 +285,19 @@ public class LearningServiceImpl implements LearningService {
         }
 
         Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+        ensureBlockUnlocked(enrollment, block);
 
         LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
+        if (block.getType() == LessonBlockType.VIDEO
+                && progress.getStatus() != LessonProgressStatus.COMPLETED
+                && (progress.getWatchedVideoSeconds() == null
+                || progress.getWatchedVideoSeconds() < videoDurationSeconds(block))) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Watch the full video before completing this lesson.",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
         if (progress.getStatus() != LessonProgressStatus.COMPLETED) {
             progress.setStatus(LessonProgressStatus.COMPLETED);
             progress.setCompletedAt(Instant.now());
@@ -355,7 +391,46 @@ public class LearningServiceImpl implements LearningService {
                         .enrollmentId(enrollment.getId())
                         .lessonBlockId(block.getId())
                         .status(LessonProgressStatus.NOT_STARTED)
+                        .watchedVideoSeconds(0)
                         .build());
+    }
+
+    private int videoDurationSeconds(LessonBlock block) {
+        return Math.max(1, (block.getDurationMinutes() == null ? 0 : block.getDurationMinutes()) * 60);
+    }
+
+    private void ensureBlockUnlocked(Enrollment enrollment, LessonBlock block) {
+        List<LessonBlock> allBlocks = flattenBlocks(enrollment.getCourse());
+        // Some legacy/unit-test fixtures resolve a block independently without
+        // hydrating the course module collection. There is no ordering graph to
+        // enforce in that case; production enrollments always load the modules
+        // through openOrResumeCourse before a lesson action is available.
+        if (allBlocks.isEmpty()) {
+            return;
+        }
+        Map<UUID, LessonBlockProgress> progressByBlockId = lessonBlockProgressRepository
+                .findByEnrollmentId(enrollment.getId())
+                .stream()
+                .collect(Collectors.toMap(LessonBlockProgress::getLessonBlockId, Function.identity()));
+        int blockIndex = -1;
+        for (int index = 0; index < allBlocks.size(); index++) {
+            if (allBlocks.get(index).getId().equals(block.getId())) {
+                blockIndex = index;
+                break;
+            }
+        }
+        if (blockIndex < 0) {
+            throw new BusinessException(MessageCodes.CONTENT_NOT_FOUND, "Lesson block was not found", HttpStatus.NOT_FOUND);
+        }
+        boolean previousIncomplete = allBlocks.subList(0, blockIndex).stream()
+                .anyMatch(previous -> !isCompleted(progressByBlockId.get(previous.getId())));
+        if (previousIncomplete && !isCompleted(progressByBlockId.get(block.getId()))) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Complete the previous lesson before opening this lesson.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
     }
 
     private boolean isCompleted(LessonBlockProgress progress) {
@@ -403,27 +478,35 @@ public class LearningServiceImpl implements LearningService {
             }
         }
 
+        boolean completed = progress != null && isCompleted(progress);
+        boolean locked = progress != null
+                ? !completed && currentLessonBlockId != null && !block.getId().equals(currentLessonBlockId)
+                : currentLessonBlockId != null && !block.getId().equals(currentLessonBlockId);
+        boolean visible = !locked;
+
         return new LearningLessonBlockResponse(
                 block.getId(),
                 module.getId(),
                 block.getType(),
                 block.getTitle(),
-                block.getContent(),
-                block.getVideoUrl(),
+                visible ? block.getContent() : null,
+                visible ? block.getVideoUrl() : null,
                 block.getDurationMinutes(),
-                block.getQuizQuestion(),
-                quizOptions,
-                readQuizItems(block, quizOptions),
-                flashcards,
-                flashcardStatuses,
-                block.getWritingPrompt(),
-                block.getRubric(),
+                visible ? block.getQuizQuestion() : null,
+                visible ? quizOptions : List.of(),
+                visible ? readQuizItems(block, quizOptions) : List.of(),
+                visible ? flashcards : List.of(),
+                visible ? flashcardStatuses : null,
+                visible ? block.getWritingPrompt() : null,
+                visible ? block.getRubric() : null,
                 block.getOrderIndex(),
-                contentAvailable,
+                visible && contentAvailable,
                 progress != null ? progress.getStatus() : LessonProgressStatus.NOT_STARTED,
                 progress != null ? progress.getLastVideoPositionSeconds() : null,
                 progress != null ? progress.getCompletedAt() : null,
-                block.getId().equals(currentLessonBlockId)
+                block.getId().equals(currentLessonBlockId),
+                progress != null ? progress.getWatchedVideoSeconds() : 0,
+                locked
         );
     }
 
@@ -444,7 +527,8 @@ public class LearningServiceImpl implements LearningService {
                 progress.getStatus(),
                 progress.getLastVideoPositionSeconds(),
                 progress.getCompletedAt(),
-                progress.getUpdatedAt()
+                progress.getUpdatedAt(),
+                progress.getWatchedVideoSeconds()
         );
     }
 
@@ -505,6 +589,7 @@ public class LearningServiceImpl implements LearningService {
     public StudentWritingSubmissionResponse getWritingSubmission(UUID lessonBlockId) {
         LessonBlock block = resolveLessonBlock(lessonBlockId);
         Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+        ensureBlockUnlocked(enrollment, block);
 
         if (block.getType() != LessonBlockType.WRITING) {
             throw new BusinessException(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Not a writing block", HttpStatus.BAD_REQUEST);
@@ -560,6 +645,7 @@ public class LearningServiceImpl implements LearningService {
         // Pessimistic lock enrollment to prevent race conditions during submission processing
         Enrollment enrollment = enrollmentRepository.findByIdForUpdate(resolveActiveEnrollment(block.getModule().getCourse().getId()).getId())
                 .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Enrollment not found", HttpStatus.NOT_FOUND));
+        ensureBlockUnlocked(enrollment, block);
 
         if (block.getType() != LessonBlockType.WRITING) {
             throw new BusinessException(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Not a writing block", HttpStatus.BAD_REQUEST);
@@ -613,7 +699,39 @@ public class LearningServiceImpl implements LearningService {
         }
         lessonBlockProgressRepository.save(progress);
 
+        notifyTeacherOfWritingSubmission(submission, block);
+
         return mapToWritingSubmissionDetailResponse(submission);
+    }
+
+    private void notifyTeacherOfWritingSubmission(
+            WritingSubmission submission,
+            LessonBlock block
+    ) {
+        Course course = submission.getEnrollment().getCourse();
+        if (course.getTeacher() == null || course.getTeacher().getUser() == null) {
+            return;
+        }
+
+        var teacherUser = course.getTeacher().getUser();
+        StudentProfile student = submission.getStudent();
+        String studentName = student != null && student.getDisplayName() != null
+                && !student.getDisplayName().isBlank()
+                ? student.getDisplayName().trim()
+                : "Học viên ManabiHub";
+        String lessonTitle = block.getTitle() == null || block.getTitle().isBlank()
+                ? "Bài viết"
+                : block.getTitle().trim();
+
+        notificationService.createNotification(
+                teacherUser.getId(),
+                teacherUser.getEmail(),
+                "Có bài viết mới cần phản hồi",
+                studentName + " đã hoàn thành bài \"" + lessonTitle
+                        + "\" trong khóa học \"" + course.getTitle() + "\".",
+                NotificationTypes.WRITING_SUBMITTED,
+                "/teacher/writing-reviews/" + submission.getId()
+        );
     }
 
     @Override
@@ -622,6 +740,7 @@ public class LearningServiceImpl implements LearningService {
         WritingSubmission preCheckSub = transactionTemplate.execute(status -> {
             LessonBlock block = resolveLessonBlock(lessonBlockId);
             Enrollment enrollment = resolveActiveEnrollment(block.getModule().getCourse().getId());
+            ensureBlockUnlocked(enrollment, block);
             return writingSubmissionRepository.findByIdAndEnrollmentIdAndLessonBlockId(submissionId, enrollment.getId(), lessonBlockId)
                     .orElseThrow(() -> new BusinessException(MessageCodes.COMMON_NOT_FOUND, "Submission not found", HttpStatus.NOT_FOUND));
         });

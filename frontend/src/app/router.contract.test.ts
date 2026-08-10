@@ -1,4 +1,4 @@
-import { matchRoutes } from 'react-router-dom';
+import { matchRoutes, Navigate } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { ROUTES } from '../shared/constants/routes';
 import { router } from './router';
@@ -25,5 +25,13 @@ describe('router contract for policy and notification links', () => {
     ['/admin/violations/report-1', 'violations/:id'],
   ])('matches %s to a concrete route', (url, expectedRoutePath) => {
     expectConcreteRoute(url, expectedRoutePath);
+  });
+
+  it('redirects the legacy wallet URL to payment history', () => {
+    const matches = matchRoutes(router.routes, ROUTES.STUDENT.WALLET);
+    const walletElement = matches?.at(-1)?.route.element;
+
+    expect(matches).not.toBeNull();
+    expect(walletElement).toMatchObject({ type: Navigate, props: { to: ROUTES.STUDENT.PAYMENTS, replace: true } });
   });
 });

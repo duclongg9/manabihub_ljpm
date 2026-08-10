@@ -36,6 +36,7 @@ import AssignmentTurnedInOutlinedIcon from '@mui/icons-material/AssignmentTurned
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { isAxiosError } from 'axios';
 import ReactPlayer from 'react-player';
 import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
@@ -47,6 +48,7 @@ import type {
   FinalTestEligibility,
   FinalTestSubmissionResult,
   LearningLessonBlock,
+  LearningModule,
   LearningCertificate,
   QuizQuestion,
   QuizSubmissionResult,
@@ -56,14 +58,22 @@ import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
 import {
-  isClipboardShortcut,
   isSingleCharacterMutation,
   readLocalStorageValue,
   removeLocalStorageValue,
   writeLocalStorageValue,
 } from '../utils/learningInputGuard';
+import {
+  FINAL_TEST_MAX_VIOLATIONS,
+  isClipboardShortcut,
+  isScreenshotShortcut,
+  violationLabel,
+  type FinalTestViolationType,
+} from '../utils/finalTestProctoring';
+import { downloadCertificatePdf, formatCertificateDate } from '../utils/certificatePdf';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
+const WATCHED_DELTA_MAX_SECONDS = 2;
 const COURSE_SELECTION_STORAGE_PREFIX = 'manabihub:course-selection:';
 const WRITING_DRAFT_STORAGE_PREFIX = 'manabihub:writing-draft:';
 const QUIZ_ANSWERS_STORAGE_PREFIX = 'manabihub:quiz-answers:';
@@ -171,12 +181,13 @@ export function CourseLearningPage() {
         ...module,
         blocks: module.blocks.map((block) => (block.id === blockId ? { ...block, ...patch } : block)),
       }));
-      const blocks = modules.flatMap((module) => module.blocks);
+      const unlockedModules = applySequentialLocks(modules);
+      const blocks = unlockedModules.flatMap((module) => module.blocks);
       const completedLessons = blocks.filter((block) => block.progressStatus === 'COMPLETED').length;
       const totalLessons = blocks.length;
       return {
         ...prev,
-        modules,
+        modules: unlockedModules,
         completedLessons,
         progressPercent: totalLessons === 0 ? 0 : Math.round((completedLessons * 10000) / totalLessons) / 100,
         courseCompleted: totalLessons > 0 && completedLessons === totalLessons,
@@ -205,8 +216,17 @@ export function CourseLearningPage() {
   };
 
   const handleVideoProgressSaved = useCallback(
-    (blockId: string, positionSeconds: number, status: LearningLessonBlock['progressStatus']) => {
-      updateBlock(blockId, { lastVideoPositionSeconds: positionSeconds, progressStatus: status });
+    (
+      blockId: string,
+      positionSeconds: number,
+      status: LearningLessonBlock['progressStatus'],
+      watchedVideoSeconds: number,
+    ) => {
+      updateBlock(blockId, {
+        lastVideoPositionSeconds: positionSeconds,
+        watchedVideoSeconds,
+        progressStatus: status,
+      });
     },
     [updateBlock],
   );
@@ -224,13 +244,14 @@ export function CourseLearningPage() {
             return { ...block, flashcardStatuses: newStatuses, progressStatus };
           }),
         }));
+        const unlockedModules = applySequentialLocks(modules);
 
-        const blocks = modules.flatMap((module) => module.blocks);
+        const blocks = unlockedModules.flatMap((module) => module.blocks);
         const completedLessons = blocks.filter((block) => block.progressStatus === 'COMPLETED').length;
         const totalLessons = blocks.length;
         return {
           ...prev,
-          modules,
+          modules: unlockedModules,
           completedLessons,
           progressPercent: totalLessons === 0 ? 0 : Math.round((completedLessons * 10000) / totalLessons) / 100,
           courseCompleted: totalLessons > 0 && completedLessons === totalLessons,
@@ -253,13 +274,14 @@ export function CourseLearningPage() {
           };
         }),
       }));
-      const newCompleted = newModules
+      const unlockedModules = applySequentialLocks(newModules);
+      const newCompleted = unlockedModules
         .flatMap((m) => m.blocks)
         .filter((b) => b.progressStatus === 'COMPLETED').length;
-      const newTotal = newModules.flatMap((m) => m.blocks).length;
+      const newTotal = unlockedModules.flatMap((m) => m.blocks).length;
       return {
         ...prev,
-        modules: newModules,
+        modules: unlockedModules,
         completedLessons: newCompleted,
         progressPercent: newTotal > 0 ? Math.round((newCompleted * 10000) / newTotal) / 100 : 0,
         courseCompleted: newTotal > 0 && newCompleted === newTotal,
@@ -347,10 +369,15 @@ export function CourseLearningPage() {
                   <ListItemButton
                     key={block.id}
                     selected={block.id === selectedBlockId}
-                    onClick={() => setSelectedBlockId(block.id)}
+                    disabled={block.locked}
+                    onClick={() => {
+                      if (!block.locked) setSelectedBlockId(block.id);
+                    }}
                   >
                     <ListItemIcon sx={{ minWidth: 34 }}>
-                      {block.progressStatus === 'COMPLETED' ? (
+                      {block.locked ? (
+                        <LockOutlinedIcon color="disabled" fontSize="small" />
+                      ) : block.progressStatus === 'COMPLETED' ? (
                         <CheckCircleIcon color="success" fontSize="small" />
                       ) : block.progressStatus === 'IN_PROGRESS' ? (
                         <PlayCircleOutlineIcon color="primary" fontSize="small" />
@@ -432,16 +459,27 @@ export function CourseLearningPage() {
                     disabled={
                       completing ||
                       selectedBlock.progressStatus === 'COMPLETED' ||
-                      ['QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
+                      ['VIDEO', 'QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
                     }
                     onClick={handleMarkComplete}
                   >
-                    {selectedBlock.progressStatus === 'COMPLETED' ? 'Đã hoàn thành' : 'Hoàn thành bài học'}
+                    {selectedBlock.progressStatus === 'COMPLETED'
+                      ? 'Đã hoàn thành'
+                      : selectedBlock.type === 'VIDEO'
+                        ? 'Xem hết video để hoàn thành'
+                        : 'Hoàn thành bài học'}
                   </Button>
                   <Button
                     endIcon={<ArrowForwardIcon />}
-                    disabled={selectedIndex < 0 || selectedIndex >= allBlocks.length - 1}
-                    onClick={() => setSelectedBlockId(allBlocks[selectedIndex + 1].id)}
+                    disabled={
+                      selectedIndex < 0
+                      || selectedIndex >= allBlocks.length - 1
+                      || allBlocks[selectedIndex + 1].locked
+                    }
+                    onClick={() => {
+                      const next = allBlocks[selectedIndex + 1];
+                      if (next && !next.locked) setSelectedBlockId(next.id);
+                    }}
                   >
                     Bài sau
                   </Button>
@@ -483,12 +521,25 @@ function blockTypeLabel(block: LearningLessonBlock): string {
   }
 }
 
+function applySequentialLocks(modules: LearningModule[]): LearningModule[] {
+  let waitingForCompletion = false;
+  return modules.map((module) => ({
+    ...module,
+    blocks: module.blocks.map((block) => {
+      const locked = waitingForCompletion && block.progressStatus !== 'COMPLETED';
+      if (block.progressStatus !== 'COMPLETED') waitingForCompletion = true;
+      return { ...block, locked };
+    }),
+  }));
+}
+
 interface BlockContentProps {
   block: LearningLessonBlock;
   onVideoProgressSaved: (
     blockId: string,
     positionSeconds: number,
     status: LearningLessonBlock['progressStatus'],
+    watchedVideoSeconds: number,
   ) => void;
   onFlashcardProgressSaved: (
     blockId: string,
@@ -547,6 +598,10 @@ function VideoBlock({
 }) {
   const playerRef = useRef<HTMLVideoElement>(null);
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
+  const watchedSecondsRef = useRef(block.watchedVideoSeconds ?? 0);
+  const lastSavedWatchedRef = useRef(block.watchedVideoSeconds ?? 0);
+  const lastObservedTimeRef = useRef<number | null>(null);
+  const isSeekingRef = useRef(false);
   const isReadyRef = useRef(false);
 
   const pendingPositionRef = useRef<number | null>(null);
@@ -560,7 +615,10 @@ function VideoBlock({
         if (isSavingRef.current || pendingPositionRef.current === null) return;
 
         const positionToSave = pendingPositionRef.current;
-        if (positionToSave === lastSavedRef.current) {
+        if (
+          positionToSave === lastSavedRef.current
+          && watchedSecondsRef.current === lastSavedWatchedRef.current
+        ) {
           pendingPositionRef.current = null;
           return;
         }
@@ -570,10 +628,17 @@ function VideoBlock({
         let success = false;
 
         learningService
-          .saveVideoProgress(block.id, positionToSave)
+          .saveVideoProgress(block.id, positionToSave, Math.floor(watchedSecondsRef.current))
           .then((progress) => {
             lastSavedRef.current = positionToSave;
-            onProgressSaved(block.id, positionToSave, progress.status);
+            lastSavedWatchedRef.current = progress.watchedVideoSeconds ?? watchedSecondsRef.current;
+            watchedSecondsRef.current = Math.max(watchedSecondsRef.current, lastSavedWatchedRef.current);
+            onProgressSaved(
+              block.id,
+              positionToSave,
+              progress.status,
+              watchedSecondsRef.current,
+            );
             success = true;
           })
           .catch(() => {
@@ -601,13 +666,41 @@ function VideoBlock({
       isReadyRef.current = true;
       video.currentTime = Math.min(block.lastVideoPositionSeconds, video.duration || block.lastVideoPositionSeconds);
     }
+    if (video) lastObservedTimeRef.current = video.currentTime;
+  };
+
+  const handlePlay = () => {
+    lastObservedTimeRef.current = playerRef.current?.currentTime ?? null;
+  };
+
+  const handleSeeking = () => {
+    isSeekingRef.current = true;
+  };
+
+  const handleSeeked = () => {
+    isSeekingRef.current = false;
+    lastObservedTimeRef.current = playerRef.current?.currentTime ?? null;
   };
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
-    if (video.paused) return;
+    if (video.paused) {
+      lastObservedTimeRef.current = video.currentTime;
+      return;
+    }
     const position = Math.floor(video.currentTime);
-    if (position - lastSavedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS) {
+    const previousPosition = lastObservedTimeRef.current;
+    if (!isSeekingRef.current && previousPosition != null) {
+      const delta = video.currentTime - previousPosition;
+      if (delta > 0 && delta <= WATCHED_DELTA_MAX_SECONDS) {
+        watchedSecondsRef.current += delta;
+      }
+    }
+    lastObservedTimeRef.current = video.currentTime;
+    if (
+      position - lastSavedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS
+      || watchedSecondsRef.current - lastSavedWatchedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS
+    ) {
       savePosition(position);
     }
   };
@@ -616,14 +709,30 @@ function VideoBlock({
     const player = playerRef.current;
     if (!player || player.ended) return;
     const position = Math.floor(player.currentTime);
-    if (position !== lastSavedRef.current) {
+    if (
+      position !== lastSavedRef.current
+      || watchedSecondsRef.current !== lastSavedWatchedRef.current
+    ) {
       savePosition(position);
     }
   };
 
+  const handleEnded = () => {
+    const video = playerRef.current;
+    if (!video) return;
+    if (video.duration && watchedSecondsRef.current >= video.duration - WATCHED_DELTA_MAX_SECONDS) {
+      watchedSecondsRef.current = Math.max(watchedSecondsRef.current, Math.floor(video.duration));
+    }
+    savePosition(Math.floor(video.currentTime));
+  };
+
   return (
     <Box>
-      <Box sx={{ position: 'relative', paddingTop: '56.25%', background: '#000', borderRadius: 2, overflow: 'hidden' }}>
+      <Box
+        sx={{ position: 'relative', paddingTop: '56.25%', background: '#000', borderRadius: 2, overflow: 'hidden', userSelect: 'none' }}
+        onContextMenu={(event) => event.preventDefault()}
+        onDragStart={(event) => event.preventDefault()}
+      >
         <ReactPlayer
           ref={playerRef}
           src={block.videoUrl}
@@ -632,8 +741,12 @@ function VideoBlock({
           height="100%"
           style={{ position: 'absolute', top: 0, left: 0 }}
           onLoadedMetadata={handleReady}
+          onPlay={handlePlay}
+          onSeeking={handleSeeking}
+          onSeeked={handleSeeked}
           onTimeUpdate={handleTimeUpdate}
           onPause={handlePause}
+          onEnded={handleEnded}
         />
       </Box>
       {block.content && (
@@ -790,8 +903,29 @@ function FinalTestPanel({
   const [result, setResult] = useState<FinalTestSubmissionResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [issuingCertificate, setIssuingCertificate] = useState(false);
+  const [downloadingCertificate, setDownloadingCertificate] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [violations, setViolations] = useState<FinalTestViolationType[]>([]);
+  const [proctoringTerminated, setProctoringTerminated] = useState(false);
+  const violationCountRef = useRef(0);
+  const lastViolationAtRef = useRef(0);
+  const terminatingForViolationRef = useRef(false);
+  const certificateIssuanceInFlightRef = useRef(false);
+
+  const handleDownloadCertificate = async () => {
+    if (!certificate || downloadingCertificate) return;
+    setDownloadingCertificate(true);
+    setErrorMsg(null);
+    try {
+      await downloadCertificatePdf(certificate);
+    } catch {
+      setErrorMsg('Không thể tạo tệp chứng chỉ PDF. Vui lòng thử lại.');
+    } finally {
+      setDownloadingCertificate(false);
+    }
+  };
 
   const loadEligibility = useCallback(async () => {
     try {
@@ -850,6 +984,81 @@ function FinalTestPanel({
     writeLocalStorageValue(finalTestStorageKey(courseId), { attempt, answers } satisfies LocalFinalTestState);
   }, [answers, attempt, courseId, result]);
 
+  useEffect(() => {
+    if (!attempt?.attemptId) return;
+    violationCountRef.current = 0;
+    lastViolationAtRef.current = 0;
+    terminatingForViolationRef.current = false;
+    setViolations([]);
+    setProctoringTerminated(false);
+  }, [attempt?.attemptId]);
+
+  const terminateForViolations = useCallback(async () => {
+    if (!attempt || terminatingForViolationRef.current) return;
+    terminatingForViolationRef.current = true;
+    setWorking(true);
+    try {
+      await learningService.terminateFinalTest(courseId, attempt.attemptId);
+      setAttempt(null);
+      setAnswers({});
+      setProctoringTerminated(true);
+      setErrorMsg('Bài thi đã dừng vì phát hiện quá nhiều thao tác không hợp lệ. Lượt thi này đã được tính.');
+      await loadEligibility();
+    } catch (error) {
+      terminatingForViolationRef.current = false;
+      setErrorMsg(
+        axios.isAxiosError(error)
+          ? error.response?.data?.message || 'Không thể khóa lượt thi sau cảnh báo.'
+          : 'Không thể khóa lượt thi sau cảnh báo.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  }, [attempt, courseId, loadEligibility]);
+
+  const recordViolation = useCallback((type: FinalTestViolationType) => {
+    if (!attempt || result || terminatingForViolationRef.current) return;
+    const now = Date.now();
+    // One tab switch can fire both blur and visibilitychange; count it once.
+    if (now - lastViolationAtRef.current < 1000) return;
+    lastViolationAtRef.current = now;
+    violationCountRef.current += 1;
+    setViolations((current) => [...current, type]);
+    if (violationCountRef.current >= FINAL_TEST_MAX_VIOLATIONS) {
+      void terminateForViolations();
+    }
+  }, [attempt, result, terminateForViolations]);
+
+  useEffect(() => {
+    if (!attempt || result) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') recordViolation('TAB_SWITCH');
+    };
+    const handleWindowBlur = () => recordViolation('WINDOW_BLUR');
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (isScreenshotShortcut(event)) {
+        event.preventDefault();
+        recordViolation('SCREENSHOT_SHORTCUT');
+      } else if (isClipboardShortcut(event)) {
+        event.preventDefault();
+        recordViolation('CLIPBOARD');
+      }
+    };
+    const handlePrint = () => recordViolation('PRINT_ATTEMPT');
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('keydown', handleShortcut, true);
+    window.addEventListener('beforeprint', handlePrint);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('keydown', handleShortcut, true);
+      window.removeEventListener('beforeprint', handlePrint);
+    };
+  }, [attempt, recordViolation, result]);
+
   const handleStart = async () => {
     setWorking(true);
     setErrorMsg(null);
@@ -859,6 +1068,7 @@ function FinalTestPanel({
       setAttempt(value);
       setAnswers({});
       setResult(null);
+      setProctoringTerminated(false);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         setErrorMsg(error.response?.data?.message || 'Không thể bắt đầu Final Test.');
@@ -910,9 +1120,10 @@ function FinalTestPanel({
     }
   };
 
-  const handleGenerateCertificate = async () => {
-    if (working) return;
-    setWorking(true);
+  const handleGenerateCertificate = useCallback(async () => {
+    if (certificate || certificateIssuanceInFlightRef.current) return;
+    certificateIssuanceInFlightRef.current = true;
+    setIssuingCertificate(true);
     setErrorMsg(null);
     try {
       const value = await learningService.generateCertificate(courseId);
@@ -923,11 +1134,16 @@ function FinalTestPanel({
       } else {
         setErrorMsg('Không thể phát hành chứng chỉ.');
       }
-      await loadEligibility();
     } finally {
-      setWorking(false);
+      certificateIssuanceInFlightRef.current = false;
+      setIssuingCertificate(false);
     }
-  };
+  }, [certificate, courseId]);
+
+  useEffect(() => {
+    if (!progressSummary?.certificateEligibility.eligible || certificate) return;
+    void handleGenerateCertificate();
+  }, [certificate, handleGenerateCertificate, progressSummary?.certificateEligibility.eligible]);
 
   const allAnswered = attempt?.questions.every((question) => (answers[question.id]?.length || 0) > 0) ?? false;
   const reasonText: Record<string, string> = {
@@ -980,6 +1196,29 @@ function FinalTestPanel({
 
         {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
 
+        {attempt && !result && (
+          <Alert severity={violations.length === 0 ? 'info' : 'warning'}>
+            <strong>Chế độ giám sát bài thi:</strong> copy/cut/paste, kéo-thả, menu chuột phải,
+            chuyển tab, rời cửa sổ và các phím chụp màn hình phổ biến đều bị chặn hoặc ghi nhận.
+            Cảnh báo: {violations.length}/{FINAL_TEST_MAX_VIOLATIONS}.
+            {violations.length > 0 && (
+              <Typography component="div" variant="body2" sx={{ mt: 0.5 }}>
+                Gần nhất: {violationLabel(violations[violations.length - 1])}.
+              </Typography>
+            )}
+            <Typography component="div" variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+              Trình duyệt không thể phát hiện tuyệt đối ảnh chụp bằng công cụ hệ điều hành; hệ thống chỉ
+              nhận diện phím tắt và tín hiệu rời trang.
+            </Typography>
+          </Alert>
+        )}
+
+        {proctoringTerminated && (
+          <Alert severity="error">
+            Bài thi đã bị dừng và lượt thi đã được tính do vượt quá giới hạn cảnh báo integrity.
+          </Alert>
+        )}
+
         {progressSummary && !progressSummary.certificateEligibility.eligible && (
           <Alert severity="info">
             Điều kiện chứng chỉ còn thiếu:{' '}
@@ -990,17 +1229,23 @@ function FinalTestPanel({
         )}
 
         {progressSummary?.certificateEligibility.eligible && !certificate && (
-          <Box>
+          <Alert
+            severity="success"
+            icon={<WorkspacePremiumOutlinedIcon />}
+            action={
             <Button
-              variant="contained"
-              color="success"
-              startIcon={<WorkspacePremiumOutlinedIcon />}
-              onClick={handleGenerateCertificate}
-              disabled={working}
+              color="inherit"
+              onClick={() => void handleGenerateCertificate()}
+              disabled={issuingCertificate}
             >
-              {working ? 'Đang phát hành...' : 'Phát hành chứng chỉ'}
+              {issuingCertificate ? 'Đang tạo...' : 'Thử lại'}
             </Button>
-          </Box>
+            }
+          >
+            {issuingCertificate
+              ? 'Bạn đã hoàn thành khóa học. Chứng chỉ đang được phát hành tự động theo thời gian thực.'
+              : 'Bạn đã hoàn thành khóa học. Hệ thống đang chuẩn bị chứng chỉ của bạn.'}
+          </Alert>
         )}
 
         {certificate && (
@@ -1009,13 +1254,14 @@ function FinalTestPanel({
             sx={{
               p: { xs: 2, sm: 3 },
               textAlign: 'center',
-              borderColor: 'success.main',
-              bgcolor: 'background.paper',
+              borderColor: '#c8a45a',
+              borderWidth: 2,
+              background: 'linear-gradient(135deg, #fffdf7 0%, #ffffff 52%, #fff8eb 100%)',
             }}
           >
-            <WorkspacePremiumOutlinedIcon color="success" sx={{ fontSize: 48 }} />
-            <Typography variant="overline" color="text.secondary">
-              ManabiHub Certificate of Completion
+            <WorkspacePremiumOutlinedIcon sx={{ fontSize: 48, color: '#c91f3d' }} />
+            <Typography variant="overline" sx={{ color: '#8f1028', fontWeight: 700, letterSpacing: 1.5 }}>
+              Chứng chỉ hoàn thành ManabiHub
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
               {certificate.studentName}
@@ -1024,15 +1270,16 @@ function FinalTestPanel({
               Đã hoàn thành khoá học <strong>{certificate.courseTitle}</strong>
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Cấp ngày {new Date(certificate.issuedAt).toLocaleDateString('vi-VN')} · {certificate.certificateNumber}
+              Hoàn thành ngày {formatCertificateDate(certificate.completedAt, certificate.issuedAt)} · {certificate.certificateNumber}
             </Typography>
             <Button
               sx={{ mt: 2 }}
-              variant="outlined"
+              variant="contained"
               startIcon={<DownloadOutlinedIcon />}
-              onClick={() => downloadCertificateView(certificate)}
+              onClick={() => void handleDownloadCertificate()}
+              disabled={downloadingCertificate}
             >
-              Tải bản chứng chỉ
+              {downloadingCertificate ? 'Đang tạo PDF...' : 'Tải chứng chỉ PDF'}
             </Button>
           </Paper>
         )}
@@ -1053,7 +1300,17 @@ function FinalTestPanel({
         )}
 
         {attempt && !result && (
-          <Stack spacing={2}>
+          <Stack
+            spacing={2}
+            sx={{ userSelect: 'none' }}
+            onCopy={(event) => { event.preventDefault(); recordViolation('CLIPBOARD'); }}
+            onCut={(event) => { event.preventDefault(); recordViolation('CLIPBOARD'); }}
+            onPaste={(event) => { event.preventDefault(); recordViolation('CLIPBOARD'); }}
+            onDragStart={(event) => { event.preventDefault(); recordViolation('DRAG_DROP'); }}
+            onDragOver={(event) => { event.preventDefault(); }}
+            onDrop={(event) => { event.preventDefault(); recordViolation('DRAG_DROP'); }}
+            onContextMenu={(event) => { event.preventDefault(); recordViolation('CONTEXT_MENU'); }}
+          >
             <Alert severity={secondsLeft > 0 ? 'info' : 'error'}>
               Điểm đạt: {attempt.passingScore}% · Thời gian còn lại: {Math.floor(secondsLeft / 60)}:
               {String(secondsLeft % 60).padStart(2, '0')}
@@ -1127,53 +1384,6 @@ function FinalTestPanel({
       </Stack>
     </Box>
   );
-}
-
-function downloadCertificateView(certificate: LearningCertificate) {
-  const studentName = escapeHtml(certificate.studentName);
-  const courseTitle = escapeHtml(certificate.courseTitle);
-  const number = escapeHtml(certificate.certificateNumber);
-  const issuedDate = new Date(certificate.issuedAt).toLocaleDateString('vi-VN');
-  const html = `<!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8">
-  <title>${number}</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 48px; color: #17212b; }
-    main { max-width: 900px; margin: 0 auto; padding: 72px 48px; text-align: center; border: 8px double #2e7d32; }
-    h1 { font-size: 42px; margin: 12px 0; }
-    h2 { font-size: 30px; margin: 30px 0 12px; }
-    p { font-size: 18px; line-height: 1.6; }
-    small { color: #52606d; }
-  </style>
-</head>
-<body>
-  <main>
-    <p>MANABIHUB</p>
-    <h1>Certificate of Completion</h1>
-    <p>Chứng nhận</p>
-    <h2>${studentName}</h2>
-    <p>đã hoàn thành khoá học <strong>${courseTitle}</strong></p>
-    <small>Cấp ngày ${issuedDate} · ${number}</small>
-  </main>
-</body>
-</html>`;
-  const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${certificate.certificateNumber}.html`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }
 
 function FlashcardBlock({

@@ -6,6 +6,7 @@ import RuleIcon from '@mui/icons-material/Rule';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import { adminKycService } from '../../admin-kyc/services/adminKycService';
@@ -17,6 +18,7 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { ROLES } from '../../../shared/constants/roles';
 import { adminPayoutService } from '../../admin-payout/services/adminPayoutService';
 import { adminRefundApi } from '../../admin-refund/api/adminRefundApi';
+import { adminViolationService } from '../../admin-violation/services/adminViolationService';
 
 export const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +28,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [kycQueue, setKycQueue] = useState<KycRequestResponse[]>([]);
   const [courseQueue, setCourseQueue] = useState<CourseApproval[]>([]);
+  const [pendingViolations, setPendingViolations] = useState(0);
   const [pendingPayouts, setPendingPayouts] = useState(0);
   const [pendingRefunds, setPendingRefunds] = useState(0);
   const [reconciliationAlerts, setReconciliationAlerts] = useState(0);
@@ -41,12 +44,14 @@ export const AdminDashboardPage: React.FC = () => {
     setError(null);
     try {
       if (isCourseManager) {
-        const [kycData, courseData] = await Promise.all([
+        const [kycData, courseData, violationData] = await Promise.all([
           adminKycService.getPendingKycQueue(),
-          courseApprovalService.getQueue()
+          courseApprovalService.getQueue(),
+          adminViolationService.getViolationQueue({ page: 0, size: 1, status: 'PENDING_REVIEW' }),
         ]);
         setKycQueue(kycData);
         setCourseQueue(courseData);
+        setPendingViolations(violationData.totalElements);
       }
 
       if (isFinanceManager) {
@@ -163,7 +168,7 @@ export const AdminDashboardPage: React.FC = () => {
       ) : (
         <>
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <CardContent sx={{ flexGrow: 1, pb: 0 }}>
                   <Stack direction="row" sx={{ alignItems: 'center', gap: 2, mb: 2 }}>
@@ -198,7 +203,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </Box>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <CardContent sx={{ flexGrow: 1, pb: 0 }}>
                   <Stack direction="row" sx={{ alignItems: 'center', gap: 2, mb: 2 }}>
@@ -230,6 +235,42 @@ export const AdminDashboardPage: React.FC = () => {
                     onClick={() => navigate(ROUTES.ADMIN.COURSE_APPROVAL)}
                   >
                     Đến hàng đợi Khóa học
+                  </Button>
+                </Box>
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <CardContent sx={{ flexGrow: 1, pb: 0 }}>
+                  <Stack direction="row" sx={{ alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#fee2e2', color: '#b91c1c', display: 'flex' }}>
+                      <ReportProblemOutlinedIcon />
+                    </Box>
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Báo cáo vi phạm</Typography>
+                      <Typography variant="body2" color="text.secondary">Báo cáo chờ xem xét</Typography>
+                    </Box>
+                  </Stack>
+                  <Box sx={{ my: 4, textAlign: 'center' }}>
+                    {loading ? (
+                      <CircularProgress />
+                    ) : (
+                      <Typography variant="h2" color="error.main" sx={{ fontWeight: 'bold' }}>
+                        {pendingViolations}
+                      </Typography>
+                    )}
+                  </Box>
+                </CardContent>
+                <Divider />
+                <Box sx={{ p: 2 }}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="error"
+                    endIcon={<ArrowForwardIcon />}
+                    onClick={() => navigate(ROUTES.ADMIN.VIOLATIONS)}
+                  >
+                    Đến hàng đợi Vi phạm
                   </Button>
                 </Box>
               </Card>

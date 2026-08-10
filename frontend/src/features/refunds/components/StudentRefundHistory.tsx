@@ -1,5 +1,23 @@
 import { Alert, Box, Button, Chip, Stack, Typography } from '@mui/material';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import type { StudentRefundResponse } from '../types';
+
+const REFUND_STATUS_MAP: Record<string, { label: string; bgcolor: string; color: string }> = {
+  PENDING: { label: 'Đang chờ', bgcolor: '#FFFBEB', color: '#B45309' },
+  APPROVED: { label: 'Đã duyệt', bgcolor: '#ECFDF5', color: '#047857' },
+  REJECTED: { label: 'Từ chối', bgcolor: '#FEF2F2', color: '#B91C1C' },
+  CANCELLED: { label: 'Đã hủy', bgcolor: '#F3F4F6', color: '#4B5563' },
+  PROCESSED: { label: 'Đã hoàn tiền', bgcolor: '#EFF6FF', color: '#1D4ED8' },
+  COMPLETED: { label: 'Hoàn tất', bgcolor: '#ECFDF5', color: '#047857' },
+};
+
+function formatMoney(amount: number, currency: string = 'VND') {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
 
 interface StudentRefundHistoryProps {
   refunds: StudentRefundResponse[];
@@ -10,36 +28,90 @@ interface StudentRefundHistoryProps {
 }
 
 export function StudentRefundHistory({ refunds, loading, error, onRetry, onOpen }: StudentRefundHistoryProps) {
-  return (
-    <Box sx={{ mt: 3, border: '1px solid #E1E5EA', borderRadius: 2, bgcolor: '#fff', p: 3 }}>
-      <Typography variant="h6" sx={{ fontWeight: 900 }}>Lịch sử yêu cầu hoàn tiền</Typography>
-      {loading && <Typography color="text.secondary" sx={{ mt: 2 }}>Đang tải lịch sử…</Typography>}
-      {error && (
-        <Alert severity="error" sx={{ mt: 2 }} action={<Button onClick={onRetry}>Thử lại</Button>}>
-          Không thể tải lịch sử yêu cầu hoàn tiền.
-        </Alert>
-      )}
-      {!loading && !error && refunds.length === 0 && (
-        <Typography color="text.secondary" sx={{ mt: 2 }}>Bạn chưa có yêu cầu hoàn tiền nào.</Typography>
-      )}
-      <Stack spacing={1.25} sx={{ mt: refunds.length ? 2 : 0 }}>
-        {refunds.map((refund) => (
-          <Button
-            key={refund.id}
-            variant="outlined"
-            onClick={() => onOpen(refund)}
-            sx={{ justifyContent: 'space-between', textAlign: 'left', p: 1.5 }}
-          >
-            <Box>
-              <Typography sx={{ fontWeight: 800 }}>{refund.courseTitle}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                {refund.orderCode} · {new Date(refund.createdAt).toLocaleDateString('vi-VN')}
-              </Typography>
-            </Box>
-            <Chip label={refund.status} size="small" />
-          </Button>
-        ))}
+  if (loading) return <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>Đang tải danh sách yêu cầu hoàn tiền…</Typography>;
+
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }} action={<Button onClick={onRetry}>Thử lại</Button>}>
+        Không thể tải lịch sử yêu cầu hoàn tiền.
+      </Alert>
+    );
+  }
+
+  if (refunds.length === 0) {
+    return (
+      <Stack spacing={1.5} sx={{ py: 6, alignItems: 'center', textAlign: 'center' }}>
+        <ReceiptLongIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
+        <Typography color="text.secondary" sx={{ fontWeight: 600 }}>Chưa có yêu cầu hoàn tiền khóa học nào.</Typography>
       </Stack>
-    </Box>
+    );
+  }
+
+  return (
+    <Stack spacing={1.5}>
+      {refunds.map((refund) => {
+        const badge = REFUND_STATUS_MAP[refund.status] ?? { label: refund.status, bgcolor: '#F3F4F6', color: '#4B5563' };
+        return (
+          <Box
+            key={refund.id}
+            onClick={() => onOpen(refund)}
+            sx={{
+              p: 2,
+              borderRadius: 2.5,
+              border: '1px solid #E5E7EB',
+              bgcolor: '#FFFFFF',
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              justifyContent: 'space-between',
+              alignItems: { sm: 'center' },
+              gap: 1.5,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              '&:hover': {
+                borderColor: '#C41E3A',
+                bgcolor: '#FAFAFA',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              },
+            }}
+          >
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+              <Box
+                sx={{
+                  bgcolor: 'rgba(59, 130, 246, 0.1)',
+                  color: '#2563EB',
+                  p: 1,
+                  borderRadius: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <ReceiptLongIcon fontSize="small" />
+              </Box>
+              <Box>
+                <Typography sx={{ fontWeight: 800, fontSize: '0.95rem' }}>{refund.courseTitle}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Mã đơn: {refund.orderCode} · {new Date(refund.createdAt).toLocaleDateString('vi-VN')} · {formatMoney(refund.eligibilitySnapshot.actuallyPaidAmount)}
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Chip
+                label={badge.label}
+                size="small"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  bgcolor: badge.bgcolor,
+                  color: badge.color,
+                  border: 'none',
+                  px: 0.5,
+                }}
+              />
+            </Stack>
+          </Box>
+        );
+      })}
+    </Stack>
   );
 }

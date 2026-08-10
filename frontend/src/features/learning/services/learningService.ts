@@ -41,9 +41,14 @@ export const learningService = {
     return response.data.data;
   },
 
-  saveVideoProgress: async (blockId: string, positionSeconds: number): Promise<LessonProgress> => {
+  saveVideoProgress: async (
+    blockId: string,
+    positionSeconds: number,
+    watchedSeconds = 0,
+  ): Promise<LessonProgress> => {
     const response = await axiosClient.put(ENDPOINTS.LEARNING.VIDEO_PROGRESS(blockId), {
       positionSeconds,
+      watchedSeconds,
     });
     return response.data.data;
   },
@@ -69,6 +74,10 @@ export const learningService = {
   startFinalTest: async (courseId: string): Promise<FinalTestAttempt> => {
     const response = await axiosClient.post(ENDPOINTS.LEARNING.FINAL_TEST_START(courseId));
     return response.data.data;
+  },
+
+  terminateFinalTest: async (courseId: string, attemptId: string): Promise<void> => {
+    await axiosClient.post(ENDPOINTS.LEARNING.FINAL_TEST_TERMINATE(courseId, attemptId));
   },
 
   submitFinalTest: async (
