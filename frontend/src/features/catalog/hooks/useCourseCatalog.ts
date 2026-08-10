@@ -7,5 +7,7 @@ export const useCourseCatalog = (params: CourseCatalogParams) => {
     queryKey: ['public-courses', params],
     queryFn: () => catalogService.searchCourses(params),
     placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 };

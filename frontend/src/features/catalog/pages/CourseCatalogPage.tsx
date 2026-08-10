@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   Box,
+  Button,
   Grid,
   Pagination,
   Stack,
@@ -8,6 +9,7 @@ import {
   Chip,
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeKanjiWatermark/DecorativeKanjiWatermark';
@@ -227,6 +229,16 @@ export const CourseCatalogPage: React.FC = () => {
               Đang cập nhật...
             </Typography>
           )}
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            disabled={isFetching}
+            onClick={() => void refetch()}
+            sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
+          >
+            Tải lại danh sách
+          </Button>
         </Stack>
 
         {isLoading && (
