@@ -17,9 +17,11 @@ import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
+import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeKanjiWatermark/DecorativeKanjiWatermark';
 import { ROUTES } from '../../../shared/constants/routes';
 import type { OrderItemResponse, OrderResponse } from '../../checkout/types';
 import { RefundRequestDialog } from '../../refunds/components/RefundRequestDialog';
+import { StudentRefundHistory } from '../../refunds/components/StudentRefundHistory';
 import { useStudentRefunds } from '../../refunds/hooks/useStudentRefunds';
 import type { StudentRefundResponse } from '../../refunds/types';
 import { useOrderHistory } from '../hooks/useOrderHistory';
@@ -178,8 +180,10 @@ export function StudentPaymentsPage() {
   };
 
   return (
-    <Box component="main" sx={{ minHeight: '100%', bgcolor: '#FAF9F6', px: { xs: 2, md: 4 }, py: { xs: 2, md: 3 } }}>
-      <Box sx={{ maxWidth: 1180, mx: 'auto' }}>
+    <Box component="main" sx={{ minHeight: '100%', bgcolor: '#FAF9F6', px: { xs: 2, md: 4 }, py: { xs: 3, md: 5 } }}>
+      <Box sx={{ maxWidth: 1180, mx: 'auto', position: 'relative', overflow: 'hidden' }}>
+        <DecorativeKanjiWatermark text="履歴" />
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
         <PageHeader
           title="Ví & Thanh toán"
           subtitle="Thanh toán & Số dư tiền hoàn"
@@ -419,21 +423,40 @@ export function StudentPaymentsPage() {
           </Box>
         )}
 
+        {mainTab === 0 && (
+          <StudentRefundHistory
+            refunds={refunds}
+            loading={refundsQuery.isLoading}
+            error={refundsQuery.isError}
+            onRetry={() => void refundsQuery.refetch()}
+            onOpen={openRefundDetail}
+          />
+        )}
+
         {/* SUBTAB 2: Lịch sử rút tiền */}
         {mainTab === 1 && (
-          <Box sx={{ border: '1px solid #E1E5EA', borderRadius: 3, bgcolor: '#fff', p: { xs: 2.5, sm: 3 } }}>
+          <Box
+            sx={{
+              p: { xs: 2, md: 2.5 },
+              bgcolor: '#FFFFFF',
+              borderRadius: 3,
+              border: '1px solid #E1E5EA',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+            }}
+          >
             <StudentWithdrawalHistory
               withdrawals={withdrawals}
               loading={loadingWithdrawals}
               error={errorWithdrawals}
               onRetry={() => void loadWithdrawalData(withdrawalPage)}
-              onChanged={refreshAll}
+              onChanged={() => loadWithdrawalData(withdrawalPage)}
               page={withdrawalPage}
               totalPages={withdrawalTotalPages}
-              onPageChange={(newPage) => setWithdrawalPage(newPage)}
+              onPageChange={setWithdrawalPage}
             />
           </Box>
         )}
+        </Box>
       </Box>
 
       {/* Refund request dialog */}

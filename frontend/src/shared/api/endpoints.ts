@@ -82,7 +82,6 @@ export const ENDPOINTS = {
     wishlistCourse: (courseId: string) => `/v1/student/wishlist/${courseId}`,
     courseReview: (courseId: string) => `/v1/student/courses/${courseId}/review`,
     wallet: '/v1/student/wallet',
-    walletTopUp: '/v1/student/wallet/top-up',
     withdrawals: '/v1/student/withdrawals',
     withdrawalDetail: (id: string) => `/v1/student/withdrawals/${id}`,
     cancelWithdrawal: (id: string) => `/v1/student/withdrawals/${id}/cancel`,
