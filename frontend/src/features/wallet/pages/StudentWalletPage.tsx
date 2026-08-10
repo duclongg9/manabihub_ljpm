@@ -1,10 +1,35 @@
 import { useEffect, useState } from 'react';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Divider,
+  Grid,
+  InputAdornment,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeKanjiWatermark/DecorativeKanjiWatermark';
+import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { getStudentWallet, topUpWallet } from '../services/studentWalletService';
 import type { StudentWalletResponse } from '../types';
 
 const MIN_TOPUP = 10000;
 const MAX_TOPUP = 100000000;
 const QUICK_AMOUNTS = [50000, 100000, 200000, 500000];
+
+function formatMoney(value: number, currency = 'VND') {
+  return `${value.toLocaleString('vi-VN')} ${currency}`;
+}
+
+function formatVnd(value: number) {
+  return `${value.toLocaleString('vi-VN')} ₫`;
+}
 
 export const StudentWalletPage = () => {
   const [wallet, setWallet] = useState<StudentWalletResponse | null>(null);
@@ -17,7 +42,7 @@ export const StudentWalletPage = () => {
     let active = true;
     getStudentWallet()
       .then((data) => active && setWallet(data))
-      .catch(() => active && setError('Không tải được số dư ví.'))
+      .catch(() => active && setError('Không tải được số dư ví. Vui lòng thử lại.'))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
@@ -27,7 +52,7 @@ export const StudentWalletPage = () => {
   const handleTopUp = async () => {
     if (!amount || amount < MIN_TOPUP || amount > MAX_TOPUP || !Number.isInteger(amount)) {
       setError(
-        `Số tiền nạp phải là số nguyên từ ${MIN_TOPUP.toLocaleString('vi-VN')}đ đến ${MAX_TOPUP.toLocaleString('vi-VN')}đ.`,
+        `Số tiền nạp phải là số nguyên từ ${MIN_TOPUP.toLocaleString('vi-VN')} ₫ đến ${MAX_TOPUP.toLocaleString('vi-VN')} ₫.`,
       );
       return;
     }
@@ -48,66 +73,236 @@ export const StudentWalletPage = () => {
     }
   };
 
+  const currency = wallet?.currency ?? 'VND';
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-extrabold text-slate-900 mb-6">Ví của tôi</h1>
+    <Box
+      component="main"
+      sx={{
+        minHeight: '100%',
+        bgcolor: '#FAF9F6',
+        px: { xs: 2, md: 4 },
+        py: { xs: 3, md: 5 },
+      }}
+    >
+      <Box sx={{ maxWidth: 1180, mx: 'auto', position: 'relative', overflow: 'hidden' }}>
+        <DecorativeKanjiWatermark text="財布" />
 
-      {/* Balance card */}
-      <div className="bg-gradient-to-br from-red-600 to-rose-700 text-white rounded-2xl p-6 shadow-lg mb-8">
-        <p className="text-sm opacity-90">Số dư khả dụng</p>
-        <p className="text-4xl font-extrabold mt-1">
-          {loading ? '…' : `${(wallet?.availableBalance ?? 0).toLocaleString('vi-VN')} ${wallet?.currency ?? 'VND'}`}
-        </p>
-      </div>
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <PageHeader
+            title="Ví của tôi"
+            subtitle="お財布"
+            breadcrumbs={[{ label: 'Học viên' }, { label: 'Ví của tôi' }]}
+          />
 
-      {/* Top-up */}
-      <div className="bg-white rounded-2xl shadow border border-slate-200/60 p-6">
-        <h2 className="font-bold text-slate-900 mb-4">Nạp tiền vào ví</h2>
+          <Grid container spacing={3} sx={{ alignItems: 'stretch' }}>
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Box
+                sx={{
+                  position: 'relative',
+                  height: '100%',
+                  minHeight: { xs: 260, md: 360 },
+                  overflow: 'hidden',
+                  borderRadius: 3,
+                  bgcolor: '#C41E3A',
+                  backgroundImage: 'linear-gradient(145deg, #C41E3A 0%, #A5112C 100%)',
+                  color: '#fff',
+                  p: { xs: 3, md: 4 },
+                  boxShadow: '0 18px 45px rgba(196, 30, 58, 0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <AccountBalanceWalletOutlinedIcon
+                  aria-hidden="true"
+                  sx={{
+                    position: 'absolute',
+                    right: -20,
+                    top: -12,
+                    fontSize: 190,
+                    opacity: 0.08,
+                    transform: 'rotate(-8deg)',
+                  }}
+                />
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          {QUICK_AMOUNTS.map((value) => (
-            <button
-              key={value}
-              onClick={() => setAmount(value)}
-              className={`py-2.5 rounded-xl font-semibold border transition-colors ${
-                amount === value
-                  ? 'bg-red-600 text-white border-red-600'
-                  : 'bg-white text-slate-700 border-slate-200 hover:border-red-400'
-              }`}
-            >
-              {value.toLocaleString('vi-VN')}đ
-            </button>
-          ))}
-        </div>
+                <Stack spacing={2} sx={{ position: 'relative' }}>
+                  <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 2,
+                        bgcolor: 'rgba(255, 255, 255, 0.15)',
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}
+                    >
+                      <AccountBalanceWalletOutlinedIcon />
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontWeight: 800 }}>Ví học viên</Typography>
+                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.72)' }}>
+                        Số dư dùng để thanh toán khóa học
+                      </Typography>
+                    </Box>
+                  </Stack>
 
-        <label className="block text-sm text-slate-600 mb-1">Hoặc nhập số tiền (VND)</label>
-        <input
-          type="number"
-          min={MIN_TOPUP}
-          max={MAX_TOPUP}
-          step={1000}
-          value={amount}
-          onChange={(e) => setAmount(Number(e.target.value))}
-          className="w-full border border-slate-300 rounded-xl px-4 py-3 mb-2 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
-        />
-        <p className="text-xs text-slate-400 mb-4">
-          Từ {MIN_TOPUP.toLocaleString('vi-VN')}đ đến {MAX_TOPUP.toLocaleString('vi-VN')}đ.
-        </p>
+                  <Box sx={{ pt: 2 }}>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mb: 0.75 }}>
+                      Số dư khả dụng
+                    </Typography>
+                    {loading ? (
+                      <CircularProgress size={34} sx={{ color: '#fff', my: 1 }} aria-label="Đang tải số dư ví" />
+                    ) : (
+                      <Typography
+                        component="p"
+                        sx={{ fontSize: { xs: '2.25rem', md: '2.65rem' }, lineHeight: 1.15, fontWeight: 900 }}
+                      >
+                        {formatMoney(wallet?.availableBalance ?? 0, currency)}
+                      </Typography>
+                    )}
+                  </Box>
+                </Stack>
 
-        {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+                <Stack
+                  direction="row"
+                  divider={<Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.2)' }} />}
+                  sx={{ position: 'relative', pt: 2.5 }}
+                >
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.68)' }}>
+                      Tổng số dư
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800 }}>{formatMoney(wallet?.balance ?? 0, currency)}</Typography>
+                  </Box>
+                  <Box sx={{ flex: 1, pl: 3 }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.68)' }}>
+                      Đang xử lý
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800 }}>{formatMoney(wallet?.frozenBalance ?? 0, currency)}</Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            </Grid>
 
-        <button
-          onClick={handleTopUp}
-          disabled={processing}
-          className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-colors"
-        >
-          {processing ? 'Đang chuyển đến cổng thanh toán…' : 'Nạp tiền qua VNPay'}
-        </button>
-        <p className="text-center text-xs text-slate-400 mt-3">
-          Giao dịch chỉ được xác nhận qua cổng thanh toán (webhook), không qua trình duyệt.
-        </p>
-      </div>
-    </div>
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Box
+                sx={{
+                  height: '100%',
+                  minHeight: { md: 360 },
+                  border: '1px solid #E1E5EA',
+                  borderRadius: 3,
+                  bgcolor: '#fff',
+                  overflow: 'hidden',
+                  boxShadow: '0 8px 28px rgba(15, 23, 42, 0.05)',
+                }}
+              >
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', px: { xs: 2.5, md: 3 }, py: 2.5 }}>
+                  <Box
+                    sx={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 2,
+                      bgcolor: '#FFF1F2',
+                      color: '#C41E3A',
+                      display: 'grid',
+                      placeItems: 'center',
+                    }}
+                  >
+                    <PaymentsOutlinedIcon />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontWeight: 900 }}>Nạp tiền vào ví</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Chọn nhanh hoặc nhập số tiền bạn muốn nạp.
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Divider />
+
+                <Stack spacing={2.25} sx={{ px: { xs: 2.5, md: 3 }, py: 2.75 }}>
+                  <Grid container spacing={1.25}>
+                    {QUICK_AMOUNTS.map((value) => {
+                      const selected = amount === value;
+                      return (
+                        <Grid key={value} size={{ xs: 6, sm: 3 }}>
+                          <Button
+                            fullWidth
+                            variant={selected ? 'contained' : 'outlined'}
+                            onClick={() => {
+                              setAmount(value);
+                              setError(null);
+                            }}
+                            aria-pressed={selected}
+                            sx={{
+                              minHeight: 44,
+                              fontWeight: 800,
+                              color: selected ? '#fff' : '#334155',
+                              borderColor: selected ? 'primary.main' : '#CBD5E1',
+                              bgcolor: selected ? 'primary.main' : '#fff',
+                              '&:hover': {
+                                borderColor: 'primary.main',
+                                bgcolor: selected ? 'primary.dark' : '#FFF1F2',
+                              },
+                            }}
+                          >
+                            {formatVnd(value)}
+                          </Button>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+
+                  <TextField
+                    fullWidth
+                    label="Số tiền nạp"
+                    value={amount ? amount.toLocaleString('vi-VN') : ''}
+                    onChange={(event) => {
+                      const digits = event.target.value.replace(/\D/g, '');
+                      setAmount(digits ? Number(digits) : 0);
+                      setError(null);
+                    }}
+                    slotProps={{
+                      htmlInput: {
+                        inputMode: 'numeric',
+                        'aria-label': 'Số tiền nạp vào ví',
+                      },
+                      input: {
+                        endAdornment: <InputAdornment position="end">₫</InputAdornment>,
+                      },
+                    }}
+                    helperText={`Tối thiểu ${formatVnd(MIN_TOPUP)} · Tối đa ${formatVnd(MAX_TOPUP)}`}
+                  />
+
+                  {error && <Alert severity="error">{error}</Alert>}
+
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    onClick={() => void handleTopUp()}
+                    disabled={processing}
+                    startIcon={processing ? <CircularProgress size={18} color="inherit" /> : <PaymentsOutlinedIcon />}
+                    sx={{ minHeight: 48, color: '#fff', fontWeight: 900 }}
+                  >
+                    {processing ? 'Đang kết nối VNPay…' : 'Nạp tiền qua VNPay'}
+                  </Button>
+
+                  <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', justifyContent: 'center' }}>
+                    <LockOutlinedIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+                    <Typography variant="caption" sx={{ color: '#94A3B8', textAlign: 'center' }}>
+                      Giao dịch được xác nhận an toàn qua cổng thanh toán VNPay.
+                    </Typography>
+                  </Stack>
+                </Stack>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+      </Box>
+    </Box>
   );
 };
 

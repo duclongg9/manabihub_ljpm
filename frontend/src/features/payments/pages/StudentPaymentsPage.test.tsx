@@ -91,6 +91,7 @@ describe('StudentPaymentsPage', () => {
     );
 
     expect(screen.getByText('MHB-20260729-001')).toBeInTheDocument();
+    expect(screen.getByTestId('decorative-kanji-watermark')).toHaveTextContent('履歴');
     expect(screen.getByText('JLPT N2 chuyên sâu')).toBeInTheDocument();
     expect(screen.getAllByText(/799\.000/).length).toBeGreaterThan(0);
     expect(screen.getByText('Đã thanh toán')).toBeInTheDocument();

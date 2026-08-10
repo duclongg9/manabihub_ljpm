@@ -13,6 +13,7 @@ import {
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
+import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeKanjiWatermark/DecorativeKanjiWatermark';
 import { ROUTES } from '../../../shared/constants/routes';
 import type { OrderItemResponse, OrderResponse } from '../../checkout/types';
 import { RefundRequestDialog } from '../../refunds/components/RefundRequestDialog';
@@ -89,7 +90,9 @@ export function StudentPaymentsPage() {
 
   return (
     <Box component="main" sx={{ minHeight: '100%', bgcolor: '#FAF9F6', px: { xs: 2, md: 4 }, py: { xs: 3, md: 5 } }}>
-      <Box sx={{ maxWidth: 1180, mx: 'auto' }}>
+      <Box sx={{ maxWidth: 1180, mx: 'auto', position: 'relative', overflow: 'hidden' }}>
+        <DecorativeKanjiWatermark text="履歴" />
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
         <PageHeader
           title="Lịch sử thanh toán"
           subtitle="購入履歴"
@@ -171,6 +174,7 @@ export function StudentPaymentsPage() {
           onRetry={() => void refundsQuery.refetch()}
           onOpen={openRefundDetail}
         />
+        </Box>
       </Box>
 
       <RefundRequestDialog
