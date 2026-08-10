@@ -74,6 +74,7 @@ class StudentWithdrawalServiceImplTest {
         student = new StudentProfile();
         student.setId(UUID.randomUUID());
         student.setUser(user);
+        student.setIdentityVerifiedAt(Instant.now());
         wallet = Wallet.builder()
                 .id(UUID.randomUUID())
                 .ownerType(WalletOwnerType.STUDENT)

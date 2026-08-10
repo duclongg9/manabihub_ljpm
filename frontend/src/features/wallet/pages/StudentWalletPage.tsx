@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
@@ -14,6 +15,7 @@ import {
 import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeKanjiWatermark/DecorativeKanjiWatermark';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { getStudentWallet } from '../services/studentWalletService';
+import { getStudentIdentityVerificationStatus } from '../services/studentIdentityVerificationService';
 import type { StudentWalletResponse } from '../types';
 import { StudentWithdrawalPanel } from '../components/StudentWithdrawalPanel';
 
@@ -22,16 +24,24 @@ function formatMoney(value: number, currency = 'VND') {
 }
 
 export const StudentWalletPage = () => {
+  const navigate = useNavigate();
   const [wallet, setWallet] = useState<StudentWalletResponse | null>(null);
+  const [identityVerified, setIdentityVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     getStudentWallet()
-      .then((data) => active && setWallet(data))
+      .then((walletData) => {
+        if (!active) return;
+        setWallet(walletData);
+      })
       .catch(() => active && setError('Không tải được số dư ví. Vui lòng thử lại.'))
       .finally(() => active && setLoading(false));
+    getStudentIdentityVerificationStatus()
+      .then((identityData) => active && setIdentityVerified(identityData.verified))
+      .catch(() => active && setIdentityVerified(false));
     return () => {
       active = false;
     };
@@ -153,9 +163,16 @@ export const StudentWalletPage = () => {
             <StudentWithdrawalPanel
               wallet={wallet}
               minimumAmount={wallet?.minimumPayoutAmount ?? 100000}
+              identityVerified={identityVerified}
+              onVerifyIdentity={() => navigate('/student/identity-verification')}
               onChanged={async () => {
                 try {
-                  setWallet(await getStudentWallet());
+                  const [walletData, identityData] = await Promise.all([
+                    getStudentWallet(),
+                    getStudentIdentityVerificationStatus(),
+                  ]);
+                  setWallet(walletData);
+                  setIdentityVerified(identityData.verified);
                 } catch {
                   setError('Không tải được số dư ví. Vui lòng thử lại.');
                 }

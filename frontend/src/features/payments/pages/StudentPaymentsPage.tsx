@@ -31,6 +31,7 @@ import type { StudentWalletResponse, StudentWithdrawal } from '../../wallet/type
 import { useCommercialPolicy } from '../../help-center/hooks/useCommercialPolicy';
 import { StudentWithdrawalModal } from '../../wallet/components/StudentWithdrawalModal';
 import { StudentWithdrawalHistory } from '../../wallet/components/StudentWithdrawalHistory';
+import { getStudentIdentityVerificationStatus } from '../../wallet/services/studentIdentityVerificationService';
 
 interface FilterOption {
   label: string;
@@ -95,6 +96,7 @@ export function StudentPaymentsPage() {
   // Wallet state
   const [wallet, setWallet] = useState<StudentWalletResponse | null>(null);
   const [loadingWallet, setLoadingWallet] = useState(true);
+  const [identityVerified, setIdentityVerified] = useState(false);
   const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
 
   // Withdrawals history state
@@ -124,6 +126,13 @@ export function StudentPaymentsPage() {
       // transient balance fetch error
     } finally {
       setLoadingWallet(false);
+    }
+    try {
+      const identity = await getStudentIdentityVerificationStatus();
+      setIdentityVerified(identity.verified);
+    } catch {
+      // A stale backend must not prevent the wallet/history from rendering.
+      setIdentityVerified(false);
     }
   }, []);
 
@@ -291,10 +300,16 @@ export function StudentPaymentsPage() {
                 <Button
                   variant="contained"
                   disabled={loadingWallet || (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount}
-                  onClick={() => setWithdrawalModalOpen(true)}
+                  onClick={() => {
+                    if (!identityVerified) {
+                      navigate('/student/identity-verification');
+                      return;
+                    }
+                    setWithdrawalModalOpen(true);
+                  }}
                   sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 800, px: 3, textTransform: 'none' }}
                 >
-                  Yêu cầu rút tiền
+                  {identityVerified ? 'Yêu cầu rút tiền' : 'Xác minh CCCD để rút tiền'}
                 </Button>
               </Stack>
             </Stack>
@@ -387,14 +402,14 @@ export function StudentPaymentsPage() {
               </Alert>
             )}
 
-            {ordersQuery.isLoading && (
+            {(ordersQuery.isLoading || ordersQuery.isFetching) && (
               <Stack spacing={1.5} sx={{ minHeight: 260, alignItems: 'center', justifyContent: 'center', bgcolor: '#FFF', borderRadius: 3, border: '1px solid #E1E5EA' }}>
                 <CircularProgress aria-label="Đang tải lịch sử thanh toán" sx={{ color: '#C41E3A' }} />
                 <Typography color="text.secondary">Đang tải giao dịch…</Typography>
               </Stack>
             )}
 
-            {!ordersQuery.isLoading && !ordersQuery.isError && courseOrders.length === 0 && (
+            {!ordersQuery.isLoading && !ordersQuery.isFetching && !ordersQuery.isError && courseOrders.length === 0 && (
               <Stack spacing={1.5} sx={{ minHeight: 280, alignItems: 'center', justifyContent: 'center', p: 3, textAlign: 'center', bgcolor: '#FFF', borderRadius: 3, border: '1px solid #E1E5EA' }}>
                 <ReceiptLongOutlinedIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
                 <Typography variant="h6" sx={{ fontWeight: 900 }}>Chưa có đơn hàng nào</Typography>
@@ -409,7 +424,7 @@ export function StudentPaymentsPage() {
             )}
 
             {/* Standalone elevated cards with clean spacing */}
-            <Stack spacing={2}>
+            {!ordersQuery.isFetching && <Stack spacing={2}>
               {courseOrders.map((order) => (
                 <Box
                   key={order.id}
@@ -433,7 +448,7 @@ export function StudentPaymentsPage() {
                   />
                 </Box>
               ))}
-            </Stack>
+            </Stack>}
 
             {/* Polished Pagination */}
             {(ordersQuery.data?.totalPages ?? 0) > 1 && (
@@ -515,6 +530,7 @@ export function StudentPaymentsPage() {
         onClose={() => setWithdrawalModalOpen(false)}
         wallet={wallet}
         minimumAmount={minimumAmount}
+        identityVerified={identityVerified}
         onSuccess={refreshAll}
       />
     </Box>

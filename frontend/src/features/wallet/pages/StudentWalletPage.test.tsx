@@ -1,10 +1,16 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getStudentWallet } from '../services/studentWalletService';
 import { StudentWalletPage } from './StudentWalletPage';
+import { getStudentIdentityVerificationStatus } from '../services/studentIdentityVerificationService';
 
 vi.mock('../services/studentWalletService', () => ({
   getStudentWallet: vi.fn(),
+}));
+
+vi.mock('../services/studentIdentityVerificationService', () => ({
+  getStudentIdentityVerificationStatus: vi.fn(),
 }));
 
 describe('StudentWalletPage', () => {
@@ -15,10 +21,14 @@ describe('StudentWalletPage', () => {
       availableBalance: 0,
       currency: 'VND',
     });
+    vi.mocked(getStudentIdentityVerificationStatus).mockResolvedValue({
+      verified: false,
+      status: 'NOT_VERIFIED',
+    });
   });
 
   it('renders a non-interactive wallet kanji watermark behind the page content', async () => {
-    render(<StudentWalletPage />);
+    render(<MemoryRouter><StudentWalletPage /></MemoryRouter>);
 
     const watermark = screen.getByTestId('decorative-kanji-watermark');
     expect(watermark).toHaveTextContent('財布');

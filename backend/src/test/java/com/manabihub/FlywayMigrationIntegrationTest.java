@@ -72,7 +72,7 @@ public class FlywayMigrationIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
-    // ── Test 1: Clean build from V001 to V064 ──────────────────────────────
+    // ── Test 1: Clean build from V001 to V065 ──────────────────────────────
     @Test
     void cleanMigrationToLatestVersion() {
         assertThat(flyway).isNotNull();
@@ -89,13 +89,13 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("064");
+        assertThat(current).isEqualTo("065");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V064 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V065 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");
@@ -317,5 +317,26 @@ public class FlywayMigrationIntegrationTest {
         assertThat(finalTestStatusConstraint)
                 .as("chk_final_test_attempt_status allows violation termination")
                 .contains("TERMINATED_FOR_VIOLATION");
+
+        Integer identityColumns = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = 'student_profiles' "
+                        + "AND column_name IN ('identity_fingerprint', 'identity_provider', "
+                        + "'identity_full_name', 'identity_date_of_birth', 'identity_verified_at')",
+                Integer.class);
+        assertThat(identityColumns).as("student identity verification columns exist").isEqualTo(5);
+
+        Integer identityIndex = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_indexes "
+                        + "WHERE indexname = 'uq_student_profiles_identity_fingerprint' "
+                        + "AND schemaname = 'public'",
+                Integer.class);
+        assertThat(identityIndex).as("uq_student_profiles_identity_fingerprint exists").isEqualTo(1);
+
+        Integer demoRegistry = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM mock_national_id_registry "
+                        + "WHERE id_number = '027204002711' AND active = TRUE",
+                Integer.class);
+        assertThat(demoRegistry).as("student demo registry record exists").isEqualTo(1);
     }
 }

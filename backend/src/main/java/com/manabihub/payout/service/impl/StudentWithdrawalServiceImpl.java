@@ -72,6 +72,12 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
         }
 
         StudentProfile student = requireStudent(userId);
+        if (student.getIdentityVerifiedAt() == null) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_002,
+                    "Vui lòng hoàn tất xác minh CCCD trước khi rút tiền",
+                    HttpStatus.FORBIDDEN);
+        }
         studentWalletService.getOrCreateStudentWallet(student.getId());
         Wallet wallet = walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, student.getId())
                 .orElseThrow(this::walletNotFound);
