@@ -52,7 +52,9 @@ class StudentCertificateControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.messageCode", is("LEARNING_CERTIFICATE_ISSUED")))
                 .andExpect(jsonPath("$.data.courseId", is(courseId.toString())))
-                .andExpect(jsonPath("$.data.certificateNumber", is("MHB-TEST")));
+                .andExpect(jsonPath("$.data.certificateNumber", is("MHB-TEST")))
+                .andExpect(jsonPath("$.data.issuedAt", is("2026-07-24T00:00:00Z")))
+                .andExpect(jsonPath("$.data.completedAt", is("2026-07-23T23:59:58Z")));
     }
 
     @Test

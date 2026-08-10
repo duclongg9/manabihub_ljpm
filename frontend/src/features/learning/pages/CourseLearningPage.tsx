@@ -55,7 +55,7 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
-import { downloadCertificatePdf } from '../utils/certificatePdf';
+import { downloadCertificatePdf, formatCertificateDate } from '../utils/certificatePdf';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
 
@@ -967,7 +967,7 @@ function FinalTestPanel({
               Đã hoàn thành khoá học <strong>{certificate.courseTitle}</strong>
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Cấp ngày {new Date(certificate.issuedAt).toLocaleDateString('vi-VN')} · {certificate.certificateNumber}
+              Hoàn thành ngày {formatCertificateDate(certificate.completedAt, certificate.issuedAt)} · {certificate.certificateNumber}
             </Typography>
             <Button
               sx={{ mt: 2 }}

@@ -130,8 +130,8 @@ export interface LearningCertificate {
   certificateNumber: string;
   studentName: string;
   courseTitle: string;
-  issuedAt: string;
-  completedAt: string | null;
+  issuedAt: string | number;
+  completedAt: string | number | null;
 }
 
 export interface CourseProgressSummary {

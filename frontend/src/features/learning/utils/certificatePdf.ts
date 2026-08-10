@@ -4,6 +4,7 @@ const CANVAS_WIDTH = 3508;
 const CANVAS_HEIGHT = 2480;
 const PDF_WIDTH_MM = 297;
 const PDF_HEIGHT_MM = 210;
+const MINIMUM_VALID_CERTIFICATE_TIME = Date.UTC(2000, 0, 1);
 
 const COLORS = {
   ivory: '#fffdf7',
@@ -15,6 +16,42 @@ const COLORS = {
   muted: '#5c6473',
   paleRed: '#f9e9ec',
 };
+
+type ApiTimestamp = string | number | null | undefined;
+
+export function parseCertificateTimestamp(value: ApiTimestamp) {
+  if (value === null || value === undefined || value === '') return null;
+
+  let timestamp: number;
+  if (typeof value === 'number') {
+    timestamp = Math.abs(value) < 100_000_000_000 ? value * 1000 : value;
+  } else {
+    const normalized = value.trim();
+    if (!normalized) return null;
+    if (/^-?\d+(\.\d+)?$/.test(normalized)) {
+      const numericValue = Number(normalized);
+      timestamp = Math.abs(numericValue) < 100_000_000_000
+        ? numericValue * 1000
+        : numericValue;
+    } else {
+      timestamp = Date.parse(normalized);
+    }
+  }
+
+  if (!Number.isFinite(timestamp) || timestamp < MINIMUM_VALID_CERTIFICATE_TIME) return null;
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function formatCertificateDate(value: ApiTimestamp, fallbackValue?: ApiTimestamp) {
+  const date = parseCertificateTimestamp(value) ?? parseCertificateTimestamp(fallbackValue);
+  if (!date) return 'Vừa hoàn thành';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
 
 export async function downloadCertificatePdf(certificate: LearningCertificate) {
   const canvas = document.createElement('canvas');
@@ -60,7 +97,10 @@ export async function renderCertificate(
   context: CanvasRenderingContext2D,
   certificate: LearningCertificate,
 ) {
-  const completionMoment = formatCompletionMoment(certificate.completedAt ?? certificate.issuedAt);
+  const completionDate = parseCertificateTimestamp(certificate.completedAt)
+    ?? parseCertificateTimestamp(certificate.issuedAt)
+    ?? new Date();
+  const completionMoment = formatCompletionMoment(completionDate);
   const systemLogo = await loadSystemLogo();
 
   context.save();
@@ -488,9 +528,7 @@ function roundedRect(
   context.closePath();
 }
 
-function formatCompletionMoment(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+function formatCompletionMoment(date: Date) {
   return new Intl.DateTimeFormat('vi-VN', {
     day: '2-digit',
     month: '2-digit',
