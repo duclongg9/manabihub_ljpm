@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +27,11 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Page<Order> findByStudent_IdAndStatus(UUID studentId,
                                           com.manabihub.order.enums.OrderStatus status,
                                           Pageable pageable);
+
+    List<Order> findTop100ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
+            com.manabihub.order.enums.OrderStatus status,
+            Instant createdAt
+    );
 
     /**
      * Loads an order by its code holding a pessimistic write lock.

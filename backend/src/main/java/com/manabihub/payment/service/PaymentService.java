@@ -25,6 +25,9 @@ public interface PaymentService {
      */
     Order payWithWallet(UUID orderId);
 
+    /** Cancels a pending order, marks pending payment components failed and releases wallet reservations. */
+    void cancelPendingOrder(UUID orderId);
+
     /**
      * Combined payment: uses as much of the student's wallet balance as available and charges
      * the remainder via VNPay. Sets the order's wallet portion and returns the VNPay payment
@@ -42,4 +45,14 @@ public interface PaymentService {
      * @return the acknowledgement to send back to the provider
      */
     IpnAckResponse handleIpn(Map<String, String> params);
+
+    /**
+     * Processes the browser return from VNPay. The payload is still verified by
+     * the backend; a successful browser return is only an acknowledgement and
+     * does not fulfil the order. The server-to-server IPN remains authoritative.
+     */
+    IpnAckResponse handleVnPayReturn(Map<String, String> params);
+
+    /** Expires pending VNPay payments and releases any reserved wallet amount. */
+    void expirePendingPayments();
 }

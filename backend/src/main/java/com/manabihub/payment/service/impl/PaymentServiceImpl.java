@@ -17,6 +17,7 @@ import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.dto.IpnAckResponse;
+import com.manabihub.payment.config.VnPayProperties;
 import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.enums.PaymentStatus;
 import com.manabihub.payment.event.PaymentNotificationEvent;
@@ -62,6 +63,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final StudentWalletService studentWalletService;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
+    private final VnPayProperties vnPayProperties;
 
     @Override
     @Transactional
@@ -107,6 +109,14 @@ public class PaymentServiceImpl implements PaymentService {
             return IpnAckResponse.of("02", "Order already confirmed");
         }
 
+        // A cancelled/failed/expired order is terminal. A late success callback
+        // must never reopen it or create a second enrollment/escrow hold.
+        if (order.getStatus() != OrderStatus.PENDING) {
+            log.warn("[{}] Ignored IPN for closed order {} (status={})",
+                    MessageCodes.MSG_PAY_005, order.getOrderCode(), order.getStatus());
+            return IpnAckResponse.of("02", "Order already closed");
+        }
+
         PaymentTransaction transaction = latestOrNewGatewayTransaction(order);
         transaction.setProviderTransactionId(result.providerTransactionId());
         transaction.setRawResponse(objectMapper.valueToTree(params));
@@ -114,13 +124,13 @@ public class PaymentServiceImpl implements PaymentService {
         if (!result.paymentSuccessful()) {
             transaction.setStatus(PaymentStatus.FAILED);
             paymentTransactionRepository.save(transaction);
-            failWalletComponent(order);
-            studentWalletService.releaseForOrder(order.getId(), Instant.now());
-            order.setStatus(OrderStatus.FAILED);
-            orderRepository.save(order);
+            OrderStatus terminalStatus = "24".equals(result.responseCode())
+                    ? OrderStatus.CANCELLED
+                    : OrderStatus.FAILED;
+            closePendingOrder(order, terminalStatus, Instant.now());
             notifyPaymentFailed(order);
-            log.info("[{}] Recorded FAILED payment for order {} (responseCode={})",
-                    MessageCodes.MSG_PAY_003, order.getOrderCode(), result.responseCode());
+            log.info("[{}] Recorded {} payment for order {} (responseCode={})",
+                    MessageCodes.MSG_PAY_003, terminalStatus, order.getOrderCode(), result.responseCode());
             return IpnAckResponse.of("00", "Confirm Success");
         }
 
@@ -167,6 +177,97 @@ public class PaymentServiceImpl implements PaymentService {
         order.setStatus(OrderStatus.PAID);
         orderRepository.save(order);
         return IpnAckResponse.of("00", "Confirm Success");
+    }
+
+    @Override
+    @Transactional
+    public IpnAckResponse handleVnPayReturn(Map<String, String> params) {
+        PaymentCallbackResult result = paymentGateway.parseCallback(params);
+        if (!result.signatureValid()) {
+            log.warn("[{}] Rejected VNPay browser return with invalid checksum, txnRef={}",
+                    MessageCodes.MSG_PAY_004, result.orderCode());
+            return IpnAckResponse.of("97", "Invalid Checksum");
+        }
+
+        Order order = orderRepository.findByOrderCodeForUpdate(result.orderCode()).orElse(null);
+        if (order == null) {
+            return IpnAckResponse.of("01", "Order not Found");
+        }
+
+        long expectedMinor = order.getGatewayAmount().multiply(MINOR_UNIT_FACTOR).longValue();
+        if (result.amount() != expectedMinor) {
+            log.warn("[{}] VNPay browser return amount mismatch for order {}: expected {}, got {}",
+                    MessageCodes.MSG_PAY_004, order.getOrderCode(), expectedMinor, result.amount());
+            return IpnAckResponse.of("04", "Invalid Amount");
+        }
+
+        if (order.getStatus() == OrderStatus.PAID) {
+            return IpnAckResponse.of("02", "Order already confirmed");
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            return IpnAckResponse.of("02", "Order already closed");
+        }
+
+        // A successful browser return is not authoritative. VNPay IPN still has
+        // to confirm the payment before the order can be fulfilled.
+        if (result.paymentSuccessful()) {
+            return IpnAckResponse.of("00", "Payment is awaiting server confirmation");
+        }
+
+        PaymentTransaction transaction = latestOrNewGatewayTransaction(order);
+        transaction.setProviderTransactionId(result.providerTransactionId());
+        transaction.setRawResponse(objectMapper.valueToTree(params));
+        transaction.setStatus(PaymentStatus.FAILED);
+        paymentTransactionRepository.save(transaction);
+
+        OrderStatus terminalStatus = "24".equals(result.responseCode())
+                ? OrderStatus.CANCELLED
+                : OrderStatus.FAILED;
+        closePendingOrder(order, terminalStatus, Instant.now());
+        log.info("[{}] Recorded {} payment return for order {} (responseCode={})",
+                MessageCodes.MSG_PAY_003, terminalStatus, order.getOrderCode(), result.responseCode());
+        return IpnAckResponse.of("00", "Return processed");
+    }
+
+    @Override
+    @Transactional
+    public void expirePendingPayments() {
+        long expiryMinutes = Math.max(1, vnPayProperties.getPaymentExpiryMinutes());
+        Instant cutoff = Instant.now().minus(Duration.ofMinutes(expiryMinutes));
+        orderRepository
+                .findTop100ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(OrderStatus.PENDING, cutoff)
+                .forEach(order -> expirePendingOrder(order.getId()));
+    }
+
+    private void expirePendingOrder(UUID orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId).orElse(null);
+        if (order == null || order.getStatus() != OrderStatus.PENDING) {
+            return;
+        }
+        closePendingOrder(order, OrderStatus.CANCELLED, Instant.now());
+        log.info("[{}] Expired pending payment order {} after {} minutes",
+                MessageCodes.MSG_PAY_003, order.getOrderCode(), vnPayProperties.getPaymentExpiryMinutes());
+    }
+
+    /**
+     * Closes a pending order exactly once and releases any wallet reservation.
+     * The caller must already hold the order row lock when this is used from a
+     * callback; the expiry path acquires that lock before calling it.
+     */
+    private void closePendingOrder(Order order, OrderStatus terminalStatus, Instant closedAt) {
+        if (order.getStatus() != OrderStatus.PENDING) {
+            return;
+        }
+        paymentTransactionRepository
+                .findByOrder_IdAndStatusInOrderByCreatedAtAsc(
+                        order.getId(), List.of(PaymentStatus.PENDING))
+                .forEach(payment -> {
+                    payment.setStatus(PaymentStatus.FAILED);
+                    paymentTransactionRepository.save(payment);
+                });
+        studentWalletService.releaseForOrder(order.getId(), closedAt);
+        order.setStatus(terminalStatus);
+        orderRepository.save(order);
     }
 
     @Override
@@ -218,6 +319,30 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("[{}] Paid order {} with wallet — enrollment + escrow created",
                 MessageCodes.MSG_PAY_002, order.getOrderCode());
         return order;
+    }
+
+    @Override
+    @Transactional
+    public void cancelPendingOrder(UUID orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.ORDER_NOT_FOUND,
+                        "Order was not found",
+                        HttpStatus.NOT_FOUND));
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            return;
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "Only a pending order can be cancelled",
+                    HttpStatus.CONFLICT);
+        }
+
+        closePendingOrder(order, OrderStatus.CANCELLED, Instant.now());
+        log.info("[{}] Cancelled pending order {} at the student's request",
+                MessageCodes.MSG_PAY_003, order.getOrderCode());
     }
 
     @Override
@@ -308,17 +433,6 @@ public class PaymentServiceImpl implements PaymentService {
         walletPayment.setStatus(PaymentStatus.SUCCESS);
         walletPayment.setSucceededAt(succeededAt);
         paymentTransactionRepository.save(walletPayment);
-    }
-
-    private void failWalletComponent(Order order) {
-        paymentTransactionRepository
-                .findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(order.getId(), WALLET_PROVIDER)
-                .ifPresent(walletPayment -> {
-                    if (walletPayment.getStatus() == PaymentStatus.PENDING) {
-                        walletPayment.setStatus(PaymentStatus.FAILED);
-                        paymentTransactionRepository.save(walletPayment);
-                    }
-                });
     }
 
     private void createEnrollments(Order order) {

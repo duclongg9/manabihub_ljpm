@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getOrder } from '../services/checkoutService';
+import { confirmPaymentReturn, getOrder } from '../services/checkoutService';
 import type { OrderResponse } from '../types';
 import { ROUTES } from '../../../shared/constants/routes';
 
-type PollState = 'polling' | 'paid' | 'failed' | 'timeout';
+type PollState = 'polling' | 'paid' | 'cancelled' | 'failed' | 'timeout';
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_ATTEMPTS = 20; // ~40s
@@ -27,6 +27,9 @@ export const CheckoutReturnPage = () => {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
 
+    const hasSignedProviderReturn = searchParams.has('vnp_TxnRef')
+      && searchParams.has('vnp_SecureHash');
+
     const poll = async () => {
       try {
         const data = await getOrder(orderId);
@@ -36,7 +39,11 @@ export const CheckoutReturnPage = () => {
           setState('paid');
           return;
         }
-        if (data.status === 'FAILED' || data.status === 'CANCELLED') {
+        if (data.status === 'CANCELLED') {
+          setState('cancelled');
+          return;
+        }
+        if (data.status === 'FAILED') {
           setState('failed');
           return;
         }
@@ -52,7 +59,26 @@ export const CheckoutReturnPage = () => {
       timer = setTimeout(poll, POLL_INTERVAL_MS);
     };
 
-    poll();
+    const processReturnAndPoll = async () => {
+      if (hasSignedProviderReturn) {
+        try {
+          const acknowledgement = await confirmPaymentReturn(searchParams);
+          if (!active) return;
+          if (acknowledgement.RspCode !== '00') {
+            setState('failed');
+            return;
+          }
+        } catch {
+          // The return endpoint may be temporarily unavailable. Polling remains
+          // useful because the authoritative IPN can still arrive independently.
+        }
+      }
+      if (active) {
+        poll();
+      }
+    };
+
+    processReturnAndPoll();
     return () => {
       active = false;
       clearTimeout(timer);
@@ -112,6 +138,22 @@ export const CheckoutReturnPage = () => {
               </>
             )}
           </div>
+        </>
+      )}
+
+      {state === 'cancelled' && (
+        <>
+          <StatusIcon variant="pending" />
+          <h1 className="text-2xl font-extrabold text-slate-900 mt-6">Thanh toán đã được hủy</h1>
+          <p className="text-sm text-slate-500 mt-2">
+            Bạn đã hủy giao dịch. Đơn hàng vẫn được lưu trong lịch sử thanh toán để đối soát.
+          </p>
+          <button
+            onClick={() => navigate(ROUTES.STUDENT.PAYMENTS)}
+            className="mt-8 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-6 rounded-xl"
+          >
+            Xem lịch sử thanh toán
+          </button>
         </>
       )}
 

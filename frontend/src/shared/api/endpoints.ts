@@ -138,6 +138,7 @@ export const ENDPOINTS = {
     create: '/v1/orders',
     list: '/v1/orders',
     detail: (orderId: string) => `/v1/orders/${orderId}`,
+    cancel: (orderId: string) => `/v1/orders/${orderId}/cancel`,
   },
   studentRefunds: {
     create: '/v1/student/refunds',
@@ -149,6 +150,7 @@ export const ENDPOINTS = {
     // Local dev simulator for the VNPay IPN callback (no tunnel needed).
     devIpn: '/v1/payments/dev/ipn',
     // Confirms an order from the browser return redirect (checksum-verified backend-side).
+    vnpayReturn: '/v1/payments/vnpay/confirm-return',
   },
   LEARNING: {
     COURSE_LEARN: (courseId: string) => `/v1/student/courses/${courseId}/learn`,

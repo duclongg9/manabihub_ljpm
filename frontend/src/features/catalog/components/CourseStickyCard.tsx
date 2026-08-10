@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useState } from 'react';
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
-import { CheckCircle2, PlayCircle, Target, BookOpen, Infinity as InfinityIcon } from 'lucide-react';
+import { CheckCircle2, PlayCircle, Target, BookOpen, Infinity as InfinityIcon, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 import { createCheckout } from '../../checkout/services/checkoutService';
@@ -12,12 +12,17 @@ interface CourseStickyCardProps {
   course: PublicCourseDetail;
 }
 
+export interface CourseStickyCardHandle {
+  openPurchaseOptions: () => void;
+}
+
 type EnrollmentSuccess = 'FREE' | 'PAID';
 
-export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
+export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyCardProps>(({ course }, ref) => {
   const [buying, setBuying] = useState(false);
   const [buyError, setBuyError] = useState<string | null>(null);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  const [showCombinedPaymentOption, setShowCombinedPaymentOption] = useState(false);
   const [enrollmentSuccess, setEnrollmentSuccess] = useState<EnrollmentSuccess | null>(null);
   const [locallyEnrolled, setLocallyEnrolled] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
@@ -26,7 +31,7 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
 
   const handleContinueLearning = () => navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
 
-  const handleBuy = async (paymentMethod: 'VNPAY' | 'WALLET' | 'WALLET_VNPAY' = 'VNPAY') => {
+  const handleBuy = useCallback(async (paymentMethod: 'VNPAY' | 'WALLET' | 'WALLET_VNPAY' = 'VNPAY') => {
     if (!getAuthSession('public')) {
       navigate(ROUTES.PUBLIC.LOGIN);
       return;
@@ -47,9 +52,10 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
     } catch (err) {
       const code = (err as { response?: { data?: { messageCode?: string } } })?.response?.data?.messageCode;
       if (code === 'WALLET_INSUFFICIENT_BALANCE') {
-        // Let the student choose how to proceed instead of failing outright.
+        // Only reveal the combined method after the wallet-only attempt is rejected.
         setShowPaymentOptions(true);
-        setBuyError(null);
+        setShowCombinedPaymentOption(true);
+        setBuyError('Số dư ví không đủ. Bạn có thể chọn ví + VNPay phần còn lại hoặc hủy.');
       } else {
         const message = code === 'ORDER_ALREADY_ENROLLED'
           ? 'Bạn đã sở hữu khóa học này.'
@@ -60,7 +66,19 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
       }
       setBuying(false);
     }
-  };
+  }, [course.id, course.price, navigate]);
+
+  const handlePurchaseClick = useCallback(() => {
+    if (course.price === 0) {
+      void handleBuy('VNPAY');
+      return;
+    }
+    setBuyError(null);
+    setShowCombinedPaymentOption(false);
+    setShowPaymentOptions(true);
+  }, [course.price, handleBuy]);
+
+  useImperativeHandle(ref, () => ({ openPurchaseOptions: handlePurchaseClick }), [handlePurchaseClick]);
 
   // Calculate course stats dynamically (partially offloaded to backend)
   let totalReadingBlocks = 0;
@@ -127,43 +145,13 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
         ) : (
           <>
             <button
-              onClick={() => handleBuy('VNPAY')}
+              onClick={handlePurchaseClick}
               disabled={buying}
               className="bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white w-full py-3 rounded-xl font-semibold mb-3 transition-colors"
             >
-              {buying ? 'Đang xử lý…' : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay (VNPay)'}
+              {buying ? 'Đang xử lý…' : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
             </button>
-            {course.price > 0 && (
-              <button
-                onClick={() => handleBuy('WALLET')}
-                disabled={buying}
-                className="border border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-60 w-full py-3 rounded-xl font-semibold mb-3 transition-colors"
-              >
-                Thanh toán bằng ví
-              </button>
-            )}
-            {showPaymentOptions && (
-              <div className="mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200">
-                <p className="text-xs text-amber-800 font-semibold mb-2">
-                  Số dư ví không đủ. Bạn muốn thanh toán bằng cách nào?
-                </p>
-                <button
-                  onClick={() => handleBuy('WALLET_VNPAY')}
-                  disabled={buying}
-                  className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg mb-2 transition-colors"
-                >
-                  Dùng số dư ví + VNPay phần còn lại
-                </button>
-                <button
-                  onClick={() => handleBuy('VNPAY')}
-                  disabled={buying}
-                  className="w-full border border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-60 font-semibold py-2.5 rounded-lg transition-colors"
-                >
-                  Thanh toán toàn bộ qua VNPay
-                </button>
-              </div>
-            )}
-            {buyError && <p className="text-center text-xs text-red-600 font-medium mb-3">{buyError}</p>}
+            {buyError && !showPaymentOptions && <p className="text-center text-xs text-red-600 font-medium mb-3">{buyError}</p>}
           </>
         )}
 
@@ -196,6 +184,94 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
         </div>
       </div>
       </div>
+
+      {showPaymentOptions && course.price > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="payment-method-title"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="payment-method-title" className="text-xl font-extrabold text-slate-900">
+                  Chọn phương thức thanh toán
+                </h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Tổng tiền: <span className="font-bold text-slate-900">{course.price.toLocaleString('vi-VN')} {course.currency}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPaymentOptions(false);
+                  setShowCombinedPaymentOption(false);
+                  setBuyError(null);
+                }}
+                disabled={buying}
+                aria-label="Đóng lựa chọn thanh toán"
+                title="Đóng lựa chọn thanh toán"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 bg-slate-100 text-slate-700 transition-colors hover:border-red-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <X className="h-6 w-6" strokeWidth={3} aria-hidden="true" />
+              </button>
+            </div>
+
+            {buyError && (
+              <p className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm font-medium text-red-600" role="alert">
+                {buyError}
+              </p>
+            )}
+
+            <div className="mt-6 space-y-3">
+              <button
+                type="button"
+                onClick={() => void handleBuy('VNPAY')}
+                disabled={buying}
+                className="w-full rounded-xl bg-red-600 px-4 py-3 text-left font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+              >
+                <span className="block">Thanh toán toàn bộ qua VNPay</span>
+                <span className="mt-1 block text-xs font-normal text-red-100">Chuyển sang cổng thanh toán VNPay</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBuy('WALLET')}
+                disabled={buying}
+                className="w-full rounded-xl border border-red-600 px-4 py-3 text-left font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+              >
+                <span className="block">Thanh toán toàn bộ bằng ví</span>
+                <span className="mt-1 block text-xs font-normal text-slate-500">Dùng số dư ví ManabiHub</span>
+              </button>
+              {showCombinedPaymentOption && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void handleBuy('WALLET_VNPAY')}
+                    disabled={buying}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-left font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    <span className="block">Ví + VNPay phần còn lại</span>
+                    <span className="mt-1 block text-xs font-normal text-slate-500">Ưu tiên dùng số dư ví trước</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPaymentOptions(false);
+                      setShowCombinedPaymentOption(false);
+                      setBuyError(null);
+                    }}
+                    disabled={buying}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Hủy
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {enrollmentSuccess && (
         <div
@@ -239,4 +315,6 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
 
     </>
   );
-};
+});
+
+CourseStickyCard.displayName = 'CourseStickyCard';
