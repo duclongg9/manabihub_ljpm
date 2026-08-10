@@ -9,6 +9,23 @@ public record StudentWalletResponse(
         BigDecimal balance,
         BigDecimal frozenBalance,
         BigDecimal availableBalance,
+        BigDecimal withdrawableBalance,
+        BigDecimal availableWithdrawableBalance,
         String currency
 ) {
+    public StudentWalletResponse(
+            BigDecimal balance,
+            BigDecimal frozenBalance,
+            BigDecimal availableBalance,
+            String currency
+    ) {
+        this(
+                balance,
+                frozenBalance,
+                availableBalance,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                currency
+        );
+    }
 }

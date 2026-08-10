@@ -14,8 +14,10 @@ public class UpdateUserProfileRequest {
     @Size(max = 255)
     private String fullName;
 
+    // Optional field: an empty value clears the phone number, so it must pass validation
+    // the same way null does.
     @Pattern(
-            regexp = "^(0\\d{9}|\\+84\\d{9})$",
+            regexp = "^(0\\d{9}|\\+84\\d{9})?$",
             message = "MSG-PRO-002"
     )
     private String phoneNumber;

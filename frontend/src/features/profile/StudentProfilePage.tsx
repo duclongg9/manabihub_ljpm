@@ -4,7 +4,7 @@ import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import {PageHeader} from "../../shared/components/PageHeader/PageHeader";
 import {LoadingState} from "../../shared/components/LoadingState/LoadingState";
 import AvatarUpload from "../../shared/components/AvatarUpload/AvatarUpload";
-import {getMyStudentProfile, updateMyStudentProfile, uploadAvatar} from "./profileApi";
+import {avatarUploadErrorMessage, getMyStudentProfile, updateMyStudentProfile, uploadAvatar} from "./profileApi";
 import {resolvePublicAssetUrl} from "../../shared/utils/assetUtils";
 
 const JLPT_LEVELS = [
@@ -130,7 +130,7 @@ export default function StudentProfilePage() {
         } catch (error) {
             console.error("Avatar upload failed:", error);
             setForm(prev => ({ ...prev, avatarUrl: previousAvatarUrl }));
-            setSnackbar({ open: true, message: "Lỗi tải ảnh đại diện", severity: "error" });
+            setSnackbar({ open: true, message: avatarUploadErrorMessage(error), severity: "error" });
         } finally {
             setSaving(false);
             URL.revokeObjectURL(preview);

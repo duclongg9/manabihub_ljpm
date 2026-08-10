@@ -36,9 +36,14 @@ import com.manabihub.review.enums.CourseReviewStatus;
 import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.violation.service.ViolationEvidenceStorageService;
 import com.manabihub.wallet.enums.WalletOwnerType;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -68,7 +73,16 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit tests for {@link ViolationModerationServiceImpl#resolveViolation} — UC-30 Resolve
+ * Violation Report.
+ * <p>
+ * Every test in this class targets the same function, so Surefire already reports it as a single
+ * summary line — it maps 1:1 to Report 5.1 sheet 53 {@code resolveViolation}. No {@code @Nested}
+ * grouping is needed here.
+ */
 @ExtendWith(MockitoExtension.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ViolationModerationServiceImplTest {
 
     @Mock private ViolationReportRepository reportRepository;
@@ -85,6 +99,7 @@ class ViolationModerationServiceImplTest {
     @Mock private OrderItemRepository orderItemRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private ViolationEvidenceStorageService evidenceStorageService;
 
     @InjectMocks
     private ViolationModerationServiceImpl moderationService;
@@ -165,6 +180,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(1)
+    @DisplayName("UTCID01 (N) - DISMISSED -> RESOLVED_NO_VIOLATION, no enforcement")
     void dismissResolvesWithoutEnforcementAndPublishesReporterNotification() {
         stubResolvePermission();
         stubSuccessfulResolutionReads();
@@ -180,6 +197,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(2)
+    @DisplayName("UTCID02 (N) - UPHELD + FORCE_DRAFT -> course leaves the public catalog")
     void upheldForceDraftRemovesCourseFromPublicCatalog() {
         stubResolvePermission();
         when(adminRepository.hasPermission(adminId, "VIOLATION_CONTENT_ENFORCE"))
@@ -200,6 +219,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(3)
+    @DisplayName("UTCID03 (N) - UPHELD + BAN + FREEZE -> user LOCKED, wallet frozen")
     void severeActionsUseUserIdForBanAndTeacherProfileIdForWallet() {
         Role systemRole = new Role();
         systemRole.setCode(RoleCode.SYSTEM_ADMIN);
@@ -233,6 +254,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(8)
+    @DisplayName("UTCID08 (A) - report already resolved -> CONFLICT")
     void secondResolutionReturnsConflict() {
         stubResolvePermission();
         report.setStatus(ViolationReportStatus.RESOLVED_UPHELD);
@@ -252,6 +275,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(9)
+    @DisplayName("UTCID09 (A) - DISMISSED + BAN_ACCOUNT -> invalid action combination")
     void dismissedDecisionRejectsClientSuppliedBanAction() {
         stubResolvePermission();
         ResolveViolationRequest request = request(
@@ -267,6 +292,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(10)
+    @DisplayName("UTCID10 (A) - UPHELD + NONE -> invalid action combination")
     void upheldDecisionRejectsNoneAction() {
         stubResolvePermission();
         ResolveViolationRequest request = request(
@@ -282,6 +309,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(11)
+    @DisplayName("UTCID11 (A) - no VIOLATION_SEVERE_ENFORCE -> FORBIDDEN")
     void courseManagerCannotApplySevereActionWithoutPermission() {
         stubResolvePermission();
         stubDecisionSave();
@@ -309,6 +338,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(12)
+    @DisplayName("UTCID12 (A) - blank decision note -> rejected before locking the report")
     void missingDecisionNoteDoesNotLockOrMutateReport() {
         stubResolvePermission();
         ResolveViolationRequest request = request(ModerationDecisionType.DISMISSED, List.of());
@@ -322,6 +353,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(6)
+    @DisplayName("UTCID06 (N) - PENDING_EVIDENCE -> no enforcement, reporter notified")
     void pendingEvidenceDoesNotApplySevereActionAndNotifiesReporter() {
         stubResolvePermission();
         stubSuccessfulResolutionReads();
@@ -343,6 +376,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(13)
+    @DisplayName("UTCID13 (A) - USER report cannot remove arbitrary course content")
     void userReportCannotBeUsedToRemoveArbitraryCourseContent() {
         report.setTargetType("USER");
         report.setTargetId(teacherUserId);
@@ -372,6 +407,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(4)
+    @DisplayName("UTCID04 (N) - REVIEW report + REMOVE_CONTENT -> only the review is hidden")
     void removingReportedReviewHidesOnlyReviewAndNotifiesReporterAndAuthor() {
         CourseReview review = reviewBy(newReviewAuthor());
         report.setTargetType("REVIEW");
@@ -409,6 +446,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(5)
+    @DisplayName("UTCID05 (N) - REVIEW report + BAN -> the review author is locked, not the teacher")
     void banningReportedReviewLocksAuthorInsteadOfCourseTeacher() {
         AppUser reviewAuthor = newReviewAuthor();
         CourseReview review = reviewBy(reviewAuthor);
@@ -438,6 +477,8 @@ class ViolationModerationServiceImplTest {
     }
 
     @Test
+    @Order(7)
+    @DisplayName("UTCID07 (N) - reporter is the affected user -> a single notification")
     void outcomeNotificationIsDeduplicatedWhenReporterIsAffectedUser() {
         report.setReporter(teacherUser);
         stubResolvePermission();
@@ -450,6 +491,48 @@ class ViolationModerationServiceImplTest {
         );
 
         verify(eventPublisher).publishEvent(any(ModerationNotificationEvent.class));
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("UTCID14 (A) - report not found -> NOT_FOUND, nothing is written")
+    void unknownReportIsRejected() {
+        stubResolvePermission();
+        when(reportRepository.findByIdLocked(reportId)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> moderationService.resolveViolation(
+                        reportId,
+                        request(ModerationDecisionType.DISMISSED, List.of()),
+                        adminId
+                )
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getHttpStatus());
+        verify(decisionRepository, never()).save(any());
+        verify(reportRepository, never()).save(any());
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("UTCID15 (A) - admin without VIOLATION_RESOLVE -> FORBIDDEN")
+    void adminWithoutTheResolvePermissionIsRejected() {
+        when(adminRepository.findById(adminId)).thenReturn(Optional.of(admin));
+        when(adminRepository.hasPermission(adminId, "VIOLATION_RESOLVE")).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> moderationService.resolveViolation(
+                        reportId,
+                        request(ModerationDecisionType.DISMISSED, List.of()),
+                        adminId
+                )
+        );
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
+        verify(reportRepository, never()).findByIdLocked(any());
+        verify(decisionRepository, never()).save(any());
     }
 
     private void stubResolvePermission() {

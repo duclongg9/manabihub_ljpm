@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react';
-import { BookOpen, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 export const HelpCenterLayout = () => {
@@ -22,12 +22,13 @@ export const HelpCenterLayout = () => {
             <Link
               to="/"
               aria-label="Về trang chủ ManabiHub"
-              className="flex shrink-0 items-center gap-2 font-bold text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-blue-600 text-white">
-                <BookOpen aria-hidden="true" className="h-5 w-5" />
-              </span>
-              <span>ManabiHub</span>
+              <img
+                src="/manabihub-header-logo.svg"
+                alt="ManabiHub"
+                className="h-12 w-auto transition-transform duration-200 hover:scale-105"
+              />
             </Link>
             <span aria-hidden="true" className="text-gray-300">/</span>
             <Link

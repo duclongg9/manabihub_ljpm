@@ -19,6 +19,11 @@ describe('public policy links', () => {
   it('routes every footer policy label to a real policy/help destination', () => {
     renderInRouter(<LandingFooter />);
 
+    expect(screen.getByRole('link', { name: 'Về trang chủ ManabiHub' }).getAttribute('href'))
+      .toBe(ROUTES.PUBLIC.HOME);
+    expect(screen.getByRole('img', { name: 'ManabiHub' }).getAttribute('src'))
+      .toBe('/manabihub-header-logo.svg');
+
     expect(screen.getByRole('link', { name: 'Điều khoản sử dụng' }).getAttribute('href'))
       .toBe(ROUTES.PUBLIC.TERMS);
     expect(screen.getByRole('link', { name: 'Chính sách bảo mật' }).getAttribute('href'))

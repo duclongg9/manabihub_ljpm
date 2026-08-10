@@ -4,6 +4,7 @@ import com.manabihub.payout.enums.PayoutStatus;
 import com.manabihub.payout.enums.PayoutNotificationStatus;
 import com.manabihub.payout.enums.PayoutTransferMethod;
 import com.manabihub.payout.enums.ReconciliationStatus;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -41,8 +42,16 @@ public class PayoutSettlement {
     @Column(name = "withdrawal_request_id", nullable = false, unique = true)
     private UUID withdrawalRequestId;
 
-    @Column(name = "teacher_id", nullable = false)
+    @Column(name = "teacher_id")
     private UUID teacherId;
+
+    @Column(name = "student_id")
+    private UUID studentId;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "owner_type", nullable = false, length = 30)
+    private WalletOwnerType ownerType = WalletOwnerType.TEACHER;
 
     @Column(name = "wallet_id", nullable = false)
     private UUID walletId;

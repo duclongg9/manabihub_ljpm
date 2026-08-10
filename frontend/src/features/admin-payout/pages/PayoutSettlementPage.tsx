@@ -47,7 +47,11 @@ import {
   getPayoutMessageByCode,
 } from '../services/payoutError';
 import { adminPayoutService } from '../services/adminPayoutService';
-import type { PayoutDetail, ReconciliationAlert } from '../types/payout.types';
+import type {
+  MockPayoutScenario,
+  PayoutDetail,
+  ReconciliationAlert,
+} from '../types/payout.types';
 import { formatCurrency } from '../../../shared/utils/formatCurrency';
 
 export function PayoutSettlementPage() {
@@ -60,6 +64,7 @@ export function PayoutSettlementPage() {
   const reviewReconciliation = useReviewReconciliation();
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [mockScenario, setMockScenario] = useState<MockPayoutScenario>('SUCCESS');
   const rejectForm = useForm<RejectPayoutFormValues>({
     defaultValues: { reason: '' },
   });
@@ -137,11 +142,17 @@ export function PayoutSettlementPage() {
   const canReject = !processing && !completed && !rejected && !mutationPending;
 
   const handleApprove = () => {
+    const mockDescription = import.meta.env.DEV
+      ? `\n\nKết quả giả lập: ${mockScenarioLabel(mockScenario)}.`
+      : '';
     const confirmed = window.confirm(
-      'Xác nhận đối soát đã chính xác và thực hiện chuyển tiền? Thao tác sẽ dùng khóa chống chuyển trùng.',
+      `Xác nhận đối soát đã chính xác và thực hiện chuyển tiền? Thao tác sẽ dùng khóa chống chuyển trùng.${mockDescription}`,
     );
     if (confirmed) {
-      approve.mutate(id);
+      approve.mutate({
+        withdrawalRequestId: id,
+        mockScenario: import.meta.env.DEV ? mockScenario : undefined,
+      });
     }
   };
 
@@ -219,7 +230,7 @@ export function PayoutSettlementPage() {
               {formatCurrency(detail.requestedAmount)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Tạo lúc {formatDate(detail.requestedAt)} · {detail.teacherName}
+              Tạo lúc {formatDate(detail.requestedAt)} · {detail.ownerName ?? detail.teacherName}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
@@ -256,10 +267,10 @@ export function PayoutSettlementPage() {
       )}
 
       <div className="grid gap-5 lg:grid-cols-3">
-        <InfoCard title="Giáo viên" icon={UserRound}>
-          <InfoRow label="Tên hiển thị" value={detail.teacherName} />
-          <InfoRow label="Mã giáo viên" value={detail.teacherId} breakAll />
-          <InfoRow label="Trạng thái tài khoản" value={accountStatusLabel(detail.teacherAccountStatus)} />
+        <InfoCard title={detail.ownerType === 'STUDENT' ? 'Học viên' : 'Giáo viên'} icon={UserRound}>
+          <InfoRow label="Tên hiển thị" value={detail.ownerName ?? detail.teacherName} />
+          <InfoRow label="Mã chủ ví" value={detail.ownerId ?? detail.teacherId} breakAll />
+          <InfoRow label="Trạng thái tài khoản" value={accountStatusLabel(detail.ownerAccountStatus ?? detail.teacherAccountStatus)} />
         </InfoCard>
 
         <InfoCard title="Số dư quyết toán" icon={CreditCard}>
@@ -379,6 +390,21 @@ export function PayoutSettlementPage() {
           {approveBlockReason(detail, mutationPending)}
         </p>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+          {import.meta.env.DEV && canApprove && (
+            <label className="flex min-w-64 flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
+              Kết quả payout giả lập
+              <select
+                value={mockScenario}
+                onChange={(event) => setMockScenario(event.target.value as MockPayoutScenario)}
+                className="rounded-md border border-amber-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+              >
+                <option value="SUCCESS">Thành công</option>
+                <option value="RETRYABLE_FAILURE">Lỗi tạm thời, có thể thử lại</option>
+                <option value="PERMANENT_FAILURE">Thất bại vĩnh viễn</option>
+              </select>
+              <span className="font-normal text-amber-700">Chỉ hiển thị khi chạy frontend development.</span>
+            </label>
+          )}
           <button
             type="button"
             onClick={() => setRejectDialogOpen(true)}
@@ -413,7 +439,11 @@ export function PayoutSettlementPage() {
             className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <CheckCircle2 className="h-4 w-4" />
-            {approve.isPending ? 'Đang chuyển tiền...' : 'Duyệt qua Gateway'}
+            {approve.isPending
+              ? 'Đang chuyển tiền...'
+              : import.meta.env.DEV
+                ? 'Chạy payout giả lập'
+                : 'Duyệt qua Gateway'}
           </button>
         </div>
       </section>
@@ -431,7 +461,7 @@ export function PayoutSettlementPage() {
             <DialogTitle sx={{ fontWeight: 800 }}>Từ chối yêu cầu rút tiền?</DialogTitle>
             <DialogContent>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Số dư đang giữ sẽ được trả lại ví khả dụng. Lý do được gửi cho giáo viên và lưu vào audit.
+                Số dư đang giữ sẽ được trả lại ví khả dụng. Lý do được gửi cho chủ ví và lưu vào audit.
               </Typography>
               <TextField
                 {...rejectForm.register('reason')}
@@ -464,6 +494,15 @@ export function PayoutSettlementPage() {
       )}
     </div>
   );
+}
+
+function mockScenarioLabel(scenario: MockPayoutScenario) {
+  const labels: Record<MockPayoutScenario, string> = {
+    SUCCESS: 'Thành công',
+    RETRYABLE_FAILURE: 'Lỗi tạm thời, có thể thử lại',
+    PERMANENT_FAILURE: 'Thất bại vĩnh viễn',
+  };
+  return labels[scenario];
 }
 
 function InfoCard({

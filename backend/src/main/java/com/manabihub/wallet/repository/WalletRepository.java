@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,6 +51,23 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
               AND wallet.teacher.id = :teacherId
             """)
     Optional<Wallet> findTeacherWalletForUpdate(@Param("teacherId") UUID teacherId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            UPDATE wallets
+            SET frozen_balance = frozen_balance + :amount,
+                frozen_withdrawable_balance = frozen_withdrawable_balance + :amount,
+                updated_at = NOW()
+            WHERE owner_type = 'STUDENT'
+              AND student_id = :studentId
+              AND frozen = FALSE
+              AND balance - frozen_balance >= :amount
+              AND withdrawable_balance - frozen_withdrawable_balance >= :amount
+            """, nativeQuery = true)
+    int reserveStudentWithdrawalBalance(
+            @Param("studentId") UUID studentId,
+            @Param("amount") BigDecimal amount
+    );
 
     /** Locks the wallet row before mutating its balance to avoid lost updates. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

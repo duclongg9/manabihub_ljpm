@@ -21,8 +21,8 @@ import com.manabihub.payout.service.WithdrawalOtpService;
 import com.manabihub.payout.service.WithdrawalNotificationService;
 import com.manabihub.systemconfig.service.CommercialPolicyService;
 import com.manabihub.wallet.repository.WalletRepository;
-import com.manabihub.wallet.service.WalletService;
 import com.manabihub.wallet.enums.WalletOwnerType;
+import com.manabihub.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -65,7 +65,8 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         UUID teacherProfileId = resolveTeacherProfileId(userId);
 
         // Serialize withdrawal creation per teacher across all application instances.
-        walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(WalletOwnerType.TEACHER, teacherProfileId)
+        var wallet = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(
+                        WalletOwnerType.TEACHER, teacherProfileId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.WALLET_NOT_FOUND,
                         "Wallet not found"
@@ -92,6 +93,8 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
         WithdrawalRequest withdrawalRequest = WithdrawalRequest.builder()
                 .teacherId(teacherProfileId)
+                .walletId(wallet.getId())
+                .ownerType(WalletOwnerType.TEACHER)
                 .requestedAmount(request.getAmount())
                 .status(WithdrawalStatus.PENDING)
                 .bankAccountSnapshot(snapshot)

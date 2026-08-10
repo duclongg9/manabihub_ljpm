@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -111,6 +112,69 @@ class StudentProfileServiceImplTest {
         assertEquals("Tran Thi B", response.getDisplayName());
         assertEquals("N2", response.getJlptGoal());
         assertEquals("/uploads/user-avatars/old.png", response.getAvatarUrl());
+    }
+
+    @Test
+    void updateMyProfileNormalizesInternationalPhoneNumber() {
+        UUID userId = UUID.randomUUID();
+        AppUser user = AppUser.builder()
+                .id(userId)
+                .email("student@manabihub.local")
+                .fullName("Google Name")
+                .build();
+        StudentProfile existingProfile = StudentProfile.builder()
+                .id(UUID.randomUUID())
+                .user(user)
+                .displayName("Old Display Name")
+                .jlptGoal("N5")
+                .build();
+        UpdateStudentProfileRequest request = request("Nguyen Van A", "+84912345678", "N3");
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(existingProfile));
+        when(appUserRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(studentProfileRepository.save(any(StudentProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        StudentProfileResponse response = studentProfileService.updateMyProfile(request);
+
+        ArgumentCaptor<AppUser> userCaptor = ArgumentCaptor.forClass(AppUser.class);
+        verify(appUserRepository).save(userCaptor.capture());
+
+        assertEquals("0912345678", userCaptor.getValue().getPhoneNumber());
+        assertEquals("0912345678", response.getPhoneNumber());
+    }
+
+    @Test
+    void updateMyProfileClearsPhoneNumberWhenProfileScreenSendsEmptyValue() {
+        UUID userId = UUID.randomUUID();
+        AppUser user = AppUser.builder()
+                .id(userId)
+                .email("student@manabihub.local")
+                .fullName("Google Name")
+                .phoneNumber("0912345678")
+                .build();
+        StudentProfile existingProfile = StudentProfile.builder()
+                .id(UUID.randomUUID())
+                .user(user)
+                .displayName("Old Display Name")
+                .jlptGoal("N5")
+                .build();
+        UpdateStudentProfileRequest request = request("Nguyen Van A", "", "N3");
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(existingProfile));
+        when(appUserRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(studentProfileRepository.save(any(StudentProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        StudentProfileResponse response = studentProfileService.updateMyProfile(request);
+
+        ArgumentCaptor<AppUser> userCaptor = ArgumentCaptor.forClass(AppUser.class);
+        verify(appUserRepository).save(userCaptor.capture());
+
+        assertNull(userCaptor.getValue().getPhoneNumber());
+        assertNull(response.getPhoneNumber());
     }
 
     private UpdateStudentProfileRequest request(String name, String phoneNumber, String jlptGoal) {

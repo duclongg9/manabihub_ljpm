@@ -7,6 +7,7 @@ import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
+import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -32,12 +33,17 @@ import com.manabihub.payout.service.PayoutReconciliationService;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletDirection;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.enums.WalletTransactionType;
 import com.manabihub.wallet.repository.WalletRepository;
-import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
+import com.manabihub.wallet.service.StudentWalletService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -77,6 +83,7 @@ class PayoutSettlementServiceImplTest {
     @Mock private WalletRepository walletRepository;
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
+    @Mock private StudentProfileRepository studentProfileRepository;
     @Mock private InternalAdminAccountRepository internalAdminAccountRepository;
     @Mock private CurrentUserService currentUserService;
     @Mock private PayoutReconciliationService reconciliationService;
@@ -86,6 +93,7 @@ class PayoutSettlementServiceImplTest {
     @Mock private PayoutProofStorageService proofStorageService;
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private PayoutSecurityService payoutSecurityService;
+    @Mock private StudentWalletService studentWalletService;
 
     private PayoutSettlementServiceImpl service;
     private UUID adminId;
@@ -144,7 +152,7 @@ class PayoutSettlementServiceImplTest {
         WalletTransaction reservation = WalletTransaction.builder()
                 .walletId(walletId)
                 .transactionType(WalletTransactionType.WITHDRAWAL_RESERVATION)
-                .amount(new BigDecimal("-1000000.00"))
+                .amount(new BigDecimal("1000000.00"))
                 .direction(WalletDirection.OUT)
                 .referenceType("WITHDRAWAL_REQUEST")
                 .referenceId(requestId)
@@ -194,6 +202,7 @@ class PayoutSettlementServiceImplTest {
                 walletRepository,
                 walletTransactionRepository,
                 teacherProfileRepository,
+                studentProfileRepository,
                 internalAdminAccountRepository,
                 currentUserService,
                 reconciliationService,
@@ -202,11 +211,23 @@ class PayoutSettlementServiceImplTest {
                 payoutGateway,
                 proofStorageService,
                 transactionTemplate,
-                payoutSecurityService
+                payoutSecurityService,
+                studentWalletService
         );
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 60 — approvePayout (UC-33 Execute Payout Settlement) — 6 TC
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Sheet 60 - approvePayout (UC-33)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class ApprovePayout {
+
     @Test
+    @org.junit.jupiter.api.Order(1)
+    @DisplayName("UTCID01 (N) - teacher payout -> wallet completed exactly once")
     void approvePayoutCompletesWalletExactlyOnce() {
         when(payoutGateway.transfer(any())).thenReturn(PayoutGateway.PayoutGatewayResult.builder()
                 .success(true)
@@ -227,6 +248,58 @@ class PayoutSettlementServiceImplTest {
     }
 
     @Test
+    @org.junit.jupiter.api.Order(2)
+    @DisplayName("UTCID02 (N) - student payout -> captures the reserved refund balance")
+    void approveStudentPayoutCapturesReservedRefundBalance() {
+        UUID studentId = UUID.randomUUID();
+        UUID studentUserId = UUID.randomUUID();
+        com.manabihub.identity.entity.AppUser studentUser =
+                com.manabihub.identity.entity.AppUser.builder()
+                        .id(studentUserId)
+                        .email("student@example.com")
+                        .fullName("Nguyen Student")
+                        .userStatus(AccountStatus.ACTIVE)
+                        .build();
+        com.manabihub.identity.entity.StudentProfile student =
+                com.manabihub.identity.entity.StudentProfile.builder()
+                        .id(studentId)
+                        .displayName("Nguyen Student")
+                        .user(studentUser)
+                        .build();
+        request.setOwnerType(WalletOwnerType.STUDENT);
+        request.setTeacherId(null);
+        request.setStudentId(studentId);
+        request.setWalletId(wallet.getId());
+        wallet.setOwnerType(WalletOwnerType.STUDENT);
+        wallet.setTeacher(null);
+        wallet.setStudent(student);
+        wallet.setWithdrawableBalance(request.getRequestedAmount());
+        wallet.setFrozenWithdrawableBalance(request.getRequestedAmount());
+
+        when(studentProfileRepository.findById(studentId)).thenReturn(Optional.of(student));
+        when(walletRepository.findByOwnerTypeAndStudent_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
+        when(reconciliationService.reconcileStudent(request, wallet, student))
+                .thenReturn(matchedReconciliation());
+        when(payoutGateway.transfer(any())).thenReturn(PayoutGateway.PayoutGatewayResult.builder()
+                .success(true)
+                .providerReference("BANK-STUDENT-123")
+                .build());
+
+        var response = service.approvePayout(requestId);
+
+        assertEquals(WithdrawalStatus.EXECUTED, response.getWithdrawalStatus());
+        verify(studentWalletService).completeWithdrawal(
+                studentId,
+                requestId,
+                request.getRequestedAmount());
+        verify(walletTransactionRepository, never()).save(any(WalletTransaction.class));
+        verify(notificationService).createNotification(
+                eq(studentUserId), any(), any(), any(), eq("PAYOUT_SUCCESS"), eq("/student/wallet"));
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(3)
+    @DisplayName("UTCID03 (A) - critical reconciliation mismatch -> blocked before the gateway")
     void approvePayoutBlocksCriticalReconciliationBeforeGateway() {
         when(reconciliationService.reconcile(request, wallet, teacher))
                 .thenReturn(criticalReconciliation());
@@ -250,6 +323,8 @@ class PayoutSettlementServiceImplTest {
     }
 
     @Test
+    @org.junit.jupiter.api.Order(4)
+    @DisplayName("UTCID04 (A) - gateway needs a retry -> reserved money is kept")
     void approvePayoutKeepsReservedMoneyWhenGatewayNeedsRetry() {
         when(payoutGateway.transfer(any())).thenReturn(PayoutGateway.PayoutGatewayResult.builder()
                 .success(false)
@@ -271,6 +346,51 @@ class PayoutSettlementServiceImplTest {
     }
 
     @Test
+    @org.junit.jupiter.api.Order(5)
+    @DisplayName("UTCID05 (A) - concurrent double click -> PAYOUT_SETTLEMENT_PROCESSING")
+    void approvePayoutRejectsConcurrentDoubleClick() {
+        PayoutSettlement processing = baseSettlement();
+        processing.setStatus(PayoutStatus.PROCESSING);
+        processing.setProcessingStartedAt(Instant.now());
+        settlementRef.set(processing);
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.approvePayout(requestId)
+        );
+
+        assertEquals("PAYOUT_SETTLEMENT_PROCESSING", error.getMessageCode());
+        verify(payoutGateway, never()).transfer(any());
+    }
+
+    @Test
+    @org.junit.jupiter.api.Order(6)
+    @DisplayName("UTCID06 (A) - actor is not an active Finance Manager -> PAYOUT_PERMISSION_DENIED")
+    void payoutRequiresActiveFinanceManagerFromDatabase() {
+        admin.getRole().setCode(RoleCode.SYSTEM_ADMIN);
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.approvePayout(requestId)
+        );
+
+        assertEquals("PAYOUT_PERMISSION_DENIED", error.getMessageCode());
+        verify(withdrawalRequestRepository, never()).findByIdWithLock(any());
+    }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 61 — rejectPayout (UC-33 Execute Payout Settlement) — 1 TC
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Sheet 61 - rejectPayout (UC-33)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class RejectPayout {
+
+    @Test
+    @org.junit.jupiter.api.Order(1)
+    @DisplayName("UTCID01 (N) - releases the reservation, repeated call is idempotent")
     void rejectPayoutReleasesReservationAndRepeatedCallIsIdempotent() {
         RejectPayoutRequest payload = new RejectPayoutRequest();
         payload.setReason("Bank account data does not match");
@@ -287,7 +407,20 @@ class PayoutSettlementServiceImplTest {
                 .createNotification(any(), any(), any(), any(), eq("PAYOUT_REJECTED"), any());
     }
 
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 62 — confirmManualTransfer (UC-33 Execute Payout Settlement) — 2 TC
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Sheet 62 - confirmManualTransfer (UC-33)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class ConfirmManualTransfer {
+
     @Test
+    @org.junit.jupiter.api.Order(1)
+    @DisplayName("UTCID01 (N) - completes the wallet and keeps the proof metadata private")
     void manualTransferCompletesWalletAndKeepsPrivateProofMetadata() {
         ManualTransferRequest payload = new ManualTransferRequest();
         payload.setTransactionReference("VCB-20260726-001");
@@ -329,6 +462,8 @@ class PayoutSettlementServiceImplTest {
     }
 
     @Test
+    @org.junit.jupiter.api.Order(2)
+    @DisplayName("UTCID02 (A) - amount mismatch -> rejected, orphan proof removed")
     void manualTransferRejectsAmountMismatchAndRemovesOrphanProof() {
         ManualTransferRequest payload = new ManualTransferRequest();
         payload.setTransactionReference("VCB-20260726-002");
@@ -361,33 +496,6 @@ class PayoutSettlementServiceImplTest {
         assertEquals(0, wallet.getFrozenBalance().compareTo(new BigDecimal("1000000.00")));
     }
 
-    @Test
-    void approvePayoutRejectsConcurrentDoubleClick() {
-        PayoutSettlement processing = baseSettlement();
-        processing.setStatus(PayoutStatus.PROCESSING);
-        processing.setProcessingStartedAt(Instant.now());
-        settlementRef.set(processing);
-
-        BusinessException error = assertThrows(
-                BusinessException.class,
-                () -> service.approvePayout(requestId)
-        );
-
-        assertEquals("PAYOUT_SETTLEMENT_PROCESSING", error.getMessageCode());
-        verify(payoutGateway, never()).transfer(any());
-    }
-
-    @Test
-    void payoutRequiresActiveFinanceManagerFromDatabase() {
-        admin.getRole().setCode(RoleCode.SYSTEM_ADMIN);
-
-        BusinessException error = assertThrows(
-                BusinessException.class,
-                () -> service.approvePayout(requestId)
-        );
-
-        assertEquals("PAYOUT_PERMISSION_DENIED", error.getMessageCode());
-        verify(withdrawalRequestRepository, never()).findByIdWithLock(any());
     }
 
     private PayoutSettlement baseSettlement() {

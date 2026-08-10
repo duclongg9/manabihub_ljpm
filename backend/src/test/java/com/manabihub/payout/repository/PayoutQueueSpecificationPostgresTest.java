@@ -51,6 +51,7 @@ class PayoutQueueSpecificationPostgresTest {
     void findsPendingRequestWhenOptionalFiltersAreAbsent() {
         UUID userId = UUID.randomUUID();
         UUID teacherId = UUID.randomUUID();
+        UUID walletId = UUID.randomUUID();
         UUID withdrawalId = UUID.randomUUID();
 
         jdbcTemplate.update("""
@@ -62,12 +63,18 @@ class PayoutQueueSpecificationPostgresTest {
                 VALUES (?, ?, 'Payout Teacher', now(), now())
                 """, teacherId, userId);
         jdbcTemplate.update("""
-                INSERT INTO withdrawal_requests (
-                    id, teacher_id, amount, status, bank_account_snapshot,
-                    requested_at, created_at, updated_at
+                INSERT INTO wallets (
+                    id, owner_type, teacher_id, balance, frozen_balance, currency
                 )
-                VALUES (?, ?, 200000, 'PENDING', '{}'::jsonb, now(), now(), now())
-                """, withdrawalId, teacherId);
+                VALUES (?, 'TEACHER', ?, 0, 0, 'VND')
+                """, walletId, teacherId);
+        jdbcTemplate.update("""
+                INSERT INTO withdrawal_requests (
+                    id, owner_type, teacher_id, wallet_id, amount, status,
+                    bank_account_snapshot, requested_at, created_at, updated_at
+                )
+                VALUES (?, 'TEACHER', ?, ?, 200000, 'PENDING', '{}'::jsonb, now(), now(), now())
+                """, withdrawalId, teacherId, walletId);
 
         PayoutQueueFilterRequest filter = new PayoutQueueFilterRequest();
         filter.setStatus(WithdrawalStatus.PENDING);

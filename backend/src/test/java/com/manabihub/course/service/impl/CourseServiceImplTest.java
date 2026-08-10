@@ -16,7 +16,12 @@ import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -38,6 +43,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -113,6 +119,13 @@ class CourseServiceImplTest {
         approvedTeacher.setKycStatus(TeacherKycStatus.APPROVED);
         approvedTeacher.setCanPublishCourse(true);
     }
+
+    // Sheets 14-17 (createDraft / updateDraft / listMyDrafts / deleteDraft) — các đợt trước.
+    // Bọc @Nested để lớp ngoài không còn test nào, nếu không Surefire sẽ gộp chúng vào nhóm cuối.
+
+    @Nested
+    @DisplayName("(dot truoc) - createDraft / updateDraft / listMyDrafts / deleteDraft")
+    class DraftManagement {
 
     @Test
     void createDraft_WhenTeacherApproved_ShouldSaveDraftWithLearningGoals() {
@@ -308,7 +321,20 @@ class CourseServiceImplTest {
         verify(courseRepository).delete(draft);
     }
 
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 55 — submitForReview (UC-25 Publish Course) — 5 TC
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Sheet 55 - submitForReview (UC-25)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class SubmitForReview {
+
     @Test
+    @Order(1)
+    @DisplayName("UTCID01 (N) - valid DRAFT -> PENDING, admin notified")
     void submitForReview_WhenDraftIsValid_ShouldMoveCourseToPending() {
         UUID draftId = UUID.randomUUID();
         Course draft = Course.builder()
@@ -343,6 +369,8 @@ class CourseServiceImplTest {
     }
 
     @Test
+    @Order(2)
+    @DisplayName("UTCID02 (N) - REJECTED course resubmitted -> PENDING, previous status audited")
     void submitForReview_WhenCourseWasRejected_ShouldResubmitAndAuditPreviousStatus() {
         UUID draftId = UUID.randomUUID();
         Course rejected = Course.builder()
@@ -379,6 +407,98 @@ class CourseServiceImplTest {
     }
 
     @Test
+    @Order(3)
+    @DisplayName("UTCID03 (A) - validation fails -> ValidationBusinessException, status unchanged")
+    void submitForReview_WhenValidationFails_ShouldKeepTheDraftUnchanged() {
+        UUID draftId = UUID.randomUUID();
+        Course draft = Course.builder()
+                .id(draftId)
+                .teacher(approvedTeacher)
+                .title("Incomplete course")
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_IdAndStatusIn(
+                draftId,
+                approvedTeacher.getId(),
+                List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
+        )).thenReturn(Optional.of(draft));
+        when(courseValidationService.validateCourse(draftId))
+                .thenReturn(new ValidationResultResponse(false, List.of()));
+
+        assertThrows(
+                com.manabihub.common.exception.ValidationBusinessException.class,
+                () -> courseService.submitForReview(draftId)
+        );
+
+        assertEquals(CourseStatus.DRAFT, draft.getStatus());
+        assertNull(draft.getSubmittedAt());
+        verify(notificationService, never()).createNotificationForAdminRole(
+                any(), any(), any(), any(), any());
+        verify(auditLogService, never()).logUserAction(
+                any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("UTCID04 (A) - draft not found for this teacher -> COMMON_NOT_FOUND")
+    void submitForReview_WhenDraftIsNotFound_ShouldThrowNotFound() {
+        UUID draftId = UUID.randomUUID();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_IdAndStatusIn(
+                draftId,
+                approvedTeacher.getId(),
+                List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
+        )).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> courseService.submitForReview(draftId)
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getHttpStatus());
+        verify(courseValidationService, never()).validateCourse(any());
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("UTCID05 (A) - teacher workspace locked by KYC -> MSG-KYC-010 FORBIDDEN")
+    void submitForReview_WhenTeacherWorkspaceIsLocked_ShouldThrowForbidden() {
+        UUID draftId = UUID.randomUUID();
+        TeacherProfile rejectedTeacher = new TeacherProfile();
+        rejectedTeacher.setId(UUID.randomUUID());
+        rejectedTeacher.setKycStatus(TeacherKycStatus.REJECTED);
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(rejectedTeacher));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> courseService.submitForReview(draftId)
+        );
+
+        assertEquals(MessageCodes.MSG_KYC_010, exception.getMessageCode());
+        assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
+        verify(courseRepository, never()).findByIdAndTeacher_IdAndStatusIn(any(), any(), any());
+    }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 56 — publishCourse (UC-25 Publish Course) — 5 TC
+    // ══════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Sheet 56 - publishCourse (UC-25)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class PublishCourse {
+
+    @Test
+    @Order(1)
+    @DisplayName("UTCID01 (N) - APPROVED and still valid -> PUBLISHED + audit")
     void publishCourse_WhenApprovedAndValid_ShouldPublishAndWriteAudit() {
         UUID courseId = UUID.randomUUID();
         Course approvedCourse = Course.builder()
@@ -417,6 +537,8 @@ class CourseServiceImplTest {
     }
 
     @Test
+    @Order(2)
+    @DisplayName("UTCID02 (A) - course still PENDING -> MSG-COURSE-007 CONFLICT")
     void publishCourse_WhenCourseIsNotApproved_ShouldRejectTransition() {
         UUID courseId = UUID.randomUUID();
         Course pendingCourse = Course.builder()
@@ -444,6 +566,83 @@ class CourseServiceImplTest {
                 any(), any(), any(), any(), any(), any(), any(), any()
         );
     }
+
+    @Test
+    @Order(3)
+    @DisplayName("UTCID03 (A) - validation no longer current -> ValidationBusinessException")
+    void publishCourse_WhenValidationIsNoLongerCurrent_ShouldNotPublish() {
+        UUID courseId = UUID.randomUUID();
+        Course approvedCourse = Course.builder()
+                .id(courseId)
+                .teacher(approvedTeacher)
+                .title("JLPT N5 Foundation")
+                .status(CourseStatus.APPROVED)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_Id(courseId, approvedTeacher.getId()))
+                .thenReturn(Optional.of(approvedCourse));
+        when(courseValidationService.validateCourse(courseId))
+                .thenReturn(new ValidationResultResponse(false, List.of()));
+
+        assertThrows(
+                com.manabihub.common.exception.ValidationBusinessException.class,
+                () -> courseService.publishCourse(courseId)
+        );
+
+        assertEquals(CourseStatus.APPROVED, approvedCourse.getStatus());
+        assertNull(approvedCourse.getPublishedAt());
+        verify(courseRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("UTCID04 (A) - course of another teacher -> COURSE_NOT_FOUND")
+    void publishCourse_WhenCourseIsNotFound_ShouldThrowNotFound() {
+        UUID courseId = UUID.randomUUID();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_Id(courseId, approvedTeacher.getId()))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> courseService.publishCourse(courseId)
+        );
+
+        assertEquals(MessageCodes.COURSE_NOT_FOUND, exception.getMessageCode());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getHttpStatus());
+        verify(courseValidationService, never()).validateCourse(any());
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("UTCID05 (A) - JLPT authenticity review pending -> MSG-KYC-010 FORBIDDEN")
+    void publishCourse_WhenJlptAuthenticityReviewIsPending_ShouldRemainLocked() {
+        UUID courseId = UUID.randomUUID();
+        TeacherProfile pendingTeacher = new TeacherProfile();
+        pendingTeacher.setId(UUID.randomUUID());
+        pendingTeacher.setKycStatus(TeacherKycStatus.PENDING);
+        pendingTeacher.setCanPublishCourse(false);
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(pendingTeacher));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> courseService.publishCourse(courseId)
+        );
+
+        assertEquals(MessageCodes.MSG_KYC_010, exception.getMessageCode());
+        assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
+        verify(courseRepository, never()).findByIdAndTeacher_Id(any(), any());
+    }
+    }
+
+    @Nested
+    @DisplayName("(dot truoc) - createDraft validation")
+    class DraftValidation {
 
     @Test
     void createDraft_WhenGoalsAreMissing_ShouldThrowGoalValidationError() {
@@ -519,24 +718,6 @@ class CourseServiceImplTest {
         assertEquals(pendingTeacher.getId(), response.teacherId());
     }
 
-    @Test
-    void publishCourse_WhenJlptAuthenticityReviewIsPending_ShouldRemainLocked() {
-        UUID courseId = UUID.randomUUID();
-        TeacherProfile pendingTeacher = new TeacherProfile();
-        pendingTeacher.setId(UUID.randomUUID());
-        pendingTeacher.setKycStatus(TeacherKycStatus.PENDING);
-        pendingTeacher.setCanPublishCourse(false);
-        when(currentUserService.getCurrentUserId()).thenReturn(userId);
-        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(pendingTeacher));
-
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> courseService.publishCourse(courseId)
-        );
-
-        assertEquals(MessageCodes.MSG_KYC_010, exception.getMessageCode());
-        assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
-        verify(courseRepository, never()).findByIdAndTeacher_Id(any(), any());
     }
 
     private CreateCourseDraftRequest validRequest() {

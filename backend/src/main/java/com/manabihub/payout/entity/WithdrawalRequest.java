@@ -1,6 +1,7 @@
 package com.manabihub.payout.entity;
 
 import com.manabihub.payout.enums.WithdrawalStatus;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -26,9 +27,22 @@ public class WithdrawalRequest {
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.UUID)
     private java.util.UUID id;
 
-    @Column(name = "teacher_id", nullable = false)
+    @Column(name = "teacher_id")
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.UUID)
     private java.util.UUID teacherId;
+
+    @Column(name = "student_id")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.UUID)
+    private java.util.UUID studentId;
+
+    @Column(name = "wallet_id", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.UUID)
+    private java.util.UUID walletId;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "owner_type", nullable = false, length = 30)
+    private WalletOwnerType ownerType = WalletOwnerType.TEACHER;
 
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal requestedAmount;

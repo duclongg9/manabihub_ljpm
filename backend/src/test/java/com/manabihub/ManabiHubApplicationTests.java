@@ -246,6 +246,9 @@ class ManabiHubApplicationTests {
     private com.manabihub.payout.repository.TeacherBankAccountRepository teacherBankAccountRepository;
 
     @MockBean
+    private com.manabihub.payout.repository.StudentBankAccountRepository studentBankAccountRepository;
+
+    @MockBean
     private com.manabihub.payout.repository.WithdrawalOtpChallengeRepository withdrawalOtpChallengeRepository;
 
     @MockBean

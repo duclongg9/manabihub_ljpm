@@ -3,6 +3,7 @@ package com.manabihub.payout.dto.response;
 import com.manabihub.payout.enums.PayoutStatus;
 import com.manabihub.payout.enums.ReconciliationStatus;
 import com.manabihub.payout.enums.WithdrawalStatus;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import lombok.Builder;
 import lombok.Value;
 
@@ -15,6 +16,9 @@ import java.util.UUID;
 @Builder
 public class PayoutQueueItemResponse {
     UUID withdrawalRequestId;
+    WalletOwnerType ownerType;
+    UUID ownerId;
+    String ownerName;
     UUID teacherId;
     String teacherName;
     BigDecimal requestedAmount;

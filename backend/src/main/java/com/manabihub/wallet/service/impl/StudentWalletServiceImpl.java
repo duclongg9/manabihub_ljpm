@@ -33,6 +33,9 @@ public class StudentWalletServiceImpl implements StudentWalletService {
     private static final String TOP_UP_KEY_PREFIX = "wallet-topup:";
     private static final String PURCHASE_KEY_PREFIX = "wallet-purchase:";
     private static final String REFUND_KEY_PREFIX = "wallet-refund:";
+    private static final String WITHDRAWAL_RESERVATION_KEY_PREFIX = "student-withdrawal-reserve:";
+    private static final String WITHDRAWAL_COMPLETED_KEY_PREFIX = "student-withdrawal-complete:";
+    private static final String WITHDRAWAL_RELEASE_KEY_PREFIX = "student-withdrawal-release:";
 
     private final WalletRepository walletRepository;
     private final WalletTransactionRepository walletTransactionRepository;
@@ -49,8 +52,12 @@ public class StudentWalletServiceImpl implements StudentWalletService {
                         wallet.getBalance(),
                         wallet.getFrozenBalance(),
                         wallet.getAvailableBalance(),
+                        wallet.getWithdrawableBalance(),
+                        wallet.getAvailableWithdrawableBalance(),
                         wallet.getCurrency()))
                 .orElseGet(() -> new StudentWalletResponse(
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
@@ -84,7 +91,8 @@ public class StudentWalletServiceImpl implements StudentWalletService {
                 "WALLET_TOPUP",
                 orderId,
                 TOP_UP_KEY_PREFIX + orderId,
-                note
+                note,
+                false
         );
     }
 
@@ -103,8 +111,164 @@ public class StudentWalletServiceImpl implements StudentWalletService {
                 "REFUND_REQUEST",
                 refundRequestId,
                 REFUND_KEY_PREFIX + refundRequestId,
-                note
+                note,
+                true
         );
+    }
+
+    @Override
+    @Transactional
+    public WalletTransaction reserveForWithdrawal(
+            UUID studentId,
+            UUID withdrawalId,
+            BigDecimal amount
+    ) {
+        requirePositive(amount, "Withdrawal amount must be positive");
+        String idempotencyKey = WITHDRAWAL_RESERVATION_KEY_PREFIX + withdrawalId;
+        WalletTransaction existing = walletTransactionRepository
+                .findByIdempotencyKey(idempotencyKey)
+                .orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+
+        Wallet wallet = getOrCreateStudentWallet(studentId);
+        existing = walletTransactionRepository.findByIdempotencyKey(idempotencyKey).orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+
+        int reserved = walletRepository.reserveStudentWithdrawalBalance(studentId, amount);
+        if (reserved == 0) {
+            wallet = walletRepository.findByOwnerTypeAndStudent_Id(
+                            WalletOwnerType.STUDENT, studentId)
+                    .orElseThrow(this::walletNotFound);
+        }
+        if (reserved == 0 && wallet.isFrozen()) {
+            throw new BusinessException(
+                    MessageCodes.PAYOUT_BALANCE_FROZEN,
+                    "Student wallet is frozen and cannot create a withdrawal",
+                    HttpStatus.CONFLICT);
+        }
+        if (reserved == 0) {
+            throw new BusinessException(
+                    MessageCodes.WALLET_INSUFFICIENT_BALANCE,
+                    "Insufficient withdrawable balance",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        return walletTransactionRepository.save(WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .transactionType(WalletTransactionType.WITHDRAWAL_RESERVATION)
+                .amount(amount)
+                .direction(WalletDirection.OUT)
+                .referenceType("WITHDRAWAL_REQUEST")
+                .referenceId(withdrawalId)
+                .idempotencyKey(idempotencyKey)
+                .note("Reserve student refund balance for withdrawal")
+                .build());
+    }
+
+    @Override
+    @Transactional
+    public void releaseWithdrawal(
+            UUID studentId,
+            UUID withdrawalId,
+            BigDecimal amount,
+            WalletTransactionType releaseType,
+            String note
+    ) {
+        requirePositive(amount, "Withdrawal release amount must be positive");
+        if (releaseType != WalletTransactionType.WITHDRAWAL_CANCELLED
+                && releaseType != WalletTransactionType.WITHDRAWAL_REJECTED) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Unsupported withdrawal release type",
+                    HttpStatus.BAD_REQUEST);
+        }
+        String idempotencyKey = WITHDRAWAL_RELEASE_KEY_PREFIX
+                + releaseType.name().toLowerCase() + ":" + withdrawalId;
+        if (walletTransactionRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
+            return;
+        }
+
+        Wallet wallet = walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)
+                .orElseThrow(this::walletNotFound);
+        if (walletTransactionRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
+            return;
+        }
+        if (wallet.getFrozenBalance().compareTo(amount) < 0
+                || wallet.getFrozenWithdrawableBalance().compareTo(amount) < 0) {
+            throw new BusinessException(
+                    MessageCodes.PAYOUT_INSUFFICIENT_RESERVED_BALANCE,
+                    "Reserved student withdrawal balance is inconsistent",
+                    HttpStatus.CONFLICT);
+        }
+
+        wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(amount));
+        wallet.setFrozenWithdrawableBalance(
+                wallet.getFrozenWithdrawableBalance().subtract(amount));
+        walletRepository.save(wallet);
+        walletTransactionRepository.save(WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .transactionType(releaseType)
+                .amount(amount)
+                .direction(WalletDirection.IN)
+                .referenceType("WITHDRAWAL_REQUEST")
+                .referenceId(withdrawalId)
+                .idempotencyKey(idempotencyKey)
+                .note(note)
+                .build());
+    }
+
+    @Override
+    @Transactional
+    public WalletTransaction completeWithdrawal(
+            UUID studentId,
+            UUID withdrawalId,
+            BigDecimal amount
+    ) {
+        requirePositive(amount, "Withdrawal completion amount must be positive");
+        String idempotencyKey = WITHDRAWAL_COMPLETED_KEY_PREFIX + withdrawalId;
+        WalletTransaction existing = walletTransactionRepository
+                .findByIdempotencyKey(idempotencyKey)
+                .orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+
+        Wallet wallet = walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)
+                .orElseThrow(this::walletNotFound);
+        existing = walletTransactionRepository.findByIdempotencyKey(idempotencyKey).orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+        if (wallet.getBalance().compareTo(amount) < 0
+                || wallet.getFrozenBalance().compareTo(amount) < 0
+                || wallet.getWithdrawableBalance().compareTo(amount) < 0
+                || wallet.getFrozenWithdrawableBalance().compareTo(amount) < 0) {
+            throw new BusinessException(
+                    MessageCodes.PAYOUT_INSUFFICIENT_RESERVED_BALANCE,
+                    "Reserved student withdrawal balance is inconsistent",
+                    HttpStatus.CONFLICT);
+        }
+
+        wallet.setBalance(wallet.getBalance().subtract(amount));
+        wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(amount));
+        wallet.setWithdrawableBalance(wallet.getWithdrawableBalance().subtract(amount));
+        wallet.setFrozenWithdrawableBalance(
+                wallet.getFrozenWithdrawableBalance().subtract(amount));
+        walletRepository.save(wallet);
+        return walletTransactionRepository.save(WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .transactionType(WalletTransactionType.WITHDRAWAL_COMPLETED)
+                .amount(amount)
+                .direction(WalletDirection.OUT)
+                .referenceType("WITHDRAWAL_REQUEST")
+                .referenceId(withdrawalId)
+                .idempotencyKey(idempotencyKey)
+                .note("Student wallet withdrawal completed")
+                .build());
     }
 
     @Override
@@ -143,13 +307,26 @@ public class StudentWalletServiceImpl implements StudentWalletService {
             throw insufficientBalance();
         }
 
+        BigDecimal availableNonWithdrawable = wallet.getBalance()
+                .subtract(wallet.getWithdrawableBalance())
+                .subtract(wallet.getFrozenBalance()
+                        .subtract(wallet.getFrozenWithdrawableBalance()));
+        BigDecimal withdrawableAmount = amount.subtract(availableNonWithdrawable)
+                .max(BigDecimal.ZERO);
+        if (wallet.getAvailableWithdrawableBalance().compareTo(withdrawableAmount) < 0) {
+            throw insufficientBalance();
+        }
+
         wallet.setFrozenBalance(wallet.getFrozenBalance().add(amount));
+        wallet.setFrozenWithdrawableBalance(
+                wallet.getFrozenWithdrawableBalance().add(withdrawableAmount));
         walletRepository.save(wallet);
 
         return reservationRepository.save(WalletPaymentReservation.builder()
                 .walletId(wallet.getId())
                 .orderId(orderId)
                 .amount(amount)
+                .withdrawableAmount(withdrawableAmount)
                 .status(WalletReservationStatus.RESERVED)
                 .expiresAt(expiresAt)
                 .build());
@@ -187,8 +364,11 @@ public class StudentWalletServiceImpl implements StudentWalletService {
                 .orElseThrow(() -> new WalletCaptureReconciliationException(
                         "Reserved wallet was not found"));
         BigDecimal amount = reservation.getAmount();
+        BigDecimal withdrawableAmount = reservation.getWithdrawableAmount();
         if (wallet.getFrozenBalance().compareTo(amount) < 0
-                || wallet.getBalance().compareTo(amount) < 0) {
+                || wallet.getBalance().compareTo(amount) < 0
+                || wallet.getFrozenWithdrawableBalance().compareTo(withdrawableAmount) < 0
+                || wallet.getWithdrawableBalance().compareTo(withdrawableAmount) < 0) {
             reservation.setStatus(WalletReservationStatus.RECONCILIATION_REQUIRED);
             reservationRepository.save(reservation);
             throw new WalletCaptureReconciliationException(
@@ -197,6 +377,10 @@ public class StudentWalletServiceImpl implements StudentWalletService {
 
         wallet.setBalance(wallet.getBalance().subtract(amount));
         wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(amount));
+        wallet.setWithdrawableBalance(
+                wallet.getWithdrawableBalance().subtract(withdrawableAmount));
+        wallet.setFrozenWithdrawableBalance(
+                wallet.getFrozenWithdrawableBalance().subtract(withdrawableAmount));
         walletRepository.save(wallet);
 
         WalletTransaction transaction = walletTransactionRepository.save(WalletTransaction.builder()
@@ -244,6 +428,18 @@ public class StudentWalletServiceImpl implements StudentWalletService {
         }
 
         wallet.setFrozenBalance(wallet.getFrozenBalance().subtract(reservation.getAmount()));
+        if (wallet.getFrozenWithdrawableBalance()
+                .compareTo(reservation.getWithdrawableAmount()) < 0) {
+            reservation.setStatus(WalletReservationStatus.RECONCILIATION_REQUIRED);
+            reservationRepository.save(reservation);
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "Frozen withdrawable balance is inconsistent with the reservation",
+                    HttpStatus.CONFLICT);
+        }
+        wallet.setFrozenWithdrawableBalance(
+                wallet.getFrozenWithdrawableBalance()
+                        .subtract(reservation.getWithdrawableAmount()));
         walletRepository.save(wallet);
         reservation.setStatus(WalletReservationStatus.RELEASED);
         reservation.setReleasedAt(releasedAt == null ? Instant.now() : releasedAt);
@@ -257,7 +453,8 @@ public class StudentWalletServiceImpl implements StudentWalletService {
             String referenceType,
             UUID referenceId,
             String idempotencyKey,
-            String note
+            String note,
+            boolean withdrawable
     ) {
         requirePositive(amount, "Wallet credit amount must be positive");
         WalletTransaction existing = walletTransactionRepository
@@ -277,6 +474,9 @@ public class StudentWalletServiceImpl implements StudentWalletService {
         }
 
         wallet.setBalance(wallet.getBalance().add(amount));
+        if (withdrawable) {
+            wallet.setWithdrawableBalance(wallet.getWithdrawableBalance().add(amount));
+        }
         walletRepository.save(wallet);
         return walletTransactionRepository.save(WalletTransaction.builder()
                 .walletId(wallet.getId())

@@ -49,7 +49,6 @@ import { ViolationDetailPage } from '../features/admin-violation/pages/Violation
 import { CheckoutPage } from '../features/checkout/pages/CheckoutPage';
 import { CheckoutReturnPage } from '../features/checkout/pages/CheckoutReturnPage';
 import { StudentPaymentsPage } from '../features/payments/pages/StudentPaymentsPage';
-import { StudentWalletPage } from '../features/wallet/pages/StudentWalletPage';
 import { PublicTeacherProfilePage } from '../features/teacher-discovery/pages/PublicTeacherProfilePage';
 import { SystemSettingsPage } from '../features/system-administration/pages/SystemSettingsPage';
 import { InternalAdminAccountsPage } from '../features/system-administration/pages/InternalAdminAccountsPage';
@@ -199,7 +198,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'wallet',
-        element: <StudentWalletPage />,
+        element: <Navigate to="/student/payments" replace />,
       },
       {
         path: 'courses',

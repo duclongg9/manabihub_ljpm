@@ -13,12 +13,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/v1/admin/violations")
@@ -66,5 +71,26 @@ public class AdminViolationController {
         UUID adminId = UUID.fromString(jwt.getSubject());
         ViolationDetailResponse result = violationModerationService.resolveViolation(id, request, adminId);
         return ApiResponse.success("MSG-ADM-003", "Violation resolved successfully", result);
+    }
+
+    @GetMapping("/{id}/evidence/{evidenceId}")
+    @Operation(summary = "Download private violation evidence")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadEvidence(
+            @PathVariable UUID id,
+            @PathVariable UUID evidenceId,
+            @AuthenticationPrincipal Jwt jwt) {
+        ViolationModerationService.ViolationEvidenceDownload evidence =
+                violationModerationService.getViolationEvidence(
+                        id,
+                        evidenceId,
+                        UUID.fromString(jwt.getSubject())
+                );
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(evidence.fileName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.parseMediaType(evidence.contentType()))
+                .body(evidence.resource());
     }
 }

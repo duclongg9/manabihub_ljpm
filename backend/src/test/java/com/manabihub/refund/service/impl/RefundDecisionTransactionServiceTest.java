@@ -1,6 +1,7 @@
 package com.manabihub.refund.service.impl;
 
 import com.manabihub.audit.service.AuditLogService;
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
 import com.manabihub.identity.entity.AppUser;
@@ -45,7 +46,11 @@ import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.service.StudentWalletService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -55,7 +60,6 @@ import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -69,6 +73,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit tests for {@link RefundDecisionTransactionService} — the decision engine behind
+ * UC-32 Approve Refund Request.
+ * <p>
+ * Grouped with {@code @Nested} so Surefire reports one summary line per Report 5.1 sheet:
+ * <pre>
+ *   RefundDecisionTransactionServiceTest$ApproveToStudentWallet -> sheet 49 approveRefundToWallet
+ *   RefundDecisionTransactionServiceTest$Reject                 -> sheet 50 rejectRefund
+ * </pre>
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class RefundDecisionTransactionServiceTest {
@@ -227,95 +241,8 @@ class RefundDecisionTransactionServiceTest {
                 .thenReturn(Optional.of(attempt));
     }
 
-    @Test
-    void requireAccessUsesLiveDatabasePermission() {
-        when(adminAccountRepository.hasPermission(adminId, "REFUND_REVIEW"))
-                .thenReturn(false);
-
-        assertThrows(BusinessException.class, () -> service.requireAccess(adminId));
-    }
-
-    @Test
-    void processingRequestCannotStartAnotherProviderAttempt() {
-        refund.setStatus(RefundStatus.PROCESSING);
-
-        assertThrows(
-                BusinessException.class,
-                () -> service.prepareApproval(
-                        refund.getId(),
-                        approvalDecision(),
-                        adminId,
-                        "VNPAY"
-                )
-        );
-
-        verify(attemptRepository, never()).save(any());
-    }
-
-    @Test
-    void providerFailurePersistsReconciliationWithoutFinancialMutation() {
-        RefundDecisionTransactionService.PreparedApproval prepared =
-                prepareApproval();
-
-        RefundStatus outcome = service.completeApproval(
-                prepared,
-                RefundGatewayResult.unavailable("PROVIDER_DOWN")
-        );
-
-        assertEquals(RefundStatus.RECONCILIATION_REQUIRED, outcome);
-        assertEquals(RefundStatus.RECONCILIATION_REQUIRED, refund.getStatus());
-        assertEquals(RefundProviderStatus.UNAVAILABLE, refund.getProviderStatus());
-        assertEquals("PROVIDER_UNAVAILABLE", refund.getReconciliationReasonCode());
-        verify(escrowService, never()).reverseHeldAllocationForRefund(any());
-        verify(enrollmentRepository, never()).save(any());
-        verify(orderItemRepository, never()).save(any());
-        verify(orderRepository, never()).save(any());
-        verify(paymentTransactionRepository, never()).save(any());
-        verify(afterCommitNotifier, never()).schedule(
-                any(), any(), any(), any(), anyString(), anyString());
-    }
-
-    @Test
-    void authenticatedProviderSuccessRefundsOnlyTheAffectedItem() {
-        when(escrowService.reverseHeldAllocationForRefund(refundedItem.getId()))
-                .thenReturn(true);
-        when(enrollmentRepository.findByStudent_IdAndCourse_Id(
-                refund.getStudent().getId(),
-                refundedItem.getCourse().getId()
-        )).thenReturn(Optional.of(enrollment));
-        when(orderItemRepository.findByOrder_Id(order.getId()))
-                .thenReturn(List.of(refundedItem, otherItem));
-        RefundDecisionTransactionService.PreparedApproval prepared =
-                prepareApproval();
-
-        RefundStatus outcome = service.completeApproval(
-                prepared,
-                new RefundGatewayResult(
-                        RefundProviderStatus.SUCCESS,
-                        true,
-                        "VNP-RF-001",
-                        "00",
-                        "Refunded",
-                        money("1000000")
-                )
-        );
-
-        assertEquals(RefundStatus.APPROVED, outcome);
-        assertEquals(RefundStatus.APPROVED, refund.getStatus());
-        assertEquals(RefundProviderStatus.SUCCESS, refund.getProviderStatus());
-        assertEquals(OrderItemRefundStatus.REFUNDED, refundedItem.getRefundStatus());
-        assertEquals(EnrollmentStatus.REFUNDED, enrollment.getStatus());
-        assertEquals(OrderStatus.PAID, order.getStatus());
-        assertEquals(PaymentStatus.SUCCESS, payment.getStatus());
-        verify(escrowService).reverseHeldAllocationForRefund(refundedItem.getId());
-        verify(orderRepository, never()).save(any());
-        verify(paymentTransactionRepository, never()).save(any());
-        verify(afterCommitNotifier).schedule(
-                any(), any(), any(), any(), anyString(), anyString());
-    }
-
-    @Test
-    void approvalCreditsFullGrossAmountToWalletWithoutCallingProvider() {
+    /** Stubs the collaborators needed for a settlement that runs all the way through. */
+    private WalletTransaction stubSuccessfulSettlement() {
         WalletTransaction walletCredit = WalletTransaction.builder()
                 .id(UUID.randomUUID())
                 .build();
@@ -332,113 +259,447 @@ class RefundDecisionTransactionServiceTest {
                 .thenReturn(Optional.of(enrollment));
         when(orderItemRepository.findByOrder_Id(order.getId()))
                 .thenReturn(List.of(refundedItem, otherItem));
-
-        RefundStatus outcome = service.approveToStudentWallet(
-                refund.getId(), approvalDecision(), adminId);
-
-        assertEquals(RefundStatus.APPROVED, outcome);
-        assertEquals(RefundSettlementMethod.WALLET, refund.getSettlementMethod());
-        assertEquals(RefundSettlementStatus.COMPLETED, refund.getSettlementStatus());
-        assertEquals(walletCredit.getId(), refund.getWalletTransactionId());
-        assertEquals(RefundProviderStatus.NOT_REQUESTED, refund.getProviderStatus());
-        assertEquals(OrderItemRefundStatus.REFUNDED, refundedItem.getRefundStatus());
-        assertEquals(EnrollmentStatus.REFUNDED, enrollment.getStatus());
-        assertEquals(OrderStatus.PAID, order.getStatus());
-        verify(studentWalletService).creditRefund(
-                eq(refund.getStudent().getId()),
-                eq(money("1000000")),
-                eq(refund.getId()),
-                anyString());
-        verify(attemptRepository, never()).save(any());
+        return walletCredit;
     }
 
-    @Test
-    void brRef01AutoApprovalCreditsFullGrossAmountToWalletWithoutAdmin() {
-        WalletTransaction walletCredit = WalletTransaction.builder()
-                .id(UUID.randomUUID())
-                .build();
-        when(escrowService.reverseHeldAllocationForRefund(refundedItem.getId()))
-                .thenReturn(true);
-        when(studentWalletService.creditRefund(
-                eq(refund.getStudent().getId()),
-                eq(money("1000000")),
-                eq(refund.getId()),
-                anyString()))
-                .thenReturn(walletCredit);
-        when(enrollmentRepository.findByStudent_IdAndCourse_Id(
-                refund.getStudent().getId(), refundedItem.getCourse().getId()))
-                .thenReturn(Optional.of(enrollment));
-        when(orderItemRepository.findByOrder_Id(order.getId()))
-                .thenReturn(List.of(refundedItem, otherItem));
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 49 — approveToStudentWallet (UC-32 Approve Refund Request) — 10 TC
+    // ══════════════════════════════════════════════════════════════════════
 
-        RefundRequest result = service.autoApproveToStudentWallet(refund.getId());
+    @Nested
+    @DisplayName("Sheet 49 - approveRefundToWallet (UC-32)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class ApproveToStudentWallet {
 
-        assertEquals(refund, result);
-        assertEquals(RefundStatus.APPROVED, refund.getStatus());
-        assertEquals(RefundDecisionReason.STANDARD_ELIGIBLE, refund.getDecisionReasonCode());
-        assertEquals("Tự động phê duyệt theo BR-REF-01", refund.getDecisionNote());
-        assertEquals(null, refund.getDecidedBy());
-        assertEquals(RefundSettlementMethod.WALLET, refund.getSettlementMethod());
-        assertEquals(RefundSettlementStatus.COMPLETED, refund.getSettlementStatus());
-        assertEquals(walletCredit.getId(), refund.getWalletTransactionId());
-        verify(studentWalletService).creditRefund(
-                eq(refund.getStudent().getId()),
-                eq(money("1000000")),
-                eq(refund.getId()),
-                anyString());
-        verify(auditLogService).logUserAction(
-                eq(refund.getStudent().getUser().getId()),
-                eq("STUDENT"),
-                eq("AUTO_APPROVE_REFUND_TO_WALLET"),
-                eq("REFUND_REQUEST"),
-                eq(refund.getId()),
-                any(),
-                any(),
-                any());
-        verify(adminAccountRepository, never()).hasPermission(any(), anyString());
-        verify(attemptRepository, never()).save(any());
+        @Test
+        @org.junit.jupiter.api.Order(1)
+        @DisplayName("UTCID01 (N) - PENDING + valid evidence -> APPROVED, wallet credited")
+        void approvalCreditsFullGrossAmountToWalletWithoutCallingProvider() {
+            WalletTransaction walletCredit = stubSuccessfulSettlement();
+
+            RefundStatus outcome = service.approveToStudentWallet(
+                    refund.getId(), approvalDecision(), adminId);
+
+            assertEquals(RefundStatus.APPROVED, outcome);
+            assertEquals(RefundSettlementMethod.WALLET, refund.getSettlementMethod());
+            assertEquals(RefundSettlementStatus.COMPLETED, refund.getSettlementStatus());
+            assertEquals(walletCredit.getId(), refund.getWalletTransactionId());
+            assertEquals(RefundProviderStatus.NOT_REQUESTED, refund.getProviderStatus());
+            assertEquals(OrderItemRefundStatus.REFUNDED, refundedItem.getRefundStatus());
+            assertEquals(EnrollmentStatus.REFUNDED, enrollment.getStatus());
+            assertEquals(OrderStatus.PAID, order.getStatus());
+            verify(studentWalletService).creditRefund(
+                    eq(refund.getStudent().getId()),
+                    eq(money("1000000")),
+                    eq(refund.getId()),
+                    anyString());
+            verify(attemptRepository, never()).save(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(2)
+        @DisplayName("UTCID02 (N) - RECONCILIATION_REQUIRED can be approved again -> APPROVED")
+        void reconciliationRequiredRequestCanStillBeApproved() {
+            refund.setStatus(RefundStatus.RECONCILIATION_REQUIRED);
+            refund.setReconciliationReasonCode("ESCROW_ALLOCATION_MISSING");
+            stubSuccessfulSettlement();
+
+            RefundStatus outcome = service.approveToStudentWallet(
+                    refund.getId(), approvalDecision(), adminId);
+
+            assertEquals(RefundStatus.APPROVED, outcome);
+            assertEquals(null, refund.getReconciliationReasonCode());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(3)
+        @DisplayName("UTCID03 (A) - already APPROVED -> idempotent, wallet not credited twice")
+        void approvingAnAlreadyApprovedRequestIsIdempotent() {
+            refund.setStatus(RefundStatus.APPROVED);
+
+            RefundStatus outcome = service.approveToStudentWallet(
+                    refund.getId(), approvalDecision(), adminId);
+
+            assertEquals(RefundStatus.APPROVED, outcome);
+            verify(studentWalletService, never()).creditRefund(any(), any(), any(), anyString());
+            verify(escrowService, never()).reverseHeldAllocationForRefund(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(4)
+        @DisplayName("UTCID04 (A) - status PROCESSING -> conflict, no money moves")
+        void approvingWhileAProviderCallIsProcessingIsRejected() {
+            refund.setStatus(RefundStatus.PROCESSING);
+
+            assertThrows(BusinessException.class, () -> service.approveToStudentWallet(
+                    refund.getId(), approvalDecision(), adminId));
+
+            verify(studentWalletService, never()).creditRefund(any(), any(), any(), anyString());
+            verify(escrowService, never()).reverseHeldAllocationForRefund(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(5)
+        @DisplayName("UTCID05 (A) - status REJECTED -> cannot be approved")
+        void approvingARejectedRequestIsRejected() {
+            refund.setStatus(RefundStatus.REJECTED);
+
+            assertThrows(BusinessException.class, () -> service.approveToStudentWallet(
+                    refund.getId(), approvalDecision(), adminId));
+
+            verify(studentWalletService, never()).creditRefund(any(), any(), any(), anyString());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(6)
+        @DisplayName("UTCID06 (A) - reason code null -> VALIDATION_FAILED")
+        void approvalWithoutAReasonCodeIsRejected() {
+            RefundDecisionRequest decision = RefundDecisionRequest.builder()
+                    .reasonCode(null)
+                    .note("No reason code supplied.")
+                    .build();
+
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.approveToStudentWallet(refund.getId(), decision, adminId));
+
+            assertEquals(MessageCodes.VALIDATION_FAILED, error.getMessageCode());
+            verify(refundRequestRepository, never()).findByIdForUpdate(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(7)
+        @DisplayName("UTCID07 (A) - rejection reason used to approve -> VALIDATION_FAILED")
+        void approvalWithARejectionReasonCodeIsRejected() {
+            RefundDecisionRequest decision = RefundDecisionRequest.builder()
+                    .reasonCode(RefundDecisionReason.OUTSIDE_REFUND_WINDOW)
+                    .note("Wrong kind of reason code.")
+                    .build();
+
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.approveToStudentWallet(refund.getId(), decision, adminId));
+
+            assertEquals(MessageCodes.VALIDATION_FAILED, error.getMessageCode());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(8)
+        @DisplayName("UTCID08 (A) - admin without REFUND_REVIEW -> ADMIN_PERMISSION_DENIED")
+        void approvalWithoutTheRefundReviewPermissionIsRejected() {
+            when(adminAccountRepository.hasPermission(adminId, "REFUND_REVIEW"))
+                    .thenReturn(false);
+
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.approveToStudentWallet(
+                            refund.getId(), approvalDecision(), adminId));
+
+            assertEquals(MessageCodes.ADMIN_PERMISSION_DENIED, error.getMessageCode());
+            verify(studentWalletService, never()).creditRefund(any(), any(), any(), anyString());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(9)
+        @DisplayName("UTCID09 (A) - order no longer PAID -> RECONCILIATION_REQUIRED, no money moves")
+        void financialEvidenceFailureMovesTheRequestToReconciliation() {
+            order.setStatus(OrderStatus.REFUNDED);
+
+            RefundStatus outcome = service.approveToStudentWallet(
+                    refund.getId(), approvalDecision(), adminId);
+
+            assertEquals(RefundStatus.RECONCILIATION_REQUIRED, outcome);
+            assertEquals(RefundStatus.RECONCILIATION_REQUIRED, refund.getStatus());
+            assertEquals("ORDER_NOT_PAID", refund.getReconciliationReasonCode());
+            assertEquals(RefundSettlementStatus.FAILED, refund.getSettlementStatus());
+            verify(studentWalletService, never()).creditRefund(any(), any(), any(), anyString());
+            verify(escrowService, never()).reverseHeldAllocationForRefund(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(10)
+        @DisplayName("UTCID10 (B) - escrow allocation already reversed -> conflict, no wallet credit")
+        void doubleReversalOfTheEscrowAllocationIsRejected() {
+            when(escrowService.reverseHeldAllocationForRefund(refundedItem.getId()))
+                    .thenReturn(false);
+
+            assertThrows(BusinessException.class, () -> service.approveToStudentWallet(
+                    refund.getId(), approvalDecision(), adminId));
+
+            verify(studentWalletService, never()).creditRefund(any(), any(), any(), anyString());
+            verify(enrollmentRepository, never()).save(any());
+        }
     }
 
-    @Test
-    void rejectionRecordsReasonWithoutTouchingMoneyOrAccess() {
-        RefundDecisionRequest decision = RefundDecisionRequest.builder()
-                .reasonCode(RefundDecisionReason.OUTSIDE_REFUND_WINDOW)
-                .note("Request is outside the documented refund window.")
-                .build();
+    // ══════════════════════════════════════════════════════════════════════
+    // Sheet 50 — reject (UC-32 Approve Refund Request) — 7 TC
+    // ══════════════════════════════════════════════════════════════════════
 
-        service.reject(refund.getId(), decision, adminId);
+    @Nested
+    @DisplayName("Sheet 50 - rejectRefund (UC-32)")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class Reject {
 
-        assertEquals(RefundStatus.REJECTED, refund.getStatus());
-        assertEquals(
-                RefundDecisionReason.OUTSIDE_REFUND_WINDOW,
-                refund.getDecisionReasonCode()
-        );
-        assertEquals(decision.getNote(), refund.getDecisionNote());
-        verify(escrowService, never()).reverseHeldAllocationForRefund(any());
-        verify(enrollmentRepository, never()).save(any());
-        verify(orderItemRepository, never()).save(any());
-        verify(orderRepository, never()).save(any());
-        verify(paymentTransactionRepository, never()).save(any());
-        verify(afterCommitNotifier).schedule(
-                any(), any(), any(), any(), anyString(), anyString());
+        @Test
+        @org.junit.jupiter.api.Order(1)
+        @DisplayName("UTCID01 (N) - PENDING + valid reason -> REJECTED, no money touched")
+        void rejectionRecordsReasonWithoutTouchingMoneyOrAccess() {
+            RefundDecisionRequest decision = RefundDecisionRequest.builder()
+                    .reasonCode(RefundDecisionReason.OUTSIDE_REFUND_WINDOW)
+                    .note("Request is outside the documented refund window.")
+                    .build();
+
+            service.reject(refund.getId(), decision, adminId);
+
+            assertEquals(RefundStatus.REJECTED, refund.getStatus());
+            assertEquals(
+                    RefundDecisionReason.OUTSIDE_REFUND_WINDOW,
+                    refund.getDecisionReasonCode()
+            );
+            assertEquals(decision.getNote(), refund.getDecisionNote());
+            verify(escrowService, never()).reverseHeldAllocationForRefund(any());
+            verify(enrollmentRepository, never()).save(any());
+            verify(orderItemRepository, never()).save(any());
+            verify(orderRepository, never()).save(any());
+            verify(paymentTransactionRepository, never()).save(any());
+            verify(afterCommitNotifier).schedule(
+                    any(), any(), any(), any(), anyString(), anyString());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(2)
+        @DisplayName("UTCID02 (N) - RECONCILIATION_REQUIRED can also be rejected")
+        void reconciliationRequiredRequestCanBeRejected() {
+            refund.setStatus(RefundStatus.RECONCILIATION_REQUIRED);
+            refund.setReconciliationReasonCode("ESCROW_ALLOCATION_MISSING");
+
+            service.reject(refund.getId(), rejectionDecision(), adminId);
+
+            assertEquals(RefundStatus.REJECTED, refund.getStatus());
+            verify(refundRequestRepository).save(refund);
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(3)
+        @DisplayName("UTCID03 (A) - already REJECTED -> idempotent no-op")
+        void rejectingAnAlreadyRejectedRequestIsIdempotent() {
+            refund.setStatus(RefundStatus.REJECTED);
+
+            service.reject(refund.getId(), rejectionDecision(), adminId);
+
+            verify(refundRequestRepository, never()).save(any());
+            verify(afterCommitNotifier, never()).schedule(
+                    any(), any(), any(), any(), anyString(), anyString());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(4)
+        @DisplayName("UTCID04 (A) - already APPROVED -> cannot be rejected")
+        void rejectingAnApprovedRequestIsRejected() {
+            refund.setStatus(RefundStatus.APPROVED);
+
+            assertThrows(BusinessException.class,
+                    () -> service.reject(refund.getId(), rejectionDecision(), adminId));
+
+            verify(refundRequestRepository, never()).save(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(5)
+        @DisplayName("UTCID05 (A) - provider already confirmed SUCCESS -> conflict")
+        void rejectingAfterTheProviderConfirmedTheRefundIsRejected() {
+            refund.setStatus(RefundStatus.RECONCILIATION_REQUIRED);
+            refund.setProviderStatus(RefundProviderStatus.SUCCESS);
+
+            assertThrows(BusinessException.class,
+                    () -> service.reject(refund.getId(), rejectionDecision(), adminId));
+
+            verify(refundRequestRepository, never()).save(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(6)
+        @DisplayName("UTCID06 (A) - approval reason used to reject -> VALIDATION_FAILED")
+        void rejectionWithAnApprovalReasonCodeIsRejected() {
+            RefundDecisionRequest decision = RefundDecisionRequest.builder()
+                    .reasonCode(RefundDecisionReason.STANDARD_ELIGIBLE)
+                    .note("Wrong kind of reason code.")
+                    .build();
+
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.reject(refund.getId(), decision, adminId));
+
+            assertEquals(MessageCodes.VALIDATION_FAILED, error.getMessageCode());
+            verify(refundRequestRepository, never()).findByIdForUpdate(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(7)
+        @DisplayName("UTCID07 (A) - admin without REFUND_REVIEW -> ADMIN_PERMISSION_DENIED")
+        void rejectionWithoutTheRefundReviewPermissionIsRejected() {
+            when(adminAccountRepository.hasPermission(adminId, "REFUND_REVIEW"))
+                    .thenReturn(false);
+
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.reject(refund.getId(), rejectionDecision(), adminId));
+
+            assertEquals(MessageCodes.ADMIN_PERMISSION_DENIED, error.getMessageCode());
+            verify(refundRequestRepository, never()).save(any());
+        }
     }
 
-    @Test
-    void nullProviderResultIsQuarantinedAsInvalid() {
-        RefundDecisionTransactionService.PreparedApproval prepared =
-                prepareApproval();
+    // ══════════════════════════════════════════════════════════════════════
+    // Not part of Report 5.1 — provider-gateway path and BR-REF-01 auto approval
+    // ══════════════════════════════════════════════════════════════════════
 
-        RefundStatus outcome = service.completeApproval(prepared, null);
+    @Nested
+    @DisplayName("(khong thuoc sheet nao) - provider gateway / auto approval")
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    class ProviderGatewayAndAutoApproval {
 
-        assertEquals(RefundStatus.RECONCILIATION_REQUIRED, outcome);
-        assertEquals(RefundProviderStatus.INVALID_RESULT, refund.getProviderStatus());
-        assertEquals(
-                "PROVIDER_INVALID_RESULT",
-                refund.getReconciliationReasonCode()
-        );
-        assertTrue(attempt.getResultCode().contains("MISSING"));
-        verify(escrowService, never()).reverseHeldAllocationForRefund(any());
+        @Test
+        @org.junit.jupiter.api.Order(1)
+        void requireAccessUsesLiveDatabasePermission() {
+            when(adminAccountRepository.hasPermission(adminId, "REFUND_REVIEW"))
+                    .thenReturn(false);
+
+            assertThrows(BusinessException.class, () -> service.requireAccess(adminId));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(2)
+        void processingRequestCannotStartAnotherProviderAttempt() {
+            refund.setStatus(RefundStatus.PROCESSING);
+
+            assertThrows(
+                    BusinessException.class,
+                    () -> service.prepareApproval(
+                            refund.getId(),
+                            approvalDecision(),
+                            adminId,
+                            "VNPAY"
+                    )
+            );
+
+            verify(attemptRepository, never()).save(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(3)
+        void providerFailurePersistsReconciliationWithoutFinancialMutation() {
+            RefundDecisionTransactionService.PreparedApproval prepared =
+                    prepareApproval();
+
+            RefundStatus outcome = service.completeApproval(
+                    prepared,
+                    RefundGatewayResult.unavailable("PROVIDER_DOWN")
+            );
+
+            assertEquals(RefundStatus.RECONCILIATION_REQUIRED, outcome);
+            assertEquals(RefundStatus.RECONCILIATION_REQUIRED, refund.getStatus());
+            assertEquals(RefundProviderStatus.UNAVAILABLE, refund.getProviderStatus());
+            assertEquals("PROVIDER_UNAVAILABLE", refund.getReconciliationReasonCode());
+            verify(escrowService, never()).reverseHeldAllocationForRefund(any());
+            verify(enrollmentRepository, never()).save(any());
+            verify(orderItemRepository, never()).save(any());
+            verify(orderRepository, never()).save(any());
+            verify(paymentTransactionRepository, never()).save(any());
+            verify(afterCommitNotifier, never()).schedule(
+                    any(), any(), any(), any(), anyString(), anyString());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(4)
+        void authenticatedProviderSuccessRefundsOnlyTheAffectedItem() {
+            when(escrowService.reverseHeldAllocationForRefund(refundedItem.getId()))
+                    .thenReturn(true);
+            when(enrollmentRepository.findByStudent_IdAndCourse_Id(
+                    refund.getStudent().getId(),
+                    refundedItem.getCourse().getId()
+            )).thenReturn(Optional.of(enrollment));
+            when(orderItemRepository.findByOrder_Id(order.getId()))
+                    .thenReturn(List.of(refundedItem, otherItem));
+            RefundDecisionTransactionService.PreparedApproval prepared =
+                    prepareApproval();
+
+            RefundStatus outcome = service.completeApproval(
+                    prepared,
+                    new RefundGatewayResult(
+                            RefundProviderStatus.SUCCESS,
+                            true,
+                            "VNP-RF-001",
+                            "00",
+                            "Refunded",
+                            money("1000000")
+                    )
+            );
+
+            assertEquals(RefundStatus.APPROVED, outcome);
+            assertEquals(RefundStatus.APPROVED, refund.getStatus());
+            assertEquals(RefundProviderStatus.SUCCESS, refund.getProviderStatus());
+            assertEquals(OrderItemRefundStatus.REFUNDED, refundedItem.getRefundStatus());
+            assertEquals(EnrollmentStatus.REFUNDED, enrollment.getStatus());
+            assertEquals(OrderStatus.PAID, order.getStatus());
+            assertEquals(PaymentStatus.SUCCESS, payment.getStatus());
+            verify(escrowService).reverseHeldAllocationForRefund(refundedItem.getId());
+            verify(orderRepository, never()).save(any());
+            verify(paymentTransactionRepository, never()).save(any());
+            verify(afterCommitNotifier).schedule(
+                    any(), any(), any(), any(), anyString(), anyString());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(5)
+        void brRef01AutoApprovalCreditsFullGrossAmountToWalletWithoutAdmin() {
+            WalletTransaction walletCredit = stubSuccessfulSettlement();
+
+            RefundRequest result = service.autoApproveToStudentWallet(refund.getId());
+
+            assertEquals(refund, result);
+            assertEquals(RefundStatus.APPROVED, refund.getStatus());
+            assertEquals(RefundDecisionReason.STANDARD_ELIGIBLE, refund.getDecisionReasonCode());
+            assertEquals("Tự động phê duyệt theo BR-REF-01", refund.getDecisionNote());
+            assertEquals(null, refund.getDecidedBy());
+            assertEquals(RefundSettlementMethod.WALLET, refund.getSettlementMethod());
+            assertEquals(RefundSettlementStatus.COMPLETED, refund.getSettlementStatus());
+            assertEquals(walletCredit.getId(), refund.getWalletTransactionId());
+            verify(studentWalletService).creditRefund(
+                    eq(refund.getStudent().getId()),
+                    eq(money("1000000")),
+                    eq(refund.getId()),
+                    anyString());
+            verify(auditLogService).logUserAction(
+                    eq(refund.getStudent().getUser().getId()),
+                    eq("STUDENT"),
+                    eq("AUTO_APPROVE_REFUND_TO_WALLET"),
+                    eq("REFUND_REQUEST"),
+                    eq(refund.getId()),
+                    any(),
+                    any(),
+                    any());
+            verify(adminAccountRepository, never()).hasPermission(any(), anyString());
+            verify(attemptRepository, never()).save(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(6)
+        void nullProviderResultIsQuarantinedAsInvalid() {
+            RefundDecisionTransactionService.PreparedApproval prepared =
+                    prepareApproval();
+
+            RefundStatus outcome = service.completeApproval(prepared, null);
+
+            assertEquals(RefundStatus.RECONCILIATION_REQUIRED, outcome);
+            assertEquals(RefundProviderStatus.INVALID_RESULT, refund.getProviderStatus());
+            assertEquals(
+                    "PROVIDER_INVALID_RESULT",
+                    refund.getReconciliationReasonCode()
+            );
+            assertTrue(attempt.getResultCode().contains("MISSING"));
+            verify(escrowService, never()).reverseHeldAllocationForRefund(any());
+        }
     }
+
+    // ──────────────────────────────────────────────
+    // Fixtures
+    // ──────────────────────────────────────────────
 
     private RefundDecisionTransactionService.PreparedApproval prepareApproval() {
         return service.prepareApproval(
@@ -453,6 +714,13 @@ class RefundDecisionTransactionServiceTest {
         return RefundDecisionRequest.builder()
                 .reasonCode(RefundDecisionReason.STANDARD_ELIGIBLE)
                 .note("Eligibility snapshot and payment evidence verified.")
+                .build();
+    }
+
+    private RefundDecisionRequest rejectionDecision() {
+        return RefundDecisionRequest.builder()
+                .reasonCode(RefundDecisionReason.OUTSIDE_REFUND_WINDOW)
+                .note("Request is outside the documented refund window.")
                 .build();
     }
 

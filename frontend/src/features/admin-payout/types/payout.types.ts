@@ -19,6 +19,11 @@ export type WithdrawalStatus =
   | 'FAILED'
   | 'CANCELLED';
 
+export type MockPayoutScenario =
+  | 'SUCCESS'
+  | 'RETRYABLE_FAILURE'
+  | 'PERMANENT_FAILURE';
+
 export type PayoutTransferMethod = 'GATEWAY' | 'MANUAL';
 export type PayoutNotificationStatus = 'NOT_REQUIRED' | 'PENDING' | 'SENT' | 'FAILED';
 
@@ -30,7 +35,10 @@ export interface ReconciliationAlert {
 
 export interface PayoutQueueItem {
   withdrawalRequestId: string;
-  teacherId: string;
+  ownerType: 'TEACHER' | 'STUDENT';
+  ownerId: string;
+  ownerName: string;
+  teacherId: string | null;
   teacherName: string;
   requestedAmount: number;
   status: WithdrawalStatus;
@@ -53,7 +61,11 @@ export interface ReconciliationHistoryEntry {
 export interface PayoutDetail {
   withdrawalRequestId: string;
   settlementId: string | null;
-  teacherId: string;
+  ownerType: 'TEACHER' | 'STUDENT';
+  ownerId: string;
+  ownerName: string;
+  ownerAccountStatus: string;
+  teacherId: string | null;
   teacherName: string;
   teacherAccountStatus: string;
   requestedAmount: number;

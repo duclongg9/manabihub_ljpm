@@ -25,4 +25,10 @@ public interface KycRequestRepository extends JpaRepository<KycRequest, UUID> {
             WHERE request.id = :id
             """)
     Optional<KycRequest> findByIdForReview(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM KycRequest r WHERE r.id = :id")
+    Optional<KycRequest> findByIdForUpdate(@Param("id") UUID id);
+
+    boolean existsByProviderTransactionId(String txId);
 }

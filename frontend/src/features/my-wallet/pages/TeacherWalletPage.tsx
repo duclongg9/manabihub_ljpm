@@ -17,6 +17,7 @@ import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { WalletBalanceCards } from '../components/WalletBalanceCards';
+import { WalletTransactionHistory } from '../components/WalletTransactionHistory';
 import { WithdrawalHistoryTable } from '../components/WithdrawalHistoryTable';
 import { WithdrawalRequestModal } from '../components/WithdrawalRequestModal';
 import { EscrowLedgerTable } from '../components/EscrowLedgerTable';
@@ -172,6 +173,8 @@ export function TeacherWalletPage() {
           Xem chi tiết chính sách
         </Link>
       </Alert>
+
+      <WalletTransactionHistory />
 
       <Paper
         elevation={0}

@@ -4,6 +4,7 @@ import com.manabihub.wallet.dto.response.StudentWalletResponse;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletPaymentReservation;
 import com.manabihub.wallet.entity.WalletTransaction;
+import com.manabihub.wallet.enums.WalletTransactionType;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -36,6 +37,15 @@ public interface StudentWalletService {
      */
     WalletTransaction creditRefund(UUID studentId, BigDecimal amount,
                                    UUID refundRequestId, String note);
+
+    WalletTransaction reserveForWithdrawal(UUID studentId, UUID withdrawalId,
+                                           BigDecimal amount);
+
+    void releaseWithdrawal(UUID studentId, UUID withdrawalId, BigDecimal amount,
+                           WalletTransactionType releaseType, String note);
+
+    WalletTransaction completeWithdrawal(UUID studentId, UUID withdrawalId,
+                                         BigDecimal amount);
 
     WalletPaymentReservation reserveForOrder(UUID studentId, UUID orderId,
                                              BigDecimal amount, Instant expiresAt);
