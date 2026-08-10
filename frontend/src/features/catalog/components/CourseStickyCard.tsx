@@ -1,10 +1,11 @@
-import { forwardRef, useCallback, useImperativeHandle, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
 import { CheckCircle2, PlayCircle, Target, BookOpen, Infinity as InfinityIcon, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 import { createCheckout } from '../../checkout/services/checkoutService';
 import { getAuthSession } from '../../../shared/auth/authSession';
+import { getStudentWallet } from '../../wallet/services/studentWalletService';
 import { ROUTES } from '../../../shared/constants/routes';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 
@@ -26,8 +27,28 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
   const [enrollmentSuccess, setEnrollmentSuccess] = useState<EnrollmentSuccess | null>(null);
   const [locallyEnrolled, setLocallyEnrolled] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [walletAvailableBalance, setWalletAvailableBalance] = useState<number | null>(null);
   const navigate = useNavigate();
   const thumbnailUrl = resolvePublicAssetUrl(course.thumbnailUrl);
+
+  useEffect(() => {
+    setWalletAvailableBalance(null);
+    if (course.price <= 0 || !getAuthSession('public')) return;
+
+    let active = true;
+    void getStudentWallet()
+      .then((wallet) => {
+        if (active) setWalletAvailableBalance(wallet.availableBalance ?? 0);
+      })
+      .catch(() => {
+        // The checkout API remains authoritative when this advisory lookup fails.
+        if (active) setWalletAvailableBalance(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [course.id, course.price]);
 
   const handleContinueLearning = () => navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
 
@@ -243,7 +264,7 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
                 <span className="block">Thanh toán toàn bộ bằng ví</span>
                 <span className="mt-1 block text-xs font-normal text-slate-500">Dùng số dư ví ManabiHub</span>
               </button>
-              {showCombinedPaymentOption && (
+              {(showCombinedPaymentOption || (walletAvailableBalance !== null && walletAvailableBalance > 0 && walletAvailableBalance < course.price)) && (
                 <>
                   <button
                     type="button"
@@ -251,7 +272,11 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
                     disabled={buying}
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 text-left font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
                   >
-                    <span className="block">Ví + VNPay phần còn lại</span>
+                    <span className="block">
+                      {walletAvailableBalance !== null && walletAvailableBalance > 0 && walletAvailableBalance < course.price
+                        ? `Dùng ví ${walletAvailableBalance.toLocaleString('vi-VN')} ₫ + VNPay phần còn lại`
+                        : 'Ví + VNPay phần còn lại'}
+                    </span>
                     <span className="mt-1 block text-xs font-normal text-slate-500">Ưu tiên dùng số dư ví trước</span>
                   </button>
                   <button

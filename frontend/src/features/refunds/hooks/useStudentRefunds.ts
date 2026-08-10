@@ -7,10 +7,10 @@ import {
 
 export const STUDENT_REFUNDS_QUERY_KEY = ['student-refunds'] as const;
 
-export function useStudentRefunds() {
+export function useStudentRefunds(page = 0, size = 10) {
   return useQuery({
-    queryKey: STUDENT_REFUNDS_QUERY_KEY,
-    queryFn: () => fetchStudentRefunds(),
+    queryKey: [...STUDENT_REFUNDS_QUERY_KEY, page, size],
+    queryFn: () => fetchStudentRefunds(page, size),
   });
 }
 
