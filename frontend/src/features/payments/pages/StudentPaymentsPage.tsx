@@ -21,6 +21,7 @@ import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeK
 import { ROUTES } from '../../../shared/constants/routes';
 import type { OrderItemResponse, OrderResponse } from '../../checkout/types';
 import { RefundRequestDialog } from '../../refunds/components/RefundRequestDialog';
+import { StudentRefundHistory } from '../../refunds/components/StudentRefundHistory';
 import { useStudentRefunds } from '../../refunds/hooks/useStudentRefunds';
 import type { StudentRefundResponse } from '../../refunds/types';
 import { useOrderHistory } from '../hooks/useOrderHistory';
@@ -422,13 +423,39 @@ export function StudentPaymentsPage() {
           </Box>
         )}
 
-        <StudentRefundHistory
-          refunds={refunds}
-          loading={refundsQuery.isLoading}
-          error={refundsQuery.isError}
-          onRetry={() => void refundsQuery.refetch()}
-          onOpen={openRefundDetail}
-        />
+        {mainTab === 0 && (
+          <StudentRefundHistory
+            refunds={refunds}
+            loading={refundsQuery.isLoading}
+            error={refundsQuery.isError}
+            onRetry={() => void refundsQuery.refetch()}
+            onOpen={openRefundDetail}
+          />
+        )}
+
+        {/* SUBTAB 2: Lịch sử rút tiền */}
+        {mainTab === 1 && (
+          <Box
+            sx={{
+              p: { xs: 2, md: 2.5 },
+              bgcolor: '#FFFFFF',
+              borderRadius: 3,
+              border: '1px solid #E1E5EA',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+            }}
+          >
+            <StudentWithdrawalHistory
+              withdrawals={withdrawals}
+              loading={loadingWithdrawals}
+              error={errorWithdrawals}
+              onRetry={() => void loadWithdrawalData(withdrawalPage)}
+              onChanged={() => loadWithdrawalData(withdrawalPage)}
+              page={withdrawalPage}
+              totalPages={withdrawalTotalPages}
+              onPageChange={setWithdrawalPage}
+            />
+          </Box>
+        )}
         </Box>
       </Box>
 

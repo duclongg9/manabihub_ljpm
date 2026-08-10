@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useOrderHistory } from '../hooks/useOrderHistory';
@@ -203,5 +203,18 @@ describe('StudentPaymentsPage', () => {
     expect(screen.getByText('MHB-FREE-001')).toBeInTheDocument();
     expect(freeCourseRow).not.toBeNull();
     expect(within(freeCourseRow as HTMLElement).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('renders withdrawal history when the withdrawal tab is selected', async () => {
+    render(
+      <MemoryRouter>
+        <StudentPaymentsPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Lịch sử rút tiền' }));
+
+    expect(await screen.findByText('Chưa có yêu cầu rút tiền về ngân hàng nào.')).toBeInTheDocument();
+    expect(screen.queryByText('MHB-20260729-001')).not.toBeInTheDocument();
   });
 });
