@@ -223,9 +223,9 @@ export function DashboardLayout({ allowedRoles, menuItems, sessionKind }: Dashbo
         </Box>
         
         {/* Mini Footer */}
-        <Box sx={{ mt: 'auto', py: 3, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', color: 'text.secondary', fontSize: '0.85rem' }}>
-          <Typography variant="body2">© 2026 ManabiHub. Bảo lưu mọi quyền.</Typography>
-          <Box sx={{ display: 'flex', gap: 3 }}>
+        <Box sx={{ mt: 'auto', py: 3, borderTop: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', gap: 2, minWidth: 0, color: 'text.secondary', fontSize: '0.85rem' }}>
+          <Typography variant="body2" sx={{ maxWidth: '100%', overflowWrap: 'anywhere' }}>© 2026 ManabiHub. Bảo lưu mọi quyền.</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1.5, sm: 3 } }}>
             <Box component={Link} to={ROUTES.PUBLIC.HELP} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Hỗ trợ</Box>
             <Box component={Link} to={ROUTES.PUBLIC.TERMS} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Điều khoản</Box>
             <Box component={Link} to={ROUTES.PUBLIC.PRIVACY} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>Quyền riêng tư</Box>

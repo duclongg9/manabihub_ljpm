@@ -168,6 +168,7 @@ export const ENDPOINTS = {
     FINAL_TEST_SUBMIT: (courseId: string) => `/v1/student/courses/${courseId}/final-test/submissions`,
     CERTIFICATE: (courseId: string) => `/v1/student/courses/${courseId}/certificate`,
     WRITING_SUBMISSION_GET: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions/me`,
+    WRITING_SUBMISSION_DRAFT: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions/draft`,
     WRITING_SUBMISSION_POST: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions`,
     WRITING_SUBMISSION_AI: (blockId: string, submissionId: string) => `/v1/student/lessons/${blockId}/writing-submissions/${submissionId}/ai-assistance`,
   },
