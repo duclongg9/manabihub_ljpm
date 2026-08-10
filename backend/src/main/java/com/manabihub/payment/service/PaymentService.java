@@ -36,8 +36,8 @@ public interface PaymentService {
     String initiateCombinedPayment(Order order, String clientIp);
 
     /**
-     * Processes a provider webhook (VNPay IPN). This is the ONLY path that confirms a
-     * payment. It verifies the checksum, and on a valid successful callback creates the
+     * Processes a provider webhook (VNPay IPN). It verifies the checksum, and on a valid
+     * successful callback creates the
      * enrollment, marks the payment/order paid, holds funds in escrow, and notifies the
      * student — all in one transaction. Idempotent: a replayed callback for an
      * already-paid order is a no-op.
@@ -47,9 +47,9 @@ public interface PaymentService {
     IpnAckResponse handleIpn(Map<String, String> params);
 
     /**
-     * Processes the browser return from VNPay. The payload is still verified by
-     * the backend; a successful browser return is only an acknowledgement and
-     * does not fulfil the order. The server-to-server IPN remains authoritative.
+     * Processes the browser return from VNPay. The backend verifies the HMAC, amount and
+     * provider status before applying the same idempotent confirmation transaction as the
+     * IPN. This provides a sandbox/demo fallback when VNPay cannot reach the IPN endpoint.
      */
     IpnAckResponse handleVnPayReturn(Map<String, String> params);
 

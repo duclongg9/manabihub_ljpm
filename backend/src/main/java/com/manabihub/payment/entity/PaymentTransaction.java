@@ -31,8 +31,8 @@ import java.util.UUID;
 /**
  * A record of one payment attempt against an {@link Order} at a payment provider (UC-08).
  * <p>
- * Payment is only ever confirmed by the provider's server-to-server webhook (VNPay IPN),
- * never by the browser return redirect. Maps the {@code payment_transactions} table (V002).
+ * Payment is confirmed from a backend-verified VNPay callback (IPN or signed browser
+ * return), never from unsigned client state. Maps the {@code payment_transactions} table (V002).
  */
 @Entity
 @Table(name = "payment_transactions")
