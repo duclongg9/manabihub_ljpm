@@ -22,7 +22,7 @@ export const STUDENT_MENU = [
     icon: FavoriteBorderIcon,
   },
   {
-    title: 'Lịch sử thanh toán',
+    title: 'Ví & Thanh toán',
     path: ROUTES.STUDENT.PAYMENTS,
     icon: ReceiptLongIcon,
   },
