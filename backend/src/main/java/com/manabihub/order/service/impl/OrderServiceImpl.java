@@ -21,8 +21,8 @@ import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.mapper.OrderMapper;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
-import com.manabihub.order.service.OrderService;
 import com.manabihub.wallet.config.WalletPaymentProperties;
+import com.manabihub.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
@@ -110,6 +110,11 @@ public class OrderServiceImpl implements OrderService {
         return order;
     }
 
+    /**
+     * Legacy compatibility for already-integrated callers. There is intentionally no
+     * student-facing controller route for creating wallet top-up orders anymore.
+     */
+    @Deprecated
     @Override
     @Transactional
     public Order createTopUpOrder(BigDecimal amount) {
@@ -118,15 +123,11 @@ public class OrderServiceImpl implements OrderService {
         boolean invalid = amount == null
                 || amount.compareTo(walletPaymentProperties.getTopUpMinAmount()) < 0
                 || amount.compareTo(walletPaymentProperties.getTopUpMaxAmount()) > 0
-                || amount.stripTrailingZeros().scale() > 0; // must be a whole number of VND
+                || amount.stripTrailingZeros().scale() > 0;
         if (invalid) {
             throw new BusinessException(
                     MessageCodes.COMMON_BAD_REQUEST,
-                    "Số tiền nạp phải là số nguyên trong khoảng "
-                            + walletPaymentProperties.getTopUpMinAmount().toPlainString()
-                            + "đ đến "
-                            + walletPaymentProperties.getTopUpMaxAmount().toPlainString()
-                            + "đ",
+                    "Số tiền nạp không hợp lệ",
                     HttpStatus.BAD_REQUEST);
         }
 

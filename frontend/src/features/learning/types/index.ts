@@ -88,8 +88,10 @@ export interface LearningLessonBlock {
   contentAvailable: boolean;
   progressStatus: LessonProgressStatus;
   lastVideoPositionSeconds?: number;
+  watchedVideoSeconds?: number;
   completedAt?: string;
   current: boolean;
+  locked: boolean;
 }
 
 export interface LearningModule {
@@ -152,6 +154,7 @@ export interface LessonProgress {
   enrollmentId: string;
   status: LessonProgressStatus;
   lastVideoPositionSeconds?: number;
+  watchedVideoSeconds?: number;
   completedAt?: string;
   updatedAt?: string;
 }

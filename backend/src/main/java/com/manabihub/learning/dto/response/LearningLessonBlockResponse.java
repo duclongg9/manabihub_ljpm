@@ -30,6 +30,35 @@ public record LearningLessonBlockResponse(
         LessonProgressStatus progressStatus,
         Integer lastVideoPositionSeconds,
         Instant completedAt,
-        boolean current
+        boolean current,
+        Integer watchedVideoSeconds,
+        boolean locked
 ) {
+    public LearningLessonBlockResponse(
+            UUID id,
+            UUID moduleId,
+            LessonBlockType type,
+            String title,
+            String content,
+            String videoUrl,
+            Integer durationMinutes,
+            String quizQuestion,
+            List<String> quizOptions,
+            List<StudentQuizQuestionResponse> quizItems,
+            List<FlashcardItemResponse> flashcards,
+            List<FlashcardStatus> flashcardStatuses,
+            String writingPrompt,
+            String rubric,
+            int orderIndex,
+            boolean contentAvailable,
+            LessonProgressStatus progressStatus,
+            Integer lastVideoPositionSeconds,
+            Instant completedAt,
+            boolean current
+    ) {
+        this(id, moduleId, type, title, content, videoUrl, durationMinutes, quizQuestion,
+                quizOptions, quizItems, flashcards, flashcardStatuses, writingPrompt, rubric,
+                orderIndex, contentAvailable, progressStatus, lastVideoPositionSeconds,
+                completedAt, current, null, false);
+    }
 }

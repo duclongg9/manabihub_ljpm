@@ -18,6 +18,18 @@ import java.util.UUID;
 @Repository
 public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID> {
 
+    interface TeacherCourseRevenueProjection {
+        UUID getCourseId();
+        String getCourseTitle();
+        Long getPurchaseCount();
+        Long getRefundedCount();
+        java.math.BigDecimal getGrossRevenue();
+        java.math.BigDecimal getTeacherNetRevenue();
+        java.math.BigDecimal getHeldAmount();
+        java.math.BigDecimal getReleasedAmount();
+        java.math.BigDecimal getRefundedAmount();
+    }
+
     /** Idempotency guard: an order must never produce more than one escrow hold. */
     boolean existsByOrder_Id(UUID orderId);
 
@@ -133,4 +145,28 @@ public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID
             @Param("startDate") Instant startDate,
             @Param("endDate") Instant endDate
     );
+
+    /**
+     * Aggregated teacher revenue by course.  The ledger is the source of truth for
+     * teacher net revenue: HELD/FROZEN is still in platform escrow, RELEASED has
+     * settled into the teacher wallet, and REFUNDED is no longer payable.
+     */
+    @Query("""
+            select escrow.course.id as courseId,
+                   escrow.course.title as courseTitle,
+                   count(escrow.id) as purchaseCount,
+                   coalesce(sum(case when escrow.status = 'REFUNDED' then 1 else 0 end), 0) as refundedCount,
+                   coalesce(sum(case when escrow.status <> 'REFUNDED' then oi.price else 0 end), 0) as grossRevenue,
+                   coalesce(sum(case when escrow.status <> 'REFUNDED' then escrow.amount else 0 end), 0) as teacherNetRevenue,
+                   coalesce(sum(case when escrow.status in ('HELD', 'FROZEN') then escrow.amount else 0 end), 0) as heldAmount,
+                   coalesce(sum(case when escrow.status = 'RELEASED' then escrow.amount else 0 end), 0) as releasedAmount,
+                   coalesce(sum(case when escrow.status = 'REFUNDED' then escrow.amount else 0 end), 0) as refundedAmount
+            from EscrowLedger escrow
+            join escrow.orderItem oi
+            where escrow.teacher.id = :teacherId
+            group by escrow.course.id, escrow.course.title
+            order by escrow.course.title asc
+            """)
+    List<TeacherCourseRevenueProjection> summarizeTeacherRevenueByCourse(
+            @Param("teacherId") UUID teacherId);
 }

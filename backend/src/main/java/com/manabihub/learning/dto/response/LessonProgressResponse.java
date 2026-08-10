@@ -11,6 +11,17 @@ public record LessonProgressResponse(
         LessonProgressStatus status,
         Integer lastVideoPositionSeconds,
         Instant completedAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Integer watchedVideoSeconds
 ) {
+    public LessonProgressResponse(
+            UUID lessonBlockId,
+            UUID enrollmentId,
+            LessonProgressStatus status,
+            Integer lastVideoPositionSeconds,
+            Instant completedAt,
+            Instant updatedAt
+    ) {
+        this(lessonBlockId, enrollmentId, status, lastVideoPositionSeconds, completedAt, updatedAt, null);
+    }
 }

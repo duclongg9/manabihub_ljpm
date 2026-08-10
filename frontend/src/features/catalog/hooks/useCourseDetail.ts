@@ -6,5 +6,7 @@ export const useCourseDetail = (id: string) => {
     queryKey: ['public-course', id],
     queryFn: () => catalogService.getCourseDetail(id),
     enabled: !!id,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 };

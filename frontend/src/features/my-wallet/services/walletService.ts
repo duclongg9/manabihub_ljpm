@@ -1,6 +1,11 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import type { ApiResponse, PageResponse } from '../../../shared/types/api';
-import type { TeacherWallet, WithdrawalRequest, CreateWithdrawalPayload } from '../types/wallet.types';
+import type {
+  TeacherWallet,
+  TeacherRevenueSummary,
+  WithdrawalRequest,
+  CreateWithdrawalPayload,
+} from '../types/wallet.types';
 import type {
   WalletTransaction,
   WalletTransactionDetail,
@@ -12,6 +17,11 @@ import { ENDPOINTS } from '../../../shared/api/endpoints';
 export const walletService = {
   getTeacherWallet: async (): Promise<ApiResponse<TeacherWallet>> => {
     const response = await axiosClient.get(ENDPOINTS.teacherWallet.detail);
+    return response.data;
+  },
+
+  getTeacherRevenueSummary: async (): Promise<ApiResponse<TeacherRevenueSummary>> => {
+    const response = await axiosClient.get(ENDPOINTS.teacherWallet.revenueSummary);
     return response.data;
   },
 

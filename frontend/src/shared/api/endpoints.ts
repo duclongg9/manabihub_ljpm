@@ -60,6 +60,7 @@ export const ENDPOINTS = {
   },
   teacherWallet: {
     detail: '/v1/teacher/wallet',
+    revenueSummary: '/v1/teacher/wallet/revenue-summary',
     escrow: '/v1/teacher/wallet/escrow',
     transactions: '/v1/teacher/wallet/transactions',
     transactionDetail: (transactionId: string) =>
@@ -82,7 +83,6 @@ export const ENDPOINTS = {
     wishlistCourse: (courseId: string) => `/v1/student/wishlist/${courseId}`,
     courseReview: (courseId: string) => `/v1/student/courses/${courseId}/review`,
     wallet: '/v1/student/wallet',
-    walletTopUp: '/v1/student/wallet/top-up',
     withdrawals: '/v1/student/withdrawals',
     withdrawalDetail: (id: string) => `/v1/student/withdrawals/${id}`,
     cancelWithdrawal: (id: string) => `/v1/student/withdrawals/${id}/cancel`,
@@ -158,6 +158,8 @@ export const ENDPOINTS = {
     QUIZ_SUBMIT: (blockId: string) => `/v1/student/lessons/${blockId}/quiz-submissions`,
     FINAL_TEST_ELIGIBILITY: (courseId: string) => `/v1/student/courses/${courseId}/final-test/eligibility`,
     FINAL_TEST_START: (courseId: string) => `/v1/student/courses/${courseId}/final-test/attempts`,
+    FINAL_TEST_TERMINATE: (courseId: string, attemptId: string) =>
+      `/v1/student/courses/${courseId}/final-test/attempts/${attemptId}/terminate`,
     FINAL_TEST_SUBMIT: (courseId: string) => `/v1/student/courses/${courseId}/final-test/submissions`,
     CERTIFICATE: (courseId: string) => `/v1/student/courses/${courseId}/certificate`,
     WRITING_SUBMISSION_GET: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions/me`,

@@ -14,7 +14,9 @@ import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.enums.WalletTransactionType;
 import com.manabihub.wallet.mapper.WalletMapper;
 import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.wallet.repository.EscrowLedgerRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
+import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,6 +37,7 @@ public class WalletServiceImpl implements WalletService {
     private final WalletTransactionRepository transactionRepository;
     private final WalletMapper walletMapper;
     private final CommercialPolicyService commercialPolicyService;
+    private final EscrowLedgerRepository escrowLedgerRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -52,11 +55,31 @@ public class WalletServiceImpl implements WalletService {
         int clearingPeriodDays = policy.escrowHoldingDays();
         LocalDate nextPayoutDate = LocalDate.now().plusDays(clearingPeriodDays);
 
-        return walletMapper.toResponse(
+        TeacherWalletResponse response = walletMapper.toResponse(
                 wallet,
                 policy.payoutThreshold(),
                 clearingPeriodDays,
                 nextPayoutDate);
+
+        // frozenBalance contains both escrow holds and withdrawal reservations.
+        // Expose the two buckets separately so a teacher cannot mistake held funds
+        // for money that has already settled into the withdrawable wallet.
+        BigDecimal heldEscrow = BigDecimal.ZERO;
+        if (escrowLedgerRepository != null) {
+            heldEscrow = safeAmount(escrowLedgerRepository.sumAmountByTeacherIdAndStatus(
+                    teacherProfile.getId(), EscrowStatus.HELD))
+                    .add(safeAmount(escrowLedgerRepository.sumAmountByTeacherIdAndStatus(
+                            teacherProfile.getId(), EscrowStatus.FROZEN)));
+        }
+        response.setPendingBalance(heldEscrow);
+        response.setReservedBalance(safeAmount(wallet.getFrozenBalance())
+                .subtract(heldEscrow)
+                .max(BigDecimal.ZERO));
+        return response;
+    }
+
+    private BigDecimal safeAmount(BigDecimal amount) {
+        return amount == null ? BigDecimal.ZERO : amount;
     }
 
     @Override
