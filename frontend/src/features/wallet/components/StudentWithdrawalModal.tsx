@@ -53,6 +53,7 @@ interface StudentWithdrawalModalProps {
   onClose: () => void;
   wallet: StudentWalletResponse | null;
   minimumAmount: number;
+  identityVerified: boolean;
   onSuccess: () => Promise<void>;
 }
 
@@ -61,6 +62,7 @@ export function StudentWithdrawalModal({
   onClose,
   wallet,
   minimumAmount,
+  identityVerified,
   onSuccess,
 }: StudentWithdrawalModalProps) {
   const [accounts, setAccounts] = useState<StudentBankAccount[]>([]);
@@ -70,7 +72,6 @@ export function StudentWithdrawalModal({
   const [accountNumber, setAccountNumber] = useState<string>('');
   const [accountHolderName, setAccountHolderName] = useState<string>('');
   const [saveAccount, setSaveAccount] = useState<boolean>(true);
-  const [ownershipConfirmed, setOwnershipConfirmed] = useState<boolean>(false);
   const [otpCode, setOtpCode] = useState<string>('');
   const [otpSent, setOtpSent] = useState<boolean>(false);
   const [processing, setProcessing] = useState<boolean>(false);
@@ -80,7 +81,7 @@ export function StudentWithdrawalModal({
   const currency = wallet?.currency ?? 'VND';
   const selectedBank = BANKS.find((b) => b.code === bankCode) ?? BANKS[0];
   const selectedSavedAccount = accounts.find((a) => a.id === accountId);
-  const ownershipVerified = selectedSavedAccount?.ownershipVerified || ownershipConfirmed;
+  const ownershipVerified = selectedSavedAccount?.ownershipVerified || identityVerified;
 
   const loadSavedAccounts = useCallback(async () => {
     try {
@@ -122,7 +123,7 @@ export function StudentWithdrawalModal({
     if (!accountId && (!accountNumber.trim() || !accountHolderName.trim())) {
       return 'Vui lòng nhập đầy đủ số tài khoản và tên chủ tài khoản.';
     }
-    if (!ownershipVerified) {
+    if (!identityVerified) {
       return 'Vui lòng xác nhận tài khoản chính chủ trước khi tiếp tục.';
     }
     return null;
@@ -278,7 +279,6 @@ export function StudentWithdrawalModal({
                 value={accountId}
                 onChange={(e) => {
                   setAccountId(e.target.value);
-                  setOwnershipConfirmed(false);
                 }}
                 size="small"
               >
@@ -360,8 +360,8 @@ export function StudentWithdrawalModal({
                   control={
                     <Checkbox
                       checked={ownershipVerified}
-                      disabled={Boolean(selectedSavedAccount?.ownershipVerified) || processing || otpSent}
-                      onChange={(e) => setOwnershipConfirmed(e.target.checked)}
+                      disabled
+                      onChange={() => undefined}
                       size="small"
                       sx={{ color: '#D97706', '&.Mui-checked': { color: '#D97706' } }}
                     />

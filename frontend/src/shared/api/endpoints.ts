@@ -89,6 +89,8 @@ export const ENDPOINTS = {
     withdrawals: '/v1/student/withdrawals',
     withdrawalDetail: (id: string) => `/v1/student/withdrawals/${id}`,
     cancelWithdrawal: (id: string) => `/v1/student/withdrawals/${id}/cancel`,
+    identityVerificationStatus: '/v1/student/identity-verifications/status',
+    identityVerification: '/v1/student/identity-verifications',
     sendWithdrawalOtp: '/v1/student/withdrawals/send-otp',
     withdrawalBankAccounts: '/v1/student/withdrawals/bank-accounts',
     walletTransactions: '/v1/student/wallet/transactions',
