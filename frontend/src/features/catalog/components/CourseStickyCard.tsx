@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
 import { CheckCircle2, PlayCircle, Target, BookOpen, Infinity as InfinityIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 import { createCheckout } from '../../checkout/services/checkoutService';
 import { getAuthSession } from '../../../shared/auth/authSession';
+import { getStudentWallet } from '../../wallet/services/studentWalletService';
 import { ROUTES } from '../../../shared/constants/routes';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 
@@ -21,8 +22,28 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
   const [enrollmentSuccess, setEnrollmentSuccess] = useState<EnrollmentSuccess | null>(null);
   const [locallyEnrolled, setLocallyEnrolled] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [walletAvailableBalance, setWalletAvailableBalance] = useState<number | null>(null);
   const navigate = useNavigate();
   const thumbnailUrl = resolvePublicAssetUrl(course.thumbnailUrl);
+
+  useEffect(() => {
+    setWalletAvailableBalance(null);
+    if (course.price <= 0 || !getAuthSession('public')) return;
+
+    let active = true;
+    void getStudentWallet()
+      .then((wallet) => {
+        if (active) setWalletAvailableBalance(wallet.availableBalance ?? 0);
+      })
+      .catch(() => {
+        // A balance lookup is advisory; the checkout API remains authoritative.
+        if (active) setWalletAvailableBalance(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [course.id, course.price]);
 
   const handleContinueLearning = () => navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
 
@@ -133,13 +154,22 @@ export const CourseStickyCard = ({ course }: CourseStickyCardProps) => {
             >
               {buying ? 'Đang xử lý…' : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay (VNPay)'}
             </button>
-            {course.price > 0 && (
+            {course.price > 0 && (walletAvailableBalance === null || walletAvailableBalance >= course.price) && (
               <button
                 onClick={() => handleBuy('WALLET')}
                 disabled={buying}
                 className="border border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-60 w-full py-3 rounded-xl font-semibold mb-3 transition-colors"
               >
-                Thanh toán bằng ví
+                Thanh toán toàn bộ bằng ví
+              </button>
+            )}
+            {course.price > 0 && walletAvailableBalance !== null && walletAvailableBalance > 0 && walletAvailableBalance < course.price && (
+              <button
+                onClick={() => handleBuy('WALLET_VNPAY')}
+                disabled={buying}
+                className="border border-red-600 text-red-600 hover:bg-red-50 disabled:opacity-60 w-full py-3 rounded-xl font-semibold mb-3 transition-colors"
+              >
+                Dùng ví {walletAvailableBalance.toLocaleString('vi-VN')} ₫ + VNPay phần còn lại
               </button>
             )}
             {showPaymentOptions && (

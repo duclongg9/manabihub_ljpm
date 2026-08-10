@@ -5,13 +5,16 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   Pagination,
   Stack,
   Tab,
   Tabs,
   Typography,
+  Tooltip,
 } from '@mui/material';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
+import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -90,6 +93,7 @@ export function StudentPaymentsPage() {
 
   const [filterIndex, setFilterIndex] = useState(0);
   const [page, setPage] = useState(0);
+  const [refundPage, setRefundPage] = useState(0);
   const [dialogItem, setDialogItem] = useState<OrderItemResponse | null>(null);
   const [dialogRefund, setDialogRefund] = useState<StudentRefundResponse | null>(null);
 
@@ -111,7 +115,7 @@ export function StudentPaymentsPage() {
 
   const selectedFilter = FILTERS[filterIndex];
   const ordersQuery = useOrderHistory({ page, size: 10, status: selectedFilter.status });
-  const refundsQuery = useStudentRefunds();
+  const refundsQuery = useStudentRefunds(refundPage, 10);
 
   // Filter out WALLET_TOPUP transactions from student order history
   const rawOrders = ordersQuery.data?.content ?? [];
@@ -240,13 +244,13 @@ export function StudentPaymentsPage() {
                 <Box>
                   <Typography sx={{ fontWeight: 900 }}>Ví học viên</Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)' }}>
-                    Tiền hoàn dùng để mua khóa học
+                    Tiền hoàn hợp lệ dùng để mua khóa học
                   </Typography>
                 </Box>
               </Stack>
               <Box>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mb: 0.5 }}>
-                  Số dư khả dụng
+                  Số dư mua khóa học
                 </Typography>
                 <Typography variant="h4" sx={{ fontWeight: 900 }}>
                   {loadingWallet ? '…' : formatMoney(wallet?.availableBalance ?? 0, wallet?.currency ?? 'VND')}
@@ -254,13 +258,13 @@ export function StudentPaymentsPage() {
               </Box>
               <Stack direction="row" divider={<Box sx={{ borderLeft: '1px solid rgba(255,255,255,0.24)' }} />} spacing={2}>
                 <Box sx={{ flex: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Có thể rút</Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Số dư có thể rút</Typography>
                   <Typography sx={{ fontWeight: 800 }}>
                     {loadingWallet ? '…' : formatMoney(wallet?.availableWithdrawableBalance ?? 0, wallet?.currency ?? 'VND')}
                   </Typography>
                 </Box>
                 <Box sx={{ flex: 1, pl: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Đang xử lý</Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Đang giữ / xử lý</Typography>
                   <Typography sx={{ fontWeight: 800 }}>
                     {loadingWallet ? '…' : formatMoney(wallet?.frozenBalance ?? 0, wallet?.currency ?? 'VND')}
                   </Typography>
@@ -299,7 +303,7 @@ export function StudentPaymentsPage() {
                 </Typography>
                 <Button
                   variant="contained"
-                  disabled={loadingWallet || (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount}
+                  disabled={loadingWallet || (identityVerified && (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount)}
                   onClick={() => {
                     if (!identityVerified) {
                       navigate('/student/identity-verification');
@@ -309,7 +313,7 @@ export function StudentPaymentsPage() {
                   }}
                   sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 800, px: 3, textTransform: 'none' }}
                 >
-                  {identityVerified ? 'Yêu cầu rút tiền' : 'Xác minh CCCD để rút tiền'}
+                  {identityVerified ? 'Yêu cầu rút tiền' : 'Xác minh SĐT & CCCD để rút tiền'}
                 </Button>
               </Stack>
             </Stack>
@@ -481,13 +485,24 @@ export function StudentPaymentsPage() {
         )}
 
         {mainTab === 0 && (
-          <StudentRefundHistory
-            refunds={refunds}
-            loading={refundsQuery.isLoading}
-            error={refundsQuery.isError}
-            onRetry={() => void refundsQuery.refetch()}
-            onOpen={openRefundDetail}
-          />
+          <Box sx={{ mt: 4 }}>
+            <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>Lịch sử hoàn tiền</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Các yêu cầu hoàn tiền được tách khỏi lịch sử đơn hàng để dễ theo dõi trạng thái xử lý.
+              </Typography>
+            </Stack>
+            <StudentRefundHistory
+              refunds={refunds}
+              loading={refundsQuery.isLoading}
+              error={refundsQuery.isError}
+              onRetry={() => void refundsQuery.refetch()}
+              onOpen={openRefundDetail}
+              page={refundPage}
+              totalPages={refundsQuery.data?.totalPages ?? 1}
+              onPageChange={setRefundPage}
+            />
+          </Box>
         )}
 
         {/* SUBTAB 2: Lịch sử rút tiền */}
@@ -548,6 +563,7 @@ function OrderCard({
   onRequestRefund: (item: OrderItemResponse) => void;
   onOpenRefund: (refund: StudentRefundResponse) => void;
 }) {
+  const [copied, setCopied] = useState(false);
   const presentation = ORDER_STATUS_CONFIG[order.status] ?? {
     label: order.status,
     bgcolor: '#F3F4F6',
@@ -559,9 +575,42 @@ function OrderCard({
       {/* Header: Secondary Order code & Date on left, Soft Status Badge aligned to right edge */}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, mb: 2 }}>
         <Box>
-          <Typography sx={{ fontWeight: 600, color: '#64748B', fontSize: '0.85rem', fontFamily: 'monospace', letterSpacing: '0.2px' }}>
-            {order.orderCode}
-          </Typography>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <Tooltip title={`Mã đơn đầy đủ: ${order.orderCode}`}>
+              <Typography
+                component="span"
+                sx={{
+                  maxWidth: { xs: 180, sm: 280 },
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 600,
+                  color: '#64748B',
+                  fontSize: '0.85rem',
+                  fontFamily: 'monospace',
+                  letterSpacing: '0.2px',
+                }}
+              >
+                {order.orderCode}
+              </Typography>
+            </Tooltip>
+            <Tooltip title={copied ? 'Đã sao chép' : 'Sao chép mã đơn hàng'}>
+              <IconButton
+                size="small"
+                aria-label="Sao chép mã đơn hàng"
+                onClick={() => {
+                  if (navigator.clipboard?.writeText) {
+                    void navigator.clipboard.writeText(order.orderCode);
+                  }
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1500);
+                }}
+                sx={{ color: copied ? '#047857' : '#64748B', p: 0.35 }}
+              >
+                <ContentCopyOutlinedIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
             Ngày mua: {new Date(order.createdAt).toLocaleDateString('vi-VN')}
           </Typography>
