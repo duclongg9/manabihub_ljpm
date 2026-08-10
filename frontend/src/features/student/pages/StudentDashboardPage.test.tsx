@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { useQuery } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -118,9 +118,10 @@ describe('StudentDashboardPage', () => {
     expect(screen.getByText('Ngữ pháp N5 nền tảng')).toBeInTheDocument();
     expect(screen.getByText('Luyện nghe N5')).toBeInTheDocument();
     expect(screen.queryByText('Khóa học thứ tư không hiện trên Dashboard')).not.toBeInTheDocument();
-    expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    const stats = within(screen.getByTestId('student-stats'));
+    expect(stats.getByText('4')).toBeInTheDocument();
+    expect(stats.getByText('3')).toBeInTheDocument();
+    expect(stats.getByText('1')).toBeInTheDocument();
     expect(screen.queryByText('45 phút')).not.toBeInTheDocument();
     expect(screen.queryByText('25 từ')).not.toBeInTheDocument();
   });

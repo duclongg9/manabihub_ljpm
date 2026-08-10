@@ -22,7 +22,6 @@ import {
   Typography,
 } from '@mui/material';
 import AddAlarmOutlinedIcon from '@mui/icons-material/AddAlarmOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import HeadphonesOutlinedIcon from '@mui/icons-material/HeadphonesOutlined';
@@ -32,7 +31,9 @@ import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
 
-const STORAGE_KEY = 'manabihub.student.study-plan.v1';
+export const STORAGE_KEY = 'manabihub.student.study-plan.v1';
+export const STUDY_PLAN_UPDATED_EVENT = 'manabihub:study-plan-updated';
+export const STUDY_PLAN_OPEN_SCHEDULE_EVENT = 'manabihub:study-plan-open-schedule';
 const TOUR_STORAGE_KEY = 'manabihub.student.study-plan.tour.v1';
 const WEEKLY_TARGET_MINUTES = 150;
 
@@ -65,7 +66,7 @@ export interface StudyCourseOption {
   title: string;
 }
 
-interface StudySlot {
+export interface StudySlot {
   id: string;
   dayOfWeek: number;
   startTime: string;
@@ -81,7 +82,7 @@ interface FocusTotal {
   sessions: number;
 }
 
-interface StudyPlan {
+export interface StudyPlan {
   weekKey: string;
   weeklyTargetMinutes: number;
   slots: StudySlot[];
@@ -94,7 +95,7 @@ interface StudyGoalsWidgetProps {
   courses?: StudyCourseOption[];
 }
 
-function todayKey(date = new Date()) {
+export function todayKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
@@ -109,7 +110,7 @@ function createInitialPlan(): StudyPlan {
   return { weekKey: getWeekKey(), weeklyTargetMinutes: WEEKLY_TARGET_MINUTES, slots: [], focusTotals: {}, attendance: {} };
 }
 
-function readPlan(): StudyPlan {
+export function readPlan(): StudyPlan {
   if (typeof window === 'undefined') return createInitialPlan();
   try {
     const value = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<StudyPlan> | null;
@@ -166,7 +167,25 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
+    window.dispatchEvent(new Event(STUDY_PLAN_UPDATED_EVENT));
   }, [plan]);
+
+  useEffect(() => {
+    const openSchedule = (event: Event) => {
+      const requestedDay = (event as CustomEvent<{ dayOfWeek?: number }>).detail?.dayOfWeek;
+      setScheduleMode('custom');
+      setSelectedPreset('custom');
+      setNewSlot((current) => ({
+        ...current,
+        dayOfWeek: typeof requestedDay === 'number' && requestedDay >= 0 && requestedDay <= 6
+          ? requestedDay
+          : new Date().getDay(),
+      }));
+      setScheduleOpen(true);
+    };
+    window.addEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, openSchedule);
+    return () => window.removeEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, openSchedule);
+  }, []);
 
   useEffect(() => {
     if (!newSlot.courseId && courses.length > 0) {
@@ -331,8 +350,6 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
 
       {courseTotals.length > 0 && <Box sx={{ mt: 1.5 }}><Typography variant="caption" sx={{ fontWeight: 900, color: '#475467' }}>Điểm theo khóa học</Typography>{courseTotals.slice(0, 3).map(([key, total]) => <Stack key={key} direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}><Typography variant="caption" sx={{ color: '#667085', maxWidth: '75%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{key.split(' · ').slice(1).join(' · ')}</Typography><Typography variant="caption" sx={{ fontWeight: 800 }}>{total.minutes} điểm</Typography></Stack>)}</Box>}
       <Typography variant="caption" sx={{ display: 'block', mt: 1.5, color: '#667085' }}>Mỗi phút tập trung hoàn thành được tính là một điểm cho kỹ năng và khóa học đã chọn.</Typography>
-
-      {plan.slots.length > 0 && <Stack spacing={0.5} sx={{ mt: 2 }}><Typography variant="caption" sx={{ fontWeight: 900, color: '#475467' }}>Lịch cố định</Typography>{plan.slots.map((slot) => <Stack key={slot.id} direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', bgcolor: '#F8FAFC', borderRadius: 1, px: 1, py: 0.5 }}><Typography variant="caption">{DAYS.find((day) => day.value === slot.dayOfWeek)?.label} {slot.startTime} · {slot.skill}</Typography><IconButton size="small" aria-label={`Xóa lịch ${slot.startTime}`} onClick={() => setPlan((previous) => ({ ...previous, slots: previous.slots.filter((item) => item.id !== slot.id) }))}><DeleteOutlineIcon fontSize="small" /></IconButton></Stack>)}</Stack>}
 
       {tourStep !== null && <Paper data-testid="study-goals-tour" elevation={8} sx={{ position: 'fixed', zIndex: 1400, right: { xs: 16, sm: 32 }, bottom: { xs: 16, sm: 32 }, width: { xs: 'calc(100% - 32px)', sm: 340 }, p: 2, border: '1px solid #F2A4B1' }}><Typography variant="overline" sx={{ color: '#C41E3A', fontWeight: 900 }}>Hướng dẫn {tourStep + 1}/3</Typography><Typography variant="body2" sx={{ mt: 0.5 }}>{['Xác định mục tiêu JLPT bạn muốn chinh phục.', 'Đặt lịch cố định để hệ thống tự động nhắc bạn vào bàn học.', 'Mở đồng hồ tập trung trong bài học để tích lũy điểm kỹ năng.'][tourStep]}</Typography><Stack direction="row" spacing={1} sx={{ mt: 1.5, justifyContent: 'flex-end' }}><Button size="small" onClick={finishTour}>Bỏ qua</Button><Button size="small" variant="contained" onClick={() => tourStep === 2 ? finishTour() : setTourStep(tourStep + 1)}>{tourStep === 2 ? 'Đã hiểu' : 'Tiếp theo'}</Button></Stack></Paper>}
 

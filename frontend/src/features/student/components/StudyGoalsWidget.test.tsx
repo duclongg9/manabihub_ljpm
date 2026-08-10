@@ -38,7 +38,7 @@ describe('StudyGoalsWidget', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Thêm lịch học' }));
     fireEvent.click(screen.getByRole('button', { name: /Tiêu chuẩn/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Lưu lịch' }));
-    expect(screen.getByText('Lịch cố định')).toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem('manabihub.student.study-plan.v1') ?? '{}').slots).toHaveLength(5);
   });
 
   it('keeps the focus timer inside the learning page', () => {
