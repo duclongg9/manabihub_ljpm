@@ -83,6 +83,7 @@ describe('CourseReviewsSection', () => {
 
   it('allows an enrolled student to idempotently save their own review', async () => {
     window.localStorage.setItem('auth_token', studentToken());
+    const refreshAggregateMock = vi.fn().mockResolvedValue(undefined);
     getPublicReviewsMock
       .mockResolvedValueOnce(page([]))
       .mockResolvedValueOnce(page([{
@@ -96,6 +97,7 @@ describe('CourseReviewsSection', () => {
         courseId="course-1"
         courseIdentifier="course-slug"
         isEnrolled
+        onReviewChanged={refreshAggregateMock}
       />,
     );
 
@@ -113,6 +115,25 @@ describe('CourseReviewsSection', () => {
       },
     ));
     expect(await screen.findByText('Đã lưu đánh giá của bạn.')).toBeInTheDocument();
+    expect(getPublicReviewsMock).toHaveBeenLastCalledWith('course-slug', 0, 10);
+    expect(refreshAggregateMock).toHaveBeenCalledOnce();
+  });
+
+  it('supports an explicit refresh without polling the review endpoint', async () => {
+    render(
+      <CourseReviewsSection
+        courseId="course-1"
+        courseIdentifier="course-slug"
+        isEnrolled={false}
+      />,
+    );
+
+    await screen.findAllByText('Học viên An');
+    const initialCalls = getPublicReviewsMock.mock.calls.length;
+    const refreshButtons = screen.getAllByRole('button', { name: 'Tải lại đánh giá' });
+    fireEvent.click(refreshButtons[refreshButtons.length - 1]);
+
+    await waitFor(() => expect(getPublicReviewsMock.mock.calls.length).toBe(initialCalls + 1));
     expect(getPublicReviewsMock).toHaveBeenLastCalledWith('course-slug', 0, 10);
   });
 

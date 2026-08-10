@@ -8,6 +8,31 @@ export type TeacherWallet = {
   nextPayoutDate?: string;
 };
 
+export type TeacherCourseRevenue = {
+  courseId: string;
+  courseTitle: string;
+  purchaseCount: number;
+  refundedCount: number;
+  grossRevenue: number;
+  teacherNetRevenue: number;
+  heldAmount: number;
+  releasedAmount: number;
+  refundedAmount: number;
+};
+
+export type TeacherRevenueSummary = {
+  totalGrossRevenue: number;
+  totalTeacherNetRevenue: number;
+  settledRevenue: number;
+  heldInEscrow: number;
+  availableInWallet: number;
+  reservedForWithdrawal: number;
+  totalWithdrawn: number;
+  totalSales: number;
+  totalRefundedSales: number;
+  courseRevenue: TeacherCourseRevenue[];
+};
+
 export type WithdrawalStatus =
   | 'PENDING'
   | 'APPROVED'

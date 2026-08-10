@@ -24,12 +24,15 @@ import { EscrowLedgerTable } from '../components/EscrowLedgerTable';
 import { useTeacherWallet } from '../hooks/useTeacherWallet';
 import { useTeacherWithdrawals } from '../hooks/useTeacherWithdrawals';
 import { useTeacherEscrowLedger } from '../hooks/useTeacherEscrowLedger';
+import { useTeacherRevenueSummary } from '../hooks/useTeacherRevenueSummary';
+import { TeacherRevenueSummary } from '../components/TeacherRevenueSummary';
 
 export function TeacherWalletPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const walletQuery = useTeacherWallet();
   const withdrawalsQuery = useTeacherWithdrawals();
   const escrowLedgerQuery = useTeacherEscrowLedger();
+  const revenueQuery = useTeacherRevenueSummary();
 
   if (walletQuery.isLoading) {
     return (
@@ -158,6 +161,13 @@ export function TeacherWalletPage() {
       )}
 
       <WalletBalanceCards wallet={wallet} />
+
+      {revenueQuery.isError && (
+        <Alert severity="warning" sx={{ mb: 2.5 }}>
+          Không thể tải bảng tổng hợp doanh thu theo khóa học. Các số dư ví bên dưới vẫn hoạt động bình thường.
+        </Alert>
+      )}
+      {revenueQuery.data && <TeacherRevenueSummary summary={revenueQuery.data} />}
 
       <Alert severity="info" sx={{ mb: 2.5 }}>
         Doanh thu được đối soát trong {wallet.clearingPeriodDays} ngày. Mức rút tối thiểu là{' '}

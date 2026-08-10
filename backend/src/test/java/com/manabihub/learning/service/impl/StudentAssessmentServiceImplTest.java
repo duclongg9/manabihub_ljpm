@@ -329,6 +329,20 @@ class StudentAssessmentServiceImplTest {
     }
 
     @Test
+    void terminateFinalTestAttempt_marksActiveAttemptAsViolationAndConsumesAttempt() {
+        FinalTestAttempt attempt = activeAttempt();
+        when(finalTestAttemptRepository.findOwnedByIdForUpdate(attempt.getId(), enrollment.getId()))
+                .thenReturn(Optional.of(attempt));
+
+        service.terminateFinalTestAttempt(course.getId(), attempt.getId());
+
+        assertEquals(FinalTestAttemptStatus.TERMINATED_FOR_VIOLATION, attempt.getStatus());
+        assertFalse(attempt.getPassed());
+        assertNotNull(attempt.getSubmittedAt());
+        verify(finalTestAttemptRepository).save(attempt);
+    }
+
+    @Test
     void submitFinalTest_whenAttemptBelongsToAnotherStudent_returnsNotFound() {
         UUID attemptId = UUID.randomUUID();
         when(finalTestAttemptRepository.findOwnedByIdForUpdate(attemptId, enrollment.getId()))

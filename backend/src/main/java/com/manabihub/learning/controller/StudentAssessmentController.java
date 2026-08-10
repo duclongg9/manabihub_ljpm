@@ -70,4 +70,17 @@ public class StudentAssessmentController {
                 assessmentService.submitFinalTest(courseId, request)
         );
     }
+
+    @PostMapping("/courses/{courseId}/final-test/attempts/{attemptId}/terminate")
+    public ApiResponse<Void> terminateFinalTestAttempt(
+            @PathVariable UUID courseId,
+            @PathVariable UUID attemptId
+    ) {
+        assessmentService.terminateFinalTestAttempt(courseId, attemptId);
+        return ApiResponse.success(
+                MessageCodes.COMMON_UPDATED,
+                "Final Test attempt terminated because of repeated integrity violations.",
+                null
+        );
+    }
 }

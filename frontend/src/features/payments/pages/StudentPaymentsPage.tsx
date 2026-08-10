@@ -190,73 +190,115 @@ export function StudentPaymentsPage() {
           breadcrumbs={[{ label: 'Học viên' }, { label: 'Ví & Thanh toán' }]}
         />
 
-        {/* Top Wallet Balance Card - Always prominent in initial viewport */}
+        {/* Refund wallet and withdrawal action live with payment history. Direct top-up is not offered. */}
         <Box
           sx={{
-            p: { xs: 2.5, sm: 3 },
-            mb: 2.5,
-            bgcolor: '#ffffff',
-            borderRadius: 3,
-            border: '1px solid #E1E5EA',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-            display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            justifyContent: 'space-between',
-            alignItems: { sm: 'center' },
+            display: 'grid',
             gap: 2,
+            gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(0, 1.25fr)' },
+            mb: 2.5,
           }}
         >
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-            <Box
-              sx={{
-                width: 52,
-                height: 52,
-                minWidth: 52,
-                minHeight: 52,
-                maxWidth: 52,
-                maxHeight: 52,
-                aspectRatio: '1 / 1',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                bgcolor: '#FEF2F2',
-                color: '#C41E3A',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <AccountBalanceWalletIcon sx={{ fontSize: 28 }} />
-            </Box>
-            <Box>
-              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                Số dư tiền hoàn (nhận lại từ các khóa học)
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#1F2937', mt: 0.25 }}>
-                {loadingWallet ? '…' : formatMoney(wallet?.availableBalance ?? 0, wallet?.currency ?? 'VND')}
-              </Typography>
-            </Box>
-          </Stack>
-
-          <Button
-            variant="contained"
-            disabled={loadingWallet || (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount}
-            onClick={() => setWithdrawalModalOpen(true)}
+          <Box
             sx={{
               bgcolor: '#C41E3A',
-              '&:hover': { bgcolor: '#9D182E' },
-              px: 3.5,
-              py: 1.25,
-              borderRadius: 10,
-              fontWeight: 800,
-              boxShadow: '0 3px 10px rgba(196, 30, 58, 0.25)',
-              alignSelf: { xs: 'flex-start', sm: 'center' },
-              whiteSpace: 'nowrap',
-              textTransform: 'none',
+              background: 'linear-gradient(135deg, #C41E3A 0%, #9D182E 100%)',
+              borderRadius: 3,
+              boxShadow: '0 10px 24px rgba(157, 24, 46, 0.22)',
+              color: '#fff',
+              minHeight: { md: 242 },
+              overflow: 'hidden',
+              p: { xs: 2.5, sm: 3 },
+              position: 'relative',
             }}
           >
-            Yêu cầu rút tiền
-          </Button>
+            <AccountBalanceWalletIcon
+              aria-hidden="true"
+              sx={{
+                bottom: -24,
+                fontSize: 180,
+                opacity: 0.12,
+                position: 'absolute',
+                right: -18,
+                transform: 'rotate(-10deg)',
+              }}
+            />
+            <Stack spacing={2.25} sx={{ position: 'relative', zIndex: 1 }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Box sx={{ bgcolor: 'rgba(255,255,255,0.16)', borderRadius: 2, display: 'grid', p: 1.1, placeItems: 'center' }}>
+                  <AccountBalanceWalletIcon />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontWeight: 900 }}>Ví học viên</Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)' }}>
+                    Tiền hoàn dùng để mua khóa học
+                  </Typography>
+                </Box>
+              </Stack>
+              <Box>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mb: 0.5 }}>
+                  Số dư khả dụng
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 900 }}>
+                  {loadingWallet ? '…' : formatMoney(wallet?.availableBalance ?? 0, wallet?.currency ?? 'VND')}
+                </Typography>
+              </Box>
+              <Stack direction="row" divider={<Box sx={{ borderLeft: '1px solid rgba(255,255,255,0.24)' }} />} spacing={2}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Có thể rút</Typography>
+                  <Typography sx={{ fontWeight: 800 }}>
+                    {loadingWallet ? '…' : formatMoney(wallet?.availableWithdrawableBalance ?? 0, wallet?.currency ?? 'VND')}
+                  </Typography>
+                </Box>
+                <Box sx={{ flex: 1, pl: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Đang xử lý</Typography>
+                  <Typography sx={{ fontWeight: 800 }}>
+                    {loadingWallet ? '…' : formatMoney(wallet?.frozenBalance ?? 0, wallet?.currency ?? 'VND')}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Stack>
+          </Box>
+
+          <Box
+            sx={{
+              bgcolor: '#fff',
+              border: '1px solid #E1E5EA',
+              borderRadius: 3,
+              boxShadow: '0 4px 16px rgba(15, 23, 42, 0.05)',
+              p: { xs: 2.5, sm: 3 },
+            }}
+          >
+            <Stack spacing={2} sx={{ height: '100%', justifyContent: 'center' }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Box sx={{ bgcolor: '#FFF1F2', borderRadius: 2, color: '#C41E3A', display: 'grid', p: 1.1, placeItems: 'center' }}>
+                  <AccountBalanceIcon />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontWeight: 900 }}>Rút tiền hoàn</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Chuyển khoản hoàn tiền về tài khoản ngân hàng chính chủ.
+                  </Typography>
+                </Box>
+              </Stack>
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                Chỉ số dư từ các khoản hoàn tiền hợp lệ mới được rút. Tài khoản cần xác thực số điện thoại và CCCD.
+              </Alert>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Tối thiểu {formatMoney(minimumAmount, wallet?.currency ?? 'VND')}
+                </Typography>
+                <Button
+                  variant="contained"
+                  disabled={loadingWallet || (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount}
+                  onClick={() => setWithdrawalModalOpen(true)}
+                  sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 800, px: 3, textTransform: 'none' }}
+                >
+                  Yêu cầu rút tiền
+                </Button>
+              </Stack>
+            </Stack>
+          </Box>
         </Box>
 
         {/* Sub-tabs Navigation */}

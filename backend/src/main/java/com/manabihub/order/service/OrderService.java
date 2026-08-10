@@ -20,12 +20,9 @@ public interface OrderService {
     Order createOrder(UUID courseId);
 
     /**
-     * Creates a PENDING wallet top-up order (type {@code WALLET_TOPUP}, no course items) for
-     * the given amount, on behalf of the current student (MHB-37).
-     *
-     * @throws com.manabihub.common.exception.BusinessException if the amount is below the
-     *         minimum or not a whole number
+     * Legacy compatibility only. No student-facing route creates new wallet top-up orders.
      */
+    @Deprecated
     Order createTopUpOrder(java.math.BigDecimal amount);
 
     /**

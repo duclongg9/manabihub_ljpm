@@ -5,7 +5,6 @@ import { StudentWalletPage } from './StudentWalletPage';
 
 vi.mock('../services/studentWalletService', () => ({
   getStudentWallet: vi.fn(),
-  topUpWallet: vi.fn(),
 }));
 
 describe('StudentWalletPage', () => {
@@ -26,6 +25,7 @@ describe('StudentWalletPage', () => {
     expect(watermark).toHaveAttribute('aria-hidden', 'true');
     expect((await screen.findAllByText('0 VND')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('heading', { name: 'Ví của tôi' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Nạp tiền qua VNPay' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nạp tiền qua VNPay' })).not.toBeInTheDocument();
+    expect(screen.getByText('ManabiHub không hỗ trợ nạp tiền trực tiếp vào ví để hạn chế rủi ro rửa tiền.')).toBeInTheDocument();
   });
 });
