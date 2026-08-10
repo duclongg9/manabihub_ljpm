@@ -35,7 +35,7 @@ public class VnPayProductionConfigurationValidator implements InitializingBean {
 
     @Override
     public void afterPropertiesSet() {
-        validate(vnPayProperties.getReturnUrl(), frontendBaseUrl);
+        validate(vnPayProperties, frontendBaseUrl);
     }
 
     static void validate(String returnUrl, String frontendBaseUrl) {
@@ -53,6 +53,22 @@ public class VnPayProductionConfigurationValidator implements InitializingBean {
         }
         if (!sameOrigin(returnUri, frontendUri)) {
             throw invalid("VNPAY_RETURN_URL must use the same origin as FRONTEND_BASE_URL");
+        }
+    }
+
+    static void validate(VnPayProperties properties, String frontendBaseUrl) {
+        if (properties == null) {
+            throw invalid("VNPay properties must be configured");
+        }
+
+        validate(properties.getReturnUrl(), frontendBaseUrl);
+        requireText("VNPAY_TMN_CODE", properties.getTmnCode());
+        requireText("VNPAY_HASH_SECRET", properties.getHashSecret());
+    }
+
+    private static void requireText(String variableName, String value) {
+        if (!StringUtils.hasText(value)) {
+            throw invalid(variableName + " must be configured");
         }
     }
 

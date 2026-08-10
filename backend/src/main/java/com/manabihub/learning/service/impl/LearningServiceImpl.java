@@ -48,6 +48,7 @@ import com.manabihub.ai.service.AiUsageLogService;
 import com.manabihub.ai.enums.AiUsageRequestStatus;
 import com.manabihub.writing.enums.WritingSubmissionStatus;
 import com.manabihub.writing.dto.request.WritingSubmissionRequest;
+import com.manabihub.writing.dto.request.WritingDraftRequest;
 import com.manabihub.writing.dto.response.StudentWritingSubmissionResponse;
 import com.manabihub.writing.dto.response.AiWritingSuggestionResponse;
 import com.manabihub.writing.dto.response.TeacherWritingFeedbackResponse;
@@ -601,6 +602,44 @@ public class LearningServiceImpl implements LearningService {
 
     @Override
     @Transactional
+    public StudentWritingSubmissionResponse saveWritingDraft(UUID lessonBlockId, WritingDraftRequest request) {
+        LessonBlock block = resolveLessonBlock(lessonBlockId);
+        Enrollment enrollment = enrollmentRepository.findByIdForUpdate(
+                        resolveActiveEnrollment(block.getModule().getCourse().getId()).getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COMMON_NOT_FOUND, "Enrollment not found", HttpStatus.NOT_FOUND));
+
+        if (block.getType() != LessonBlockType.WRITING) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Not a writing block", HttpStatus.BAD_REQUEST);
+        }
+
+        WritingSubmission submission = writingSubmissionRepository
+                .findByEnrollmentIdAndLessonBlockIdForUpdate(enrollment.getId(), lessonBlockId)
+                .orElse(null);
+
+        if (submission != null && submission.getStatus() != WritingSubmissionStatus.DRAFT) {
+            // Autosave must never modify a submitted assignment or its review lifecycle.
+            return mapToWritingSubmissionDetailResponse(submission);
+        }
+
+        if (submission == null) {
+            submission = WritingSubmission.builder()
+                    .enrollment(enrollment)
+                    .student(enrollment.getStudent())
+                    .lessonBlockId(lessonBlockId)
+                    .legacyLessonId(null)
+                    .status(WritingSubmissionStatus.DRAFT)
+                    .submittedAt(Instant.now())
+                    .build();
+        }
+        submission.setContent(request.content());
+        submission.setStatus(WritingSubmissionStatus.DRAFT);
+        return mapToWritingSubmissionDetailResponse(writingSubmissionRepository.saveAndFlush(submission));
+    }
+
+    @Override
+    @Transactional
     public StudentWritingSubmissionResponse submitWriting(UUID lessonBlockId, WritingSubmissionRequest request) {
         LessonBlock block = resolveLessonBlock(lessonBlockId);
         // Pessimistic lock enrollment to prevent race conditions during submission processing
@@ -612,15 +651,28 @@ public class LearningServiceImpl implements LearningService {
             throw new BusinessException(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Not a writing block", HttpStatus.BAD_REQUEST);
         }
 
-        WritingSubmission submission = WritingSubmission.builder()
-                .enrollment(enrollment)
-                .student(enrollment.getStudent())
-                .lessonBlockId(lessonBlockId)
-                .legacyLessonId(null)
-                .content(request.content())
-                .status(WritingSubmissionStatus.SUBMITTED)
-                .submittedAt(Instant.now())
-                .build();
+        WritingSubmission submission = writingSubmissionRepository
+                .findByEnrollmentIdAndLessonBlockIdForUpdate(enrollment.getId(), lessonBlockId)
+                .orElse(null);
+
+        if (submission != null && submission.getStatus() != WritingSubmissionStatus.DRAFT) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "You have already submitted this assignment.",
+                    HttpStatus.CONFLICT);
+        }
+
+        if (submission == null) {
+            submission = WritingSubmission.builder()
+                    .enrollment(enrollment)
+                    .student(enrollment.getStudent())
+                    .lessonBlockId(lessonBlockId)
+                    .legacyLessonId(null)
+                    .build();
+        }
+        submission.setContent(request.content());
+        submission.setStatus(WritingSubmissionStatus.SUBMITTED);
+        submission.setSubmittedAt(Instant.now());
 
         try {
             submission = writingSubmissionRepository.saveAndFlush(submission);

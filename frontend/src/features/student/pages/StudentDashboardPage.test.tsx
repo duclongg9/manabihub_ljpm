@@ -81,6 +81,8 @@ describe('StudentDashboardPage', () => {
     );
 
     expect(screen.getByText('Chào Long')).toBeInTheDocument();
+    expect(screen.getByText('Mục tiêu: JLPT N3 · Trình độ hiện tại: N3')).toBeInTheDocument();
+    expect(screen.getByTestId('mini-roadmap')).toBeInTheDocument();
     expect(screen.getByText('JLPT N3 thực chiến')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();

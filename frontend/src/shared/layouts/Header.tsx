@@ -62,7 +62,22 @@ export const Header: React.FC<HeaderProps> = ({
   const primaryRole = session?.roles[0];
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
   const brandLabel = getHeaderBrand(session);
+  const isAdminPortal = session?.kind === 'admin';
   const { data: unreadCount = 0 } = useUnreadCount(Boolean(session));
+
+  const brandContent = (
+    <>
+      <Box
+        component="img"
+        src="/manabihub-header-logo.svg"
+        alt="ManabiHub"
+        sx={{ display: 'block', flexShrink: 0, height: { xs: 40, sm: 48 }, width: 'auto' }}
+      />
+      <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {brandLabel}
+      </Box>
+    </>
+  );
 
   const handleLogout = async () => {
     if (!session) return;
@@ -85,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: 'background.paper', color: 'text.primary' }} elevation={1}>
-      <Toolbar>
+      <Toolbar sx={{ minWidth: 0, px: { xs: 1.5, sm: 2 } }}>
         {showMenuIcon && onMenuClick && (
           <Tooltip title={menuExpanded ? 'Thu gọn menu' : 'Mở menu'}>
             <IconButton
@@ -94,24 +109,24 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label={menuExpanded ? 'Thu gọn menu' : 'Mở menu'}
               aria-expanded={menuExpanded}
               onClick={onMenuClick}
-              sx={{ mr: 2 }}
+              sx={{ mr: { xs: 0.5, sm: 2 } }}
             >
               <MenuIcon />
             </IconButton>
           </Tooltip>
         )}
         
-        <Typography variant="h6" component={Link} to={ROUTES.PUBLIC.HOME} sx={{ alignItems: 'center', display: 'flex', flexGrow: 1, gap: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
-          <Box
-            component="img"
-            src="/manabihub-header-logo.svg"
-            alt="ManabiHub"
-            sx={{ display: 'block', flexShrink: 0, height: 48, width: 'auto' }}
-          />
-          {brandLabel}
-        </Typography>
+        {isAdminPortal ? (
+          <Typography variant="h6" component="div" aria-label="ManabiAdmin" sx={{ alignItems: 'center', display: 'flex', flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 1, color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
+            {brandContent}
+          </Typography>
+        ) : (
+          <Typography variant="h6" component={Link} to={ROUTES.PUBLIC.HOME} sx={{ alignItems: 'center', display: 'flex', flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
+            {brandContent}
+          </Typography>
+        )}
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 2 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, gap: { xs: 0.25, sm: 2 } }}>
           {!session && (
             <Button component={Link} to="/" color="inherit" sx={{ display: { xs: 'none', md: 'flex' }, textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
               Trang chủ
@@ -133,13 +148,13 @@ export const Header: React.FC<HeaderProps> = ({
                 aria-controls={accountAnchor ? 'account-menu' : undefined}
                 aria-haspopup="true"
                 onClick={(event) => setAccountAnchor(event.currentTarget)}
-                sx={{ textTransform: 'none', color: 'text.primary', borderRadius: 8, pl: 0.5, pr: 1.5, py: 0.5, '&:hover': { bgcolor: 'grey.100' } }}
+                sx={{ textTransform: 'none', color: 'text.primary', borderRadius: 8, minWidth: { xs: 40, sm: 'auto' }, pl: { xs: 0.5, sm: 0.5 }, pr: { xs: 0.5, sm: 1.5 }, py: 0.5, '&:hover': { bgcolor: 'grey.100' } }}
               >
-                <Avatar sx={{ bgcolor: '#C41E3A', width: 32, height: 32, mr: 1, fontSize: '0.875rem', fontWeight: 700 }}>{avatarLabel}</Avatar>
+                <Avatar sx={{ bgcolor: '#C41E3A', width: 32, height: 32, mr: { xs: 0, sm: 1 }, fontSize: '0.875rem', fontWeight: 700 }}>{avatarLabel}</Avatar>
                 <Typography variant="body2" sx={{ fontWeight: 600, display: { xs: 'none', sm: 'block' } }}>
                   {session.email?.split('@')[0] || 'Tài khoản'}
                 </Typography>
-                <Box component="span" sx={{ display: 'inline-flex', ml: 0.5, fontSize: '0.7rem', color: 'grey.500' }}>▼</Box>
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline-flex' }, ml: 0.5, fontSize: '0.7rem', color: 'grey.500' }}>▼</Box>
               </Button>
             </Box>
           ) : (

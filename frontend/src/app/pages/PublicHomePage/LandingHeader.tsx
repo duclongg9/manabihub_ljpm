@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Avatar, Menu, MenuItem } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
@@ -16,7 +15,6 @@ export const LandingHeader: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [scrolled, setScrolled] = useState(false);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
   const [session, setSession] = useState(() => getAuthSession('public'));
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
@@ -70,13 +68,13 @@ export const LandingHeader: React.FC = () => {
         transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
-      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', px: { xs: 2, md: 4 }, py: 1 }}>
-        {/* Left Section: Logo & Categories */}
+      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', minWidth: 0, px: { xs: 1.5, md: 4 }, py: 1 }}>
+        {/* Left section: brand */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <Box component={Link} to={ROUTES.PUBLIC.HOME} sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
             <Box
               sx={{
-                height: 54,
+                height: { xs: 48, sm: 54 },
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -88,46 +86,12 @@ export const LandingHeader: React.FC = () => {
                 component="img"
                 src="/manabihub-header-logo.svg"
                 alt="ManabiHub"
-                sx={{ display: 'block', height: 54, width: 'auto' }}
+                sx={{ display: 'block', height: { xs: 48, sm: 54 }, width: 'auto' }}
               />
             </Box>
             {/* <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.5px', display: { xs: 'none', sm: 'block' }, color: '#1A1A2E' }}>
               ManabiHub
             </Typography> */}
-          </Box>
-
-          <Box>
-            <Button
-              color="inherit"
-              endIcon={<KeyboardArrowDownIcon />}
-              onClick={(e) => setAnchorEl(e.currentTarget)}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                display: { xs: 'none', md: 'flex' },
-                color: '#475569',
-                '&:hover': { color: '#C41E3A' }
-              }}
-            >
-              Danh mục
-            </Button>
-            <Menu
-              anchorEl={anchorEl}
-              open={Boolean(anchorEl)}
-              onClose={() => setAnchorEl(null)}
-              disableScrollLock
-              sx={{ zIndex: 9999, '& .MuiPaper-root': { mt: 1, borderRadius: '12px', minWidth: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', border: '1px solid #e8e0d8' } }}
-            >
-              <MenuItem onClick={() => { setAnchorEl(null); navigate(ROUTES.PUBLIC.COURSE_BROWSE); }} sx={{ py: 1.5, fontWeight: 600, color: '#1A1A2E' }}>
-                Tất cả khóa học
-              </MenuItem>
-              <MenuItem onClick={() => { setAnchorEl(null); navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?jlptLevel=N5`); }} sx={{ py: 1.5, color: '#475569' }}>
-                Luyện thi JLPT
-              </MenuItem>
-              <MenuItem onClick={() => { setAnchorEl(null); navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?category=VOCABULARY`); }} sx={{ py: 1.5, color: '#475569' }}>
-                Kỹ năng ứng dụng
-              </MenuItem>
-            </Menu>
           </Box>
         </Box>
 
@@ -245,10 +209,12 @@ export const LandingHeader: React.FC = () => {
               sx={{
                 textTransform: 'none',
                 fontWeight: 600,
+                whiteSpace: 'nowrap',
                 bgcolor: '#1B2A4A',
                 color: 'white',
                 borderRadius: 2,
-                px: 3,
+                px: { xs: 1.5, sm: 3 },
+                fontSize: { xs: '0.8rem', sm: '0.875rem' },
                 transition: 'all 0.3s ease',
                 '&:hover': { bgcolor: '#2A3F6A', transform: 'translateY(-1px)', boxShadow: '0 4px 12px rgba(27, 42, 74, 0.3)' }
               }}

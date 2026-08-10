@@ -1,7 +1,8 @@
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useRef } from 'react';
 import { useCourseDetail } from '../hooks/useCourseDetail';
 import { CourseHero } from '../components/CourseHero';
-import { CourseStickyCard } from '../components/CourseStickyCard';
+import { CourseStickyCard, type CourseStickyCardHandle } from '../components/CourseStickyCard';
 import { CurriculumAccordion } from '../components/CurriculumAccordion';
 import { TeacherProfile } from '../components/TeacherProfile';
 import { CourseStickyHeader } from '../components/CourseStickyHeader';
@@ -13,6 +14,8 @@ import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 
 export const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const stickyCardRef = useRef<CourseStickyCardHandle>(null);
   const {
     data: course,
     isLoading,
@@ -86,7 +89,11 @@ export const CourseDetailPage = () => {
         {thumbnailUrl && <meta name="twitter:image" content={thumbnailUrl} />}
       </Helmet>
 
-      <CourseStickyHeader course={course} />
+      <CourseStickyHeader
+        course={course}
+        onPurchase={() => stickyCardRef.current?.openPurchaseOptions()}
+        onContinueLearning={() => navigate(`/student/courses/${course.id}/learn`)}
+      />
       <CourseHero course={course} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -162,7 +169,7 @@ export const CourseDetailPage = () => {
           {/* Right Column: Sticky Card */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              <CourseStickyCard course={course} />
+              <CourseStickyCard ref={stickyCardRef} course={course} />
             </div>
           </div>
 

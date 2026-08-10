@@ -44,8 +44,9 @@ interface FilterOption {
 const FILTERS: FilterOption[] = [
   { label: 'Tất cả' },
   { label: 'Thành công', status: 'PAID' },
-  { label: 'Đang xử lý', status: 'PENDING' },
+  { label: 'Chờ thanh toán', status: 'PENDING' },
   { label: 'Thất bại', status: 'FAILED' },
+  { label: 'Đã hủy', status: 'CANCELLED' },
   { label: 'Đã hoàn tiền', status: 'REFUNDED' },
 ];
 
@@ -55,7 +56,7 @@ const ORDER_STATUS_CONFIG: Record<
 > = {
   PAID: { label: 'Đã thanh toán', bgcolor: '#ECFDF5', color: '#047857' },
   REFUNDED: { label: 'Đã hoàn tiền', bgcolor: '#EFF6FF', color: '#1D4ED8' },
-  PENDING: { label: 'Đang xử lý', bgcolor: '#FFFBEB', color: '#B45309' },
+  PENDING: { label: 'Chờ thanh toán', bgcolor: '#FFFBEB', color: '#B45309' },
   FAILED: { label: 'Thất bại', bgcolor: '#FEF2F2', color: '#B91C1C' },
   CANCELLED: { label: 'Đã hủy', bgcolor: '#F3F4F6', color: '#4B5563' },
 };
@@ -697,11 +698,15 @@ function OrderCard({
                     )
                   ) : order.status === 'PENDING' ? (
                     <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', fontWeight: 500 }}>
-                      Đơn hàng đang trong tiến trình xử lý
+                      Đơn hàng đang chờ thanh toán VNPay
                     </Typography>
                   ) : order.status === 'FAILED' ? (
                     <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', fontWeight: 500 }}>
                       Thanh toán không thành công
+                    </Typography>
+                  ) : order.status === 'CANCELLED' ? (
+                    <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', fontWeight: 500 }}>
+                      Thanh toán đã được hủy
                     </Typography>
                   ) : null}
                 </Box>

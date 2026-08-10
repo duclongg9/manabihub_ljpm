@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.Map;
 
@@ -42,6 +43,17 @@ public class PaymentController {
     @GetMapping("/vnpay/ipn")
     public IpnAckResponse handleVnPayIpn(@RequestParam Map<String, String> params) {
         return paymentService.handleIpn(params);
+    }
+
+    /**
+     * VNPay browser return forwarded by the authenticated student frontend. The
+     * service verifies the VNPay signature, amount and provider status before applying
+     * the same idempotent confirmation transaction as the server-to-server IPN.
+     */
+    @GetMapping("/vnpay/confirm-return")
+    @PreAuthorize("hasRole('STUDENT')")
+    public IpnAckResponse handleVnPayReturn(@RequestParam Map<String, String> params) {
+        return paymentService.handleVnPayReturn(params);
     }
 
     /**

@@ -102,6 +102,11 @@ export const learningService = {
     return response.data.data;
   },
 
+  saveWritingDraft: async (blockId: string, content: string): Promise<WritingSubmissionDetail> => {
+    const response = await axiosClient.put(ENDPOINTS.LEARNING.WRITING_SUBMISSION_DRAFT(blockId), { content });
+    return response.data.data;
+  },
+
   submitWriting: async (blockId: string, content: string): Promise<WritingSubmissionDetail> => {
     const response = await axiosClient.post(ENDPOINTS.LEARNING.WRITING_SUBMISSION_POST(blockId), { content });
     return response.data.data;

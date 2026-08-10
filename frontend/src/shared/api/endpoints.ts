@@ -140,6 +140,7 @@ export const ENDPOINTS = {
     create: '/v1/orders',
     list: '/v1/orders',
     detail: (orderId: string) => `/v1/orders/${orderId}`,
+    cancel: (orderId: string) => `/v1/orders/${orderId}/cancel`,
   },
   studentRefunds: {
     create: '/v1/student/refunds',
@@ -151,6 +152,7 @@ export const ENDPOINTS = {
     // Local dev simulator for the VNPay IPN callback (no tunnel needed).
     devIpn: '/v1/payments/dev/ipn',
     // Confirms an order from the browser return redirect (checksum-verified backend-side).
+    vnpayReturn: '/v1/payments/vnpay/confirm-return',
   },
   LEARNING: {
     COURSE_LEARN: (courseId: string) => `/v1/student/courses/${courseId}/learn`,
@@ -166,6 +168,7 @@ export const ENDPOINTS = {
     FINAL_TEST_SUBMIT: (courseId: string) => `/v1/student/courses/${courseId}/final-test/submissions`,
     CERTIFICATE: (courseId: string) => `/v1/student/courses/${courseId}/certificate`,
     WRITING_SUBMISSION_GET: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions/me`,
+    WRITING_SUBMISSION_DRAFT: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions/draft`,
     WRITING_SUBMISSION_POST: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions`,
     WRITING_SUBMISSION_AI: (blockId: string, submissionId: string) => `/v1/student/lessons/${blockId}/writing-submissions/${submissionId}/ai-assistance`,
   },

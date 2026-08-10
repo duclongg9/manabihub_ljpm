@@ -5,6 +5,7 @@ import { CheckoutReturnPage } from './CheckoutReturnPage';
 
 const mocks = vi.hoisted(() => ({
   getOrder: vi.fn(),
+  confirmPaymentReturn: vi.fn(),
   navigate: vi.fn(),
 }));
 
@@ -18,6 +19,7 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('../services/checkoutService', () => ({
   getOrder: mocks.getOrder,
+  confirmPaymentReturn: mocks.confirmPaymentReturn,
 }));
 
 afterEach(() => {
@@ -55,5 +57,33 @@ describe('CheckoutReturnPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Để sau' }));
     expect(mocks.navigate).toHaveBeenCalledWith('/student/courses');
+  });
+
+  it('shows a separate cancelled state after a signed VNPay return', async () => {
+    mocks.confirmPaymentReturn.mockResolvedValue({ RspCode: '00', Message: 'Return processed' });
+    mocks.getOrder.mockResolvedValue({
+      id: 'order-2',
+      orderCode: 'MHB-002',
+      totalAmount: 250_000,
+      currency: 'VND',
+      status: 'CANCELLED',
+      type: 'COURSE',
+      createdAt: '2026-08-02T00:00:00Z',
+      items: [{ courseId: 'course-2', courseTitle: 'Kanji N5', price: 250_000 }],
+    });
+
+    render(
+      <MemoryRouter initialEntries={[
+        '/checkout/return?orderId=order-2&vnp_TxnRef=MHB-002&vnp_ResponseCode=24&vnp_SecureHash=signed',
+      ]}>
+        <CheckoutReturnPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Thanh toán đã được hủy' }))
+      .toBeInTheDocument();
+    expect(screen.getByText('Bạn đã hủy giao dịch. Đơn hàng vẫn được lưu trong lịch sử thanh toán để đối soát.'))
+      .toBeInTheDocument();
+    expect(mocks.confirmPaymentReturn).toHaveBeenCalledTimes(1);
   });
 });

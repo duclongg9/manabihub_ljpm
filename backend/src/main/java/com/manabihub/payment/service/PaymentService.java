@@ -25,6 +25,9 @@ public interface PaymentService {
      */
     Order payWithWallet(UUID orderId);
 
+    /** Cancels a pending order, marks pending payment components failed and releases wallet reservations. */
+    void cancelPendingOrder(UUID orderId);
+
     /**
      * Combined payment: uses as much of the student's wallet balance as available and charges
      * the remainder via VNPay. Sets the order's wallet portion and returns the VNPay payment
@@ -33,8 +36,8 @@ public interface PaymentService {
     String initiateCombinedPayment(Order order, String clientIp);
 
     /**
-     * Processes a provider webhook (VNPay IPN). This is the ONLY path that confirms a
-     * payment. It verifies the checksum, and on a valid successful callback creates the
+     * Processes a provider webhook (VNPay IPN). It verifies the checksum, and on a valid
+     * successful callback creates the
      * enrollment, marks the payment/order paid, holds funds in escrow, and notifies the
      * student — all in one transaction. Idempotent: a replayed callback for an
      * already-paid order is a no-op.
@@ -42,4 +45,14 @@ public interface PaymentService {
      * @return the acknowledgement to send back to the provider
      */
     IpnAckResponse handleIpn(Map<String, String> params);
+
+    /**
+     * Processes the browser return from VNPay. The backend verifies the HMAC, amount and
+     * provider status before applying the same idempotent confirmation transaction as the
+     * IPN. This provides a sandbox/demo fallback when VNPay cannot reach the IPN endpoint.
+     */
+    IpnAckResponse handleVnPayReturn(Map<String, String> params);
+
+    /** Expires pending VNPay payments and releases any reserved wallet amount. */
+    void expirePendingPayments();
 }

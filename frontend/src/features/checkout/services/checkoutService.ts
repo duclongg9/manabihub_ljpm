@@ -27,6 +27,14 @@ export async function getOrder(orderId: string): Promise<OrderResponse> {
   return response.data.data;
 }
 
+/** Cancels the authenticated student's pending order and releases any wallet reservation. */
+export async function cancelOrder(orderId: string): Promise<OrderResponse> {
+  const response = await axiosClient.post<ApiResponse<OrderResponse>>(
+    ENDPOINTS.orders.cancel(orderId),
+  );
+  return response.data.data;
+}
+
 /**
  * Local-only helper: asks the backend to simulate a signed VNPay IPN callback for an order,
  * so the full confirmation flow can be exercised without a public tunnel to VNPay.
@@ -36,6 +44,26 @@ export async function simulatePayment(orderCode: string, success = true): Promis
     ENDPOINTS.payments.devIpn,
     null,
     { params: { orderCode, success } },
+  );
+  return response.data;
+}
+
+/**
+ * Sends the VNPay browser-return parameters to the backend. The backend verifies
+ * the checksum, amount and provider status, then idempotently confirms successful
+ * payments when the server-to-server IPN is unavailable in sandbox/demo.
+ */
+export async function confirmPaymentReturn(params: URLSearchParams): Promise<IpnAck> {
+  const vnpParams: Record<string, string> = {};
+  params.forEach((value, key) => {
+    if (key.startsWith('vnp_')) {
+      vnpParams[key] = value;
+    }
+  });
+
+  const response = await axiosClient.get<IpnAck>(
+    ENDPOINTS.payments.vnpayReturn,
+    { params: vnpParams },
   );
   return response.data;
 }
