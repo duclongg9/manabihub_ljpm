@@ -62,7 +62,22 @@ export const Header: React.FC<HeaderProps> = ({
   const primaryRole = session?.roles[0];
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
   const brandLabel = getHeaderBrand(session);
+  const isAdminPortal = session?.kind === 'admin';
   const { data: unreadCount = 0 } = useUnreadCount(Boolean(session));
+
+  const brandContent = (
+    <>
+      <Box
+        component="img"
+        src="/manabihub-header-logo.svg"
+        alt="ManabiHub"
+        sx={{ display: 'block', flexShrink: 0, height: { xs: 40, sm: 48 }, width: 'auto' }}
+      />
+      <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {brandLabel}
+      </Box>
+    </>
+  );
 
   const handleLogout = async () => {
     if (!session) return;
@@ -101,17 +116,15 @@ export const Header: React.FC<HeaderProps> = ({
           </Tooltip>
         )}
         
-        <Typography variant="h6" component={Link} to={ROUTES.PUBLIC.HOME} sx={{ alignItems: 'center', display: 'flex', flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
-          <Box
-            component="img"
-            src="/manabihub-header-logo.svg"
-            alt="ManabiHub"
-            sx={{ display: 'block', flexShrink: 0, height: { xs: 40, sm: 48 }, width: 'auto' }}
-          />
-          <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {brandLabel}
-          </Box>
-        </Typography>
+        {isAdminPortal ? (
+          <Typography variant="h6" component="div" aria-label="ManabiAdmin" sx={{ alignItems: 'center', display: 'flex', flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 1, color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
+            {brandContent}
+          </Typography>
+        ) : (
+          <Typography variant="h6" component={Link} to={ROUTES.PUBLIC.HOME} sx={{ alignItems: 'center', display: 'flex', flexGrow: 1, flexShrink: 1, minWidth: 0, gap: 1, textDecoration: 'none', color: 'primary.main', fontWeight: 900, letterSpacing: '-0.5px' }}>
+            {brandContent}
+          </Typography>
+        )}
 
         <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, gap: { xs: 0.25, sm: 2 } }}>
           {!session && (
