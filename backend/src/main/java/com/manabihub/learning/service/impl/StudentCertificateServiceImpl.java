@@ -160,7 +160,8 @@ public class StudentCertificateServiceImpl implements StudentCertificateService 
                 certificate.getCertificateNumber(),
                 certificate.getStudentName(),
                 certificate.getCourseTitle(),
-                certificate.getIssuedAt()
+                certificate.getIssuedAt(),
+                certificate.getEnrollment().getCompletedAt()
         );
     }
 }

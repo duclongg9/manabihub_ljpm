@@ -100,6 +100,7 @@ class StudentCertificateServiceImplTest {
                 .student(student)
                 .course(course)
                 .status(EnrollmentStatus.COMPLETED)
+                .completedAt(Instant.parse("2026-07-23T23:59:58Z"))
                 .build();
     }
 
@@ -127,6 +128,7 @@ class StudentCertificateServiceImplTest {
 
         assertEquals("An Nguyen", result.studentName());
         assertEquals(course.getTitle(), result.courseTitle());
+        assertEquals(enrollment.getCompletedAt(), result.completedAt());
         assertTrue(result.certificateNumber().startsWith("MHB-"));
         verify(certificateRepository).save(any(LearningCertificate.class));
         verify(notificationService).createNotificationOnce(

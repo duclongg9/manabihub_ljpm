@@ -14,6 +14,7 @@ public class ViolationReportResponse {
     private ViolationTargetType targetType;
     private UUID targetId;
     private String reason;
+    private String description;
     private ViolationStatus status;
     private Instant createdAt;
 }

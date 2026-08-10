@@ -55,6 +55,7 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
+import { downloadCertificatePdf, formatCertificateDate } from '../utils/certificatePdf';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
 
@@ -720,8 +721,24 @@ function FinalTestPanel({
   const [result, setResult] = useState<FinalTestSubmissionResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [issuingCertificate, setIssuingCertificate] = useState(false);
+  const [downloadingCertificate, setDownloadingCertificate] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const certificateIssuanceInFlightRef = useRef(false);
+
+  const handleDownloadCertificate = async () => {
+    if (!certificate || downloadingCertificate) return;
+    setDownloadingCertificate(true);
+    setErrorMsg(null);
+    try {
+      await downloadCertificatePdf(certificate);
+    } catch {
+      setErrorMsg('Không thể tạo tệp chứng chỉ PDF. Vui lòng thử lại.');
+    } finally {
+      setDownloadingCertificate(false);
+    }
+  };
 
   const loadEligibility = useCallback(async () => {
     try {
@@ -823,9 +840,10 @@ function FinalTestPanel({
     }
   };
 
-  const handleGenerateCertificate = async () => {
-    if (working) return;
-    setWorking(true);
+  const handleGenerateCertificate = useCallback(async () => {
+    if (certificate || certificateIssuanceInFlightRef.current) return;
+    certificateIssuanceInFlightRef.current = true;
+    setIssuingCertificate(true);
     setErrorMsg(null);
     try {
       const value = await learningService.generateCertificate(courseId);
@@ -836,11 +854,16 @@ function FinalTestPanel({
       } else {
         setErrorMsg('Không thể phát hành chứng chỉ.');
       }
-      await loadEligibility();
     } finally {
-      setWorking(false);
+      certificateIssuanceInFlightRef.current = false;
+      setIssuingCertificate(false);
     }
-  };
+  }, [certificate, courseId]);
+
+  useEffect(() => {
+    if (!progressSummary?.certificateEligibility.eligible || certificate) return;
+    void handleGenerateCertificate();
+  }, [certificate, handleGenerateCertificate, progressSummary?.certificateEligibility.eligible]);
 
   const allAnswered = attempt?.questions.every((question) => (answers[question.id]?.length || 0) > 0) ?? false;
   const reasonText: Record<string, string> = {
@@ -903,17 +926,23 @@ function FinalTestPanel({
         )}
 
         {progressSummary?.certificateEligibility.eligible && !certificate && (
-          <Box>
+          <Alert
+            severity="success"
+            icon={<WorkspacePremiumOutlinedIcon />}
+            action={
             <Button
-              variant="contained"
-              color="success"
-              startIcon={<WorkspacePremiumOutlinedIcon />}
-              onClick={handleGenerateCertificate}
-              disabled={working}
+              color="inherit"
+              onClick={() => void handleGenerateCertificate()}
+              disabled={issuingCertificate}
             >
-              {working ? 'Đang phát hành...' : 'Phát hành chứng chỉ'}
+              {issuingCertificate ? 'Đang tạo...' : 'Thử lại'}
             </Button>
-          </Box>
+            }
+          >
+            {issuingCertificate
+              ? 'Bạn đã hoàn thành khóa học. Chứng chỉ đang được phát hành tự động theo thời gian thực.'
+              : 'Bạn đã hoàn thành khóa học. Hệ thống đang chuẩn bị chứng chỉ của bạn.'}
+          </Alert>
         )}
 
         {certificate && (
@@ -922,13 +951,14 @@ function FinalTestPanel({
             sx={{
               p: { xs: 2, sm: 3 },
               textAlign: 'center',
-              borderColor: 'success.main',
-              bgcolor: 'background.paper',
+              borderColor: '#c8a45a',
+              borderWidth: 2,
+              background: 'linear-gradient(135deg, #fffdf7 0%, #ffffff 52%, #fff8eb 100%)',
             }}
           >
-            <WorkspacePremiumOutlinedIcon color="success" sx={{ fontSize: 48 }} />
-            <Typography variant="overline" color="text.secondary">
-              ManabiHub Certificate of Completion
+            <WorkspacePremiumOutlinedIcon sx={{ fontSize: 48, color: '#c91f3d' }} />
+            <Typography variant="overline" sx={{ color: '#8f1028', fontWeight: 700, letterSpacing: 1.5 }}>
+              Chứng chỉ hoàn thành ManabiHub
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
               {certificate.studentName}
@@ -937,15 +967,16 @@ function FinalTestPanel({
               Đã hoàn thành khoá học <strong>{certificate.courseTitle}</strong>
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Cấp ngày {new Date(certificate.issuedAt).toLocaleDateString('vi-VN')} · {certificate.certificateNumber}
+              Hoàn thành ngày {formatCertificateDate(certificate.completedAt, certificate.issuedAt)} · {certificate.certificateNumber}
             </Typography>
             <Button
               sx={{ mt: 2 }}
-              variant="outlined"
+              variant="contained"
               startIcon={<DownloadOutlinedIcon />}
-              onClick={() => downloadCertificateView(certificate)}
+              onClick={() => void handleDownloadCertificate()}
+              disabled={downloadingCertificate}
             >
-              Tải bản chứng chỉ
+              {downloadingCertificate ? 'Đang tạo PDF...' : 'Tải chứng chỉ PDF'}
             </Button>
           </Paper>
         )}
@@ -1040,53 +1071,6 @@ function FinalTestPanel({
       </Stack>
     </Box>
   );
-}
-
-function downloadCertificateView(certificate: LearningCertificate) {
-  const studentName = escapeHtml(certificate.studentName);
-  const courseTitle = escapeHtml(certificate.courseTitle);
-  const number = escapeHtml(certificate.certificateNumber);
-  const issuedDate = new Date(certificate.issuedAt).toLocaleDateString('vi-VN');
-  const html = `<!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8">
-  <title>${number}</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 48px; color: #17212b; }
-    main { max-width: 900px; margin: 0 auto; padding: 72px 48px; text-align: center; border: 8px double #2e7d32; }
-    h1 { font-size: 42px; margin: 12px 0; }
-    h2 { font-size: 30px; margin: 30px 0 12px; }
-    p { font-size: 18px; line-height: 1.6; }
-    small { color: #52606d; }
-  </style>
-</head>
-<body>
-  <main>
-    <p>MANABIHUB</p>
-    <h1>Certificate of Completion</h1>
-    <p>Chứng nhận</p>
-    <h2>${studentName}</h2>
-    <p>đã hoàn thành khoá học <strong>${courseTitle}</strong></p>
-    <small>Cấp ngày ${issuedDate} · ${number}</small>
-  </main>
-</body>
-</html>`;
-  const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${certificate.certificateNumber}.html`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }
 
 function FlashcardBlock({

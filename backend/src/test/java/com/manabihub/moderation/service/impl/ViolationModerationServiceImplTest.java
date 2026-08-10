@@ -36,6 +36,7 @@ import com.manabihub.review.enums.CourseReviewStatus;
 import com.manabihub.review.repository.CourseReviewRepository;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.repository.WalletRepository;
+import com.manabihub.violation.service.ViolationEvidenceStorageService;
 import com.manabihub.wallet.enums.WalletOwnerType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -98,6 +99,7 @@ class ViolationModerationServiceImplTest {
     @Mock private OrderItemRepository orderItemRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private ViolationEvidenceStorageService evidenceStorageService;
 
     @InjectMocks
     private ViolationModerationServiceImpl moderationService;
