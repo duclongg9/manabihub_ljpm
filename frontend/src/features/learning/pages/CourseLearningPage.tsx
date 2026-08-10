@@ -36,6 +36,7 @@ import AssignmentTurnedInOutlinedIcon from '@mui/icons-material/AssignmentTurned
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { isAxiosError } from 'axios';
 import ReactPlayer from 'react-player';
 import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
@@ -47,6 +48,7 @@ import type {
   FinalTestEligibility,
   FinalTestSubmissionResult,
   LearningLessonBlock,
+  LearningModule,
   LearningCertificate,
   QuizQuestion,
   QuizSubmissionResult,
@@ -65,6 +67,7 @@ import {
 import { downloadCertificatePdf, formatCertificateDate } from '../utils/certificatePdf';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
+const WATCHED_DELTA_MAX_SECONDS = 2;
 
 export function CourseLearningPage() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -127,12 +130,13 @@ export function CourseLearningPage() {
         ...module,
         blocks: module.blocks.map((block) => (block.id === blockId ? { ...block, ...patch } : block)),
       }));
-      const blocks = modules.flatMap((module) => module.blocks);
+      const unlockedModules = applySequentialLocks(modules);
+      const blocks = unlockedModules.flatMap((module) => module.blocks);
       const completedLessons = blocks.filter((block) => block.progressStatus === 'COMPLETED').length;
       const totalLessons = blocks.length;
       return {
         ...prev,
-        modules,
+        modules: unlockedModules,
         completedLessons,
         progressPercent: totalLessons === 0 ? 0 : Math.round((completedLessons * 10000) / totalLessons) / 100,
         courseCompleted: totalLessons > 0 && completedLessons === totalLessons,
@@ -161,8 +165,17 @@ export function CourseLearningPage() {
   };
 
   const handleVideoProgressSaved = useCallback(
-    (blockId: string, positionSeconds: number, status: LearningLessonBlock['progressStatus']) => {
-      updateBlock(blockId, { lastVideoPositionSeconds: positionSeconds, progressStatus: status });
+    (
+      blockId: string,
+      positionSeconds: number,
+      status: LearningLessonBlock['progressStatus'],
+      watchedVideoSeconds: number,
+    ) => {
+      updateBlock(blockId, {
+        lastVideoPositionSeconds: positionSeconds,
+        watchedVideoSeconds,
+        progressStatus: status,
+      });
     },
     [updateBlock],
   );
@@ -180,13 +193,14 @@ export function CourseLearningPage() {
             return { ...block, flashcardStatuses: newStatuses, progressStatus };
           }),
         }));
+        const unlockedModules = applySequentialLocks(modules);
 
-        const blocks = modules.flatMap((module) => module.blocks);
+        const blocks = unlockedModules.flatMap((module) => module.blocks);
         const completedLessons = blocks.filter((block) => block.progressStatus === 'COMPLETED').length;
         const totalLessons = blocks.length;
         return {
           ...prev,
-          modules,
+          modules: unlockedModules,
           completedLessons,
           progressPercent: totalLessons === 0 ? 0 : Math.round((completedLessons * 10000) / totalLessons) / 100,
           courseCompleted: totalLessons > 0 && completedLessons === totalLessons,
@@ -209,13 +223,14 @@ export function CourseLearningPage() {
           };
         }),
       }));
-      const newCompleted = newModules
+      const unlockedModules = applySequentialLocks(newModules);
+      const newCompleted = unlockedModules
         .flatMap((m) => m.blocks)
         .filter((b) => b.progressStatus === 'COMPLETED').length;
-      const newTotal = newModules.flatMap((m) => m.blocks).length;
+      const newTotal = unlockedModules.flatMap((m) => m.blocks).length;
       return {
         ...prev,
-        modules: newModules,
+        modules: unlockedModules,
         completedLessons: newCompleted,
         progressPercent: newTotal > 0 ? Math.round((newCompleted * 10000) / newTotal) / 100 : 0,
         courseCompleted: newTotal > 0 && newCompleted === newTotal,
@@ -303,10 +318,15 @@ export function CourseLearningPage() {
                   <ListItemButton
                     key={block.id}
                     selected={block.id === selectedBlockId}
-                    onClick={() => setSelectedBlockId(block.id)}
+                    disabled={block.locked}
+                    onClick={() => {
+                      if (!block.locked) setSelectedBlockId(block.id);
+                    }}
                   >
                     <ListItemIcon sx={{ minWidth: 34 }}>
-                      {block.progressStatus === 'COMPLETED' ? (
+                      {block.locked ? (
+                        <LockOutlinedIcon color="disabled" fontSize="small" />
+                      ) : block.progressStatus === 'COMPLETED' ? (
                         <CheckCircleIcon color="success" fontSize="small" />
                       ) : block.progressStatus === 'IN_PROGRESS' ? (
                         <PlayCircleOutlineIcon color="primary" fontSize="small" />
@@ -388,16 +408,27 @@ export function CourseLearningPage() {
                     disabled={
                       completing ||
                       selectedBlock.progressStatus === 'COMPLETED' ||
-                      ['QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
+                      ['VIDEO', 'QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
                     }
                     onClick={handleMarkComplete}
                   >
-                    {selectedBlock.progressStatus === 'COMPLETED' ? 'Đã hoàn thành' : 'Hoàn thành bài học'}
+                    {selectedBlock.progressStatus === 'COMPLETED'
+                      ? 'Đã hoàn thành'
+                      : selectedBlock.type === 'VIDEO'
+                        ? 'Xem hết video để hoàn thành'
+                        : 'Hoàn thành bài học'}
                   </Button>
                   <Button
                     endIcon={<ArrowForwardIcon />}
-                    disabled={selectedIndex < 0 || selectedIndex >= allBlocks.length - 1}
-                    onClick={() => setSelectedBlockId(allBlocks[selectedIndex + 1].id)}
+                    disabled={
+                      selectedIndex < 0
+                      || selectedIndex >= allBlocks.length - 1
+                      || allBlocks[selectedIndex + 1].locked
+                    }
+                    onClick={() => {
+                      const next = allBlocks[selectedIndex + 1];
+                      if (next && !next.locked) setSelectedBlockId(next.id);
+                    }}
                   >
                     Bài sau
                   </Button>
@@ -439,12 +470,25 @@ function blockTypeLabel(block: LearningLessonBlock): string {
   }
 }
 
+function applySequentialLocks(modules: LearningModule[]): LearningModule[] {
+  let waitingForCompletion = false;
+  return modules.map((module) => ({
+    ...module,
+    blocks: module.blocks.map((block) => {
+      const locked = waitingForCompletion && block.progressStatus !== 'COMPLETED';
+      if (block.progressStatus !== 'COMPLETED') waitingForCompletion = true;
+      return { ...block, locked };
+    }),
+  }));
+}
+
 interface BlockContentProps {
   block: LearningLessonBlock;
   onVideoProgressSaved: (
     blockId: string,
     positionSeconds: number,
     status: LearningLessonBlock['progressStatus'],
+    watchedVideoSeconds: number,
   ) => void;
   onFlashcardProgressSaved: (
     blockId: string,
@@ -503,6 +547,10 @@ function VideoBlock({
 }) {
   const playerRef = useRef<HTMLVideoElement>(null);
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
+  const watchedSecondsRef = useRef(block.watchedVideoSeconds ?? 0);
+  const lastSavedWatchedRef = useRef(block.watchedVideoSeconds ?? 0);
+  const lastObservedTimeRef = useRef<number | null>(null);
+  const isSeekingRef = useRef(false);
   const isReadyRef = useRef(false);
 
   const pendingPositionRef = useRef<number | null>(null);
@@ -516,7 +564,10 @@ function VideoBlock({
         if (isSavingRef.current || pendingPositionRef.current === null) return;
 
         const positionToSave = pendingPositionRef.current;
-        if (positionToSave === lastSavedRef.current) {
+        if (
+          positionToSave === lastSavedRef.current
+          && watchedSecondsRef.current === lastSavedWatchedRef.current
+        ) {
           pendingPositionRef.current = null;
           return;
         }
@@ -526,10 +577,17 @@ function VideoBlock({
         let success = false;
 
         learningService
-          .saveVideoProgress(block.id, positionToSave)
+          .saveVideoProgress(block.id, positionToSave, Math.floor(watchedSecondsRef.current))
           .then((progress) => {
             lastSavedRef.current = positionToSave;
-            onProgressSaved(block.id, positionToSave, progress.status);
+            lastSavedWatchedRef.current = progress.watchedVideoSeconds ?? watchedSecondsRef.current;
+            watchedSecondsRef.current = Math.max(watchedSecondsRef.current, lastSavedWatchedRef.current);
+            onProgressSaved(
+              block.id,
+              positionToSave,
+              progress.status,
+              watchedSecondsRef.current,
+            );
             success = true;
           })
           .catch(() => {
@@ -557,13 +615,41 @@ function VideoBlock({
       isReadyRef.current = true;
       video.currentTime = Math.min(block.lastVideoPositionSeconds, video.duration || block.lastVideoPositionSeconds);
     }
+    if (video) lastObservedTimeRef.current = video.currentTime;
+  };
+
+  const handlePlay = () => {
+    lastObservedTimeRef.current = playerRef.current?.currentTime ?? null;
+  };
+
+  const handleSeeking = () => {
+    isSeekingRef.current = true;
+  };
+
+  const handleSeeked = () => {
+    isSeekingRef.current = false;
+    lastObservedTimeRef.current = playerRef.current?.currentTime ?? null;
   };
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
-    if (video.paused) return;
+    if (video.paused) {
+      lastObservedTimeRef.current = video.currentTime;
+      return;
+    }
     const position = Math.floor(video.currentTime);
-    if (position - lastSavedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS) {
+    const previousPosition = lastObservedTimeRef.current;
+    if (!isSeekingRef.current && previousPosition != null) {
+      const delta = video.currentTime - previousPosition;
+      if (delta > 0 && delta <= WATCHED_DELTA_MAX_SECONDS) {
+        watchedSecondsRef.current += delta;
+      }
+    }
+    lastObservedTimeRef.current = video.currentTime;
+    if (
+      position - lastSavedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS
+      || watchedSecondsRef.current - lastSavedWatchedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS
+    ) {
       savePosition(position);
     }
   };
@@ -572,14 +658,30 @@ function VideoBlock({
     const player = playerRef.current;
     if (!player || player.ended) return;
     const position = Math.floor(player.currentTime);
-    if (position !== lastSavedRef.current) {
+    if (
+      position !== lastSavedRef.current
+      || watchedSecondsRef.current !== lastSavedWatchedRef.current
+    ) {
       savePosition(position);
     }
   };
 
+  const handleEnded = () => {
+    const video = playerRef.current;
+    if (!video) return;
+    if (video.duration && watchedSecondsRef.current >= video.duration - WATCHED_DELTA_MAX_SECONDS) {
+      watchedSecondsRef.current = Math.max(watchedSecondsRef.current, Math.floor(video.duration));
+    }
+    savePosition(Math.floor(video.currentTime));
+  };
+
   return (
     <Box>
-      <Box sx={{ position: 'relative', paddingTop: '56.25%', background: '#000', borderRadius: 2, overflow: 'hidden' }}>
+      <Box
+        sx={{ position: 'relative', paddingTop: '56.25%', background: '#000', borderRadius: 2, overflow: 'hidden', userSelect: 'none' }}
+        onContextMenu={(event) => event.preventDefault()}
+        onDragStart={(event) => event.preventDefault()}
+      >
         <ReactPlayer
           ref={playerRef}
           src={block.videoUrl}
@@ -588,8 +690,12 @@ function VideoBlock({
           height="100%"
           style={{ position: 'absolute', top: 0, left: 0 }}
           onLoadedMetadata={handleReady}
+          onPlay={handlePlay}
+          onSeeking={handleSeeking}
+          onSeeked={handleSeeked}
           onTimeUpdate={handleTimeUpdate}
           onPause={handlePause}
+          onEnded={handleEnded}
         />
       </Box>
       {block.content && (

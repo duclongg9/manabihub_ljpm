@@ -46,6 +46,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -91,6 +92,7 @@ public class StudentAssessmentServiceImpl implements StudentAssessmentService {
         }
 
         Enrollment enrollment = lockEnrollment(resolveEnrollment(block.getModule().getCourse().getId()));
+        ensureBlockUnlocked(enrollment, block);
         List<InternalQuizQuestionDto> questions = readQuizQuestions(block);
         validateQuizAnswers(request.answers(), questions);
 
@@ -362,6 +364,45 @@ public class StudentAssessmentServiceImpl implements StudentAssessmentService {
                         "Enrollment was not found.",
                         HttpStatus.FORBIDDEN
                 ));
+    }
+
+    private void ensureBlockUnlocked(Enrollment enrollment, LessonBlock block) {
+        List<LessonBlock> allBlocks = enrollment.getCourse().getModules().stream()
+                .sorted(Comparator.comparingInt(module -> module.getOrderIndex()))
+                .flatMap(module -> module.getBlocks().stream()
+                        .filter(value -> !value.isModerationHidden())
+                        .sorted(Comparator.comparingInt(LessonBlock::getOrderIndex)))
+                .toList();
+        Map<UUID, LessonBlockProgress> progressByBlockId = lessonBlockProgressRepository
+                .findByEnrollmentId(enrollment.getId())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        LessonBlockProgress::getLessonBlockId,
+                        value -> value
+                ));
+        int blockIndex = -1;
+        for (int index = 0; index < allBlocks.size(); index++) {
+            if (allBlocks.get(index).getId().equals(block.getId())) {
+                blockIndex = index;
+                break;
+            }
+        }
+        if (blockIndex < 0) {
+            throw new BusinessException(MessageCodes.CONTENT_NOT_FOUND, "Lesson block was not found.", HttpStatus.NOT_FOUND);
+        }
+        boolean previousIncomplete = allBlocks.subList(0, blockIndex).stream()
+                .anyMatch(previous -> {
+                    LessonBlockProgress progress = progressByBlockId.get(previous.getId());
+                    return progress == null || progress.getStatus() != LessonProgressStatus.COMPLETED;
+                });
+        LessonBlockProgress current = progressByBlockId.get(block.getId());
+        if (previousIncomplete && (current == null || current.getStatus() != LessonProgressStatus.COMPLETED)) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Complete the previous lesson before opening this lesson.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
     }
 
     private List<InternalQuizQuestionDto> readQuizQuestions(LessonBlock block) {

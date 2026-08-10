@@ -41,9 +41,14 @@ export const learningService = {
     return response.data.data;
   },
 
-  saveVideoProgress: async (blockId: string, positionSeconds: number): Promise<LessonProgress> => {
+  saveVideoProgress: async (
+    blockId: string,
+    positionSeconds: number,
+    watchedSeconds = 0,
+  ): Promise<LessonProgress> => {
     const response = await axiosClient.put(ENDPOINTS.LEARNING.VIDEO_PROGRESS(blockId), {
       positionSeconds,
+      watchedSeconds,
     });
     return response.data.data;
   },
