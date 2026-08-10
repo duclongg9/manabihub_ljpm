@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../../../shared/constants/routes';
 import { launchVnptIdentitySdk, resetVnptIdentitySdkRuntime } from '../../kyc/vnptIdentitySdk';
 import { getStudentIdentityVerificationStatus, verifyStudentIdentity } from '../services/studentIdentityVerificationService';
 
@@ -63,7 +64,7 @@ export function StudentIdentityVerificationPage() {
                 <Button variant="contained" onClick={() => void startVerification()} disabled={launching}>
                   {launching ? 'Đang mở VNPT eKYC…' : status?.verified ? 'Xác minh lại' : 'Bắt đầu xác minh'}
                 </Button>
-                <Button variant="outlined" onClick={() => navigate('/student/wallet')}>Quay lại ví</Button>
+                <Button variant="outlined" onClick={() => navigate(ROUTES.STUDENT.PAYMENTS)}>Quay lại lịch sử thanh toán</Button>
               </Stack>
               {launching && (
                 <Box id="ekyc_sdk_intergrated" sx={{ minHeight: 520, bgcolor: '#111827', borderRadius: 2, overflow: 'hidden' }} />

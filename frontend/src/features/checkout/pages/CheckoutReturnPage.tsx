@@ -88,10 +88,10 @@ export const CheckoutReturnPage = () => {
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             {isTopUp ? (
               <button
-                onClick={() => navigate(ROUTES.STUDENT.WALLET)}
+                onClick={() => navigate(ROUTES.STUDENT.PAYMENTS)}
                 className="bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg"
               >
-                Về ví của tôi
+                Về lịch sử thanh toán
               </button>
             ) : (
               <>

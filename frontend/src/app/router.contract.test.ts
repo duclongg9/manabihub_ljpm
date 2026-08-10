@@ -1,7 +1,6 @@
-import { matchRoutes } from 'react-router-dom';
+import { matchRoutes, Navigate } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { ROUTES } from '../shared/constants/routes';
-import { StudentWalletPage } from '../features/wallet/pages/StudentWalletPage';
 import { router } from './router';
 
 function expectConcreteRoute(url: string, expectedRoutePath: string) {
@@ -28,11 +27,11 @@ describe('router contract for policy and notification links', () => {
     expectConcreteRoute(url, expectedRoutePath);
   });
 
-  it('renders the wallet top-up page instead of redirecting to payment history', () => {
+  it('redirects the legacy wallet URL to payment history', () => {
     const matches = matchRoutes(router.routes, ROUTES.STUDENT.WALLET);
     const walletElement = matches?.at(-1)?.route.element;
 
     expect(matches).not.toBeNull();
-    expect(walletElement).toMatchObject({ type: StudentWalletPage });
+    expect(walletElement).toMatchObject({ type: Navigate, props: { to: ROUTES.STUDENT.PAYMENTS, replace: true } });
   });
 });
