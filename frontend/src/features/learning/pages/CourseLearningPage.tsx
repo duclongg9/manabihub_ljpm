@@ -71,6 +71,7 @@ import {
   type FinalTestViolationType,
 } from '../utils/finalTestProctoring';
 import { downloadCertificatePdf, formatCertificateDate } from '../utils/certificatePdf';
+import { CoursePomodoroPanel } from '../components/CoursePomodoroPanel';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
 const WATCHED_DELTA_MAX_SECONDS = 2;
@@ -420,6 +421,7 @@ export function CourseLearningPage() {
         </Paper>
 
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <CoursePomodoroPanel courseTitle={learning.courseTitle} />
           {selectedBlock ? (
             <Card variant="outlined">
               <CardContent>

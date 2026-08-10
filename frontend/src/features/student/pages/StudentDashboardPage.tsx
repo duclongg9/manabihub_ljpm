@@ -333,13 +333,27 @@ export function StudentDashboardPage() {
                 </Box>
               </Box>
             ) : (
-              <Grid container spacing={2.5}>
-                {courses.map((course) => (
-                  <Grid size={{ xs: 12, md: 6 }} key={course.enrollmentId}>
+              <Box
+                data-testid="recent-courses-list"
+                sx={{
+                  display: 'flex',
+                  gap: 2.5,
+                  overflowX: 'auto',
+                  pb: 1,
+                  px: 0.25,
+                  scrollSnapType: { xs: 'x mandatory', md: 'none' },
+                  '& > *': {
+                    flex: { xs: '0 0 min(88vw, 360px)', md: '0 0 320px' },
+                    scrollSnapAlign: 'start',
+                  },
+                }}
+              >
+                {courses.slice(0, 3).map((course) => (
+                  <Box key={course.enrollmentId} sx={{ minWidth: 0 }}>
                     <StudentCourseCard course={course} />
-                  </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
             )}
           </Grid>
 

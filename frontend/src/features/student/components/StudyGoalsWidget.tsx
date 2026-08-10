@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -28,15 +28,12 @@ import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import HeadphonesOutlinedIcon from '@mui/icons-material/HeadphonesOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsActiveOutlined';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutlineOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
 
 const STORAGE_KEY = 'manabihub.student.study-plan.v1';
 const TOUR_STORAGE_KEY = 'manabihub.student.study-plan.tour.v1';
-const DEFAULT_FOCUS_MINUTES = 25;
-const BREAK_MINUTES = 5;
 const WEEKLY_TARGET_MINUTES = 150;
 
 const DAYS = [
@@ -92,16 +89,6 @@ interface StudyPlan {
   attendance: Record<string, string[]>;
 }
 
-interface TimerState {
-  mode: 'focus' | 'break';
-  secondsLeft: number;
-  initialSeconds: number;
-  running: boolean;
-  skill: string;
-  courseTitle?: string;
-  slotId?: string;
-}
-
 interface StudyGoalsWidgetProps {
   jlptGoal?: string | null;
   courses?: StudyCourseOption[];
@@ -140,11 +127,6 @@ function readPlan(): StudyPlan {
   }
 }
 
-function formatSeconds(seconds: number) {
-  const safe = Math.max(0, seconds);
-  return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
-}
-
 function getUpcomingSlot(slots: StudySlot[], now = new Date()) {
   return slots
     .filter((slot) => slot.enabled)
@@ -158,10 +140,6 @@ function getUpcomingSlot(slots: StudySlot[], now = new Date()) {
       return { slot, date: candidate };
     })
     .sort((a, b) => a.date.getTime() - b.date.getTime())[0] ?? null;
-}
-
-function getTargetKey(skill: string, courseTitle?: string) {
-  return courseTitle ? `${skill} · ${courseTitle}` : skill;
 }
 
 function newId() {
@@ -178,7 +156,6 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   const [reminderPermission, setReminderPermission] = useState<NotificationPermission | 'unsupported'>(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported',
   );
-  const [timer, setTimer] = useState<TimerState | null>(null);
   const [editingTarget, setEditingTarget] = useState(false);
   const [targetInput, setTargetInput] = useState(WEEKLY_TARGET_MINUTES);
   const [durationChoice, setDurationChoice] = useState<DurationChoice>(25);
@@ -200,41 +177,6 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   useEffect(() => {
     if (typeof window !== 'undefined' && !window.localStorage.getItem(TOUR_STORAGE_KEY)) setTourStep(0);
   }, []);
-
-  useEffect(() => {
-    if (!timer?.running) return undefined;
-    const interval = window.setInterval(() => {
-      setTimer((current) => current ? { ...current, secondsLeft: current.secondsLeft - 1 } : null);
-    }, 1000);
-    return () => window.clearInterval(interval);
-  }, [timer?.running]);
-
-  const recordFocusSession = useCallback((current: TimerState) => {
-    const elapsedMinutes = Math.max(1, Math.round((current.initialSeconds - Math.max(0, current.secondsLeft)) / 60));
-    const skillKey = getTargetKey(current.skill);
-    const courseKey = current.courseTitle ? getTargetKey(current.skill, current.courseTitle) : null;
-    const attendanceDate = todayKey();
-    setPlan((previous) => {
-      const focusTotals = { ...previous.focusTotals };
-      for (const key of [skillKey, courseKey].filter(Boolean) as string[]) {
-        const old = focusTotals[key] ?? { minutes: 0, sessions: 0 };
-        focusTotals[key] = { minutes: old.minutes + elapsedMinutes, sessions: old.sessions + 1 };
-      }
-      const attendance = { ...previous.attendance };
-      const currentAttendance = new Set(attendance[attendanceDate] ?? []);
-      if (current.slotId) currentAttendance.add(current.slotId);
-      attendance[attendanceDate] = [...currentAttendance];
-      return { ...previous, focusTotals, attendance };
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!timer || timer.running || timer.secondsLeft > 0) return;
-    if (timer.mode === 'focus') {
-      recordFocusSession(timer);
-      setTimer({ ...timer, mode: 'break', secondsLeft: BREAK_MINUTES * 60, initialSeconds: BREAK_MINUTES * 60, running: false });
-    } else setTimer(null);
-  }, [recordFocusSession, timer]);
 
   const upcoming = useMemo(() => getUpcomingSlot(plan.slots), [plan.slots]);
   const weeklyMinutes = SKILLS.reduce((sum, skill) => sum + (plan.focusTotals[skill.label]?.minutes ?? 0), 0);
@@ -312,23 +254,6 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     setSelectedPreset('gentle');
   };
 
-  const startTimer = (slot?: StudySlot) => {
-    const courseTitle = slot?.courseTitle ?? selectedCourse?.title;
-    const skill = slot?.skill ?? newSlot.skill;
-    const initialSeconds = (slot?.durationMinutes ?? DEFAULT_FOCUS_MINUTES) * 60;
-    if (slot) {
-      const key = todayKey();
-      setPlan((previous) => ({ ...previous, attendance: { ...previous.attendance, [key]: [...new Set([...(previous.attendance[key] ?? []), slot.id])] } }));
-    }
-    setTimer({ mode: 'focus', secondsLeft: initialSeconds, initialSeconds, running: true, skill, courseTitle, slotId: slot?.id });
-  };
-
-  const finishTimerEarly = () => {
-    if (!timer) return;
-    recordFocusSession({ ...timer, running: false, secondsLeft: Math.max(0, timer.secondsLeft) });
-    setTimer(null);
-  };
-
   const finishTour = () => {
     window.localStorage.setItem(TOUR_STORAGE_KEY, '1');
     setTourStep(null);
@@ -340,13 +265,13 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
         <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900 }}>Mục tiêu học tập</Typography>
         <Chip label={jlptGoal ? `JLPT ${jlptGoal}` : 'Chưa thiết lập'} size="small" sx={{ bgcolor: jlptGoal ? '#C41E3A' : '#EEF2F6', color: jlptGoal ? '#fff' : '#475467', fontWeight: 900 }} />
       </Stack>
-      <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#667085' }}>Lịch học, điểm danh và Pomodoro được lưu trên thiết bị này; điểm tập trung tự làm mới theo tuần.</Typography>
+      <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#667085' }}>Lịch học và điểm tập trung được lưu trên thiết bị này; mục tiêu tự làm mới theo tuần.</Typography>
 
       <Box sx={{ mt: 2 }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
             <Typography variant="body2" sx={{ fontWeight: 800 }}>Mục tiêu tuần</Typography>
-            <Tooltip title="Mục tiêu tuần khuyến nghị là 150 phút (tương đương 6 phiên Pomodoro 25 phút)." arrow>
+            <Tooltip title="Mục tiêu tuần khuyến nghị là 150 phút (tương đương 6 phiên tập trung 25 phút)." arrow>
               <HelpOutlineOutlinedIcon sx={{ fontSize: 16, color: '#98A2B3' }} />
             </Tooltip>
           </Stack>
@@ -383,7 +308,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>Điểm tập trung theo kỹ năng</Typography>
-          <Tooltip title="Mỗi 1 phút bấm giờ Pomodoro khi học kỹ năng tương ứng sẽ được cộng 1 điểm." arrow><HelpOutlineOutlinedIcon sx={{ fontSize: 16, color: '#98A2B3' }} /></Tooltip>
+          <Tooltip title="Mỗi 1 phút tập trung khi học kỹ năng tương ứng sẽ được cộng 1 điểm." arrow><HelpOutlineOutlinedIcon sx={{ fontSize: 16, color: '#98A2B3' }} /></Tooltip>
         </Stack>
         <TimerOutlinedIcon sx={{ color: '#C41E3A' }} />
       </Stack>
@@ -398,7 +323,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
                 <Typography variant="caption" sx={{ fontWeight: 800, color }}>{total.minutes}/{target} phút</Typography>
               </Stack>
               <LinearProgress variant="determinate" value={Math.min(100, (total.minutes / target) * 100)} sx={{ mt: 0.45, height: 7, borderRadius: 4, bgcolor: `${color}1A`, '& .MuiLinearProgress-bar': { bgcolor: color } }} />
-              <Typography variant="caption" sx={{ color: '#98A2B3', fontSize: '0.68rem' }}>{total.sessions} phiên Pomodoro</Typography>
+              <Typography variant="caption" sx={{ color: '#98A2B3', fontSize: '0.68rem' }}>{total.sessions} phiên tập trung</Typography>
             </Box>
           );
         })}
@@ -407,15 +332,9 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       {courseTotals.length > 0 && <Box sx={{ mt: 1.5 }}><Typography variant="caption" sx={{ fontWeight: 900, color: '#475467' }}>Điểm theo khóa học</Typography>{courseTotals.slice(0, 3).map(([key, total]) => <Stack key={key} direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}><Typography variant="caption" sx={{ color: '#667085', maxWidth: '75%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{key.split(' · ').slice(1).join(' · ')}</Typography><Typography variant="caption" sx={{ fontWeight: 800 }}>{total.minutes} điểm</Typography></Stack>)}</Box>}
       <Typography variant="caption" sx={{ display: 'block', mt: 1.5, color: '#667085' }}>Mỗi phút tập trung hoàn thành được tính là một điểm cho kỹ năng và khóa học đã chọn.</Typography>
 
-      <Button fullWidth variant="contained" startIcon={<PlayCircleOutlineIcon />} onClick={() => startTimer(upcoming?.slot)} data-tour="pomodoro" sx={{ mt: 2, bgcolor: '#C41E3A', color: '#fff', fontWeight: 800, '&:hover': { bgcolor: '#A71931' } }}>
-        {timer?.mode === 'break' ? `Nghỉ giải lao ${formatSeconds(timer.secondsLeft)}` : timer ? `${timer.skill} · ${formatSeconds(timer.secondsLeft)}` : 'Bắt đầu Pomodoro'}
-      </Button>
-      {timer?.running && <Button fullWidth size="small" onClick={finishTimerEarly} sx={{ mt: 0.5, color: '#667085' }}>Kết thúc và lưu phiên</Button>}
-      {timer && !timer.running && timer.mode === 'break' && <Button fullWidth size="small" onClick={() => setTimer(null)} sx={{ mt: 0.5 }}>Đóng bộ đếm nghỉ</Button>}
-
       {plan.slots.length > 0 && <Stack spacing={0.5} sx={{ mt: 2 }}><Typography variant="caption" sx={{ fontWeight: 900, color: '#475467' }}>Lịch cố định</Typography>{plan.slots.map((slot) => <Stack key={slot.id} direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', bgcolor: '#F8FAFC', borderRadius: 1, px: 1, py: 0.5 }}><Typography variant="caption">{DAYS.find((day) => day.value === slot.dayOfWeek)?.label} {slot.startTime} · {slot.skill}</Typography><IconButton size="small" aria-label={`Xóa lịch ${slot.startTime}`} onClick={() => setPlan((previous) => ({ ...previous, slots: previous.slots.filter((item) => item.id !== slot.id) }))}><DeleteOutlineIcon fontSize="small" /></IconButton></Stack>)}</Stack>}
 
-      {tourStep !== null && <Paper data-testid="study-goals-tour" elevation={8} sx={{ position: 'fixed', zIndex: 1400, right: { xs: 16, sm: 32 }, bottom: { xs: 16, sm: 32 }, width: { xs: 'calc(100% - 32px)', sm: 340 }, p: 2, border: '1px solid #F2A4B1' }}><Typography variant="overline" sx={{ color: '#C41E3A', fontWeight: 900 }}>Hướng dẫn {tourStep + 1}/3</Typography><Typography variant="body2" sx={{ mt: 0.5 }}>{['Xác định mục tiêu JLPT bạn muốn chinh phục.', 'Đặt lịch cố định để hệ thống tự động nhắc bạn vào bàn học.', 'Bật đồng hồ tập trung mỗi khi học để tích lũy điểm kỹ năng.'][tourStep]}</Typography><Stack direction="row" spacing={1} sx={{ mt: 1.5, justifyContent: 'flex-end' }}><Button size="small" onClick={finishTour}>Bỏ qua</Button><Button size="small" variant="contained" onClick={() => tourStep === 2 ? finishTour() : setTourStep(tourStep + 1)}>{tourStep === 2 ? 'Đã hiểu' : 'Tiếp theo'}</Button></Stack></Paper>}
+      {tourStep !== null && <Paper data-testid="study-goals-tour" elevation={8} sx={{ position: 'fixed', zIndex: 1400, right: { xs: 16, sm: 32 }, bottom: { xs: 16, sm: 32 }, width: { xs: 'calc(100% - 32px)', sm: 340 }, p: 2, border: '1px solid #F2A4B1' }}><Typography variant="overline" sx={{ color: '#C41E3A', fontWeight: 900 }}>Hướng dẫn {tourStep + 1}/3</Typography><Typography variant="body2" sx={{ mt: 0.5 }}>{['Xác định mục tiêu JLPT bạn muốn chinh phục.', 'Đặt lịch cố định để hệ thống tự động nhắc bạn vào bàn học.', 'Mở đồng hồ tập trung trong bài học để tích lũy điểm kỹ năng.'][tourStep]}</Typography><Stack direction="row" spacing={1} sx={{ mt: 1.5, justifyContent: 'flex-end' }}><Button size="small" onClick={finishTour}>Bỏ qua</Button><Button size="small" variant="contained" onClick={() => tourStep === 2 ? finishTour() : setTourStep(tourStep + 1)}>{tourStep === 2 ? 'Đã hiểu' : 'Tiếp theo'}</Button></Stack></Paper>}
 
       <Dialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Thêm lịch học</DialogTitle>
@@ -428,7 +347,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
             {courses.length > 1 ? <FormControl fullWidth size="small"><InputLabel id="study-course-label">Khóa học</InputLabel><Select labelId="study-course-label" label="Khóa học" value={newSlot.courseId} onChange={(event) => setNewSlot((current) => ({ ...current, courseId: event.target.value }))}>{courses.map((course) => <MenuItem key={course.id} value={course.id}>{course.title}</MenuItem>)}</Select></FormControl> : <Alert severity="info" sx={{ py: 0.25 }}>{selectedCourse ? `Khóa học đang học: ${selectedCourse.title}` : 'Bạn chưa có khóa học đang học.'}</Alert>}
             <FormControl fullWidth size="small"><InputLabel id="study-skill-label">Kỹ năng</InputLabel><Select labelId="study-skill-label" label="Kỹ năng" value={newSlot.skill} onChange={(event) => setNewSlot((current) => ({ ...current, skill: event.target.value }))}>{SKILLS.map((skill) => <MenuItem key={skill.label} value={skill.label}>{skill.label}</MenuItem>)}</Select></FormControl>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}><FormControl fullWidth size="small"><InputLabel id="study-day-label">Ngày</InputLabel><Select labelId="study-day-label" label="Ngày" value={newSlot.dayOfWeek} onChange={(event) => setNewSlot((current) => ({ ...current, dayOfWeek: Number(event.target.value) }))}>{DAYS.map((day) => <MenuItem key={day.value} value={day.value}>{day.label}</MenuItem>)}</Select></FormControl><TextField size="small" label="Giờ bắt đầu" type="time" value={newSlot.startTime} onChange={(event) => setNewSlot((current) => ({ ...current, startTime: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} fullWidth /></Stack>
-            <Box><Typography variant="caption" sx={{ color: '#667085', fontWeight: 800 }}>Thời lượng</Typography><Stack direction="row" spacing={1} sx={{ mt: 0.75, flexWrap: 'wrap' }}>{([25, 50, 60] as const).map((value) => <Button key={value} size="small" variant={durationChoice === value ? 'contained' : 'outlined'} aria-pressed={durationChoice === value} onClick={() => setDurationChoice(value)}>{value} phút{value === 25 ? ' (1 Pomodoro)' : ''}</Button>)}<Button size="small" variant={durationChoice === 'custom' ? 'contained' : 'outlined'} aria-pressed={durationChoice === 'custom'} onClick={() => setDurationChoice('custom')}>Tùy chỉnh</Button></Stack>{durationChoice === 'custom' && <TextField size="small" type="number" label="Số phút" value={customDuration} onChange={(event) => setCustomDuration(Number(event.target.value))} slotProps={{ htmlInput: { min: 5, max: 180, step: 5 } }} sx={{ mt: 1, width: 140 }} />}</Box>
+            <Box><Typography variant="caption" sx={{ color: '#667085', fontWeight: 800 }}>Thời lượng</Typography><Stack direction="row" spacing={1} sx={{ mt: 0.75, flexWrap: 'wrap' }}>{([25, 50, 60] as const).map((value) => <Button key={value} size="small" variant={durationChoice === value ? 'contained' : 'outlined'} aria-pressed={durationChoice === value} onClick={() => setDurationChoice(value)}>{value} phút{value === 25 ? ' (1 phiên)' : ''}</Button>)}<Button size="small" variant={durationChoice === 'custom' ? 'contained' : 'outlined'} aria-pressed={durationChoice === 'custom'} onClick={() => setDurationChoice('custom')}>Tùy chỉnh</Button></Stack>{durationChoice === 'custom' && <TextField size="small" type="number" label="Số phút" value={customDuration} onChange={(event) => setCustomDuration(Number(event.target.value))} slotProps={{ htmlInput: { min: 5, max: 180, step: 5 } }} sx={{ mt: 1, width: 140 }} />}</Box>
           </Stack>}
           <Alert severity="info" sx={{ mt: 2 }} icon={<TimerOutlinedIcon />}><Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 800 }}>Gợi ý từ hệ thống</Typography><Typography variant="caption">Để hoàn thành khóa Kanji N5 đúng tiến độ, bạn chỉ cần học 3 buổi/tuần (tổng 75 phút).</Typography></Box><Button size="small" onClick={applySuggestion}>Áp dụng gợi ý này</Button></Stack></Alert>
         </DialogContent>

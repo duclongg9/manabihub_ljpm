@@ -40,4 +40,11 @@ describe('StudyGoalsWidget', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Lưu lịch' }));
     expect(screen.getByText('Lịch cố định')).toBeInTheDocument();
   });
+
+  it('keeps the focus timer inside the learning page', () => {
+    render(<StudyGoalsWidget jlptGoal="N3" courses={[]} />);
+
+    expect(screen.queryByRole('button', { name: /Bắt đầu Pomodoro/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pomodoro-timer')).not.toBeInTheDocument();
+  });
 });
