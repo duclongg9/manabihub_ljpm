@@ -238,6 +238,7 @@ public final class MessageCodes {
     public static final String ORDER_COURSE_NOT_PUBLISHED = "ORDER_COURSE_NOT_PUBLISHED";
     public static final String ORDER_ALREADY_ENROLLED = "ORDER_ALREADY_ENROLLED";
     public static final String ORDER_ALREADY_PAID = "ORDER_ALREADY_PAID";
+    public static final String ORDER_CANCELLED = "ORDER_CANCELLED";
 
     // ──────────────────────────────────────────────
     // PAYMENT — payment processing

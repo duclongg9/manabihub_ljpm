@@ -74,6 +74,17 @@ class PaymentControllerSecurityTest {
 
     @Test
     @WithMockUser(roles = "STUDENT")
+    void authenticatedStudent_CanForwardSignedBrowserReturn() throws Exception {
+        when(paymentService.handleVnPayReturn(anyMap()))
+                .thenReturn(IpnAckResponse.of("00", "Return processed"));
+
+        mockMvc.perform(get("/api/v1/payments/vnpay/confirm-return")
+                        .param("vnp_TxnRef", "OD-TEST"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
     void authenticatedUser_CannotInvokeDisabledDevSimulator() throws Exception {
         when(vnPayProperties.isDevSimulatorEnabled()).thenReturn(false);
 

@@ -29,8 +29,10 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -95,5 +97,28 @@ class OrderControllerTest {
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(orderService);
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void studentCanCancelOwnPendingOrder() throws Exception {
+        UUID orderId = UUID.randomUUID();
+        when(orderService.getOrderForCurrentStudent(orderId)).thenReturn(new OrderResponse(
+                orderId,
+                "OD202608100001",
+                new BigDecimal("150000.00"),
+                BigDecimal.ZERO,
+                "VND",
+                "CANCELLED",
+                "COURSE",
+                Instant.parse("2026-08-10T00:00:00Z"),
+                List.of()));
+
+        mockMvc.perform(post("/api/v1/orders/{orderId}/cancel", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messageCode").value("ORDER_CANCELLED"))
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+
+        verify(paymentService).cancelPendingOrder(orderId);
     }
 }

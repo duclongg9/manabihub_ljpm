@@ -29,8 +29,11 @@ public class VnPayProperties {
     /** VNPay merchant web API (query/refund) — reserved for later use cases. */
     private String apiUrl = "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
 
-    /** Where VNPay redirects the browser after payment (a frontend page that polls order status). */
+    /** Where VNPay redirects the browser after payment (a frontend page that verifies the return and polls order status). */
     private String returnUrl = "http://localhost:5173/checkout/return";
+
+    /** Payment validity window used by the expiry job, in minutes. */
+    private long paymentExpiryMinutes = 15;
 
     private String version = "2.1.0";
     private String command = "pay";
