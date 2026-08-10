@@ -55,6 +55,13 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
+import {
+  FINAL_TEST_MAX_VIOLATIONS,
+  isClipboardShortcut,
+  isScreenshotShortcut,
+  violationLabel,
+  type FinalTestViolationType,
+} from '../utils/finalTestProctoring';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
 
@@ -722,6 +729,11 @@ function FinalTestPanel({
   const [working, setWorking] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [violations, setViolations] = useState<FinalTestViolationType[]>([]);
+  const [proctoringTerminated, setProctoringTerminated] = useState(false);
+  const violationCountRef = useRef(0);
+  const lastViolationAtRef = useRef(0);
+  const terminatingForViolationRef = useRef(false);
 
   const loadEligibility = useCallback(async () => {
     try {
@@ -764,6 +776,81 @@ function FinalTestPanel({
     void loadEligibility();
   }, [attempt, loadEligibility, result, secondsLeft]);
 
+  useEffect(() => {
+    if (!attempt?.attemptId) return;
+    violationCountRef.current = 0;
+    lastViolationAtRef.current = 0;
+    terminatingForViolationRef.current = false;
+    setViolations([]);
+    setProctoringTerminated(false);
+  }, [attempt?.attemptId]);
+
+  const terminateForViolations = useCallback(async () => {
+    if (!attempt || terminatingForViolationRef.current) return;
+    terminatingForViolationRef.current = true;
+    setWorking(true);
+    try {
+      await learningService.terminateFinalTest(courseId, attempt.attemptId);
+      setAttempt(null);
+      setAnswers({});
+      setProctoringTerminated(true);
+      setErrorMsg('Bài thi đã dừng vì phát hiện quá nhiều thao tác không hợp lệ. Lượt thi này đã được tính.');
+      await loadEligibility();
+    } catch (error) {
+      terminatingForViolationRef.current = false;
+      setErrorMsg(
+        axios.isAxiosError(error)
+          ? error.response?.data?.message || 'Không thể khóa lượt thi sau cảnh báo.'
+          : 'Không thể khóa lượt thi sau cảnh báo.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  }, [attempt, courseId, loadEligibility]);
+
+  const recordViolation = useCallback((type: FinalTestViolationType) => {
+    if (!attempt || result || terminatingForViolationRef.current) return;
+    const now = Date.now();
+    // One tab switch can fire both blur and visibilitychange; count it once.
+    if (now - lastViolationAtRef.current < 1000) return;
+    lastViolationAtRef.current = now;
+    violationCountRef.current += 1;
+    setViolations((current) => [...current, type]);
+    if (violationCountRef.current >= FINAL_TEST_MAX_VIOLATIONS) {
+      void terminateForViolations();
+    }
+  }, [attempt, result, terminateForViolations]);
+
+  useEffect(() => {
+    if (!attempt || result) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') recordViolation('TAB_SWITCH');
+    };
+    const handleWindowBlur = () => recordViolation('WINDOW_BLUR');
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (isScreenshotShortcut(event)) {
+        event.preventDefault();
+        recordViolation('SCREENSHOT_SHORTCUT');
+      } else if (isClipboardShortcut(event)) {
+        event.preventDefault();
+        recordViolation('CLIPBOARD');
+      }
+    };
+    const handlePrint = () => recordViolation('PRINT_ATTEMPT');
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('keydown', handleShortcut, true);
+    window.addEventListener('beforeprint', handlePrint);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('keydown', handleShortcut, true);
+      window.removeEventListener('beforeprint', handlePrint);
+    };
+  }, [attempt, recordViolation, result]);
+
   const handleStart = async () => {
     setWorking(true);
     setErrorMsg(null);
@@ -773,6 +860,7 @@ function FinalTestPanel({
       setAttempt(value);
       setAnswers({});
       setResult(null);
+      setProctoringTerminated(false);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         setErrorMsg(error.response?.data?.message || 'Không thể bắt đầu Final Test.');
@@ -893,6 +981,29 @@ function FinalTestPanel({
 
         {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
 
+        {attempt && !result && (
+          <Alert severity={violations.length === 0 ? 'info' : 'warning'}>
+            <strong>Chế độ giám sát bài thi:</strong> copy/cut/paste, kéo-thả, menu chuột phải,
+            chuyển tab, rời cửa sổ và các phím chụp màn hình phổ biến đều bị chặn hoặc ghi nhận.
+            Cảnh báo: {violations.length}/{FINAL_TEST_MAX_VIOLATIONS}.
+            {violations.length > 0 && (
+              <Typography component="div" variant="body2" sx={{ mt: 0.5 }}>
+                Gần nhất: {violationLabel(violations[violations.length - 1])}.
+              </Typography>
+            )}
+            <Typography component="div" variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+              Trình duyệt không thể phát hiện tuyệt đối ảnh chụp bằng công cụ hệ điều hành; hệ thống chỉ
+              nhận diện phím tắt và tín hiệu rời trang.
+            </Typography>
+          </Alert>
+        )}
+
+        {proctoringTerminated && (
+          <Alert severity="error">
+            Bài thi đã bị dừng và lượt thi đã được tính do vượt quá giới hạn cảnh báo integrity.
+          </Alert>
+        )}
+
         {progressSummary && !progressSummary.certificateEligibility.eligible && (
           <Alert severity="info">
             Điều kiện chứng chỉ còn thiếu:{' '}
@@ -966,7 +1077,17 @@ function FinalTestPanel({
         )}
 
         {attempt && !result && (
-          <Stack spacing={2}>
+          <Stack
+            spacing={2}
+            sx={{ userSelect: 'none' }}
+            onCopy={(event) => { event.preventDefault(); recordViolation('CLIPBOARD'); }}
+            onCut={(event) => { event.preventDefault(); recordViolation('CLIPBOARD'); }}
+            onPaste={(event) => { event.preventDefault(); recordViolation('CLIPBOARD'); }}
+            onDragStart={(event) => { event.preventDefault(); recordViolation('DRAG_DROP'); }}
+            onDragOver={(event) => { event.preventDefault(); }}
+            onDrop={(event) => { event.preventDefault(); recordViolation('DRAG_DROP'); }}
+            onContextMenu={(event) => { event.preventDefault(); recordViolation('CONTEXT_MENU'); }}
+          >
             <Alert severity={secondsLeft > 0 ? 'info' : 'error'}>
               Điểm đạt: {attempt.passingScore}% · Thời gian còn lại: {Math.floor(secondsLeft / 60)}:
               {String(secondsLeft % 60).padStart(2, '0')}

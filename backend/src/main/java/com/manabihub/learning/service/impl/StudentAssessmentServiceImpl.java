@@ -297,6 +297,40 @@ public class StudentAssessmentServiceImpl implements StudentAssessmentService {
         );
     }
 
+    @Override
+    @Transactional
+    public void terminateFinalTestAttempt(UUID courseId, UUID attemptId) {
+        Enrollment enrollment = lockEnrollment(resolveEnrollment(courseId));
+        FinalTestAttempt attempt = finalTestAttemptRepository
+                .findOwnedByIdForUpdate(attemptId, enrollment.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.LEARNING_FINAL_TEST_ATTEMPT_NOT_FOUND,
+                        "Final Test attempt was not found.",
+                        HttpStatus.NOT_FOUND
+                ));
+        if (!attempt.getFinalTest().getCourse().getId().equals(courseId)) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_FINAL_TEST_ATTEMPT_NOT_FOUND,
+                    "Final Test attempt was not found.",
+                    HttpStatus.NOT_FOUND
+            );
+        }
+        if (attempt.getStatus() == FinalTestAttemptStatus.TERMINATED_FOR_VIOLATION) {
+            return;
+        }
+        if (attempt.getStatus() != FinalTestAttemptStatus.IN_PROGRESS) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "This Final Test attempt has already ended.",
+                    HttpStatus.CONFLICT
+            );
+        }
+        attempt.setStatus(FinalTestAttemptStatus.TERMINATED_FOR_VIOLATION);
+        attempt.setPassed(false);
+        attempt.setSubmittedAt(Instant.now());
+        finalTestAttemptRepository.save(attempt);
+    }
+
     private Enrollment resolveEnrollment(UUID courseId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException(

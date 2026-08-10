@@ -71,6 +71,10 @@ export const learningService = {
     return response.data.data;
   },
 
+  terminateFinalTest: async (courseId: string, attemptId: string): Promise<void> => {
+    await axiosClient.post(ENDPOINTS.LEARNING.FINAL_TEST_TERMINATE(courseId, attemptId));
+  },
+
   submitFinalTest: async (
     courseId: string,
     attemptId: string,
