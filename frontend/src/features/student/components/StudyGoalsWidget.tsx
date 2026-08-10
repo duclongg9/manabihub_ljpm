@@ -34,7 +34,6 @@ import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
 export const STORAGE_KEY = 'manabihub.student.study-plan.v1';
 export const STUDY_PLAN_UPDATED_EVENT = 'manabihub:study-plan-updated';
 export const STUDY_PLAN_OPEN_SCHEDULE_EVENT = 'manabihub:study-plan-open-schedule';
-const TOUR_STORAGE_KEY = 'manabihub.student.study-plan.tour.v1';
 const WEEKLY_TARGET_MINUTES = 150;
 
 const DAYS = [
@@ -162,7 +161,6 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   const [durationChoice, setDurationChoice] = useState<DurationChoice>(25);
   const [customDuration, setCustomDuration] = useState(25);
   const [newSlot, setNewSlot] = useState({ dayOfWeek: 1, startTime: '19:00', skill: SKILLS[0].label, courseId: courses[0]?.id ?? '' });
-  const [tourStep, setTourStep] = useState<number | null>(null);
   const notifiedRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -192,10 +190,6 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       setNewSlot((current) => ({ ...current, courseId: courses[0].id }));
     }
   }, [courses, newSlot.courseId]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !window.localStorage.getItem(TOUR_STORAGE_KEY)) setTourStep(0);
-  }, []);
 
   const upcoming = useMemo(() => getUpcomingSlot(plan.slots), [plan.slots]);
   const weeklyMinutes = SKILLS.reduce((sum, skill) => sum + (plan.focusTotals[skill.label]?.minutes ?? 0), 0);
@@ -273,13 +267,8 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     setSelectedPreset('gentle');
   };
 
-  const finishTour = () => {
-    window.localStorage.setItem(TOUR_STORAGE_KEY, '1');
-    setTourStep(null);
-  };
-
   return (
-    <Paper data-testid="study-goals-widget" elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, border: '1px solid #E4E7EC', borderRadius: '8px', bgcolor: '#fff', position: 'relative' }}>
+    <Paper data-testid="study-goals-widget" data-onboarding-target="student-goals" elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, border: '1px solid #E4E7EC', borderRadius: '8px', bgcolor: '#fff', position: 'relative' }}>
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1 }} data-tour="goal-badge">
         <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900 }}>Mục tiêu học tập</Typography>
         <Chip label={jlptGoal ? `JLPT ${jlptGoal}` : 'Chưa thiết lập'} size="small" sx={{ bgcolor: jlptGoal ? '#C41E3A' : '#EEF2F6', color: jlptGoal ? '#fff' : '#475467', fontWeight: 900 }} />
@@ -350,8 +339,6 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
 
       {courseTotals.length > 0 && <Box sx={{ mt: 1.5 }}><Typography variant="caption" sx={{ fontWeight: 900, color: '#475467' }}>Điểm theo khóa học</Typography>{courseTotals.slice(0, 3).map(([key, total]) => <Stack key={key} direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}><Typography variant="caption" sx={{ color: '#667085', maxWidth: '75%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{key.split(' · ').slice(1).join(' · ')}</Typography><Typography variant="caption" sx={{ fontWeight: 800 }}>{total.minutes} điểm</Typography></Stack>)}</Box>}
       <Typography variant="caption" sx={{ display: 'block', mt: 1.5, color: '#667085' }}>Mỗi phút tập trung hoàn thành được tính là một điểm cho kỹ năng và khóa học đã chọn.</Typography>
-
-      {tourStep !== null && <Paper data-testid="study-goals-tour" elevation={8} sx={{ position: 'fixed', zIndex: 1400, right: { xs: 16, sm: 32 }, bottom: { xs: 16, sm: 32 }, width: { xs: 'calc(100% - 32px)', sm: 340 }, p: 2, border: '1px solid #F2A4B1' }}><Typography variant="overline" sx={{ color: '#C41E3A', fontWeight: 900 }}>Hướng dẫn {tourStep + 1}/3</Typography><Typography variant="body2" sx={{ mt: 0.5 }}>{['Xác định mục tiêu JLPT bạn muốn chinh phục.', 'Đặt lịch cố định để hệ thống tự động nhắc bạn vào bàn học.', 'Mở đồng hồ tập trung trong bài học để tích lũy điểm kỹ năng.'][tourStep]}</Typography><Stack direction="row" spacing={1} sx={{ mt: 1.5, justifyContent: 'flex-end' }}><Button size="small" onClick={finishTour}>Bỏ qua</Button><Button size="small" variant="contained" onClick={() => tourStep === 2 ? finishTour() : setTourStep(tourStep + 1)}>{tourStep === 2 ? 'Đã hiểu' : 'Tiếp theo'}</Button></Stack></Paper>}
 
       <Dialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Thêm lịch học</DialogTitle>
