@@ -59,6 +59,36 @@ describe('StudentDashboardPage', () => {
             enrolledAt: '2026-07-01T00:00:00Z',
             progressPercentage: 35,
           },
+          {
+            enrollmentId: 'enrollment-2',
+            courseId: 'course-2',
+            courseTitle: 'Ngữ pháp N5 nền tảng',
+            thumbnailUrl: null,
+            teacherName: 'Sato Sensei',
+            enrollmentStatus: 'ACTIVE',
+            enrolledAt: '2026-07-02T00:00:00Z',
+            progressPercentage: 20,
+          },
+          {
+            enrollmentId: 'enrollment-3',
+            courseId: 'course-3',
+            courseTitle: 'Luyện nghe N5',
+            thumbnailUrl: null,
+            teacherName: 'Tanaka Sensei',
+            enrollmentStatus: 'ACTIVE',
+            enrolledAt: '2026-07-03T00:00:00Z',
+            progressPercentage: 10,
+          },
+          {
+            enrollmentId: 'enrollment-4',
+            courseId: 'course-4',
+            courseTitle: 'Khóa học thứ tư không hiện trên Dashboard',
+            thumbnailUrl: null,
+            teacherName: 'Kato Sensei',
+            enrollmentStatus: 'ACTIVE',
+            enrolledAt: '2026-07-04T00:00:00Z',
+            progressPercentage: 5,
+          },
         ],
         page: 0,
         size: 3,
@@ -84,6 +114,10 @@ describe('StudentDashboardPage', () => {
     expect(screen.getByText('Mục tiêu: JLPT N3 · Trình độ hiện tại: N3')).toBeInTheDocument();
     expect(screen.getByTestId('mini-roadmap')).toBeInTheDocument();
     expect(screen.getByText('JLPT N3 thực chiến')).toBeInTheDocument();
+    expect(screen.getByTestId('recent-courses-list')).toBeInTheDocument();
+    expect(screen.getByText('Ngữ pháp N5 nền tảng')).toBeInTheDocument();
+    expect(screen.getByText('Luyện nghe N5')).toBeInTheDocument();
+    expect(screen.queryByText('Khóa học thứ tư không hiện trên Dashboard')).not.toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
