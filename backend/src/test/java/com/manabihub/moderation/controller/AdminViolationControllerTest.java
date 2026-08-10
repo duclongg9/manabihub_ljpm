@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -31,6 +32,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AdminViolationController.class)
@@ -81,6 +84,28 @@ class AdminViolationControllerTest {
 
         verify(violationModerationService)
                 .resolveViolation(eq(reportId), any(ResolveViolationRequest.class), eq(ADMIN_ID));
+    }
+
+    @Test
+    void courseManagerCanDownloadPrivateViolationEvidence() throws Exception {
+        UUID reportId = UUID.randomUUID();
+        UUID evidenceId = UUID.randomUUID();
+        byte[] fileContent = new byte[]{1, 2, 3, 4};
+        when(violationModerationService.getViolationEvidence(reportId, evidenceId, ADMIN_ID))
+                .thenReturn(new ViolationModerationService.ViolationEvidenceDownload(
+                        "bang-chung.png",
+                        "image/png",
+                        new ByteArrayResource(fileContent)
+                ));
+
+        mockMvc.perform(get("/api/v1/admin/violations/" + reportId + "/evidence/" + evidenceId)
+                        .with(adminJwt("COURSE_MANAGER")))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("attachment")))
+                .andExpect(content().contentType("image/png"))
+                .andExpect(content().bytes(fileContent));
+
+        verify(violationModerationService).getViolationEvidence(reportId, evidenceId, ADMIN_ID);
     }
 
     @Test

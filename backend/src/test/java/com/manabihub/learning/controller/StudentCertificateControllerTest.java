@@ -89,7 +89,8 @@ class StudentCertificateControllerTest {
                 "MHB-TEST",
                 "An Nguyen",
                 "Japanese Foundations",
-                Instant.parse("2026-07-24T00:00:00Z")
+                Instant.parse("2026-07-24T00:00:00Z"),
+                Instant.parse("2026-07-23T23:59:58Z")
         );
     }
 }

@@ -10,6 +10,7 @@ public record LearningCertificateResponse(
         String certificateNumber,
         String studentName,
         String courseTitle,
-        Instant issuedAt
+        Instant issuedAt,
+        Instant completedAt
 ) {
 }

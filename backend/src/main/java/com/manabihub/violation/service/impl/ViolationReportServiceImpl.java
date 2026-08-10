@@ -5,6 +5,8 @@ import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.identity.entity.AppUser;
+import com.manabihub.moderation.entity.ViolationEvidence;
+import com.manabihub.moderation.repository.ViolationEvidenceRepository;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.notification.NotificationTypes;
 import com.manabihub.review.entity.CourseReview;
@@ -16,24 +18,33 @@ import com.manabihub.violation.enums.ViolationTargetType;
 import com.manabihub.violation.mapper.ViolationReportMapper;
 import com.manabihub.violation.repository.ViolationReportRepository;
 import com.manabihub.violation.service.ViolationReportService;
+import com.manabihub.violation.service.ViolationEvidenceStorageService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class ViolationReportServiceImpl implements ViolationReportService {
 
+    private static final int MAX_EVIDENCE_FILES = 3;
+
     private final ViolationReportRepository violationReportRepository;
     private final ViolationReportMapper violationReportMapper;
     private final NotificationService notificationService;
     private final EntityManager entityManager;
+    private final ViolationEvidenceRepository evidenceRepository;
+    private final ViolationEvidenceStorageService evidenceStorageService;
 
     @Value("${manabihub.violation.spam-window-minutes:60}")
     private int spamWindowMinutes;
@@ -41,8 +52,28 @@ public class ViolationReportServiceImpl implements ViolationReportService {
     @Override
     @Transactional
     public ViolationReportResponse submitReport(ViolationReportRequest request, UUID reporterId) {
+        return submitReport(request, List.of(), reporterId);
+    }
+
+    @Override
+    @Transactional
+    public ViolationReportResponse submitReport(
+            ViolationReportRequest request,
+            List<MultipartFile> evidenceFiles,
+            UUID reporterId
+    ) {
         if (request.getTargetType() != ViolationTargetType.COURSE && request.getTargetType() != ViolationTargetType.LESSON_BLOCK) {
             throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST, "Only COURSE and LESSON_BLOCK targets can be reported via this API.");
+        }
+
+        List<MultipartFile> files = evidenceFiles == null ? List.of() : evidenceFiles.stream()
+                .filter(file -> file != null && !file.isEmpty())
+                .toList();
+        if (files.size() > MAX_EVIDENCE_FILES) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Mỗi báo cáo chỉ được đính kèm tối đa 3 tệp."
+            );
         }
 
         boolean targetExists = checkTargetExists(request.getTargetType(), request.getTargetId());
@@ -71,11 +102,13 @@ public class ViolationReportServiceImpl implements ViolationReportService {
                 .reporter(reporter)
                 .targetType(request.getTargetType())
                 .targetId(request.getTargetId())
-                .reason(request.getReason())
+                .reason(request.getReason().trim())
+                .description(request.getDescription().trim())
                 .status(ViolationStatus.PENDING_REVIEW)
                 .build();
 
         report = violationReportRepository.save(report);
+        saveEvidence(report.getId(), reporter, files);
 
         // Course Manager owns the standard moderation queue and VIOLATION_RESOLVE permission.
         notificationService.createNotificationForAdminRole(
@@ -88,6 +121,43 @@ public class ViolationReportServiceImpl implements ViolationReportService {
         );
 
         return violationReportMapper.toResponse(report);
+    }
+
+    private void saveEvidence(UUID reportId, AppUser reporter, List<MultipartFile> files) {
+        if (files.isEmpty()) {
+            return;
+        }
+
+        com.manabihub.moderation.entity.ViolationReport moderationReport = entityManager.getReference(
+                com.manabihub.moderation.entity.ViolationReport.class,
+                reportId
+        );
+        for (MultipartFile file : files) {
+            ViolationEvidenceStorageService.StoredEvidence stored = evidenceStorageService.store(reportId, file);
+            registerRollbackCleanup(stored.storageKey());
+            evidenceRepository.save(ViolationEvidence.builder()
+                    .violationReport(moderationReport)
+                    .evidenceType(stored.evidenceType())
+                    .displayName(stored.originalName())
+                    .externalUrl(evidenceStorageService.toStoredReference(stored.storageKey()))
+                    .contentType(stored.contentType())
+                    .submittedBy(reporter)
+                    .build());
+        }
+    }
+
+    private void registerRollbackCleanup(String storageKey) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                    evidenceStorageService.deleteQuietly(storageKey);
+                }
+            }
+        });
     }
 
     private String targetTypeLabel(ViolationTargetType targetType) {
