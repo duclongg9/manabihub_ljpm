@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Grid,
   Paper,
@@ -10,7 +9,6 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import AutoStoriesOutlinedIcon from '@mui/icons-material/AutoStoriesOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutlined';
 import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined';
@@ -21,6 +19,7 @@ import { getMyStudentProfile } from '../../profile/profileApi';
 import { StudentCourseCard } from '../components/StudentCourseCard';
 import { useStudentCourses } from '../hooks/useStudentCourses';
 import { useStudentStats } from '../hooks/useStudentStats';
+import { StudyGoalsWidget } from '../components/StudyGoalsWidget';
 
 const BRAND_COLORS = {
   red: '#C41E3A',
@@ -305,75 +304,10 @@ export function StudentDashboardPage() {
           </Grid>
 
           <Grid size={{ xs: 12, lg: 3.5 }}>
-            <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900, mb: 2 }}>
-              Mục tiêu học tập
-            </Typography>
-            <Paper
-              elevation={0}
-              sx={{
-                height: 'calc(100% - 40px)',
-                minHeight: 330,
-                p: 3,
-                border: '1px solid #E4E7EC',
-                borderRadius: '8px',
-                bgcolor: '#FFFFFF',
-              }}
-            >
-              <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="overline" sx={{ color: '#667085', fontWeight: 800 }}>
-                  Cấp độ hướng tới
-                </Typography>
-                <Chip
-                  label={profile?.jlptGoal ? `JLPT ${profile.jlptGoal}` : 'Chưa thiết lập'}
-                  size="small"
-                  sx={{
-                    bgcolor: profile?.jlptGoal ? BRAND_COLORS.red : '#EEF2F6',
-                    color: profile?.jlptGoal ? '#FFFFFF' : '#475467',
-                    fontWeight: 900,
-                    borderRadius: '6px',
-                  }}
-                />
-              </Stack>
-
-              <Box sx={{ my: 3, height: 1, bgcolor: '#EEF0F3' }} />
-
-              <Stack spacing={1.25}>
-                {[
-                  'Kanji và từ vựng',
-                  'Ngữ pháp',
-                  'Đọc hiểu và nghe',
-                ].map((skill) => (
-                  <Button
-                    key={skill}
-                    fullWidth
-                    variant="outlined"
-                    onClick={() => navigate(ROUTES.STUDENT.BROWSE_COURSES)}
-                    endIcon={<ArrowForwardIcon />}
-                    sx={{
-                      minHeight: 48,
-                      justifyContent: 'space-between',
-                      borderColor: '#E1E5EA',
-                      color: '#303846',
-                      fontWeight: 700,
-                      '&:hover': {
-                        borderColor: '#F2A4B1',
-                        color: BRAND_COLORS.red,
-                        bgcolor: '#FFF6F7',
-                      },
-                    }}
-                  >
-                    {skill}
-                  </Button>
-                ))}
-              </Stack>
-
-              <Stack direction="row" spacing={1.25} sx={{ mt: 3, alignItems: 'center' }}>
-                <AutoStoriesOutlinedIcon sx={{ color: BRAND_COLORS.green }} />
-                <Typography variant="body2" sx={{ color: '#667085', lineHeight: 1.55 }}>
-                  Chọn kỹ năng bạn muốn cải thiện để tìm khóa học phù hợp với mục tiêu.
-                </Typography>
-              </Stack>
-            </Paper>
+            <StudyGoalsWidget
+              jlptGoal={profile?.jlptGoal}
+              courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
+            />
           </Grid>
         </Grid>
       </Box>
