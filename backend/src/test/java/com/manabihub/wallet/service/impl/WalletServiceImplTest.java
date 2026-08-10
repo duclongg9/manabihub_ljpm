@@ -48,6 +48,7 @@ class WalletServiceImplTest {
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private WalletMapper walletMapper;
     @Mock private CommercialPolicyService commercialPolicyService;
+    @Mock private com.manabihub.wallet.repository.EscrowLedgerRepository escrowLedgerRepository;
 
     @InjectMocks
     private WalletServiceImpl service;

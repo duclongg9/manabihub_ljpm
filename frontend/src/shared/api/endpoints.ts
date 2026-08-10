@@ -60,6 +60,7 @@ export const ENDPOINTS = {
   },
   teacherWallet: {
     detail: '/v1/teacher/wallet',
+    revenueSummary: '/v1/teacher/wallet/revenue-summary',
     escrow: '/v1/teacher/wallet/escrow',
     transactions: '/v1/teacher/wallet/transactions',
     transactionDetail: (transactionId: string) =>

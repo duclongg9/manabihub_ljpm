@@ -15,6 +15,7 @@ import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeK
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { getStudentWallet } from '../services/studentWalletService';
 import type { StudentWalletResponse } from '../types';
+import { StudentWithdrawalPanel } from '../components/StudentWithdrawalPanel';
 
 function formatMoney(value: number, currency = 'VND') {
   return `${value.toLocaleString('vi-VN')} ${currency}`;
@@ -147,6 +148,20 @@ export const StudentWalletPage = () => {
               </Box>
             </Grid>
           </Grid>
+
+          {!loading && !error && (
+            <StudentWithdrawalPanel
+              wallet={wallet}
+              minimumAmount={wallet?.minimumPayoutAmount ?? 100000}
+              onChanged={async () => {
+                try {
+                  setWallet(await getStudentWallet());
+                } catch {
+                  setError('Không tải được số dư ví. Vui lòng thử lại.');
+                }
+              }}
+            />
+          )}
         </Box>
       </Box>
     </Box>

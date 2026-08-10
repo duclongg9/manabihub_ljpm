@@ -5,6 +5,7 @@ export interface StudentWalletResponse {
   withdrawableBalance: number;
   availableWithdrawableBalance: number;
   currency: string;
+  minimumPayoutAmount?: number;
 }
 
 export type StudentWithdrawalStatus =
