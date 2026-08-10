@@ -50,8 +50,8 @@ export async function simulatePayment(orderCode: string, success = true): Promis
 
 /**
  * Sends the VNPay browser-return parameters to the backend. The backend verifies
- * the checksum and only closes failed/cancelled orders; a successful return still
- * waits for the server-to-server IPN.
+ * the checksum, amount and provider status, then idempotently confirms successful
+ * payments when the server-to-server IPN is unavailable in sandbox/demo.
  */
 export async function confirmPaymentReturn(params: URLSearchParams): Promise<IpnAck> {
   const vnpParams: Record<string, string> = {};

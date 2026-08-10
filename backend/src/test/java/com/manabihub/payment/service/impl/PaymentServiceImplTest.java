@@ -564,6 +564,51 @@ class PaymentServiceImplTest {
             verify(orderRepository, never()).findByOrderCodeForUpdate(anyString());
             verify(paymentTransactionRepository, never()).save(any());
         }
+
+        @Test
+        @org.junit.jupiter.api.Order(16)
+        @DisplayName("UTCID16 (N) - signed successful browser return confirms pending order")
+        void handleVnPayReturn_success_confirmsPaymentAndFulfilsOrder() {
+            PaymentTransaction gatewayPayment = PaymentTransaction.builder()
+                    .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build();
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+            when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                    order.getId(), "VNPAY")).thenReturn(Optional.of(gatewayPayment));
+            when(orderItemRepository.findByOrder_Id(order.getId()))
+                    .thenReturn(List.of(OrderItem.builder()
+                            .order(order).course(course).price(new BigDecimal("100.00")).build()));
+            when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any()))
+                    .thenReturn(Optional.empty());
+
+            IpnAckResponse ack = service.handleVnPayReturn(params);
+
+            assertEquals("00", ack.rspCode());
+            assertEquals(OrderStatus.PAID, order.getStatus());
+            assertEquals(PaymentStatus.SUCCESS, gatewayPayment.getStatus());
+            assertEquals("99999", gatewayPayment.getProviderTransactionId());
+            verify(enrollmentRepository).save(any(Enrollment.class));
+            verify(escrowService).holdForOrder(order);
+            verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(17)
+        @DisplayName("UTCID17 (A) - signed return after IPN is replay-safe for frontend")
+        void handleVnPayReturn_alreadyPaid_returns00WithoutDuplicateFulfilment() {
+            order.setStatus(OrderStatus.PAID);
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+
+            IpnAckResponse ack = service.handleVnPayReturn(params);
+
+            assertEquals("00", ack.rspCode());
+            assertEquals(OrderStatus.PAID, order.getStatus());
+            verify(paymentTransactionRepository, never()).save(any());
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+            verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════

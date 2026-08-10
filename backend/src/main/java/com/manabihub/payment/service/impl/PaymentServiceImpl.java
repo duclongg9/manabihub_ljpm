@@ -88,7 +88,22 @@ public class PaymentServiceImpl implements PaymentService {
             return IpnAckResponse.of("97", "Invalid Checksum");
         }
 
-        // Pessimistic lock serializes concurrent IPN callbacks for the same order,
+        return processVerifiedProviderCallback(params, result, false);
+    }
+
+    /**
+     * Applies a callback only after its VNPay HMAC has been verified. Browser returns and
+     * IPNs share this transaction so either arrival order remains idempotent. The browser
+     * redirect is therefore a safe fallback for demo/sandbox environments where VNPay
+     * cannot reach the IPN endpoint, without trusting any unsigned client-side value.
+     */
+    private IpnAckResponse processVerifiedProviderCallback(
+            Map<String, String> params,
+            PaymentCallbackResult result,
+            boolean browserReturn
+    ) {
+
+        // Pessimistic lock serializes concurrent provider callbacks for the same order,
         // which — together with the PAID status check below — makes processing idempotent.
         Order order = orderRepository.findByOrderCodeForUpdate(result.orderCode()).orElse(null);
         if (order == null) {
@@ -97,22 +112,26 @@ public class PaymentServiceImpl implements PaymentService {
 
         long expectedMinor = order.getGatewayAmount().multiply(MINOR_UNIT_FACTOR).longValue();
         if (result.amount() != expectedMinor) {
-            log.warn("[{}] Payment IPN amount mismatch for order {}: expected {}, got {}",
+            log.warn("[{}] Payment callback amount mismatch for order {}: expected {}, got {}",
                     MessageCodes.MSG_PAY_004, order.getOrderCode(), expectedMinor, result.amount());
             return IpnAckResponse.of("04", "Invalid Amount");
         }
 
         if (order.getStatus() == OrderStatus.PAID) {
             // Duplicate/replayed callback — already processed.
-            log.info("[{}] Duplicate payment IPN for already-paid order {}",
+            log.info("[{}] Duplicate payment callback for already-paid order {}",
                     MessageCodes.MSG_PAY_005, order.getOrderCode());
-            return IpnAckResponse.of("02", "Order already confirmed");
+            // VNPay expects 02 for duplicate IPNs. The browser endpoint returns 00
+            // so the frontend can poll and render the already-paid order.
+            return browserReturn
+                    ? IpnAckResponse.of("00", "Payment already confirmed")
+                    : IpnAckResponse.of("02", "Order already confirmed");
         }
 
         // A cancelled/failed/expired order is terminal. A late success callback
         // must never reopen it or create a second enrollment/escrow hold.
         if (order.getStatus() != OrderStatus.PENDING) {
-            log.warn("[{}] Ignored IPN for closed order {} (status={})",
+            log.warn("[{}] Ignored payment callback for closed order {} (status={})",
                     MessageCodes.MSG_PAY_005, order.getOrderCode(), order.getStatus());
             return IpnAckResponse.of("02", "Order already closed");
         }
@@ -189,44 +208,7 @@ public class PaymentServiceImpl implements PaymentService {
             return IpnAckResponse.of("97", "Invalid Checksum");
         }
 
-        Order order = orderRepository.findByOrderCodeForUpdate(result.orderCode()).orElse(null);
-        if (order == null) {
-            return IpnAckResponse.of("01", "Order not Found");
-        }
-
-        long expectedMinor = order.getGatewayAmount().multiply(MINOR_UNIT_FACTOR).longValue();
-        if (result.amount() != expectedMinor) {
-            log.warn("[{}] VNPay browser return amount mismatch for order {}: expected {}, got {}",
-                    MessageCodes.MSG_PAY_004, order.getOrderCode(), expectedMinor, result.amount());
-            return IpnAckResponse.of("04", "Invalid Amount");
-        }
-
-        if (order.getStatus() == OrderStatus.PAID) {
-            return IpnAckResponse.of("02", "Order already confirmed");
-        }
-        if (order.getStatus() != OrderStatus.PENDING) {
-            return IpnAckResponse.of("02", "Order already closed");
-        }
-
-        // A successful browser return is not authoritative. VNPay IPN still has
-        // to confirm the payment before the order can be fulfilled.
-        if (result.paymentSuccessful()) {
-            return IpnAckResponse.of("00", "Payment is awaiting server confirmation");
-        }
-
-        PaymentTransaction transaction = latestOrNewGatewayTransaction(order);
-        transaction.setProviderTransactionId(result.providerTransactionId());
-        transaction.setRawResponse(objectMapper.valueToTree(params));
-        transaction.setStatus(PaymentStatus.FAILED);
-        paymentTransactionRepository.save(transaction);
-
-        OrderStatus terminalStatus = "24".equals(result.responseCode())
-                ? OrderStatus.CANCELLED
-                : OrderStatus.FAILED;
-        closePendingOrder(order, terminalStatus, Instant.now());
-        log.info("[{}] Recorded {} payment return for order {} (responseCode={})",
-                MessageCodes.MSG_PAY_003, terminalStatus, order.getOrderCode(), result.responseCode());
-        return IpnAckResponse.of("00", "Return processed");
+        return processVerifiedProviderCallback(params, result, true);
     }
 
     @Override

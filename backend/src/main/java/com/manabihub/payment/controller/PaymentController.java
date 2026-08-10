@@ -47,8 +47,8 @@ public class PaymentController {
 
     /**
      * VNPay browser return forwarded by the authenticated student frontend. The
-     * service verifies the VNPay signature and only records a cancellation/failure
-     * here. A successful return still waits for the authoritative server-to-server IPN.
+     * service verifies the VNPay signature, amount and provider status before applying
+     * the same idempotent confirmation transaction as the server-to-server IPN.
      */
     @GetMapping("/vnpay/confirm-return")
     @PreAuthorize("hasRole('STUDENT')")
