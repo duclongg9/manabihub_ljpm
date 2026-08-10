@@ -448,7 +448,9 @@ export function CourseLearningPage() {
 
                 {!selectedBlock.contentAvailable ? (
                   <Alert severity="warning">Nội dung bài học hiện chưa sẵn sàng. Vui lòng quay lại sau.</Alert>
-                ) : (
+                ) : selectedBlock.type === 'WRITING' ? (
+                  // Keep the writing prompt, editor, autosave status and submit action
+                  // in the page flow; only lesson content gets a bounded scroll area.
                   <BlockContent
                     block={selectedBlock}
                     onContentLoadingChange={setSelectedContentLoading}
@@ -457,6 +459,27 @@ export function CourseLearningPage() {
                     onFlashcardProgressSaved={handleFlashcardProgressSaved}
                     onWritingProgressSaved={handleWritingProgressSaved}
                   />
+                ) : (
+                  <Box
+                    data-testid="lesson-content-scroll"
+                    sx={{
+                      maxHeight: { xs: '60vh', md: 'calc(100vh - 330px)' },
+                      overflowY: 'auto',
+                      overflowX: 'hidden',
+                      pr: { xs: 0.5, md: 1.5 },
+                      overscrollBehavior: 'contain',
+                      scrollbarGutter: 'stable',
+                    }}
+                  >
+                    <BlockContent
+                      block={selectedBlock}
+                      onContentLoadingChange={setSelectedContentLoading}
+                      onVideoProgressSaved={handleVideoProgressSaved}
+                      onQuizProgressSaved={handleQuizProgressSaved}
+                      onFlashcardProgressSaved={handleFlashcardProgressSaved}
+                      onWritingProgressSaved={handleWritingProgressSaved}
+                    />
+                  </Box>
                 )}
 
                 <Divider sx={{ my: 2 }} />
