@@ -16,6 +16,7 @@ import { CourseDraftPage } from '../features/course-builder/pages/CourseDraftPag
 import { TeacherCoursesPage } from '../features/course-builder/pages/TeacherCoursesPage';
 import { CourseApprovalQueuePage } from '../features/admin-course-approval/pages/CourseApprovalQueuePage';
 import { CourseApprovalDetailPage } from '../features/admin-course-approval/pages/CourseApprovalDetailPage';
+import { WeeklyChallengeManagementPage } from '../features/admin-weekly-challenge/WeeklyChallengeManagementPage';
 import { AdminRefundQueue } from '../features/admin-refund/components/AdminRefundQueue';
 import { AdminRefundDetail } from '../features/admin-refund/components/AdminRefundDetail';
 import { FinalTestConfigPage } from '../features/course-builder/pages/FinalTestConfigPage';
@@ -328,6 +329,10 @@ export const router = createBrowserRouter([
       {
         path: 'courses/approvals/:id',
         element: <CourseApprovalDetailPage />,
+      },
+      {
+        path: 'weekly-challenges',
+        element: <WeeklyChallengeManagementPage />,
       },
       {
         path: 'refunds',

@@ -263,6 +263,24 @@ class ManabiHubApplicationTests {
     @MockBean
     private com.manabihub.violation.repository.ViolationReportRepository violationReportRepository;
 
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengeRepository weeklyLearningChallengeRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptRepository weeklyLearningChallengeAttemptRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengePairRepository weeklyLearningChallengePairRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptCardRepository weeklyLearningChallengeAttemptCardRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengeRewardRepository weeklyLearningChallengeRewardRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.DailyLearningAttendanceRewardRepository dailyLearningAttendanceRewardRepository;
+
     @Test
     void contextLoads() {
         // Basic integration test to verify the Spring Application Context loads

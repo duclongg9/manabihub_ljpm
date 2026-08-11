@@ -96,6 +96,15 @@ export const ENDPOINTS = {
     walletTransactions: '/v1/student/wallet/transactions',
     walletTransactionDetail: (transactionId: string) =>
       `/v1/student/wallet/transactions/${transactionId}`,
+    weeklyChallenge: '/v1/student/weekly-challenge',
+    startWeeklyChallenge: (challengeId: string) => `/v1/student/weekly-challenge/${challengeId}/attempts`,
+    matchWeeklyChallenge: (attemptId: string) => `/v1/student/weekly-challenge/attempts/${attemptId}/matches`,
+  },
+  ADMIN_WEEKLY_CHALLENGES: {
+    LIST: '/v1/admin/weekly-challenges',
+    DETAIL: (id: string) => `/v1/admin/weekly-challenges/${id}`,
+    PUBLISH: (id: string) => `/v1/admin/weekly-challenges/${id}/publish`,
+    UNPUBLISH: (id: string) => `/v1/admin/weekly-challenges/${id}/unpublish`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>

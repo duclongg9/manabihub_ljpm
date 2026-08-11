@@ -6,6 +6,7 @@ import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlin
 import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
+import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 
@@ -57,5 +58,11 @@ export const ADMIN_MENU = [
     path: ROUTES.ADMIN.PAYOUTS,
     icon: AccountBalanceOutlinedIcon,
     roles: [ROLES.FINANCE_MANAGER],
+  },
+  {
+    title: 'Trò chơi & thưởng tuần',
+    path: ROUTES.ADMIN.WEEKLY_CHALLENGES,
+    icon: SportsEsportsOutlinedIcon,
+    roles: [ROLES.COURSE_MANAGER],
   },
 ];
