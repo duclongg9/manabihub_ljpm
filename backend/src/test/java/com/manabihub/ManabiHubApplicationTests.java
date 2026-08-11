@@ -143,6 +143,9 @@ class ManabiHubApplicationTests {
     private CourseRepository courseRepository;
 
     @MockBean
+    private com.manabihub.course.repository.CourseThumbnailAssetRepository courseThumbnailAssetRepository;
+
+    @MockBean
     private CourseCategoryRepository courseCategoryRepository;
 
     @MockBean
