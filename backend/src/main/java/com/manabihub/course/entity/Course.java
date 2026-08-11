@@ -86,6 +86,15 @@ public class Course {
     @Column(name = "target_students", columnDefinition = "TEXT")
     private String targetStudents;
 
+    /** Relative access duration captured on each enrollment unless a fixed expiry is set. */
+    @Builder.Default
+    @Column(name = "access_duration_days", nullable = false)
+    private Integer accessDurationDays = 180;
+
+    /** Optional fixed expiry for cohort/JLPT-season courses. */
+    @Column(name = "access_expires_at")
+    private Instant accessExpiresAt;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -130,6 +139,14 @@ public class Course {
     @OrderBy("orderIndex ASC")
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CourseModule> modules = new ArrayList<>();
+
+    public Instant resolveEnrollmentExpiry(Instant enrolledAt) {
+        if (accessExpiresAt != null) {
+            return accessExpiresAt;
+        }
+        int days = accessDurationDays == null || accessDurationDays < 1 ? 180 : accessDurationDays;
+        return enrolledAt.plus(java.time.Duration.ofDays(days));
+    }
 
     public void addLearningGoal(String goalText, int orderIndex) {
         CourseLearningGoal goal = CourseLearningGoal.builder()

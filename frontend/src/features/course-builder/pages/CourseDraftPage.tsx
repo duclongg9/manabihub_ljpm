@@ -61,6 +61,8 @@ interface CourseDraftForm {
   prerequisites: string;
   targetStudents: string;
   learningGoals: string[];
+  accessDurationDays: string;
+  accessExpiresAt: string;
 }
 
 interface RichTextEditorProps {
@@ -107,6 +109,8 @@ const initialForm: CourseDraftForm = {
   prerequisites: '',
   targetStudents: '',
   learningGoals: ['', '', '', ''],
+  accessDurationDays: '180',
+  accessExpiresAt: '',
 };
 
 function buildInitialForm(draft?: CourseDraftResponse): CourseDraftForm {
@@ -130,6 +134,8 @@ function buildInitialForm(draft?: CourseDraftResponse): CourseDraftForm {
     prerequisites: sanitizeRichText(draft.prerequisites),
     targetStudents: sanitizeRichText(draft.targetStudents),
     learningGoals: withMinimumGoals(draft.learningGoals),
+    accessDurationDays: String(draft.accessDurationDays ?? 180),
+    accessExpiresAt: draft.accessExpiresAt ? draft.accessExpiresAt.slice(0, 10) : '',
   };
 }
 
@@ -182,7 +188,7 @@ export function CourseDraftPage() {
   );
 
   function updateField(field: keyof CourseDraftForm) {
-    return (event: ChangeEvent<HTMLInputElement>) => {
+    return (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
       clearFieldError(field);
     };
@@ -330,6 +336,8 @@ export function CourseDraftPage() {
         prerequisites: sanitizeRichText(form.prerequisites),
         targetStudents: sanitizeRichText(form.targetStudents),
         learningGoals: form.learningGoals.map((goal) => goal.trim()).filter(Boolean),
+        accessDurationDays: Number(form.accessDurationDays || 180),
+        accessExpiresAt: form.accessExpiresAt ? `${form.accessExpiresAt}T23:59:59Z` : null,
       };
       const draft = editingDraft
         ? await updateCourseDraft(editingDraft.id, payload)
@@ -596,6 +604,37 @@ export function CourseDraftPage() {
                 placeholder="Ví dụ: Người mới bắt đầu học tiếng Nhật, sinh viên chuẩn bị thi JLPT N5 hoặc người cần nền tảng giao tiếp cơ bản."
                 error={errors.targetStudents}
               />
+
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Thá»i háº¡n truy cáº­p khÃ³a há»c
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Há»c viÃªn Ä‘Æ°á»£c truy cáº­p theo sá»‘ ngÃ y ká»ƒ tá»« khi ghi danh; cÃ³ thá»ƒ Ä‘áº·t háº¡n cá»‘ Ä‘á»‹nh cho khÃ³a luyá»‡n thi.
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Sá»‘ ngÃ y truy cáº­p"
+                    value={form.accessDurationDays}
+                    onChange={(event) => updateField('accessDurationDays')(event)}
+                    slotProps={{ htmlInput: { min: 1 } }}
+                    error={Boolean(errors.accessDurationDays)}
+                    helperText={errors.accessDurationDays || 'Máº·c Ä‘á»‹nh 180 ngÃ y'}
+                  />
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="Háº¡n cá»‘ Ä‘á»‹nh (tÃ¹y chá»n)"
+                    value={form.accessExpiresAt}
+                    onChange={(event) => updateField('accessExpiresAt')(event)}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    error={Boolean(errors.accessExpiresAt)}
+                    helperText={errors.accessExpiresAt || 'Äá»ƒ trá»‘ng náº¿u dÃ¹ng sá»‘ ngÃ y'}
+                  />
+                </Stack>
+              </Paper>
 
               <Box>
                 <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
@@ -1062,6 +1101,14 @@ function collectStepErrors(step: number, form: CourseDraftForm, categoryLoadErro
       nextErrors.targetStudents = 'Vui lòng nhập đối tượng học viên phù hợp.';
     }
 
+    const accessDays = Number(form.accessDurationDays);
+    if (!Number.isInteger(accessDays) || accessDays < 1) {
+      nextErrors.accessDurationDays = 'Thá»i háº¡n truy cáº­p pháº£i tá»« 1 ngÃ y trá» lÃªn.';
+    }
+    if (form.accessExpiresAt && new Date(`${form.accessExpiresAt}T23:59:59Z`) <= new Date()) {
+      nextErrors.accessExpiresAt = 'Háº¡n cá»‘ Ä‘á»‹nh pháº£i náº±m trong tÆ°Æ¡ng lai.';
+    }
+
     const validGoals = form.learningGoals
       .map((goal) => goal.trim())
       .filter((goal) => goal.length > 0 && goal.length <= maxGoalLength);
@@ -1089,7 +1136,7 @@ function clearStepErrors(step: number, learningGoals: string[]) {
   const keysByStep: Record<number, string[]> = {
     0: ['title', 'category', 'price'],
     1: ['thumbnailUrl', 'introduction', 'outcomes'],
-    2: ['prerequisites', 'targetStudents', 'learningGoals', ...learningGoals.map((_, index) => `goal-${index}`)],
+    2: ['prerequisites', 'targetStudents', 'accessDurationDays', 'accessExpiresAt', 'learningGoals', ...learningGoals.map((_, index) => `goal-${index}`)],
   };
 
   return Object.fromEntries(keysByStep[step].map((key) => [key, '']));

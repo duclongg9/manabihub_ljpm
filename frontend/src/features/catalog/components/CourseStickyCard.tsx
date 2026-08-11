@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
-import { CheckCircle2, PlayCircle, Target, BookOpen, Infinity as InfinityIcon, X } from 'lucide-react';
+import { CheckCircle2, PlayCircle, Target, BookOpen, Infinity as InfinityIcon, Clock3, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
 import { createCheckout } from '../../checkout/services/checkoutService';
@@ -197,6 +197,14 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
                 <span className="group-hover:text-slate-900 transition-colors">Bài tập thực hành & Trắc nghiệm</span>
               </li>
             )}
+            <li className="flex items-center group">
+              <Clock3 className="w-4 h-4 mr-3 text-slate-500 group-hover:text-red-600 transition-colors" />
+              <span className="group-hover:text-slate-900 transition-colors">
+                Thời hạn truy cập: {course.accessExpiresAt
+                  ? `đến ${new Date(course.accessExpiresAt).toLocaleDateString('vi-VN')}`
+                  : `${course.accessDurationDays ?? 180} ngày kể từ ngày ghi danh`}
+              </span>
+            </li>
             <li className="flex items-center group">
               <InfinityIcon className="w-4 h-4 mr-3 text-slate-500 group-hover:text-red-600 transition-colors" />
               <span className="group-hover:text-slate-900 transition-colors">Truy cập nội dung sau khi ghi danh</span>

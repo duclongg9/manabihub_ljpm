@@ -214,6 +214,15 @@ public class StudentRefundServiceImpl implements StudentRefundService {
                 .eligibilitySnapshot(snapshot)
                 .build();
         RefundRequest saved = refundRequestRepository.saveAndFlush(refund);
+        // Lock course access before exposing the pending request. This closes the
+        // race where a learner opens a lesson between submitting a refund and the
+        // refund decision transaction.
+        enrollmentRepository.findByStudentIdAndCourseIdForUpdate(
+                        student.getId(), orderItem.getCourse().getId())
+                .ifPresent(enrollmentRecord -> {
+                    enrollmentRecord.setStatus(com.manabihub.learning.enums.EnrollmentStatus.REFUND_PENDING);
+                    enrollmentRepository.save(enrollmentRecord);
+                });
         if (standardEligible) {
             saved = refundDecisionTransactionService.autoApproveToStudentWallet(saved.getId());
         }
@@ -257,7 +266,20 @@ public class StudentRefundServiceImpl implements StudentRefundService {
             );
         }
         refund.setStatus(RefundStatus.CANCELLED);
+        reopenEnrollmentIfPending(student.getId(), refund.getOrderItem().getCourse().getId());
         return toStudentResponse(refundRequestRepository.save(refund));
+    }
+
+    private void reopenEnrollmentIfPending(UUID studentId, UUID courseId) {
+        enrollmentRepository.findByStudentIdAndCourseIdForUpdate(studentId, courseId)
+                .ifPresent(enrollment -> {
+                    if (enrollment.getStatus() == com.manabihub.learning.enums.EnrollmentStatus.REFUND_PENDING) {
+                        enrollment.setStatus(enrollment.isExpired(Instant.now())
+                                ? com.manabihub.learning.enums.EnrollmentStatus.EXPIRED
+                                : com.manabihub.learning.enums.EnrollmentStatus.ACTIVE);
+                        enrollmentRepository.save(enrollment);
+                    }
+                });
     }
 
     private StudentProfile requireStudent(UUID userId) {

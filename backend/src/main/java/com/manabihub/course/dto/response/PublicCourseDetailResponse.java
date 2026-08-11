@@ -27,6 +27,8 @@ public class PublicCourseDetailResponse {
     private String targetStudents;
     private Instant publishedAt;
     private Boolean aiSupported;
+    private Integer accessDurationDays;
+    private Instant accessExpiresAt;
 
     // Teacher Info
     private TeacherDto teacher;

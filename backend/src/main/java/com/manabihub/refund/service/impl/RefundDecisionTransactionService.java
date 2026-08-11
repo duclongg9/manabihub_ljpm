@@ -495,6 +495,7 @@ public class RefundDecisionTransactionService {
         refund.setDecisionNote(decision.getNote().trim());
         refund.setDecidedBy(admin);
         refund.setDecidedAt(Instant.now());
+        reopenEnrollmentIfPending(refund);
         refundRequestRepository.save(refund);
 
         auditLogService.logAdminAction(
@@ -511,6 +512,23 @@ public class RefundDecisionTransactionService {
                 Map.of()
         );
         scheduleNotifications(refund, RefundStatus.REJECTED);
+    }
+
+    private void reopenEnrollmentIfPending(RefundRequest refund) {
+        if (refund.getStudent() == null || refund.getOrderItem() == null
+                || refund.getOrderItem().getCourse() == null) {
+            return;
+        }
+        enrollmentRepository.findByStudentIdAndCourseIdForUpdate(
+                        refund.getStudent().getId(), refund.getOrderItem().getCourse().getId())
+                .ifPresent(enrollment -> {
+                    if (enrollment.getStatus() == EnrollmentStatus.REFUND_PENDING) {
+                        enrollment.setStatus(enrollment.isExpired(Instant.now())
+                                ? EnrollmentStatus.EXPIRED
+                                : EnrollmentStatus.ACTIVE);
+                        enrollmentRepository.save(enrollment);
+                    }
+                });
     }
 
     private ValidationContext validateBeforeProvider(
