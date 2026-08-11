@@ -26,6 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -139,6 +140,7 @@ class CourseEditDraftServiceTest {
         teacherDraft.getFinalTest().getQuestions().getFirst()
                 .setContent("Câu hỏi mới chưa được duyệt");
         assertTrue(service.saveIfVersioned(teacherDraft));
+        assertNotNull(service.resolveLastModifiedAt(liveCourse));
 
         // Student-facing aggregate is still the live, approved version.
         assertEquals("Nội dung đã duyệt", liveCourse.getTitle());

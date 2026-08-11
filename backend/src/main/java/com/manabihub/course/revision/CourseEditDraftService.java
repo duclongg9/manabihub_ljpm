@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -43,10 +44,12 @@ public class CourseEditDraftService {
         if (editDraftRepository.existsById(course.getId())) {
             return;
         }
+        Instant now = Instant.now();
         editDraftRepository.save(CourseEditDraft.builder()
                 .courseId(course.getId())
                 .snapshotJson(write(CourseEditSnapshot.fromCourse(course)))
                 .basePublishedAt(course.getPublishedAt())
+                .updatedAt(now)
                 .build());
     }
 
@@ -73,8 +76,18 @@ public class CourseEditDraftService {
             return false;
         }
         draft.setSnapshotJson(write(CourseEditSnapshot.fromCourse(editableCourse)));
+        draft.setUpdatedAt(Instant.now());
         editDraftRepository.save(draft);
         return true;
+    }
+
+    @Transactional(readOnly = true)
+    public Instant resolveLastModifiedAt(Course persistedCourse) {
+        return editDraftRepository.findById(persistedCourse.getId())
+                .map(CourseEditDraft::getUpdatedAt)
+                .orElseGet(() -> persistedCourse.getUpdatedAt() != null
+                        ? persistedCourse.getUpdatedAt()
+                        : persistedCourse.getCreatedAt());
     }
 
     @Transactional(readOnly = true)

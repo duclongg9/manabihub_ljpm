@@ -760,6 +760,7 @@ public class CourseServiceImpl implements CourseService {
                 responseCourse.getAccessDurationDays(),
                 responseCourse.getAccessExpiresAt(),
                 responseCourse.getCreatedAt(),
+                courseEditDraftService.resolveLastModifiedAt(course),
                 srsTrace()
         );
     }
