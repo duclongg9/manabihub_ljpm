@@ -54,6 +54,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 
 @Service
@@ -735,25 +736,39 @@ public class CourseServiceImpl implements CourseService {
     ) {
         var spec = PublicCourseSpecification.buildSearch(keyword, category, jlptLevel, minPrice, maxPrice);
         Page<Course> coursePage = courseRepository.findAll(spec, pageable);
-        Map<UUID, CourseReviewAggregateResponse> reviewAggregates =
+        Map<UUID, Long> enrollmentCounts = new HashMap<>();
+        List<UUID> courseIds = coursePage.getContent().stream().map(Course::getId).toList();
+        if (!courseIds.isEmpty()) {
+            List<EnrollmentRepository.CourseEnrollmentCount> rows =
+                    enrollmentRepository.countByCourseIdsAndStatuses(
+                            courseIds,
+                            List.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED)
+                    );
+            if (rows != null) {
+                rows.forEach(row -> enrollmentCounts.put(row.getCourseId(), row.getEnrollmentCount()));
+            }
+        }
+        Map<UUID, CourseReviewAggregateResponse> loadedReviewAggregates =
                 courseReviewService.getAggregates(
-                        coursePage.getContent().stream()
-                                .map(Course::getId)
-                                .toList()
+                        courseIds
                 );
+        Map<UUID, CourseReviewAggregateResponse> reviewAggregates =
+                loadedReviewAggregates == null ? Map.of() : loadedReviewAggregates;
 
         return coursePage.map(course -> toSummaryResponse(
                 course,
                 reviewAggregates.getOrDefault(
                         course.getId(),
                         CourseReviewAggregateResponse.empty()
-                )
+                ),
+                enrollmentCounts.getOrDefault(course.getId(), 0L)
         ));
     }
 
     private PublicCourseSummaryResponse toSummaryResponse(
             Course course,
-            CourseReviewAggregateResponse reviewAggregate
+            CourseReviewAggregateResponse reviewAggregate,
+            long enrollmentCount
     ) {
         int totalLessons = 0;
         for (CourseModule module : course.getModules()) {
@@ -787,6 +802,7 @@ public class CourseServiceImpl implements CourseService {
                 .publishedAt(course.getPublishedAt())
                 .averageRating(reviewAggregate.averageRating())
                 .reviewCount(reviewAggregate.reviewCount())
+                .enrollmentCount(enrollmentCount)
                 .build();
     }
 
