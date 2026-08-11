@@ -10,6 +10,7 @@ import { getStudentWallet } from '../../features/wallet/services/studentWalletSe
 
 vi.mock('../../features/notifications/hooks/useNotifications', () => ({
   useUnreadCount: () => ({ data: 0 }),
+  useMarkAsRead: () => ({ mutate: vi.fn() }),
 }));
 
 vi.mock('../../features/wallet/services/studentWalletService', () => ({

@@ -24,6 +24,7 @@ import { ROUTES } from '../constants/routes';
 import { logoutAdminSession } from '../auth/adminAuthApi';
 import { getHeaderBrand } from './headerBrand';
 import { AccountMenu } from './AccountMenu';
+import { NotificationMenu } from './NotificationMenu';
 import { useUnreadCount } from '../../features/notifications/hooks/useNotifications';
 
 interface HeaderProps {
@@ -41,6 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const [accountAnchor, setAccountAnchor] = useState<HTMLElement | null>(null);
+  const [notificationAnchor, setNotificationAnchor] = useState<HTMLElement | null>(null);
   const notificationPath = session ? getNotificationPath(session) : null;
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
   const brandLabel = getHeaderBrand(session);
@@ -179,7 +181,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <IconButton
                   color="inherit"
                   aria-label="Mở thông báo"
-                  onClick={() => navigate(notificationPath)}
+                  aria-controls={notificationAnchor ? 'notification-menu' : undefined}
+                  aria-haspopup="true"
+                  aria-expanded={Boolean(notificationAnchor)}
+                  onClick={(event) => setNotificationAnchor(event.currentTarget)}
                   sx={{ color: 'text.secondary' }}
                 >
                   <Badge badgeContent={unreadCount} color="error" max={99}>
@@ -224,6 +229,15 @@ export const Header: React.FC<HeaderProps> = ({
                   ▼
                 </Box>
               </Button>
+              <NotificationMenu
+                anchorEl={notificationAnchor}
+                onClose={() => setNotificationAnchor(null)}
+                onViewAll={() => {
+                  setNotificationAnchor(null);
+                  navigate(notificationPath);
+                }}
+                scopeKey={session.subject}
+              />
             </Box>
           ) : (
             <Button startIcon={<LoginIcon />} onClick={() => navigate(ROUTES.PUBLIC.LOGIN)} sx={{ fontWeight: 600 }}>
