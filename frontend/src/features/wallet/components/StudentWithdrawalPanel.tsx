@@ -36,12 +36,16 @@ const STATUS_LABELS: Record<StudentWithdrawalStatus, string> = {
 interface Props {
   wallet: StudentWalletResponse | null;
   minimumAmount: number;
+  identityVerified: boolean;
+  onVerifyIdentity: () => void;
   onChanged: () => Promise<void>;
 }
 
 export function StudentWithdrawalPanel({
   wallet,
   minimumAmount,
+  identityVerified,
+  onVerifyIdentity,
   onChanged,
 }: Props) {
   const [withdrawals, setWithdrawals] = useState<StudentWithdrawal[]>([]);
@@ -54,7 +58,6 @@ export function StudentWithdrawalPanel({
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolderName, setAccountHolderName] = useState('');
   const [saveAccount, setSaveAccount] = useState(true);
-  const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -87,7 +90,7 @@ export function StudentWithdrawalPanel({
   const available = wallet?.availableWithdrawableBalance ?? 0;
   const selectedBank = BANKS.find((bank) => bank.code === bankCode) ?? BANKS[0];
   const selectedSavedAccount = accounts.find((account) => account.id === accountId);
-  const ownershipVerified = selectedSavedAccount?.ownershipVerified || ownershipConfirmed;
+  const ownershipVerified = selectedSavedAccount?.ownershipVerified || identityVerified;
 
   const validate = () => {
     if (!Number.isInteger(amountValue) || amountValue < minimumAmount) {
@@ -95,6 +98,9 @@ export function StudentWithdrawalPanel({
     }
     if (amountValue > available) {
       return 'Số dư có thể rút không đủ.';
+    }
+    if (!identityVerified) {
+      return 'Vui lòng xác minh CCCD trước khi rút tiền.';
     }
     if (!accountId && (!accountNumber.trim() || !accountHolderName.trim())) {
       return 'Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng.';
@@ -155,7 +161,6 @@ export function StudentWithdrawalPanel({
       setAmount('');
       setOtpCode('');
       setOtpSent(false);
-      setOwnershipConfirmed(false);
       await Promise.all([loadData(), onChanged()]);
     } catch (requestError) {
       setError(apiMessage(requestError, 'Không thể tạo yêu cầu rút tiền.'));
@@ -202,6 +207,21 @@ export function StudentWithdrawalPanel({
 
         {formOpen && (
           <div className="mt-6 grid gap-4 border-t border-slate-100 pt-6">
+            {!identityVerified && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <p className="text-sm font-bold text-blue-900">Cần xác minh CCCD</p>
+                <p className="mt-1 text-xs text-blue-700">
+                  VNPT eKYC sẽ trả kết quả để hệ thống đối chiếu họ tên và ngày sinh với dữ liệu CCCD demo.
+                </p>
+                <button
+                  type="button"
+                  onClick={onVerifyIdentity}
+                  className="mt-3 rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white"
+                >
+                  Đến trang xác minh
+                </button>
+              </div>
+            )}
             <label className="grid gap-1 text-sm font-medium text-slate-700">
               Số tiền rút
               <input
@@ -221,7 +241,6 @@ export function StudentWithdrawalPanel({
                   value={accountId}
                   onChange={(event) => {
                     setAccountId(event.target.value);
-                    setOwnershipConfirmed(false);
                   }}
                   className="rounded-xl border border-slate-300 px-4 py-3"
                 >
@@ -278,25 +297,19 @@ export function StudentWithdrawalPanel({
             )}
 
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-bold text-amber-900">Xác minh giả lập</p>
+              <p className="text-sm font-bold text-amber-900">Đối chiếu chính chủ (demo)</p>
               <p className="mt-1 text-xs text-amber-700">
-                Nút này tạm mô phỏng KYC và đối chiếu chủ tài khoản. Chưa kết nối nhà cung cấp xác minh thật.
+                Luồng demo dùng kết quả VNPT và dữ liệu CCCD giả lập; không phải xác minh quốc gia thật.
               </p>
-              <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-amber-900">
-                <input
-                  type="checkbox"
-                  checked={ownershipVerified}
-                  disabled={Boolean(selectedSavedAccount?.ownershipVerified)}
-                  onChange={(event) => setOwnershipConfirmed(event.target.checked)}
-                />
-                Đã xác minh chính chủ
-              </label>
+              <p className="mt-2 text-sm font-semibold text-amber-900">
+                {identityVerified ? 'Đã xác minh CCCD và sẵn sàng đối chiếu.' : 'Hãy xác minh CCCD trước.'}
+              </p>
             </div>
 
             {!otpSent ? (
               <button
                 type="button"
-                disabled={processing}
+                disabled={processing || !identityVerified}
                 onClick={() => void handleSendOtp()}
                 className="rounded-xl bg-red-600 px-5 py-3 font-bold text-white disabled:opacity-50"
               >
@@ -314,7 +327,7 @@ export function StudentWithdrawalPanel({
                 />
                 <button
                   type="button"
-                  disabled={processing}
+                  disabled={processing || !identityVerified}
                   onClick={() => void handleSubmit()}
                   className="rounded-xl bg-red-600 px-5 py-3 font-bold text-white disabled:opacity-50"
                 >

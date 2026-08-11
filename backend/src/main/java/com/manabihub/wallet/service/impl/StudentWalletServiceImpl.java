@@ -17,6 +17,8 @@ import com.manabihub.wallet.repository.WalletPaymentReservationRepository;
 import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
 import com.manabihub.wallet.service.StudentWalletService;
+import com.manabihub.systemconfig.model.CommercialPolicy;
+import com.manabihub.systemconfig.service.CommercialPolicyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -41,11 +43,13 @@ public class StudentWalletServiceImpl implements StudentWalletService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final WalletPaymentReservationRepository reservationRepository;
     private final StudentProfileRepository studentProfileRepository;
+    private final CommercialPolicyService commercialPolicyService;
 
     @Override
     @Transactional(readOnly = true)
     public StudentWalletResponse getWalletOverview(UUID userId) {
         StudentProfile student = requireStudentByUserId(userId);
+        final BigDecimal minimumPayoutAmount = resolveMinimumPayoutAmount();
         return walletRepository
                 .findByOwnerTypeAndStudent_Id(WalletOwnerType.STUDENT, student.getId())
                 .map(wallet -> new StudentWalletResponse(
@@ -54,14 +58,26 @@ public class StudentWalletServiceImpl implements StudentWalletService {
                         wallet.getAvailableBalance(),
                         wallet.getWithdrawableBalance(),
                         wallet.getAvailableWithdrawableBalance(),
-                        wallet.getCurrency()))
+                        wallet.getCurrency(),
+                        minimumPayoutAmount))
                 .orElseGet(() -> new StudentWalletResponse(
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
-                        "VND"));
+                        "VND",
+                        minimumPayoutAmount));
+    }
+
+    private BigDecimal resolveMinimumPayoutAmount() {
+        if (commercialPolicyService == null) {
+            return BigDecimal.ZERO;
+        }
+        CommercialPolicy policy = commercialPolicyService.getCurrentPolicy();
+        return policy == null || policy.payoutThreshold() == null
+                ? BigDecimal.ZERO
+                : policy.payoutThreshold();
     }
 
     @Override

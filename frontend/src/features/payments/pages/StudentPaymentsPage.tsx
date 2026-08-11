@@ -5,13 +5,16 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   Pagination,
   Stack,
   Tab,
   Tabs,
   Typography,
+  Tooltip,
 } from '@mui/material';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
+import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -31,6 +34,7 @@ import type { StudentWalletResponse, StudentWithdrawal } from '../../wallet/type
 import { useCommercialPolicy } from '../../help-center/hooks/useCommercialPolicy';
 import { StudentWithdrawalModal } from '../../wallet/components/StudentWithdrawalModal';
 import { StudentWithdrawalHistory } from '../../wallet/components/StudentWithdrawalHistory';
+import { getStudentIdentityVerificationStatus } from '../../wallet/services/studentIdentityVerificationService';
 
 interface FilterOption {
   label: string;
@@ -40,8 +44,9 @@ interface FilterOption {
 const FILTERS: FilterOption[] = [
   { label: 'Tất cả' },
   { label: 'Thành công', status: 'PAID' },
-  { label: 'Đang xử lý', status: 'PENDING' },
+  { label: 'Chờ thanh toán', status: 'PENDING' },
   { label: 'Thất bại', status: 'FAILED' },
+  { label: 'Đã hủy', status: 'CANCELLED' },
   { label: 'Đã hoàn tiền', status: 'REFUNDED' },
 ];
 
@@ -51,7 +56,7 @@ const ORDER_STATUS_CONFIG: Record<
 > = {
   PAID: { label: 'Đã thanh toán', bgcolor: '#ECFDF5', color: '#047857' },
   REFUNDED: { label: 'Đã hoàn tiền', bgcolor: '#EFF6FF', color: '#1D4ED8' },
-  PENDING: { label: 'Đang xử lý', bgcolor: '#FFFBEB', color: '#B45309' },
+  PENDING: { label: 'Chờ thanh toán', bgcolor: '#FFFBEB', color: '#B45309' },
   FAILED: { label: 'Thất bại', bgcolor: '#FEF2F2', color: '#B91C1C' },
   CANCELLED: { label: 'Đã hủy', bgcolor: '#F3F4F6', color: '#4B5563' },
 };
@@ -89,12 +94,14 @@ export function StudentPaymentsPage() {
 
   const [filterIndex, setFilterIndex] = useState(0);
   const [page, setPage] = useState(0);
+  const [refundPage, setRefundPage] = useState(0);
   const [dialogItem, setDialogItem] = useState<OrderItemResponse | null>(null);
   const [dialogRefund, setDialogRefund] = useState<StudentRefundResponse | null>(null);
 
   // Wallet state
   const [wallet, setWallet] = useState<StudentWalletResponse | null>(null);
   const [loadingWallet, setLoadingWallet] = useState(true);
+  const [identityVerified, setIdentityVerified] = useState(false);
   const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
 
   // Withdrawals history state
@@ -109,7 +116,7 @@ export function StudentPaymentsPage() {
 
   const selectedFilter = FILTERS[filterIndex];
   const ordersQuery = useOrderHistory({ page, size: 10, status: selectedFilter.status });
-  const refundsQuery = useStudentRefunds();
+  const refundsQuery = useStudentRefunds(refundPage, 10);
 
   // Filter out WALLET_TOPUP transactions from student order history
   const rawOrders = ordersQuery.data?.content ?? [];
@@ -124,6 +131,13 @@ export function StudentPaymentsPage() {
       // transient balance fetch error
     } finally {
       setLoadingWallet(false);
+    }
+    try {
+      const identity = await getStudentIdentityVerificationStatus();
+      setIdentityVerified(identity.verified);
+    } catch {
+      // A stale backend must not prevent the wallet/history from rendering.
+      setIdentityVerified(false);
     }
   }, []);
 
@@ -190,73 +204,121 @@ export function StudentPaymentsPage() {
           breadcrumbs={[{ label: 'Học viên' }, { label: 'Ví & Thanh toán' }]}
         />
 
-        {/* Top Wallet Balance Card - Always prominent in initial viewport */}
+        {/* Refund wallet and withdrawal action live with payment history. Direct top-up is not offered. */}
         <Box
           sx={{
-            p: { xs: 2.5, sm: 3 },
-            mb: 2.5,
-            bgcolor: '#ffffff',
-            borderRadius: 3,
-            border: '1px solid #E1E5EA',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-            display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            justifyContent: 'space-between',
-            alignItems: { sm: 'center' },
+            display: 'grid',
             gap: 2,
+            gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(0, 1.25fr)' },
+            mb: 2.5,
           }}
         >
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-            <Box
-              sx={{
-                width: 52,
-                height: 52,
-                minWidth: 52,
-                minHeight: 52,
-                maxWidth: 52,
-                maxHeight: 52,
-                aspectRatio: '1 / 1',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                bgcolor: '#FEF2F2',
-                color: '#C41E3A',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <AccountBalanceWalletIcon sx={{ fontSize: 28 }} />
-            </Box>
-            <Box>
-              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                Số dư tiền hoàn (nhận lại từ các khóa học)
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#1F2937', mt: 0.25 }}>
-                {loadingWallet ? '…' : formatMoney(wallet?.availableBalance ?? 0, wallet?.currency ?? 'VND')}
-              </Typography>
-            </Box>
-          </Stack>
-
-          <Button
-            variant="contained"
-            disabled={loadingWallet || (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount}
-            onClick={() => setWithdrawalModalOpen(true)}
+          <Box
             sx={{
               bgcolor: '#C41E3A',
-              '&:hover': { bgcolor: '#9D182E' },
-              px: 3.5,
-              py: 1.25,
-              borderRadius: 10,
-              fontWeight: 800,
-              boxShadow: '0 3px 10px rgba(196, 30, 58, 0.25)',
-              alignSelf: { xs: 'flex-start', sm: 'center' },
-              whiteSpace: 'nowrap',
-              textTransform: 'none',
+              background: 'linear-gradient(135deg, #C41E3A 0%, #9D182E 100%)',
+              borderRadius: 3,
+              boxShadow: '0 10px 24px rgba(157, 24, 46, 0.22)',
+              color: '#fff',
+              minHeight: { md: 242 },
+              overflow: 'hidden',
+              p: { xs: 2.5, sm: 3 },
+              position: 'relative',
             }}
           >
-            Yêu cầu rút tiền
-          </Button>
+            <AccountBalanceWalletIcon
+              aria-hidden="true"
+              sx={{
+                bottom: -24,
+                fontSize: 180,
+                opacity: 0.12,
+                position: 'absolute',
+                right: -18,
+                transform: 'rotate(-10deg)',
+              }}
+            />
+            <Stack spacing={2.25} sx={{ position: 'relative', zIndex: 1 }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Box sx={{ bgcolor: 'rgba(255,255,255,0.16)', borderRadius: 2, display: 'grid', p: 1.1, placeItems: 'center' }}>
+                  <AccountBalanceWalletIcon />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontWeight: 900 }}>Ví học viên</Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)' }}>
+                    Tiền hoàn hợp lệ dùng để mua khóa học
+                  </Typography>
+                </Box>
+              </Stack>
+              <Box>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mb: 0.5 }}>
+                  Số dư mua khóa học
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 900 }}>
+                  {loadingWallet ? '…' : formatMoney(wallet?.availableBalance ?? 0, wallet?.currency ?? 'VND')}
+                </Typography>
+              </Box>
+              <Stack direction="row" divider={<Box sx={{ borderLeft: '1px solid rgba(255,255,255,0.24)' }} />} spacing={2}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Số dư có thể rút</Typography>
+                  <Typography sx={{ fontWeight: 800 }}>
+                    {loadingWallet ? '…' : formatMoney(wallet?.availableWithdrawableBalance ?? 0, wallet?.currency ?? 'VND')}
+                  </Typography>
+                </Box>
+                <Box sx={{ flex: 1, pl: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Đang giữ / xử lý</Typography>
+                  <Typography sx={{ fontWeight: 800 }}>
+                    {loadingWallet ? '…' : formatMoney(wallet?.frozenBalance ?? 0, wallet?.currency ?? 'VND')}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Stack>
+          </Box>
+
+          <Box
+            sx={{
+              bgcolor: '#fff',
+              border: '1px solid #E1E5EA',
+              borderRadius: 3,
+              boxShadow: '0 4px 16px rgba(15, 23, 42, 0.05)',
+              p: { xs: 2.5, sm: 3 },
+            }}
+          >
+            <Stack spacing={2} sx={{ height: '100%', justifyContent: 'center' }}>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Box sx={{ bgcolor: '#FFF1F2', borderRadius: 2, color: '#C41E3A', display: 'grid', p: 1.1, placeItems: 'center' }}>
+                  <AccountBalanceIcon />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontWeight: 900 }}>Rút tiền hoàn</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Chuyển khoản hoàn tiền về tài khoản ngân hàng chính chủ.
+                  </Typography>
+                </Box>
+              </Stack>
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                Chỉ số dư từ các khoản hoàn tiền hợp lệ mới được rút. Tài khoản cần xác thực số điện thoại và CCCD.
+              </Alert>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Tối thiểu {formatMoney(minimumAmount, wallet?.currency ?? 'VND')}
+                </Typography>
+                <Button
+                  variant="contained"
+                  disabled={loadingWallet || (identityVerified && (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount)}
+                  onClick={() => {
+                    if (!identityVerified) {
+                      navigate('/student/identity-verification');
+                      return;
+                    }
+                    setWithdrawalModalOpen(true);
+                  }}
+                  sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 800, px: 3, textTransform: 'none' }}
+                >
+                  {identityVerified ? 'Yêu cầu rút tiền' : 'Xác minh SĐT & CCCD để rút tiền'}
+                </Button>
+              </Stack>
+            </Stack>
+          </Box>
         </Box>
 
         {/* Sub-tabs Navigation */}
@@ -345,14 +407,14 @@ export function StudentPaymentsPage() {
               </Alert>
             )}
 
-            {ordersQuery.isLoading && (
+            {(ordersQuery.isLoading || ordersQuery.isFetching) && (
               <Stack spacing={1.5} sx={{ minHeight: 260, alignItems: 'center', justifyContent: 'center', bgcolor: '#FFF', borderRadius: 3, border: '1px solid #E1E5EA' }}>
                 <CircularProgress aria-label="Đang tải lịch sử thanh toán" sx={{ color: '#C41E3A' }} />
                 <Typography color="text.secondary">Đang tải giao dịch…</Typography>
               </Stack>
             )}
 
-            {!ordersQuery.isLoading && !ordersQuery.isError && courseOrders.length === 0 && (
+            {!ordersQuery.isLoading && !ordersQuery.isFetching && !ordersQuery.isError && courseOrders.length === 0 && (
               <Stack spacing={1.5} sx={{ minHeight: 280, alignItems: 'center', justifyContent: 'center', p: 3, textAlign: 'center', bgcolor: '#FFF', borderRadius: 3, border: '1px solid #E1E5EA' }}>
                 <ReceiptLongOutlinedIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
                 <Typography variant="h6" sx={{ fontWeight: 900 }}>Chưa có đơn hàng nào</Typography>
@@ -367,7 +429,7 @@ export function StudentPaymentsPage() {
             )}
 
             {/* Standalone elevated cards with clean spacing */}
-            <Stack spacing={2}>
+            {!ordersQuery.isFetching && <Stack spacing={2}>
               {courseOrders.map((order) => (
                 <Box
                   key={order.id}
@@ -391,7 +453,7 @@ export function StudentPaymentsPage() {
                   />
                 </Box>
               ))}
-            </Stack>
+            </Stack>}
 
             {/* Polished Pagination */}
             {(ordersQuery.data?.totalPages ?? 0) > 1 && (
@@ -424,13 +486,24 @@ export function StudentPaymentsPage() {
         )}
 
         {mainTab === 0 && (
-          <StudentRefundHistory
-            refunds={refunds}
-            loading={refundsQuery.isLoading}
-            error={refundsQuery.isError}
-            onRetry={() => void refundsQuery.refetch()}
-            onOpen={openRefundDetail}
-          />
+          <Box sx={{ mt: 4 }}>
+            <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>Lịch sử hoàn tiền</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Các yêu cầu hoàn tiền được tách khỏi lịch sử đơn hàng để dễ theo dõi trạng thái xử lý.
+              </Typography>
+            </Stack>
+            <StudentRefundHistory
+              refunds={refunds}
+              loading={refundsQuery.isLoading}
+              error={refundsQuery.isError}
+              onRetry={() => void refundsQuery.refetch()}
+              onOpen={openRefundDetail}
+              page={refundPage}
+              totalPages={refundsQuery.data?.totalPages ?? 1}
+              onPageChange={setRefundPage}
+            />
+          </Box>
         )}
 
         {/* SUBTAB 2: Lịch sử rút tiền */}
@@ -473,6 +546,7 @@ export function StudentPaymentsPage() {
         onClose={() => setWithdrawalModalOpen(false)}
         wallet={wallet}
         minimumAmount={minimumAmount}
+        identityVerified={identityVerified}
         onSuccess={refreshAll}
       />
     </Box>
@@ -490,6 +564,7 @@ function OrderCard({
   onRequestRefund: (item: OrderItemResponse) => void;
   onOpenRefund: (refund: StudentRefundResponse) => void;
 }) {
+  const [copied, setCopied] = useState(false);
   const presentation = ORDER_STATUS_CONFIG[order.status] ?? {
     label: order.status,
     bgcolor: '#F3F4F6',
@@ -501,9 +576,42 @@ function OrderCard({
       {/* Header: Secondary Order code & Date on left, Soft Status Badge aligned to right edge */}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, mb: 2 }}>
         <Box>
-          <Typography sx={{ fontWeight: 600, color: '#64748B', fontSize: '0.85rem', fontFamily: 'monospace', letterSpacing: '0.2px' }}>
-            {order.orderCode}
-          </Typography>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <Tooltip title={`Mã đơn đầy đủ: ${order.orderCode}`}>
+              <Typography
+                component="span"
+                sx={{
+                  maxWidth: { xs: 180, sm: 280 },
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 600,
+                  color: '#64748B',
+                  fontSize: '0.85rem',
+                  fontFamily: 'monospace',
+                  letterSpacing: '0.2px',
+                }}
+              >
+                {order.orderCode}
+              </Typography>
+            </Tooltip>
+            <Tooltip title={copied ? 'Đã sao chép' : 'Sao chép mã đơn hàng'}>
+              <IconButton
+                size="small"
+                aria-label="Sao chép mã đơn hàng"
+                onClick={() => {
+                  if (navigator.clipboard?.writeText) {
+                    void navigator.clipboard.writeText(order.orderCode);
+                  }
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1500);
+                }}
+                sx={{ color: copied ? '#047857' : '#64748B', p: 0.35 }}
+              >
+                <ContentCopyOutlinedIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+          </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
             Ngày mua: {new Date(order.createdAt).toLocaleDateString('vi-VN')}
           </Typography>
@@ -590,11 +698,15 @@ function OrderCard({
                     )
                   ) : order.status === 'PENDING' ? (
                     <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', fontWeight: 500 }}>
-                      Đơn hàng đang trong tiến trình xử lý
+                      Đơn hàng đang chờ thanh toán VNPay
                     </Typography>
                   ) : order.status === 'FAILED' ? (
                     <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', fontWeight: 500 }}>
                       Thanh toán không thành công
+                    </Typography>
+                  ) : order.status === 'CANCELLED' ? (
+                    <Typography variant="caption" sx={{ color: '#94A3B8', fontStyle: 'italic', fontWeight: 500 }}>
+                      Thanh toán đã được hủy
                     </Typography>
                   ) : null}
                 </Box>

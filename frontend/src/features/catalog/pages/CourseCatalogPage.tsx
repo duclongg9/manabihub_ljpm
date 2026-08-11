@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   Box,
+  Button,
   Grid,
   Pagination,
   Stack,
@@ -8,6 +9,7 @@ import {
   Chip,
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeKanjiWatermark/DecorativeKanjiWatermark';
@@ -176,8 +178,8 @@ export const CourseCatalogPage: React.FC = () => {
   };
 
   return (
-    <Box component="main" sx={{ minHeight: '100vh', flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#FAF9F6', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
-      <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', position: 'relative', flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
+    <Box component="main" sx={{ minHeight: '100vh', minWidth: 0, overflowX: 'hidden', flexGrow: 1, display: 'flex', flexDirection: 'column', bgcolor: '#FAF9F6', py: { xs: 3, md: 5 }, px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: '1280px', mx: 'auto', width: '100%', minWidth: 0, position: 'relative', flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: '50vh' }}>
         <DecorativeKanjiWatermark text="探求" />
         <PageHeader
           title="Khám phá khóa học"
@@ -187,7 +189,7 @@ export const CourseCatalogPage: React.FC = () => {
         />
 
         <Box sx={{ position: 'relative', zIndex: 1, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ position: 'sticky', top: { xs: 56, sm: 64 }, zIndex: 20, bgcolor: 'rgba(250, 249, 246, 0.92)', backdropFilter: 'blur(12px)', py: 2, mx: -2, px: 2, borderRadius: 2, transition: 'all 0.3s' }}>
+          <Box sx={{ position: 'sticky', top: { xs: 72, sm: 64 }, zIndex: 20, bgcolor: 'rgba(250, 249, 246, 0.92)', backdropFilter: 'blur(12px)', py: 2, mx: { xs: -2, sm: -3 }, px: { xs: 2, sm: 3 }, borderRadius: 2, transition: 'all 0.3s' }}>
             <CourseCatalogFiltersBar
             filters={query.filters}
             onFiltersChange={handleFiltersChange}
@@ -227,6 +229,16 @@ export const CourseCatalogPage: React.FC = () => {
               Đang cập nhật...
             </Typography>
           )}
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            disabled={isFetching}
+            onClick={() => void refetch()}
+            sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
+          >
+            Tải lại danh sách
+          </Button>
         </Stack>
 
         {isLoading && (

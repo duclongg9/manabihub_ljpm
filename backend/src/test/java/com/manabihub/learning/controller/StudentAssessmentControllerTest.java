@@ -24,6 +24,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -120,5 +121,21 @@ class StudentAssessmentControllerTest {
     void finalTestEndpoints_asAnonymous_areUnauthorized() throws Exception {
         mockMvc.perform(post("/api/v1/student/courses/{courseId}/final-test/attempts", UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void terminateFinalTestAttempt_asStudent_delegatesToService() throws Exception {
+        UUID courseId = UUID.randomUUID();
+        UUID attemptId = UUID.randomUUID();
+
+        mockMvc.perform(post(
+                        "/api/v1/student/courses/{courseId}/final-test/attempts/{attemptId}/terminate",
+                        courseId,
+                        attemptId
+                ).with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messageCode", is("COMMON_UPDATED")));
+
+        verify(assessmentService).terminateFinalTestAttempt(courseId, attemptId);
     }
 }

@@ -17,4 +17,6 @@ public interface StudentAssessmentService {
     FinalTestStartResponse startFinalTest(UUID courseId);
 
     FinalTestSubmissionResponse submitFinalTest(UUID courseId, FinalTestSubmissionRequest request);
+
+    void terminateFinalTestAttempt(UUID courseId, UUID attemptId);
 }

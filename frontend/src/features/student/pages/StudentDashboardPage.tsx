@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Grid,
   Paper,
@@ -10,7 +9,6 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import AutoStoriesOutlinedIcon from '@mui/icons-material/AutoStoriesOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutlined';
 import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined';
@@ -21,6 +19,9 @@ import { getMyStudentProfile } from '../../profile/profileApi';
 import { StudentCourseCard } from '../components/StudentCourseCard';
 import { useStudentCourses } from '../hooks/useStudentCourses';
 import { useStudentStats } from '../hooks/useStudentStats';
+import { StudyGoalsWidget } from '../components/StudyGoalsWidget';
+import { StudyCalendar } from '../components/StudyCalendar';
+import { OnboardingGuide, type OnboardingStep } from '../../../shared/components/OnboardingGuide/OnboardingGuide';
 
 const BRAND_COLORS = {
   red: '#C41E3A',
@@ -28,6 +29,38 @@ const BRAND_COLORS = {
   green: '#2F855A',
   navy: '#1B2A4A',
 };
+
+const STUDENT_DASHBOARD_GUIDE: OnboardingStep[] = [
+  {
+    id: 'roadmap',
+    title: 'Bắt đầu từ mục tiêu của bạn',
+    description: 'Lộ trình JLPT cho biết bạn đang học cấp độ nào và còn những chặng nào trước mục tiêu. Nếu mục tiêu thay đổi, bạn có thể cập nhật trong Hồ sơ cá nhân.',
+    targetId: 'student-roadmap',
+  },
+  {
+    id: 'progress',
+    title: 'Theo dõi tiến độ mỗi ngày',
+    description: 'Ba thẻ tổng quan cho biết số khóa đã ghi danh, khóa đang học và khóa đã hoàn thành. Hãy chọn Học tiếp ở khóa gần đây để quay lại đúng bài đang dở.',
+    targetId: 'student-stats',
+  },
+  {
+    id: 'calendar',
+    title: 'Xem lịch học tổng quát',
+    description: 'Lịch học gom các buổi của nhiều khóa vào một nơi. Bạn có thể lọc khóa học, chuyển giữa tháng/tuần/hôm nay, phát hiện trùng lịch và bấm Vào học ngay từ một buổi đã đặt.',
+    targetId: 'student-calendar',
+  },
+  {
+    id: 'focus',
+    title: 'Đặt lịch và tích điểm tập trung',
+    description: 'Mục tiêu học tập lưu lịch cố định, mục tiêu phút theo tuần và điểm Pomodoro theo kỹ năng/khóa học. Pomodoro được mở trong lúc học để thời gian hoàn thành được ghi nhận đúng bài.',
+    targetId: 'student-goals',
+  },
+  {
+    id: 'payments',
+    title: 'Khi cần mua khóa học hoặc xem hoàn tiền',
+    description: 'Mục Ví & Thanh toán là nơi xem đơn hàng, thanh toán và các khoản hoàn hợp lệ. Chỉ số dư được phép rút mới có thể gửi yêu cầu rút sau khi xác thực theo quy định.',
+  },
+];
 
 export function StudentDashboardPage() {
   const navigate = useNavigate();
@@ -80,7 +113,19 @@ export function StudentDashboardPage() {
   const stats = statsQuery.data;
   const courses = coursesQuery.data?.content ?? [];
   const profile = profileQuery.data;
-  const jlptGoal = profile?.jlptGoal || 'chưa thiết lập';
+  const goalLevel = profile?.jlptGoal?.match(/\bN[1-5]\b/i)?.[0].toUpperCase() || 'N3';
+  const currentLevel = courses
+    .map((course) => course.courseTitle.match(/\bN[1-5]\b/i)?.[0].toUpperCase())
+    .find(Boolean) || 'N5';
+  const currentNumber = Number(currentLevel.replace('N', '')) || 5;
+  const goalNumber = Number(goalLevel.replace('N', '')) || 3;
+  const roadmapDirection = currentNumber === goalNumber ? 0 : currentNumber > goalNumber ? -1 : 1;
+  const roadmapLevels = [currentLevel];
+  let roadmapNumber = currentNumber;
+  while (roadmapNumber !== goalNumber && roadmapLevels.length < 5) {
+    roadmapNumber += roadmapDirection;
+    roadmapLevels.push(`N${roadmapNumber}`);
+  }
   const statCards = [
     {
       label: 'Khóa học đã ghi danh',
@@ -161,7 +206,7 @@ export function StudentDashboardPage() {
               Chào {profile?.displayName || 'bạn'}
             </Typography>
             <Typography sx={{ color: '#5B6472', fontSize: { xs: '0.95rem', md: '1.05rem' } }}>
-              Tiếp tục lộ trình JLPT {jlptGoal} từ nơi bạn đã dừng lại.
+              Mục tiêu: JLPT {goalLevel} · Trình độ hiện tại: {currentLevel}
             </Typography>
           </Box>
           <Button
@@ -181,7 +226,36 @@ export function StudentDashboardPage() {
           </Button>
         </Stack>
 
-        <Grid container spacing={2.5} sx={{ position: 'relative', mb: 5 }}>
+        <Paper
+          data-testid="mini-roadmap"
+          data-onboarding-target="student-roadmap"
+          elevation={0}
+          sx={{ p: { xs: 2, sm: 2.5 }, mb: 4, border: '1px solid #E4E7EC', borderRadius: '8px', bgcolor: '#FFFFFF' }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', gap: 1, mb: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ color: '#172033', fontWeight: 900 }}>Lộ trình JLPT của bạn</Typography>
+            <Typography variant="caption" sx={{ color: '#667085' }}>Đang học {currentLevel} · Mục tiêu {goalLevel}</Typography>
+          </Stack>
+          <Stack direction="row" sx={{ alignItems: 'center', width: '100%' }}>
+            {roadmapLevels.map((level, index) => {
+              const isCurrent = index === 0;
+              const isTarget = index === roadmapLevels.length - 1;
+              return (
+                <Box key={`${level}-${index}`} sx={{ display: 'flex', alignItems: 'center', flex: index === roadmapLevels.length - 1 ? '0 0 auto' : 1 }}>
+                  <Stack spacing={0.35} sx={{ alignItems: 'center', minWidth: { xs: 42, sm: 64 } }}>
+                    <Box sx={{ width: 30, height: 30, borderRadius: '50%', display: 'grid', placeItems: 'center', bgcolor: isCurrent ? '#DCFCE7' : isTarget ? '#FFF1C2' : '#F1F5F9', color: isCurrent ? '#15803D' : isTarget ? '#A16207' : '#94A3B8', fontWeight: 900, fontSize: 13 }}>
+                      {isTarget ? '🏆' : isCurrent ? '●' : '○'}
+                    </Box>
+                    <Typography variant="caption" sx={{ fontWeight: isCurrent || isTarget ? 900 : 700, color: isCurrent ? '#15803D' : isTarget ? '#A16207' : '#667085' }}>{level}{isCurrent ? ' (Đang học)' : isTarget ? ' (Mục tiêu)' : ''}</Typography>
+                  </Stack>
+                  {index < roadmapLevels.length - 1 && <Box sx={{ height: 2, flex: 1, mx: { xs: 0.5, sm: 1 }, bgcolor: '#D7DEE8' }} />}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Paper>
+
+        <Grid container spacing={2.5} sx={{ position: 'relative', mb: 5 }} data-testid="student-stats" data-onboarding-target="student-stats">
           {statCards.map(({ label, value, helper, icon: Icon, color, tint }) => (
             <Grid size={{ xs: 12, sm: 4 }} key={label}>
               <Paper
@@ -232,6 +306,12 @@ export function StudentDashboardPage() {
             </Grid>
           ))}
         </Grid>
+
+        <Box sx={{ mb: 4 }} data-onboarding-target="student-calendar">
+          <StudyCalendar
+            courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
+          />
+        </Box>
 
         <Grid container spacing={3.5} sx={{ alignItems: 'stretch' }}>
           <Grid size={{ xs: 12, lg: 8.5 }}>
@@ -294,88 +374,45 @@ export function StudentDashboardPage() {
                 </Box>
               </Box>
             ) : (
-              <Grid container spacing={2.5}>
-                {courses.map((course) => (
-                  <Grid size={{ xs: 12, md: 6 }} key={course.enrollmentId}>
+              <Box
+                data-testid="recent-courses-list"
+                sx={{
+                  display: 'flex',
+                  gap: 2.5,
+                  overflowX: 'auto',
+                  pb: 1,
+                  px: 0.25,
+                  scrollSnapType: { xs: 'x mandatory', md: 'none' },
+                  '& > *': {
+                    flex: { xs: '0 0 min(88vw, 360px)', md: '0 0 320px' },
+                    scrollSnapAlign: 'start',
+                  },
+                }}
+              >
+                {courses.slice(0, 3).map((course) => (
+                  <Box key={course.enrollmentId} sx={{ minWidth: 0 }}>
                     <StudentCourseCard course={course} />
-                  </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
             )}
           </Grid>
 
           <Grid size={{ xs: 12, lg: 3.5 }}>
-            <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900, mb: 2 }}>
-              Mục tiêu học tập
-            </Typography>
-            <Paper
-              elevation={0}
-              sx={{
-                height: 'calc(100% - 40px)',
-                minHeight: 330,
-                p: 3,
-                border: '1px solid #E4E7EC',
-                borderRadius: '8px',
-                bgcolor: '#FFFFFF',
-              }}
-            >
-              <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="overline" sx={{ color: '#667085', fontWeight: 800 }}>
-                  Cấp độ hướng tới
-                </Typography>
-                <Chip
-                  label={profile?.jlptGoal ? `JLPT ${profile.jlptGoal}` : 'Chưa thiết lập'}
-                  size="small"
-                  sx={{
-                    bgcolor: profile?.jlptGoal ? BRAND_COLORS.red : '#EEF2F6',
-                    color: profile?.jlptGoal ? '#FFFFFF' : '#475467',
-                    fontWeight: 900,
-                    borderRadius: '6px',
-                  }}
-                />
-              </Stack>
-
-              <Box sx={{ my: 3, height: 1, bgcolor: '#EEF0F3' }} />
-
-              <Stack spacing={1.25}>
-                {[
-                  'Kanji và từ vựng',
-                  'Ngữ pháp',
-                  'Đọc hiểu và nghe',
-                ].map((skill) => (
-                  <Button
-                    key={skill}
-                    fullWidth
-                    variant="outlined"
-                    onClick={() => navigate(ROUTES.STUDENT.BROWSE_COURSES)}
-                    endIcon={<ArrowForwardIcon />}
-                    sx={{
-                      minHeight: 48,
-                      justifyContent: 'space-between',
-                      borderColor: '#E1E5EA',
-                      color: '#303846',
-                      fontWeight: 700,
-                      '&:hover': {
-                        borderColor: '#F2A4B1',
-                        color: BRAND_COLORS.red,
-                        bgcolor: '#FFF6F7',
-                      },
-                    }}
-                  >
-                    {skill}
-                  </Button>
-                ))}
-              </Stack>
-
-              <Stack direction="row" spacing={1.25} sx={{ mt: 3, alignItems: 'center' }}>
-                <AutoStoriesOutlinedIcon sx={{ color: BRAND_COLORS.green }} />
-                <Typography variant="body2" sx={{ color: '#667085', lineHeight: 1.55 }}>
-                  Chọn kỹ năng bạn muốn cải thiện để tìm khóa học phù hợp với mục tiêu.
-                </Typography>
-              </Stack>
-            </Paper>
+            <StudyGoalsWidget
+              jlptGoal={goalLevel}
+              courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
+            />
           </Grid>
         </Grid>
+
+        <OnboardingGuide
+          scope="student-dashboard"
+          title="Làm quen với bảng điều khiển học viên"
+          intro="ManabiHub chia dashboard thành các khu vực nhỏ để bạn biết nên bắt đầu từ đâu và không bỏ sót tiến độ học. Bạn có thể xem lại hướng dẫn bằng cách xóa dữ liệu trang của tài khoản nếu cần."
+          steps={STUDENT_DASHBOARD_GUIDE}
+          accountKey={profile?.id ?? profile?.email}
+        />
       </Box>
     </Box>
   );

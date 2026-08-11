@@ -28,6 +28,8 @@ import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.mock.domain.MockNationalIdRegistryRecord;
+import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import com.manabihub.notification.entity.Notification;
 import com.manabihub.notification.repository.NotificationRepository;
 import com.manabihub.notification.NotificationTypes;
@@ -91,9 +93,11 @@ public class TeacherKycService {
     private final PublicJwtTokenService publicJwtTokenService;
     private final VnptVerificationPort vnptVerificationPort;
     private final SecurityAuditService securityAuditService;
+    private final MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
     private final EntityManager entityManager;
     private final Path storageRoot;
     private final VnptVerificationCoordinator verificationCoordinator;
+    private final String identityVerificationMode;
 
     public TeacherKycService(
             TeacherProfileRepository teacherProfileRepository,
@@ -107,9 +111,11 @@ public class TeacherKycService {
             PublicJwtTokenService publicJwtTokenService,
             VnptVerificationPort vnptVerificationPort,
             SecurityAuditService securityAuditService,
+            MockNationalIdRegistryRepository mockNationalIdRegistryRepository,
             EntityManager entityManager,
             VnptVerificationCoordinator verificationCoordinator,
-            @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot
+            @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot,
+            @Value("${manabihub.kyc.identity-verification-mode:server}") String identityVerificationMode
     ) {
         this.teacherProfileRepository = teacherProfileRepository;
         this.kycRequestRepository = kycRequestRepository;
@@ -122,9 +128,11 @@ public class TeacherKycService {
         this.publicJwtTokenService = publicJwtTokenService;
         this.vnptVerificationPort = vnptVerificationPort;
         this.securityAuditService = securityAuditService;
+        this.mockNationalIdRegistryRepository = mockNationalIdRegistryRepository;
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
         this.verificationCoordinator = verificationCoordinator;
+        this.identityVerificationMode = identityVerificationMode;
     }
 
     @Transactional
@@ -157,6 +165,16 @@ public class TeacherKycService {
             throw new BusinessException(MessageCodes.MSG_KYC_002, "VNPT eKYC SDK result is required");
         }
 
+        if (usesDirectSdkVerification()) {
+            return verifyIdentityFromSdk(
+                    userId,
+                    request,
+                    ipAddress,
+                    userAgent,
+                    usesMockNationalIdRegistry()
+            );
+        }
+
         String incTxId = blankToNull(request.providerTransactionId());
         String incSessionId = blankToNull(request.providerSessionId());
         if (incTxId == null || incSessionId == null) {
@@ -175,6 +193,137 @@ public class TeacherKycService {
                 .orElseThrow();
 
         return buildIdentityResponse(teacherProfile, kycRequest, outcome.auditLogged());
+    }
+
+    /**
+     * Direct SDK mode is intentionally explicit. It is useful for the AWS demo/UAT
+     * deployment where the VNPT browser SDK is available but server-to-server
+     * verification is not. The production-safe default remains SERVER.
+     */
+    private KycIdentityVerificationResponse verifyIdentityFromSdk(
+            UUID userId,
+            KycIdentityVerificationRequest request,
+            String ipAddress,
+            String userAgent,
+            boolean crossCheckMockNationalId
+    ) {
+        TeacherProfile teacherProfile = resolveTeacher(userId);
+        AppUser user = teacherProfile.getUser();
+        KycRequest latestRequest = findLatestRequest(teacherProfile);
+        validateIdentityAllowed(user, teacherProfile, latestRequest);
+
+        KycRequest kycRequest = findReusableRealtimeRequest(teacherProfile, latestRequest);
+        VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
+        boolean verified = sdkDecision.verified();
+        List<String> failureReasons = new ArrayList<>(sdkDecision.failureReasons());
+        Map<String, String> identityOcr = sdkDecision.identityOcr();
+
+        if (verified) {
+            String normalizedCccd = null;
+            try {
+                normalizedCccd = teacherIdentityClaimService.normalizeCccd(identityOcr.get("idNumber"));
+                parseSupportedDate(identityOcr.get("dateOfBirth"));
+                if (crossCheckMockNationalId) {
+                    verified = crossCheckMockNationalId(
+                            normalizedCccd,
+                            identityOcr,
+                            failureReasons
+                    ) && verified;
+                }
+            } catch (BusinessException exception) {
+                verified = false;
+                failureReasons.add(exception.getMessage());
+            }
+
+            if (verified && normalizedCccd != null) {
+                teacherIdentityClaimService.processIdentityClaim(
+                        teacherProfile.getId(),
+                        normalizedCccd,
+                        user,
+                        ipAddress,
+                        userAgent
+                );
+            }
+        }
+
+        Instant now = Instant.now();
+        kycRequest.setStatus(KycRequestStatus.DRAFT);
+        kycRequest.setTeacherProfile(teacherProfile);
+        kycRequest.setEkycProvider(VNPT_PROVIDER);
+        kycRequest.setEkycReferenceId("VNPT-SDK-" + UUID.randomUUID());
+        kycRequest.setProviderSessionId(blankToNull(request.providerSessionId()));
+        kycRequest.setProviderTransactionId(blankToNull(request.providerTransactionId()));
+        kycRequest.setIdentityStatus(verified ? IdentityVerificationStatus.VERIFIED : IdentityVerificationStatus.FAILED);
+        kycRequest.setIdentityVerifiedAt(verified ? now : null);
+        kycRequest.setCertificateStatus(
+                verified ? CertificateVerificationStatus.NOT_SUBMITTED : CertificateVerificationStatus.LOCKED
+        );
+        kycRequest.setServerFullName(verified ? blankToNull(identityOcr.get("fullName")) : null);
+        kycRequest.setServerDateOfBirth(verified ? blankToNull(identityOcr.get("dateOfBirth")) : null);
+
+        Map<String, Object> verificationPayload = new LinkedHashMap<>();
+        verificationPayload.put("identityProvider", VNPT_PROVIDER);
+        verificationPayload.put("verificationMode", normalizedIdentityVerificationMode());
+        verificationPayload.put("providerResult", request.sdkResult());
+        verificationPayload.put("providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED");
+        verificationPayload.put("identityOcr", identityOcr);
+        verificationPayload.put("failureReasons", failureReasons);
+        verificationPayload.put("certificateManualAuthenticityReviewRequired", true);
+        verificationPayload.put("autoApproval", false);
+        verificationPayload.put("srs", srsTrace());
+        kycRequest.setVerificationPayload(verificationPayload);
+
+        KycRequest savedRequest = kycRequestRepository.save(kycRequest);
+        boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
+        return buildIdentityResponse(teacherProfile, savedRequest, auditLogged);
+    }
+
+    private boolean crossCheckMockNationalId(
+            String normalizedCccd,
+            Map<String, String> identityOcr,
+            List<String> failureReasons
+    ) {
+        MockNationalIdRegistryRecord registryRecord = mockNationalIdRegistryRepository
+                .findByIdNumberAndActiveTrue(normalizedCccd)
+                .orElse(null);
+        if (registryRecord == null) {
+            failureReasons.add("Thông tin CCCD không tồn tại trong cơ sở dữ liệu quốc gia mô phỏng");
+            return false;
+        }
+
+        boolean matches = true;
+        if (!normalizePersonName(identityOcr.get("fullName")).equals(normalizePersonName(registryRecord.getFullName()))) {
+            failureReasons.add("Họ và tên không khớp với cơ sở dữ liệu quốc gia mô phỏng");
+            matches = false;
+        }
+        try {
+            LocalDate ocrDateOfBirth = parseSupportedDate(identityOcr.get("dateOfBirth"));
+            if (!ocrDateOfBirth.equals(registryRecord.getDateOfBirth())) {
+                failureReasons.add("Ngày sinh không khớp với cơ sở dữ liệu quốc gia mô phỏng");
+                matches = false;
+            }
+        } catch (BusinessException exception) {
+            failureReasons.add(exception.getMessage());
+            matches = false;
+        }
+
+        return matches;
+    }
+
+    private boolean usesDirectSdkVerification() {
+        String mode = normalizedIdentityVerificationMode();
+        return "DIRECT_SDK".equals(mode) || "DIRECT_SDK_MOCK".equals(mode);
+    }
+
+    private boolean usesMockNationalIdRegistry() {
+        return "DIRECT_SDK_MOCK".equals(normalizedIdentityVerificationMode());
+    }
+
+    private String normalizedIdentityVerificationMode() {
+        return (identityVerificationMode == null ? "SERVER" : identityVerificationMode)
+                .trim()
+                .toUpperCase(Locale.ROOT)
+                .replace('-', '_');
     }
 
     private KycIdentityVerificationResponse buildIdentityResponse(TeacherProfile teacherProfile, KycRequest request, boolean auditLogged) {
@@ -415,9 +564,10 @@ public class TeacherKycService {
 
     private KycRequest findReusableRealtimeRequest(TeacherProfile teacherProfile, KycRequest latestRequest) {
         return java.util.Optional.ofNullable(latestRequest)
-                .filter(request -> request.getStatus() == KycRequestStatus.DRAFT
+                .filter(request -> (request.getStatus() == KycRequestStatus.DRAFT
                         && request.getIdentityStatus() == IdentityVerificationStatus.NOT_STARTED
                         && request.getProviderTransactionId() == null)
+                        || request.getIdentityStatus() == IdentityVerificationStatus.FAILED)
                 .orElseGet(KycRequest::new);
     }
 
@@ -867,8 +1017,13 @@ public class TeacherKycService {
             throw certificateMismatch("Only JLPT levels N1 through N5 are accepted");
         }
 
-        String identityFullName = kycRequest.getServerFullName();
-        String identityDateOfBirth = kycRequest.getServerDateOfBirth();
+        Map<String, String> identityOcr = extractOcrFromPayload(kycRequest.getVerificationPayload());
+        String identityFullName = StringUtils.hasText(kycRequest.getServerFullName())
+                ? kycRequest.getServerFullName()
+                : identityOcr.get("fullName");
+        String identityDateOfBirth = StringUtils.hasText(kycRequest.getServerDateOfBirth())
+                ? kycRequest.getServerDateOfBirth()
+                : identityOcr.get("dateOfBirth");
         if (!StringUtils.hasText(identityFullName) || !StringUtils.hasText(identityDateOfBirth)) {
             throw certificateMismatch(
                     "VNPT identity result is missing the name or date of birth required for matching"
@@ -1005,7 +1160,9 @@ public class TeacherKycService {
         }
 
         List<ResultEntry> entries = flattenResult(sdkResult);
-        boolean hasExplicitInvalid = entries.stream().anyMatch(this::isExplicitInvalidValue);
+        boolean hasInvalidProviderSignal = entries.stream().anyMatch(this::isExplicitInvalidValue)
+                || hasNonEmptyCollection(entries, "generalwarning", "warning")
+                || hasAffirmativeSignal(entries, "masked");
         Map<String, String> identityOcr = extractIdentityOcr(entries);
         boolean hasRequiredOcr = StringUtils.hasText(identityOcr.get("idNumber"))
                 && StringUtils.hasText(identityOcr.get("fullName"))
@@ -1013,7 +1170,7 @@ public class TeacherKycService {
         boolean hasFaceVerification = hasAcceptedFaceVerification(entries);
 
         java.util.ArrayList<String> failureReasons = new java.util.ArrayList<>();
-        if (hasExplicitInvalid) {
+        if (hasInvalidProviderSignal) {
             failureReasons.add("VNPT validation returned invalid document, mismatch, failed, or null result");
         }
         if (!hasRequiredOcr) {
@@ -1059,12 +1216,7 @@ public class TeacherKycService {
         String normalizedKey = normalizeKey(key);
 
         if (isDecisionKey(key) && value instanceof Boolean booleanValue) {
-            boolean isNegativeKey = normalizedKey.contains("fake")
-                    || normalizedKey.contains("spoof")
-                    || normalizedKey.contains("tamper")
-                    || normalizedKey.contains("multiple")
-                    || normalizedKey.contains("warning")
-                    || normalizedKey.contains("swapping");
+            boolean isNegativeKey = isNegativeDecisionKey(normalizedKey);
             if (isNegativeKey) {
                 if (booleanValue) return true; // Fake is true -> Invalid
             } else {
@@ -1072,12 +1224,12 @@ public class TeacherKycService {
             }
         }
 
-        if (isVerificationScoreKey(key) && value instanceof Number numberValue) {
-            return !isAcceptedScore(numberValue.doubleValue());
+        if (isNegativeDecisionKey(normalizedKey) && isAffirmativeFlagValue(value)) {
+            return true;
         }
 
         if (isDecisionKey(key) && value instanceof String text) {
-            String normalized = normalizeSearchText(text);
+            String normalized = normalizeSearchText(text).trim();
             return normalized.contains("khong hop le")
                     || normalized.contains("khong cung loai")
                     || normalized.contains("khong trung khop")
@@ -1088,12 +1240,82 @@ public class TeacherKycService {
                     || normalized.contains("not valid")
                     || normalized.contains("not same")
                     || normalized.contains("not match")
+                    || normalized.contains("nomatch")
+                    || normalized.equals("nothing")
                     || normalized.contains("mismatch")
                     || normalized.contains("failed")
                     || normalized.contains("failure")
                     || normalized.contains("null%");
         }
 
+        return false;
+    }
+
+    private boolean isNegativeDecisionKey(String normalizedKey) {
+        return normalizedKey.contains("fake")
+                || normalizedKey.contains("spoof")
+                || normalizedKey.contains("tamper")
+                || normalizedKey.contains("multiple")
+                || normalizedKey.contains("warning")
+                || normalizedKey.contains("swapping");
+    }
+
+    private boolean hasNonEmptyCollection(List<ResultEntry> entries, String... aliases) {
+        Set<String> normalizedAliases = java.util.Arrays.stream(aliases)
+                .map(this::normalizeKey)
+                .collect(java.util.stream.Collectors.toSet());
+
+        return entries.stream()
+                .filter(entry -> normalizedAliases.contains(normalizeKey(lastPathSegment(entry.key()))))
+                .map(ResultEntry::value)
+                .anyMatch(value -> {
+                    if (value instanceof Iterable<?> iterable) {
+                        return iterable.iterator().hasNext();
+                    }
+                    return value != null && value.getClass().isArray()
+                            && java.lang.reflect.Array.getLength(value) > 0;
+                });
+    }
+
+    private boolean hasAffirmativeSignal(List<ResultEntry> entries, String... aliases) {
+        Set<String> normalizedAliases = java.util.Arrays.stream(aliases)
+                .map(this::normalizeKey)
+                .collect(java.util.stream.Collectors.toSet());
+
+        return entries.stream()
+                .filter(entry -> normalizedAliases.contains(normalizeKey(lastPathSegment(entry.key()))))
+                .anyMatch(entry -> isAffirmativeValue(entry.value()));
+    }
+
+    private boolean isAffirmativeValue(Object value) {
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+        if (value instanceof Number numberValue) {
+            return numberValue.doubleValue() > 0.0D;
+        }
+        if (value instanceof String text) {
+            String normalized = normalizeSearchText(text).trim();
+            return normalized.equals("true")
+                    || normalized.equals("yes")
+                    || normalized.equals("1")
+                    || normalized.equals("co")
+                    || normalized.equals("có");
+        }
+        return false;
+    }
+
+    private boolean isAffirmativeFlagValue(Object value) {
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+        if (value instanceof String text) {
+            String normalized = normalizeSearchText(text).trim();
+            return normalized.equals("true")
+                    || normalized.equals("yes")
+                    || normalized.equals("1")
+                    || normalized.equals("co");
+        }
         return false;
     }
 
@@ -1167,7 +1389,21 @@ public class TeacherKycService {
     }
 
     private boolean isVerificationScoreKey(String key) {
-        return isFaceVerificationKey(key) && isScoreKey(key);
+        if (!isFaceVerificationKey(key) || !isScoreKey(key)) {
+            return false;
+        }
+
+        // VNPT uses low values for quality/anti-spoof indicators where a low
+        // value is a good result (for example blur_face_score and
+        // fake_liveness_prob). Those are not confidence scores and must not be
+        // evaluated with the face-match threshold below.
+        String normalizedKey = normalizeKey(key);
+        return !normalizedKey.contains("blur")
+                && !normalizedKey.contains("fake")
+                && !normalizedKey.contains("spoof")
+                && !normalizedKey.contains("tamper")
+                && !normalizedKey.contains("swapping")
+                && !normalizedKey.contains("masked");
     }
 
     private boolean isAcceptedScore(double value) {

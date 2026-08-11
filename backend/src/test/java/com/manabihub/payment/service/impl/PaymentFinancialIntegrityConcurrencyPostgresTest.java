@@ -17,6 +17,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -76,6 +78,9 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
 
     @Autowired
     private StudentWalletService studentWalletService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @MockBean
     private PaymentGateway paymentGateway;
@@ -518,6 +523,96 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
                   AND transaction_type = 'WITHDRAWAL_RESERVATION'
                   AND amount = 200000.00
                 """, walletId));
+    }
+
+    @Test
+    void checkoutTransactionRollsBackNewOrderWhenWalletBalanceIsInsufficient() {
+        UUID orderId = UUID.randomUUID();
+        UUID walletId = UUID.randomUUID();
+        String orderCode = "WI-" + orderId;
+        BigDecimal gross = new BigDecimal("250000.00");
+
+        jdbcTemplate.update("""
+                INSERT INTO wallets (
+                    id, owner_type, student_id, balance, frozen_balance, currency, frozen
+                )
+                VALUES (?, 'STUDENT', ?, 100000.00, 0, 'VND', FALSE)
+                """, walletId, STUDENT_ID);
+
+        try {
+            TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+            assertThrows(BusinessException.class, () -> transactionTemplate.executeWithoutResult(status -> {
+                jdbcTemplate.update("""
+                        INSERT INTO orders (
+                            id, student_id, order_code, total_amount, currency, order_status
+                        )
+                        VALUES (?, ?, ?, ?, 'VND', 'PENDING')
+                        """, orderId, STUDENT_ID, orderCode, gross);
+
+                paymentService.payWithWallet(orderId);
+            }));
+
+            assertEquals(0, count("SELECT COUNT(*) FROM orders WHERE id = ?", orderId));
+            assertEquals(0, count("SELECT COUNT(*) FROM wallet_payment_reservations WHERE order_id = ?", orderId));
+        } finally {
+            jdbcTemplate.update("DELETE FROM wallets WHERE id = ?", walletId);
+        }
+    }
+
+    @Test
+    void lateSuccessfulIpnCannotReopenCancelledOrder() {
+        UUID studentId = createStudentProfile("late-ipn");
+        UUID orderId = UUID.randomUUID();
+        String orderCode = "LATE-IPN-" + orderId;
+        jdbcTemplate.update("""
+                INSERT INTO orders (
+                    id, student_id, order_code, total_amount, currency, order_status
+                ) VALUES (?, ?, ?, 250000.00, 'VND', 'CANCELLED')
+                """, orderId, studentId, orderCode);
+
+        when(paymentGateway.getProvider()).thenReturn("VNPAY");
+        when(paymentGateway.parseCallback(anyMap())).thenReturn(new PaymentCallbackResult(
+                true,
+                orderCode,
+                "LATE-TX-" + orderId,
+                25_000_000L,
+                "00",
+                "00",
+                true));
+
+        assertEquals("02", paymentService.handleIpn(Map.of("vnp_TxnRef", orderCode)).rspCode());
+        assertEquals("CANCELLED", jdbcTemplate.queryForObject(
+                "SELECT order_status FROM orders WHERE id = ?", String.class, orderId));
+        assertEquals(0, count("SELECT COUNT(*) FROM payment_transactions WHERE order_id = ?", orderId));
+        assertEquals(0, count("SELECT COUNT(*) FROM enrollments WHERE student_id = ?", studentId));
+    }
+
+    @Test
+    void pendingVnPayPaymentExpiresAndCancelsOrder() {
+        UUID studentId = createStudentProfile("expiry");
+        UUID orderId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        String orderCode = "EXPIRY-" + orderId;
+        jdbcTemplate.update("""
+                INSERT INTO orders (
+                    id, student_id, order_code, total_amount, currency, order_status, created_at
+                ) VALUES (?, ?, ?, 250000.00, 'VND', 'PENDING', NOW() - INTERVAL '16 minutes')
+                """, orderId, studentId, orderCode);
+        jdbcTemplate.update("""
+                INSERT INTO payment_transactions (
+                    id, order_id, provider, amount, status, created_at
+                ) VALUES (?, ?, 'VNPAY', 250000.00, 'PENDING', NOW() - INTERVAL '16 minutes')
+                """, transactionId, orderId);
+
+        when(paymentGateway.getProvider()).thenReturn("VNPAY");
+
+        paymentService.expirePendingPayments();
+
+        assertEquals("CANCELLED", jdbcTemplate.queryForObject(
+                "SELECT order_status FROM orders WHERE id = ?", String.class, orderId));
+        assertEquals("FAILED", jdbcTemplate.queryForObject(
+                "SELECT status FROM payment_transactions WHERE id = ?", String.class, transactionId));
     }
 
     private int count(String sql, Object... arguments) {

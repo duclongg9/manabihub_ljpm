@@ -4,6 +4,7 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.common.response.PageResponse;
 import com.manabihub.writing.dto.request.WritingSubmissionRequest;
+import com.manabihub.writing.dto.request.WritingDraftRequest;
 import com.manabihub.writing.dto.response.StudentWritingSubmissionResponse;
 import com.manabihub.learning.dto.request.ReviewFlashcardRequest;
 import com.manabihub.learning.dto.request.SaveVideoProgressRequest;
@@ -107,6 +108,16 @@ public class StudentLearningController {
                 MessageCodes.COMMON_SUCCESS,
                 "Writing submission retrieved successfully",
                 learningService.getWritingSubmission(lessonBlockId));
+    }
+
+    @PutMapping("/lessons/{lessonBlockId}/writing-submissions/draft")
+    public ApiResponse<StudentWritingSubmissionResponse> saveWritingDraft(
+            @PathVariable UUID lessonBlockId,
+            @Valid @RequestBody WritingDraftRequest request) {
+        return ApiResponse.success(
+                MessageCodes.COMMON_SUCCESS,
+                "Writing draft saved successfully",
+                learningService.saveWritingDraft(lessonBlockId, request));
     }
 
     @PostMapping("/lessons/{lessonBlockId}/writing-submissions")

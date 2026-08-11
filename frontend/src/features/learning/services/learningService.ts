@@ -41,9 +41,14 @@ export const learningService = {
     return response.data.data;
   },
 
-  saveVideoProgress: async (blockId: string, positionSeconds: number): Promise<LessonProgress> => {
+  saveVideoProgress: async (
+    blockId: string,
+    positionSeconds: number,
+    watchedSeconds = 0,
+  ): Promise<LessonProgress> => {
     const response = await axiosClient.put(ENDPOINTS.LEARNING.VIDEO_PROGRESS(blockId), {
       positionSeconds,
+      watchedSeconds,
     });
     return response.data.data;
   },
@@ -71,6 +76,10 @@ export const learningService = {
     return response.data.data;
   },
 
+  terminateFinalTest: async (courseId: string, attemptId: string): Promise<void> => {
+    await axiosClient.post(ENDPOINTS.LEARNING.FINAL_TEST_TERMINATE(courseId, attemptId));
+  },
+
   submitFinalTest: async (
     courseId: string,
     attemptId: string,
@@ -90,6 +99,11 @@ export const learningService = {
 
   getWritingSubmission: async (blockId: string): Promise<WritingSubmissionDetail | null> => {
     const response = await axiosClient.get(ENDPOINTS.LEARNING.WRITING_SUBMISSION_GET(blockId));
+    return response.data.data;
+  },
+
+  saveWritingDraft: async (blockId: string, content: string): Promise<WritingSubmissionDetail> => {
+    const response = await axiosClient.put(ENDPOINTS.LEARNING.WRITING_SUBMISSION_DRAFT(blockId), { content });
     return response.data.data;
   },
 

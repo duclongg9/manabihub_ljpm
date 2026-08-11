@@ -15,6 +15,7 @@ import com.manabihub.wallet.enums.WalletTransactionType;
 import com.manabihub.wallet.repository.WalletPaymentReservationRepository;
 import com.manabihub.wallet.repository.WalletRepository;
 import com.manabihub.wallet.repository.WalletTransactionRepository;
+import com.manabihub.systemconfig.service.CommercialPolicyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
@@ -55,6 +56,7 @@ class StudentWalletServiceImplTest {
     @Mock private WalletTransactionRepository walletTransactionRepository;
     @Mock private WalletPaymentReservationRepository reservationRepository;
     @Mock private StudentProfileRepository studentProfileRepository;
+    @Mock private CommercialPolicyService commercialPolicyService;
 
     private StudentWalletServiceImpl service;
     private UUID studentId;
@@ -66,7 +68,8 @@ class StudentWalletServiceImplTest {
                 walletRepository,
                 walletTransactionRepository,
                 reservationRepository,
-                studentProfileRepository);
+                studentProfileRepository,
+                commercialPolicyService);
         studentId = UUID.randomUUID();
         wallet = Wallet.builder()
                 .id(UUID.randomUUID())

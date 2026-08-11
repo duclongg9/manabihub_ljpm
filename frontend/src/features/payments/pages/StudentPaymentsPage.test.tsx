@@ -39,6 +39,13 @@ vi.mock('../../wallet/services/studentWalletService', () => ({
   })),
 }));
 
+vi.mock('../../wallet/services/studentIdentityVerificationService', () => ({
+  getStudentIdentityVerificationStatus: vi.fn(() => Promise.resolve({
+    verified: false,
+    status: 'NOT_VERIFIED',
+  })),
+}));
+
 vi.mock('../../help-center/hooks/useCommercialPolicy', () => ({
   useCommercialPolicy: vi.fn(() => ({
     data: {
@@ -113,6 +120,11 @@ describe('StudentPaymentsPage', () => {
     expect(screen.getByText('Đã thanh toán')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Vào học/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Yêu cầu hoàn tiền/i })).toBeInTheDocument();
+    expect(screen.getByText('Ví học viên')).toBeInTheDocument();
+    expect(screen.getByText('Rút tiền hoàn')).toBeInTheDocument();
+    expect(screen.getByText('Tiền hoàn hợp lệ dùng để mua khóa học')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Nạp tiền/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Xác minh SĐT & CCCD để rút tiền' })).toBeInTheDocument();
   });
 
   it('filters out top-up orders from course order history', () => {

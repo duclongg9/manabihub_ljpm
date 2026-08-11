@@ -42,6 +42,22 @@ public class StudentProfile {
     @Column(name = "jlpt_goal", length = 20)
     private String jlptGoal;
 
+    /** Demo-only identity verification evidence. The raw CCCD is never stored. */
+    @Column(name = "identity_fingerprint", length = 64)
+    private String identityFingerprint;
+
+    @Column(name = "identity_provider", length = 64)
+    private String identityProvider;
+
+    @Column(name = "identity_full_name")
+    private String identityFullName;
+
+    @Column(name = "identity_date_of_birth")
+    private java.time.LocalDate identityDateOfBirth;
+
+    @Column(name = "identity_verified_at")
+    private Instant identityVerifiedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

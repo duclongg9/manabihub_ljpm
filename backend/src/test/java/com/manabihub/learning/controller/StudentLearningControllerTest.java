@@ -445,6 +445,28 @@ class StudentLearningControllerTest {
     }
 
     @Test
+    void saveWritingDraft_success() throws Exception {
+        UUID lessonBlockId = UUID.randomUUID();
+        var response = new com.manabihub.writing.dto.response.StudentWritingSubmissionResponse(
+                UUID.randomUUID(), lessonBlockId, "Draft content",
+                com.manabihub.writing.enums.WritingSubmissionStatus.DRAFT, Instant.now(), null, null
+        );
+
+        when(learningService.saveWritingDraft(eq(lessonBlockId), any())).thenReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                                "/api/v1/student/lessons/{lessonBlockId}/writing-submissions/draft", lessonBlockId)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"Draft content\"}")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.status", is("DRAFT")))
+                .andExpect(jsonPath("$.data.content", is("Draft content")));
+    }
+
+    @Test
     void submitWriting_forbidden() throws Exception {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/student/lessons/{lessonBlockId}/writing-submissions", UUID.randomUUID())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)

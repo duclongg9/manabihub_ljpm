@@ -3,9 +3,11 @@ import type { PublicCourseDetail } from '../types/courseDetailTypes';
 
 interface CourseStickyHeaderProps {
   course: PublicCourseDetail;
+  onPurchase?: () => void;
+  onContinueLearning?: () => void;
 }
 
-export const CourseStickyHeader = ({ course }: CourseStickyHeaderProps) => {
+export const CourseStickyHeader = ({ course, onPurchase, onContinueLearning }: CourseStickyHeaderProps) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -42,11 +44,17 @@ export const CourseStickyHeader = ({ course }: CourseStickyHeaderProps) => {
             )}
           </div>
           {course.isEnrolled ? (
-            <button className="bg-white hover:bg-slate-100 text-slate-900 font-bold py-2 px-6 rounded-lg transition-colors text-sm">
+            <button
+              onClick={onContinueLearning}
+              className="bg-white hover:bg-slate-100 text-slate-900 font-bold py-2 px-6 rounded-lg transition-colors text-sm"
+            >
               Tiếp tục học
             </button>
           ) : (
-            <button className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white font-bold py-2 px-6 rounded-lg transition-all shadow-md shadow-indigo-500/20 text-sm">
+            <button
+              onClick={onPurchase}
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white font-bold py-2 px-6 rounded-lg transition-all shadow-md shadow-indigo-500/20 text-sm"
+            >
               {course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
             </button>
           )}

@@ -36,6 +36,7 @@ import AssignmentTurnedInOutlinedIcon from '@mui/icons-material/AssignmentTurned
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { isAxiosError } from 'axios';
 import ReactPlayer from 'react-player';
 import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
@@ -47,6 +48,7 @@ import type {
   FinalTestEligibility,
   FinalTestSubmissionResult,
   LearningLessonBlock,
+  LearningModule,
   LearningCertificate,
   QuizQuestion,
   QuizSubmissionResult,
@@ -55,9 +57,58 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
+import {
+  isSingleCharacterMutation,
+  readLocalStorageValue,
+  removeLocalStorageValue,
+  writeLocalStorageValue,
+} from '../utils/learningInputGuard';
+import {
+  FINAL_TEST_MAX_VIOLATIONS,
+  isClipboardShortcut,
+  isScreenshotShortcut,
+  violationLabel,
+  type FinalTestViolationType,
+} from '../utils/finalTestProctoring';
 import { downloadCertificatePdf, formatCertificateDate } from '../utils/certificatePdf';
+import { CoursePomodoroPanel } from '../components/CoursePomodoroPanel';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
+const WATCHED_DELTA_MAX_SECONDS = 2;
+const COURSE_SELECTION_STORAGE_PREFIX = 'manabihub:course-selection:';
+const WRITING_DRAFT_STORAGE_PREFIX = 'manabihub:writing-draft:';
+const QUIZ_ANSWERS_STORAGE_PREFIX = 'manabihub:quiz-answers:';
+const FINAL_TEST_STORAGE_PREFIX = 'manabihub:final-test:';
+
+interface LocalWritingDraft {
+  content: string;
+  savedAt: number;
+}
+
+function publicStorageScope() {
+  return getAuthSession('public')?.subject ?? 'anonymous';
+}
+
+function courseSelectionStorageKey(courseId: string) {
+  return `${COURSE_SELECTION_STORAGE_PREFIX}${publicStorageScope()}:${courseId}`;
+}
+
+function writingDraftStorageKey(blockId: string) {
+  return `${WRITING_DRAFT_STORAGE_PREFIX}${publicStorageScope()}:${blockId}`;
+}
+
+function quizAnswersStorageKey(blockId: string) {
+  return `${QUIZ_ANSWERS_STORAGE_PREFIX}${publicStorageScope()}:${blockId}`;
+}
+
+function finalTestStorageKey(courseId: string) {
+  return `${FINAL_TEST_STORAGE_PREFIX}${publicStorageScope()}:${courseId}`;
+}
+
+interface LocalFinalTestState {
+  attempt: FinalTestAttempt;
+  answers: Record<string, string[]>;
+}
 
 export function CourseLearningPage() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -67,6 +118,7 @@ export function CourseLearningPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [selectedContentLoading, setSelectedContentLoading] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
 
   const session = getAuthSession('public');
@@ -80,8 +132,19 @@ export function CourseLearningPage() {
       .openCourse(courseId)
       .then((data) => {
         if (!active) return;
-        setLearning(data);
-        setSelectedBlockId(data.currentLessonBlockId ?? data.modules[0]?.blocks[0]?.id ?? null);
+        // Derive sequential access locally as a defensive guard for older
+        // deployments or cached responses that omit the `locked` flag.
+        const modules = applySequentialLocks(data.modules);
+        const availableBlockIds = new Set(modules.flatMap((module) => module.blocks.map((block) => block.id)));
+        const savedBlockId = readLocalStorageValue<string>(courseSelectionStorageKey(data.courseId));
+        const initialBlockId =
+          savedBlockId && availableBlockIds.has(savedBlockId)
+            ? savedBlockId
+            : data.currentLessonBlockId ?? modules[0]?.blocks[0]?.id ?? null;
+        const initialBlock = modules.flatMap((module) => module.blocks).find((block) => block.id === initialBlockId);
+        setLearning({ ...data, modules });
+        setSelectedBlockId(initialBlockId);
+        setSelectedContentLoading(initialBlock?.type === 'VIDEO');
       })
       .catch((err) => {
         if (!active) return;
@@ -100,6 +163,11 @@ export function CourseLearningPage() {
       active = false;
     };
   }, [courseId, navigate]);
+
+  useEffect(() => {
+    if (!courseId || !selectedBlockId) return;
+    writeLocalStorageValue(courseSelectionStorageKey(courseId), selectedBlockId);
+  }, [courseId, selectedBlockId]);
 
   const allBlocks = useMemo(
     () => (learning ? learning.modules.flatMap((module) => module.blocks) : []),
@@ -120,12 +188,13 @@ export function CourseLearningPage() {
         ...module,
         blocks: module.blocks.map((block) => (block.id === blockId ? { ...block, ...patch } : block)),
       }));
-      const blocks = modules.flatMap((module) => module.blocks);
+      const unlockedModules = applySequentialLocks(modules);
+      const blocks = unlockedModules.flatMap((module) => module.blocks);
       const completedLessons = blocks.filter((block) => block.progressStatus === 'COMPLETED').length;
       const totalLessons = blocks.length;
       return {
         ...prev,
-        modules,
+        modules: unlockedModules,
         completedLessons,
         progressPercent: totalLessons === 0 ? 0 : Math.round((completedLessons * 10000) / totalLessons) / 100,
         courseCompleted: totalLessons > 0 && completedLessons === totalLessons,
@@ -134,7 +203,7 @@ export function CourseLearningPage() {
   }, []);
 
   const handleMarkComplete = async () => {
-    if (!selectedBlock || completing) return;
+    if (!selectedBlock || completing || selectedContentLoading || selectedBlock.locked) return;
     setCompleting(true);
     try {
       const progress = await learningService.markLessonComplete(selectedBlock.id);
@@ -153,9 +222,24 @@ export function CourseLearningPage() {
     }
   };
 
+  const handleSelectBlock = useCallback((block: LearningLessonBlock) => {
+    if (completing || selectedContentLoading || block.locked) return;
+    setSelectedContentLoading(block.type === 'VIDEO');
+    setSelectedBlockId(block.id);
+  }, [completing, selectedContentLoading]);
+
   const handleVideoProgressSaved = useCallback(
-    (blockId: string, positionSeconds: number, status: LearningLessonBlock['progressStatus']) => {
-      updateBlock(blockId, { lastVideoPositionSeconds: positionSeconds, progressStatus: status });
+    (
+      blockId: string,
+      positionSeconds: number,
+      status: LearningLessonBlock['progressStatus'],
+      watchedVideoSeconds: number,
+    ) => {
+      updateBlock(blockId, {
+        lastVideoPositionSeconds: positionSeconds,
+        watchedVideoSeconds,
+        progressStatus: status,
+      });
     },
     [updateBlock],
   );
@@ -173,13 +257,14 @@ export function CourseLearningPage() {
             return { ...block, flashcardStatuses: newStatuses, progressStatus };
           }),
         }));
+        const unlockedModules = applySequentialLocks(modules);
 
-        const blocks = modules.flatMap((module) => module.blocks);
+        const blocks = unlockedModules.flatMap((module) => module.blocks);
         const completedLessons = blocks.filter((block) => block.progressStatus === 'COMPLETED').length;
         const totalLessons = blocks.length;
         return {
           ...prev,
-          modules,
+          modules: unlockedModules,
           completedLessons,
           progressPercent: totalLessons === 0 ? 0 : Math.round((completedLessons * 10000) / totalLessons) / 100,
           courseCompleted: totalLessons > 0 && completedLessons === totalLessons,
@@ -202,13 +287,14 @@ export function CourseLearningPage() {
           };
         }),
       }));
-      const newCompleted = newModules
+      const unlockedModules = applySequentialLocks(newModules);
+      const newCompleted = unlockedModules
         .flatMap((m) => m.blocks)
         .filter((b) => b.progressStatus === 'COMPLETED').length;
-      const newTotal = newModules.flatMap((m) => m.blocks).length;
+      const newTotal = unlockedModules.flatMap((m) => m.blocks).length;
       return {
         ...prev,
-        modules: newModules,
+        modules: unlockedModules,
         completedLessons: newCompleted,
         progressPercent: newTotal > 0 ? Math.round((newCompleted * 10000) / newTotal) / 100 : 0,
         courseCompleted: newTotal > 0 && newCompleted === newTotal,
@@ -285,7 +371,7 @@ export function CourseLearningPage() {
       />
 
       <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
-        <Paper variant="outlined" sx={{ width: { xs: '100%', md: 320 }, flexShrink: 0, alignSelf: 'flex-start' }}>
+        <Paper variant="outlined" sx={{ width: { xs: '100%', md: 360 }, flexShrink: 0, alignSelf: 'flex-start' }}>
           {learning.modules.map((module) => (
             <Box key={module.id}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, px: 2, pt: 2, pb: 1, color: 'text.secondary' }}>
@@ -296,10 +382,14 @@ export function CourseLearningPage() {
                   <ListItemButton
                     key={block.id}
                     selected={block.id === selectedBlockId}
-                    onClick={() => setSelectedBlockId(block.id)}
+                    disabled={block.locked || completing || selectedContentLoading}
+                    onClick={() => handleSelectBlock(block)}
+                    sx={{ alignItems: 'flex-start', py: 1.25 }}
                   >
                     <ListItemIcon sx={{ minWidth: 34 }}>
-                      {block.progressStatus === 'COMPLETED' ? (
+                      {block.locked ? (
+                        <LockOutlinedIcon color="disabled" fontSize="small" />
+                      ) : block.progressStatus === 'COMPLETED' ? (
                         <CheckCircleIcon color="success" fontSize="small" />
                       ) : block.progressStatus === 'IN_PROGRESS' ? (
                         <PlayCircleOutlineIcon color="primary" fontSize="small" />
@@ -310,9 +400,11 @@ export function CourseLearningPage() {
                     <ListItemText
                       disableTypography
                       primary={
-                        <Typography variant="body2" noWrap>
-                          {block.title}
-                        </Typography>
+                        <Tooltip title={block.title} placement="top-start">
+                          <Typography variant="body2" sx={{ whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.3 }}>
+                            {block.title}
+                          </Typography>
+                        </Tooltip>
                       }
                       secondary={
                         <Typography variant="caption" color="text.secondary" component="div">
@@ -329,12 +421,13 @@ export function CourseLearningPage() {
         </Paper>
 
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <CoursePomodoroPanel courseTitle={learning.courseTitle} />
           {selectedBlock ? (
             <Card variant="outlined">
               <CardContent>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 2 }}>
-                  <Chip size="small" label={selectedBlock.type} variant="outlined" />
-                  <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1 }} noWrap>
+                  <Chip size="small" label={blockTypeLabel(selectedBlock)} color={blockTypeColor(selectedBlock)} />
+                  <Typography variant="h6" sx={{ fontWeight: 700, flexGrow: 1, overflowWrap: 'anywhere' }}>
                     {selectedBlock.title}
                   </Typography>
                   {canReport && (
@@ -355,22 +448,57 @@ export function CourseLearningPage() {
 
                 {!selectedBlock.contentAvailable ? (
                   <Alert severity="warning">Nội dung bài học hiện chưa sẵn sàng. Vui lòng quay lại sau.</Alert>
-                ) : (
+                ) : selectedBlock.type === 'WRITING' ? (
+                  // Keep the writing prompt, editor, autosave status and submit action
+                  // in the page flow; only lesson content gets a bounded scroll area.
                   <BlockContent
                     block={selectedBlock}
+                    onContentLoadingChange={setSelectedContentLoading}
                     onVideoProgressSaved={handleVideoProgressSaved}
                     onQuizProgressSaved={handleQuizProgressSaved}
                     onFlashcardProgressSaved={handleFlashcardProgressSaved}
                     onWritingProgressSaved={handleWritingProgressSaved}
                   />
+                ) : (
+                  <Box
+                    data-testid="lesson-content-scroll"
+                    sx={{
+                      maxHeight: { xs: '60vh', md: 'calc(100vh - 330px)' },
+                      overflowY: 'auto',
+                      overflowX: 'hidden',
+                      pr: { xs: 0.5, md: 1.5 },
+                      overscrollBehavior: 'contain',
+                      scrollbarGutter: 'stable',
+                    }}
+                  >
+                    <BlockContent
+                      block={selectedBlock}
+                      onContentLoadingChange={setSelectedContentLoading}
+                      onVideoProgressSaved={handleVideoProgressSaved}
+                      onQuizProgressSaved={handleQuizProgressSaved}
+                      onFlashcardProgressSaved={handleFlashcardProgressSaved}
+                      onWritingProgressSaved={handleWritingProgressSaved}
+                    />
+                  </Box>
                 )}
 
                 <Divider sx={{ my: 2 }} />
-                <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between' }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{
+                    justifyContent: 'space-between',
+                    position: 'sticky',
+                    bottom: 0,
+                    zIndex: 2,
+                    py: 1,
+                    backgroundColor: 'background.paper',
+                  }}
+                >
                   <Button
                     startIcon={<ArrowBackIcon />}
-                    disabled={selectedIndex <= 0}
-                    onClick={() => setSelectedBlockId(allBlocks[selectedIndex - 1].id)}
+                    disabled={selectedIndex <= 0 || completing || selectedContentLoading}
+                    onClick={() => handleSelectBlock(allBlocks[selectedIndex - 1])}
                   >
                     Bài trước
                   </Button>
@@ -380,17 +508,28 @@ export function CourseLearningPage() {
                     startIcon={<CheckCircleIcon />}
                     disabled={
                       completing ||
+                      selectedContentLoading ||
                       selectedBlock.progressStatus === 'COMPLETED' ||
-                      ['QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
+                      ['VIDEO', 'QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
                     }
                     onClick={handleMarkComplete}
                   >
-                    {selectedBlock.progressStatus === 'COMPLETED' ? 'Đã hoàn thành' : 'Hoàn thành bài học'}
+                    {selectedBlock.progressStatus === 'COMPLETED'
+                      ? 'Đã hoàn thành'
+                      : selectedBlock.type === 'VIDEO'
+                        ? 'Xem hết video để hoàn thành'
+                        : 'Hoàn thành bài học'}
                   </Button>
                   <Button
                     endIcon={<ArrowForwardIcon />}
-                    disabled={selectedIndex < 0 || selectedIndex >= allBlocks.length - 1}
-                    onClick={() => setSelectedBlockId(allBlocks[selectedIndex + 1].id)}
+                    disabled={
+                      selectedIndex < 0
+                      || selectedIndex >= allBlocks.length - 1
+                      || allBlocks[selectedIndex + 1].locked
+                      || completing
+                      || selectedContentLoading
+                    }
+                    onClick={() => handleSelectBlock(allBlocks[selectedIndex + 1])}
                   >
                     Bài sau
                   </Button>
@@ -432,12 +571,43 @@ function blockTypeLabel(block: LearningLessonBlock): string {
   }
 }
 
+function blockTypeColor(block: LearningLessonBlock): 'primary' | 'success' | 'warning' | 'info' | 'secondary' {
+  switch (block.type) {
+    case 'VIDEO':
+      return 'primary';
+    case 'TEXT':
+      return 'info';
+    case 'QUIZ':
+      return 'warning';
+    case 'FLASHCARD':
+      return 'success';
+    case 'WRITING':
+      return 'secondary';
+    default:
+      return 'primary';
+  }
+}
+
+export function applySequentialLocks(modules: LearningModule[]): LearningModule[] {
+  let waitingForCompletion = false;
+  return modules.map((module) => ({
+    ...module,
+    blocks: module.blocks.map((block) => {
+      const locked = waitingForCompletion && block.progressStatus !== 'COMPLETED';
+      if (block.progressStatus !== 'COMPLETED') waitingForCompletion = true;
+      return { ...block, locked };
+    }),
+  }));
+}
+
 interface BlockContentProps {
   block: LearningLessonBlock;
+  onContentLoadingChange: (loading: boolean) => void;
   onVideoProgressSaved: (
     blockId: string,
     positionSeconds: number,
     status: LearningLessonBlock['progressStatus'],
+    watchedVideoSeconds: number,
   ) => void;
   onFlashcardProgressSaved: (
     blockId: string,
@@ -454,6 +624,7 @@ interface BlockContentProps {
 
 function BlockContent({
   block,
+  onContentLoadingChange,
   onVideoProgressSaved,
   onQuizProgressSaved,
   onFlashcardProgressSaved,
@@ -461,7 +632,14 @@ function BlockContent({
 }: BlockContentProps) {
   switch (block.type) {
     case 'VIDEO':
-      return <VideoBlock key={block.id} block={block} onProgressSaved={onVideoProgressSaved} />;
+      return (
+        <VideoBlock
+          key={block.id}
+          block={block}
+          onProgressSaved={onVideoProgressSaved}
+          onLoadingChange={onContentLoadingChange}
+        />
+      );
     case 'TEXT':
       return (
         <Box
@@ -490,16 +668,29 @@ function BlockContent({
 function VideoBlock({
   block,
   onProgressSaved,
+  onLoadingChange,
 }: {
   block: LearningLessonBlock;
   onProgressSaved: BlockContentProps['onVideoProgressSaved'];
+  onLoadingChange: BlockContentProps['onContentLoadingChange'];
 }) {
+  const [playerLoading, setPlayerLoading] = useState(true);
   const playerRef = useRef<HTMLVideoElement>(null);
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
+  const watchedSecondsRef = useRef(block.watchedVideoSeconds ?? 0);
+  const lastSavedWatchedRef = useRef(block.watchedVideoSeconds ?? 0);
+  const lastObservedTimeRef = useRef<number | null>(null);
+  const isSeekingRef = useRef(false);
   const isReadyRef = useRef(false);
 
   const pendingPositionRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
+
+  useEffect(() => {
+    setPlayerLoading(true);
+    onLoadingChange(true);
+    return () => onLoadingChange(false);
+  }, [block.id, onLoadingChange]);
 
   const savePosition = useCallback(
     (positionSeconds: number) => {
@@ -509,7 +700,10 @@ function VideoBlock({
         if (isSavingRef.current || pendingPositionRef.current === null) return;
 
         const positionToSave = pendingPositionRef.current;
-        if (positionToSave === lastSavedRef.current) {
+        if (
+          positionToSave === lastSavedRef.current
+          && watchedSecondsRef.current === lastSavedWatchedRef.current
+        ) {
           pendingPositionRef.current = null;
           return;
         }
@@ -519,10 +713,17 @@ function VideoBlock({
         let success = false;
 
         learningService
-          .saveVideoProgress(block.id, positionToSave)
+          .saveVideoProgress(block.id, positionToSave, Math.floor(watchedSecondsRef.current))
           .then((progress) => {
             lastSavedRef.current = positionToSave;
-            onProgressSaved(block.id, positionToSave, progress.status);
+            lastSavedWatchedRef.current = progress.watchedVideoSeconds ?? watchedSecondsRef.current;
+            watchedSecondsRef.current = Math.max(watchedSecondsRef.current, lastSavedWatchedRef.current);
+            onProgressSaved(
+              block.id,
+              positionToSave,
+              progress.status,
+              watchedSecondsRef.current,
+            );
             success = true;
           })
           .catch(() => {
@@ -550,13 +751,58 @@ function VideoBlock({
       isReadyRef.current = true;
       video.currentTime = Math.min(block.lastVideoPositionSeconds, video.duration || block.lastVideoPositionSeconds);
     }
+    if (video) lastObservedTimeRef.current = video.currentTime;
+    setPlayerLoading(false);
+    onLoadingChange(false);
+  };
+
+  const handleWaiting = () => {
+    setPlayerLoading(true);
+    onLoadingChange(true);
+  };
+
+  const handlePlaying = () => {
+    setPlayerLoading(false);
+    onLoadingChange(false);
+  };
+
+  const handleError = () => {
+    setPlayerLoading(false);
+    onLoadingChange(false);
+  };
+
+  const handlePlay = () => {
+    lastObservedTimeRef.current = playerRef.current?.currentTime ?? null;
+  };
+
+  const handleSeeking = () => {
+    isSeekingRef.current = true;
+  };
+
+  const handleSeeked = () => {
+    isSeekingRef.current = false;
+    lastObservedTimeRef.current = playerRef.current?.currentTime ?? null;
   };
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
-    if (video.paused) return;
+    if (video.paused) {
+      lastObservedTimeRef.current = video.currentTime;
+      return;
+    }
     const position = Math.floor(video.currentTime);
-    if (position - lastSavedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS) {
+    const previousPosition = lastObservedTimeRef.current;
+    if (!isSeekingRef.current && previousPosition != null) {
+      const delta = video.currentTime - previousPosition;
+      if (delta > 0 && delta <= WATCHED_DELTA_MAX_SECONDS) {
+        watchedSecondsRef.current += delta;
+      }
+    }
+    lastObservedTimeRef.current = video.currentTime;
+    if (
+      position - lastSavedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS
+      || watchedSecondsRef.current - lastSavedWatchedRef.current >= VIDEO_SAVE_INTERVAL_SECONDS
+    ) {
       savePosition(position);
     }
   };
@@ -565,14 +811,48 @@ function VideoBlock({
     const player = playerRef.current;
     if (!player || player.ended) return;
     const position = Math.floor(player.currentTime);
-    if (position !== lastSavedRef.current) {
+    if (
+      position !== lastSavedRef.current
+      || watchedSecondsRef.current !== lastSavedWatchedRef.current
+    ) {
       savePosition(position);
     }
   };
 
+  const handleEnded = () => {
+    const video = playerRef.current;
+    if (!video) return;
+    if (video.duration && watchedSecondsRef.current >= video.duration - WATCHED_DELTA_MAX_SECONDS) {
+      watchedSecondsRef.current = Math.max(watchedSecondsRef.current, Math.floor(video.duration));
+    }
+    savePosition(Math.floor(video.currentTime));
+  };
+
   return (
     <Box>
-      <Box sx={{ position: 'relative', paddingTop: '56.25%', background: '#000', borderRadius: 2, overflow: 'hidden' }}>
+      <Box
+        sx={{ position: 'relative', paddingTop: '56.25%', background: '#000', borderRadius: 2, overflow: 'hidden', userSelect: 'none' }}
+        onContextMenu={(event) => event.preventDefault()}
+        onDragStart={(event) => event.preventDefault()}
+      >
+        {playerLoading && (
+          <Stack
+            spacing={1}
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'common.white',
+              bgcolor: 'rgba(0, 0, 0, 0.55)',
+              pointerEvents: 'all',
+            }}
+          >
+            <CircularProgress color="inherit" size={28} aria-label="Đang tải video" />
+            <Typography variant="body2">Đang tải bài học…</Typography>
+          </Stack>
+        )}
         <ReactPlayer
           ref={playerRef}
           src={block.videoUrl}
@@ -580,9 +860,17 @@ function VideoBlock({
           width="100%"
           height="100%"
           style={{ position: 'absolute', top: 0, left: 0 }}
+          onReady={handleReady}
           onLoadedMetadata={handleReady}
+          onWaiting={handleWaiting}
+          onPlaying={handlePlaying}
+          onError={handleError}
+          onPlay={handlePlay}
+          onSeeking={handleSeeking}
+          onSeeked={handleSeeked}
           onTimeUpdate={handleTimeUpdate}
           onPause={handlePause}
+          onEnded={handleEnded}
         />
       </Box>
       {block.content && (
@@ -603,10 +891,21 @@ function QuizBlock({
   questions: QuizQuestion[];
   onProgressSaved: BlockContentProps['onQuizProgressSaved'];
 }) {
-  const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ''));
+  const [answers, setAnswers] = useState<string[]>(() => {
+    const savedAnswers = readLocalStorageValue<unknown>(quizAnswersStorageKey(blockId));
+    if (Array.isArray(savedAnswers) && savedAnswers.length === questions.length) {
+      return savedAnswers.map((answer) => typeof answer === 'string' ? answer : '');
+    }
+    return questions.map(() => '');
+  });
   const [result, setResult] = useState<QuizSubmissionResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (result) return;
+    writeLocalStorageValue(quizAnswersStorageKey(blockId), answers);
+  }, [answers, blockId, result]);
 
   if (questions.length === 0) {
     return <Alert severity="info">Bài trắc nghiệm chưa có câu hỏi.</Alert>;
@@ -619,6 +918,7 @@ function QuizBlock({
     try {
       const nextResult = await learningService.submitQuiz(blockId, answers);
       setResult(nextResult);
+      removeLocalStorageValue(quizAnswersStorageKey(blockId));
       onProgressSaved(blockId, nextResult.progressStatus);
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -716,8 +1016,14 @@ function FinalTestPanel({
   const [eligibility, setEligibility] = useState<FinalTestEligibility | null>(null);
   const [progressSummary, setProgressSummary] = useState<CourseProgressSummary | null>(null);
   const [certificate, setCertificate] = useState<LearningCertificate | null>(null);
-  const [attempt, setAttempt] = useState<FinalTestAttempt | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [attempt, setAttempt] = useState<FinalTestAttempt | null>(() => {
+    const saved = readLocalStorageValue<LocalFinalTestState>(finalTestStorageKey(courseId));
+    return saved?.attempt ?? null;
+  });
+  const [answers, setAnswers] = useState<Record<string, string[]>>(() => {
+    const saved = readLocalStorageValue<LocalFinalTestState>(finalTestStorageKey(courseId));
+    return saved?.answers ?? {};
+  });
   const [result, setResult] = useState<FinalTestSubmissionResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -725,6 +1031,11 @@ function FinalTestPanel({
   const [downloadingCertificate, setDownloadingCertificate] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [violations, setViolations] = useState<FinalTestViolationType[]>([]);
+  const [proctoringTerminated, setProctoringTerminated] = useState(false);
+  const violationCountRef = useRef(0);
+  const lastViolationAtRef = useRef(0);
+  const terminatingForViolationRef = useRef(false);
   const certificateIssuanceInFlightRef = useRef(false);
 
   const handleDownloadCertificate = async () => {
@@ -750,6 +1061,11 @@ function FinalTestPanel({
       setEligibility(finalTestValue);
       setProgressSummary(progressValue);
       setCertificate(certificateValue);
+      if (!finalTestValue.eligible || finalTestValue.passed) {
+        setAttempt(null);
+        setAnswers({});
+        removeLocalStorageValue(finalTestStorageKey(courseId));
+      }
     } catch {
       setErrorMsg('Không thể kiểm tra điều kiện làm Final Test.');
     } finally {
@@ -778,8 +1094,94 @@ function FinalTestPanel({
 
     setErrorMsg('Lượt thi đã hết thời gian. Hãy bắt đầu lượt tiếp theo nếu vẫn còn lượt.');
     setAttempt(null);
+    setAnswers({});
+    removeLocalStorageValue(finalTestStorageKey(courseId));
     void loadEligibility();
-  }, [attempt, loadEligibility, result, secondsLeft]);
+  }, [attempt, courseId, loadEligibility, result, secondsLeft]);
+
+  useEffect(() => {
+    if (!attempt || result) {
+      removeLocalStorageValue(finalTestStorageKey(courseId));
+      return;
+    }
+    if (new Date(attempt.expiresAt).getTime() <= Date.now()) return;
+    writeLocalStorageValue(finalTestStorageKey(courseId), { attempt, answers } satisfies LocalFinalTestState);
+  }, [answers, attempt, courseId, result]);
+
+  useEffect(() => {
+    if (!attempt?.attemptId) return;
+    violationCountRef.current = 0;
+    lastViolationAtRef.current = 0;
+    terminatingForViolationRef.current = false;
+    setViolations([]);
+    setProctoringTerminated(false);
+  }, [attempt?.attemptId]);
+
+  const terminateForViolations = useCallback(async () => {
+    if (!attempt || terminatingForViolationRef.current) return;
+    terminatingForViolationRef.current = true;
+    setWorking(true);
+    try {
+      await learningService.terminateFinalTest(courseId, attempt.attemptId);
+      setAttempt(null);
+      setAnswers({});
+      setProctoringTerminated(true);
+      setErrorMsg('Bài thi đã dừng vì phát hiện quá nhiều thao tác không hợp lệ. Lượt thi này đã được tính.');
+      await loadEligibility();
+    } catch (error) {
+      terminatingForViolationRef.current = false;
+      setErrorMsg(
+        axios.isAxiosError(error)
+          ? error.response?.data?.message || 'Không thể khóa lượt thi sau cảnh báo.'
+          : 'Không thể khóa lượt thi sau cảnh báo.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  }, [attempt, courseId, loadEligibility]);
+
+  const recordViolation = useCallback((type: FinalTestViolationType) => {
+    if (!attempt || result || terminatingForViolationRef.current) return;
+    const now = Date.now();
+    // One tab switch can fire both blur and visibilitychange; count it once.
+    if (now - lastViolationAtRef.current < 1000) return;
+    lastViolationAtRef.current = now;
+    violationCountRef.current += 1;
+    setViolations((current) => [...current, type]);
+    if (violationCountRef.current >= FINAL_TEST_MAX_VIOLATIONS) {
+      void terminateForViolations();
+    }
+  }, [attempt, result, terminateForViolations]);
+
+  useEffect(() => {
+    if (!attempt || result) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') recordViolation('TAB_SWITCH');
+    };
+    const handleWindowBlur = () => recordViolation('WINDOW_BLUR');
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (isScreenshotShortcut(event)) {
+        event.preventDefault();
+        recordViolation('SCREENSHOT_SHORTCUT');
+      } else if (isClipboardShortcut(event)) {
+        event.preventDefault();
+        recordViolation('CLIPBOARD');
+      }
+    };
+    const handlePrint = () => recordViolation('PRINT_ATTEMPT');
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('keydown', handleShortcut, true);
+    window.addEventListener('beforeprint', handlePrint);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('keydown', handleShortcut, true);
+      window.removeEventListener('beforeprint', handlePrint);
+    };
+  }, [attempt, recordViolation, result]);
 
   const handleStart = async () => {
     setWorking(true);
@@ -790,6 +1192,7 @@ function FinalTestPanel({
       setAttempt(value);
       setAnswers({});
       setResult(null);
+      setProctoringTerminated(false);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         setErrorMsg(error.response?.data?.message || 'Không thể bắt đầu Final Test.');
@@ -828,6 +1231,7 @@ function FinalTestPanel({
         })),
       );
       setResult(value);
+      removeLocalStorageValue(finalTestStorageKey(courseId));
       await loadEligibility();
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -916,6 +1320,29 @@ function FinalTestPanel({
 
         {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
 
+        {attempt && !result && (
+          <Alert severity={violations.length === 0 ? 'info' : 'warning'}>
+            <strong>Chế độ giám sát bài thi:</strong> copy/cut/paste, kéo-thả, menu chuột phải,
+            chuyển tab, rời cửa sổ và các phím chụp màn hình phổ biến đều bị chặn hoặc ghi nhận.
+            Cảnh báo: {violations.length}/{FINAL_TEST_MAX_VIOLATIONS}.
+            {violations.length > 0 && (
+              <Typography component="div" variant="body2" sx={{ mt: 0.5 }}>
+                Gần nhất: {violationLabel(violations[violations.length - 1])}.
+              </Typography>
+            )}
+            <Typography component="div" variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+              Trình duyệt không thể phát hiện tuyệt đối ảnh chụp bằng công cụ hệ điều hành; hệ thống chỉ
+              nhận diện phím tắt và tín hiệu rời trang.
+            </Typography>
+          </Alert>
+        )}
+
+        {proctoringTerminated && (
+          <Alert severity="error">
+            Bài thi đã bị dừng và lượt thi đã được tính do vượt quá giới hạn cảnh báo integrity.
+          </Alert>
+        )}
+
         {progressSummary && !progressSummary.certificateEligibility.eligible && (
           <Alert severity="info">
             Điều kiện chứng chỉ còn thiếu:{' '}
@@ -997,7 +1424,17 @@ function FinalTestPanel({
         )}
 
         {attempt && !result && (
-          <Stack spacing={2}>
+          <Stack
+            spacing={2}
+            sx={{ userSelect: 'none' }}
+            onCopy={(event) => { event.preventDefault(); recordViolation('CLIPBOARD'); }}
+            onCut={(event) => { event.preventDefault(); recordViolation('CLIPBOARD'); }}
+            onPaste={(event) => { event.preventDefault(); recordViolation('CLIPBOARD'); }}
+            onDragStart={(event) => { event.preventDefault(); recordViolation('DRAG_DROP'); }}
+            onDragOver={(event) => { event.preventDefault(); }}
+            onDrop={(event) => { event.preventDefault(); recordViolation('DRAG_DROP'); }}
+            onContextMenu={(event) => { event.preventDefault(); recordViolation('CONTEXT_MENU'); }}
+          >
             <Alert severity={secondsLeft > 0 ? 'info' : 'error'}>
               Điểm đạt: {attempt.passingScore}% · Thời gian còn lại: {Math.floor(secondsLeft / 60)}:
               {String(secondsLeft % 60).padStart(2, '0')}
@@ -1232,27 +1669,114 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [aiRequesting, setAiRequesting] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftSaveState, setDraftSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const acceptedContentRef = useRef('');
+  const latestContentRef = useRef('');
+  const draftSaveQueueRef = useRef(Promise.resolve());
+  const composingRef = useRef(false);
+
+  const draftKey = writingDraftStorageKey(block.id);
+  const submissionStatus = submission?.status;
 
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setDraftReady(false);
+    setSubmission(null);
+    setContent('');
+    acceptedContentRef.current = '';
+    latestContentRef.current = '';
+    setDraftSaveState('idle');
     learningService
       .getWritingSubmission(block.id)
       .then((data) => {
         if (!active) return;
+        const localDraft = readLocalStorageValue<LocalWritingDraft>(draftKey);
+
+        if (data && data.status !== 'DRAFT') {
+          removeLocalStorageValue(draftKey);
+          setSubmission(data);
+          return;
+        }
+
+        const restoredContent = localDraft?.content ?? data?.content ?? '';
         setSubmission(data);
+        setContent(restoredContent);
+        acceptedContentRef.current = restoredContent;
+        latestContentRef.current = restoredContent;
       })
       .catch((err) => {
         if (!active) return;
         console.error('Fetch submission error', err);
+        const localDraft = readLocalStorageValue<LocalWritingDraft>(draftKey);
+        const restoredContent = localDraft?.content ?? '';
+        setContent(restoredContent);
+        acceptedContentRef.current = restoredContent;
+        latestContentRef.current = restoredContent;
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setDraftReady(true);
+          setLoading(false);
+        }
       });
     return () => {
       active = false;
     };
-  }, [block.id]);
+  }, [block.id, draftKey]);
+
+  useEffect(() => {
+    latestContentRef.current = content;
+    if (!draftReady || submission?.status !== 'DRAFT' && submission?.status !== undefined) return;
+
+    if (content.trim()) {
+      writeLocalStorageValue(draftKey, { content, savedAt: Date.now() } satisfies LocalWritingDraft);
+    } else {
+      removeLocalStorageValue(draftKey);
+    }
+  }, [content, draftKey, draftReady, submission?.status]);
+
+  useEffect(() => {
+    if (!draftReady || !content.trim() || (submissionStatus && submissionStatus !== 'DRAFT')) return;
+
+    setDraftSaveState('saving');
+    const contentToSave = content;
+    const timer = window.setTimeout(() => {
+      draftSaveQueueRef.current = draftSaveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          if (latestContentRef.current !== contentToSave) return;
+          try {
+            const savedDraft = await learningService.saveWritingDraft(block.id, contentToSave);
+            if (latestContentRef.current === contentToSave) {
+              setSubmission(savedDraft);
+              setDraftSaveState('saved');
+            }
+          } catch {
+            if (latestContentRef.current === contentToSave) setDraftSaveState('failed');
+          }
+        });
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [block.id, content, draftReady, submissionStatus]);
+
+  const handleContentChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const nextContent = event.target.value;
+    if (composingRef.current || isSingleCharacterMutation(acceptedContentRef.current, nextContent)) {
+      acceptedContentRef.current = nextContent;
+      setContent(nextContent);
+    }
+  };
+
+  const blockClipboardAction = (event: React.ClipboardEvent | React.DragEvent | React.MouseEvent) => {
+    event.preventDefault();
+  };
+
+  const handleWritingKeyDown = (event: React.KeyboardEvent) => {
+    if (isClipboardShortcut(event)) event.preventDefault();
+  };
 
   const handleSubmit = async () => {
     if (!content.trim() || content.length > 10000) return;
@@ -1261,6 +1785,8 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
     try {
       const data = await learningService.submitWriting(block.id, content);
       setSubmission(data);
+      removeLocalStorageValue(draftKey);
+      setDraftSaveState('saved');
       onProgressSaved(); // mark COMPLETED
     } catch (err) {
       if (axios.isAxiosError(err)) {
@@ -1272,6 +1798,8 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
       setSubmitting(false);
     }
   };
+
+  const submittedSubmission = submission && submission.status !== 'DRAFT' ? submission : null;
 
   const handleRequestAi = async () => {
     if (!submission) return;
@@ -1316,7 +1844,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
 
       {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
 
-      {!submission ? (
+      {!submittedSubmission ? (
         <Stack spacing={2}>
           <TextField
             multiline
@@ -1325,11 +1853,30 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
             fullWidth
             placeholder="Viết câu trả lời của bạn ở đây..."
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
+            onKeyDown={handleWritingKeyDown}
+            onCopy={blockClipboardAction}
+            onCut={blockClipboardAction}
+            onPaste={blockClipboardAction}
+            onDrop={blockClipboardAction}
+            onDragStart={blockClipboardAction}
+            onContextMenu={blockClipboardAction}
+            onCompositionStart={() => { composingRef.current = true; }}
+            onCompositionEnd={(event) => {
+              composingRef.current = false;
+              const composedContent = (event.target as HTMLTextAreaElement).value;
+              acceptedContentRef.current = composedContent;
+              setContent(composedContent);
+            }}
             disabled={submitting}
             error={content.length > 10000}
             helperText={content.length > 10000 ? 'Bài viết quá dài (tối đa 10,000 ký tự).' : `${content.length}/10,000`}
           />
+          <Typography variant="caption" color={draftSaveState === 'failed' ? 'error.main' : 'text.secondary'}>
+            {draftSaveState === 'saving' && 'Đang tự động lưu nháp...'}
+            {draftSaveState === 'saved' && 'Đã lưu nháp an toàn.'}
+            {draftSaveState === 'failed' && 'Chưa đồng bộ được lên máy chủ; bản lưu trên thiết bị vẫn còn.'}
+          </Typography>
           <Box>
             <Button
               variant="contained"
@@ -1348,7 +1895,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                 Bài làm của bạn (đã nộp)
               </Typography>
               <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                {submission.content}
+                {submittedSubmission.content}
               </Typography>
             </CardContent>
           </Card>
@@ -1359,14 +1906,14 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
               Gợi ý từ AI
             </Typography>
 
-            {submission.status === 'SUGGESTION_PROCESSING' ? (
+            {submittedSubmission.status === 'SUGGESTION_PROCESSING' ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Typography variant="body2" color="text.secondary">
                   AI đang phân tích bài viết của bạn. Vui lòng đợi trong giây lát...
                 </Typography>
                 <CircularProgress size={24} />
               </Stack>
-            ) : !submission.aiSuggestion ? (
+            ) : !submittedSubmission.aiSuggestion ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Typography variant="body2" color="text.secondary">
                   Bạn có thể yêu cầu AI hỗ trợ nhận xét sơ bộ và đưa ra gợi ý cải thiện cho bài viết của mình.
@@ -1379,7 +1926,7 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   {aiRequesting ? 'Đang phân tích...' : 'Yêu cầu AI hỗ trợ'}
                 </Button>
               </Stack>
-            ) : submission.aiSuggestion.status === 'FAILED' ? (
+            ) : submittedSubmission.aiSuggestion.status === 'FAILED' ? (
               <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
                 <Alert severity="error">Phân tích bằng AI thất bại. Bạn có muốn thử lại?</Alert>
                 <Button variant="outlined" onClick={handleRequestAi} disabled={aiRequesting}>
@@ -1394,18 +1941,18 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   </Typography>
                 </Alert>
 
-                {submission.aiSuggestion.revisionGuidance && (
+                {submittedSubmission.aiSuggestion.revisionGuidance && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Nhận xét sơ bộ</Typography>
-                    <Typography variant="body2">{submission.aiSuggestion.revisionGuidance}</Typography>
+                    <Typography variant="body2">{submittedSubmission.aiSuggestion.revisionGuidance}</Typography>
                   </Box>
                 )}
 
-                {submission.aiSuggestion.grammarSuggestions?.length > 0 && (
+                {submittedSubmission.aiSuggestion.grammarSuggestions?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Ngữ pháp</Typography>
                     <List dense>
-                      {submission.aiSuggestion.grammarSuggestions.map((item, i) => (
+                      {submittedSubmission.aiSuggestion.grammarSuggestions.map((item, i) => (
                         <ListItem key={i} disableGutters>
                           <ListItemText
                             primary={
@@ -1422,11 +1969,11 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   </Box>
                 )}
 
-                {submission.aiSuggestion.vocabularySuggestions?.length > 0 && (
+                {submittedSubmission.aiSuggestion.vocabularySuggestions?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Từ vựng</Typography>
                     <List dense>
-                      {submission.aiSuggestion.vocabularySuggestions.map((item, i) => (
+                      {submittedSubmission.aiSuggestion.vocabularySuggestions.map((item, i) => (
                         <ListItem key={i} disableGutters>
                           <ListItemText
                             primary={
@@ -1442,11 +1989,11 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
                   </Box>
                 )}
 
-                {submission.aiSuggestion.structureSuggestions?.length > 0 && (
+                {submittedSubmission.aiSuggestion.structureSuggestions?.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Cấu trúc & Mạch văn</Typography>
                     <List dense>
-                      {submission.aiSuggestion.structureSuggestions.map((item, i) => (
+                      {submittedSubmission.aiSuggestion.structureSuggestions.map((item, i) => (
                         <ListItem key={i} disableGutters>
                           <ListItemText
                             primary={<Typography variant="body2">Vấn đề: {item.issue}</Typography>}
@@ -1467,24 +2014,24 @@ function WritingBlock({ block, onProgressSaved }: { block: LearningLessonBlock; 
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
               <SchoolOutlinedIcon color="primary" />
               <Typography variant="h6">Đánh giá chính thức từ giáo viên</Typography>
-              {submission.teacherFeedback?.official && (
+              {submittedSubmission.teacherFeedback?.official && (
                 <Chip label="Chính thức" size="small" color="primary" variant="outlined" />
               )}
             </Stack>
 
-            {!submission.teacherFeedback ? (
+            {!submittedSubmission.teacherFeedback ? (
               <Typography variant="body2" color="text.secondary">
                 Giáo viên chưa gửi đánh giá chính thức cho bài viết này.
               </Typography>
             ) : (
               <Paper variant="outlined" sx={{ p: 2, borderLeft: 4, borderLeftColor: 'primary.main' }}>
-                {submission.teacherFeedback.score != null && (
+                {submittedSubmission.teacherFeedback.score != null && (
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
-                    Điểm: {submission.teacherFeedback.score}
+                    Điểm: {submittedSubmission.teacherFeedback.score}
                   </Typography>
                 )}
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {submission.teacherFeedback.comment || 'Giáo viên chưa để lại nhận xét.'}
+                  {submittedSubmission.teacherFeedback.comment || 'Giáo viên chưa để lại nhận xét.'}
                 </Typography>
               </Paper>
             )}

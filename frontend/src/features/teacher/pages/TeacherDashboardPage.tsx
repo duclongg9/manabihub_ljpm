@@ -17,6 +17,33 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAuthSession } from '../../../shared/auth/authSession';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import { courseStatusLabel, courseStatusColor } from '../../course-builder/utils/courseStatus';
+import { OnboardingGuide, type OnboardingStep } from '../../../shared/components/OnboardingGuide/OnboardingGuide';
+
+const TEACHER_DASHBOARD_GUIDE: OnboardingStep[] = [
+  {
+    id: 'overview',
+    title: 'Đọc nhanh tình hình giảng dạy',
+    description: 'Bốn thẻ đầu trang cho biết tổng số khóa, bản nháp cần hoàn thiện, khóa đang chờ duyệt và khóa đã xuất bản. Đây là nơi kiểm tra nhanh trước khi bắt tay vào việc.',
+    targetId: 'teacher-stats',
+  },
+  {
+    id: 'courses',
+    title: 'Quản lý nội dung khóa học',
+    description: 'Khóa học gần đây hiển thị trạng thái và thao tác tiếp theo. Dùng Tiếp tục biên soạn cho bản nháp, Xem chi tiết cho khóa đã xuất bản, hoặc Tạo khóa học để bắt đầu khóa mới.',
+    targetId: 'teacher-courses',
+  },
+  {
+    id: 'wallet',
+    title: 'Theo dõi doanh thu và tiền có thể rút',
+    description: 'Ví của tôi là nơi xem doanh thu đã ghi nhận, khoản đang được giữ/đối soát và số dư đủ điều kiện rút. Tiền đang hold không thể rút trước khi hoàn tất thời hạn bảo vệ giao dịch.',
+    targetId: 'teacher-wallet',
+  },
+  {
+    id: 'profile',
+    title: 'Hoàn thiện hồ sơ giảng viên',
+    description: 'Hồ sơ công khai giúp học viên nhận diện bạn và xem thông tin giảng dạy. Hãy cập nhật tên hiển thị, giới thiệu và thông tin xác thực trước khi chia sẻ khóa học.',
+  },
+];
 
 export const TeacherDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -88,6 +115,7 @@ export const TeacherDashboardPage: React.FC = () => {
               variant="outlined"
               startIcon={<AccountBalanceWalletOutlinedIcon />}
               onClick={() => navigate(ROUTES.TEACHER.WALLET)}
+              data-onboarding-target="teacher-wallet"
               sx={{ textTransform: 'none', fontWeight: 700 }}
             >
               Ví của tôi
@@ -104,7 +132,7 @@ export const TeacherDashboardPage: React.FC = () => {
         )}
       />
 
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={3} sx={{ mb: 4 }} data-onboarding-target="teacher-stats">
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Paper sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2, height: '100%' }}>
             <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'primary.light', color: 'primary.dark' }}>
@@ -151,7 +179,7 @@ export const TeacherDashboardPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>Khóa học gần đây</Typography>
+      <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }} data-onboarding-target="teacher-courses">Khóa học gần đây</Typography>
       {recentCourses.length === 0 ? (
         <Paper sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
           <EmptyState
@@ -217,6 +245,14 @@ export const TeacherDashboardPage: React.FC = () => {
           </Button>
         </Box>
       )}
+
+      <OnboardingGuide
+        scope="teacher-dashboard"
+        title="Làm quen với bảng điều khiển giảng viên"
+        intro="Dashboard giúp bạn đi từ việc hoàn thiện khóa học đến theo dõi doanh thu. Hướng dẫn này chỉ xuất hiện lần đầu trên từng tài khoản; bạn có thể đóng tạm thời hoặc chọn không hiển thị lại."
+        steps={TEACHER_DASHBOARD_GUIDE}
+        accountKey={teacherId}
+      />
     </Box>
   );
 };
