@@ -1,21 +1,30 @@
 import {useEffect, useState} from "react";
 
-import {Alert, Box, Button, Card, CardContent, Snackbar, TextField,} from "@mui/material";
+import {Alert, Box, Button, Card, CardContent, Snackbar, TextField, Stack,} from "@mui/material";
 
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 
 import {PageHeader} from "../../shared/components/PageHeader/PageHeader";
 import {LoadingState} from "../../shared/components/LoadingState/LoadingState";
 import AvatarUpload from "../../shared/components/AvatarUpload/AvatarUpload";
 
-import {avatarUploadErrorMessage, getMyTeacherProfile, updateMyTeacherProfile, uploadAvatar} from "./profileApi";
+import {avatarUploadErrorMessage, confirmTeacherPhoneVerification, getMyTeacherProfile, requestTeacherPhoneVerification, updateMyTeacherProfile, uploadAvatar} from "./profileApi";
 import {resolvePublicAssetUrl} from "../../shared/utils/assetUtils";
+import {PHONE_PATTERN, sanitizeOtpInput, sanitizePhoneInput} from "./phoneValidation";
 
 export default function TeacherProfilePage() {
 
     const [loading, setLoading] = useState(true);
 
     const [saving, setSaving] = useState(false);
+    const [phoneVerified, setPhoneVerified] = useState(false);
+    const [phoneCode, setPhoneCode] = useState("");
+    const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+    const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
+    const [confirmingPhoneOtp, setConfirmingPhoneOtp] = useState(false);
+    const [initialPhoneNumber, setInitialPhoneNumber] = useState("");
 
     const [snackbar, setSnackbar] = useState({
         open: false,
@@ -75,6 +84,10 @@ export default function TeacherProfilePage() {
                 bio: profile.bio ?? "",
 
             });
+            setPhoneVerified(profile.phoneVerified === true);
+            setInitialPhoneNumber(profile.phoneNumber ?? "");
+            setPhoneCode("");
+            setPhoneOtpSent(false);
 
         } catch (error) {
 
@@ -118,9 +131,7 @@ export default function TeacherProfilePage() {
 
         }
 
-        const phoneRegex = /^(0\d{9}|\+84\d{9})$/;
-
-        if (!phoneRegex.test(form.phoneNumber)) {
+        if (!PHONE_PATTERN.test(form.phoneNumber)) {
 
             newErrors.phoneNumber = "Số điện thoại không hợp lệ.";
 
@@ -140,6 +151,11 @@ export default function TeacherProfilePage() {
 
             return;
 
+        }
+
+        if (!phoneVerified && form.phoneNumber !== initialPhoneNumber) {
+            setSnackbar({ open: true, message: "Hãy xác thực số điện thoại bằng mã SMS trước khi lưu.", severity: "error" });
+            return;
         }
 
         try {
@@ -208,17 +224,60 @@ export default function TeacherProfilePage() {
 
     }
 
+    function validatePhone() {
+        if (!PHONE_PATTERN.test(form.phoneNumber)) {
+            setErrors(prev => ({ ...prev, phoneNumber: "Số điện thoại không hợp lệ." }));
+            return false;
+        }
+        return true;
+    }
+
+    async function handleRequestPhoneOtp() {
+        if (phoneVerified || !validatePhone()) return;
+        try {
+            setSendingPhoneOtp(true);
+            await requestTeacherPhoneVerification(form.phoneNumber);
+            setPhoneOtpSent(true);
+            setSnackbar({ open: true, message: "Đã gửi mã xác thực SMS.", severity: "success" });
+        } catch (error: any) {
+            setSnackbar({ open: true, message: error.response?.data?.message ?? "Không thể gửi mã SMS.", severity: "error" });
+        } finally {
+            setSendingPhoneOtp(false);
+        }
+    }
+
+    async function handleConfirmPhoneOtp() {
+        if (phoneVerified || !validatePhone() || !/^\d{6}$/.test(phoneCode)) {
+            setSnackbar({ open: true, message: "Mã xác thực phải gồm 6 chữ số.", severity: "error" });
+            return;
+        }
+        try {
+            setConfirmingPhoneOtp(true);
+            await confirmTeacherPhoneVerification(form.phoneNumber, phoneCode);
+            await loadProfile();
+            setSnackbar({ open: true, message: "Số điện thoại đã được xác thực và khóa thay đổi.", severity: "success" });
+        } catch (error: any) {
+            setSnackbar({ open: true, message: error.response?.data?.message ?? "Mã xác thực không hợp lệ.", severity: "error" });
+        } finally {
+            setConfirmingPhoneOtp(false);
+        }
+    }
+
     function handleChange(field: keyof typeof form) {
 
         return (
             event: React.ChangeEvent<HTMLInputElement>
         ) => {
 
+            const value = field === "phoneNumber"
+                ? sanitizePhoneInput(event.target.value)
+                : event.target.value;
+
             setForm({
 
                 ...form,
 
-                [field]: event.target.value,
+                [field]: value,
 
             });
 
@@ -360,15 +419,35 @@ export default function TeacherProfilePage() {
                             disabled
                         />
 
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Số điện thoại"
-                            value={form.phoneNumber}
-                            onChange={handleChange("phoneNumber")}
-                            error={!!errors.phoneNumber}
-                            helperText={errors.phoneNumber}
-                        />
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 2 }}>
+                            <TextField
+                                fullWidth
+                                label="Số điện thoại"
+                                value={form.phoneNumber}
+                                disabled={phoneVerified}
+                                type="tel"
+                                onChange={handleChange("phoneNumber")}
+                                error={!!errors.phoneNumber}
+                                helperText={errors.phoneNumber || (phoneVerified ? "Đã xác thực — không thể thay đổi số điện thoại." : "Bạn cần xác thực số điện thoại bằng SMS.")}
+                                slotProps={{
+                                    ...(phoneVerified ? { input: { endAdornment: <LockOutlinedIcon fontSize="small" /> } } : {}),
+                                    htmlInput: { inputMode: "tel", maxLength: 12, autoComplete: "tel" },
+                                }}
+                            />
+                            {!phoneVerified && (
+                                <Button variant="outlined" onClick={handleRequestPhoneOtp} disabled={saving || sendingPhoneOtp || !form.phoneNumber} sx={{ minWidth: 150, height: 56, whiteSpace: "nowrap" }}>
+                                    {sendingPhoneOtp ? "Đang gửi..." : "Gửi mã SMS"}
+                                </Button>
+                            )}
+                        </Stack>
+                        {!phoneVerified && phoneOtpSent && (
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1 }}>
+                                <TextField size="small" label="Mã SMS 6 số" value={phoneCode} onChange={(event) => setPhoneCode(sanitizeOtpInput(event.target.value))} slotProps={{ htmlInput: { inputMode: "numeric", maxLength: 6 } }} />
+                                <Button variant="contained" onClick={handleConfirmPhoneOtp} disabled={confirmingPhoneOtp || phoneCode.length !== 6} startIcon={<VerifiedUserOutlinedIcon />}>
+                                    {confirmingPhoneOtp ? "Đang xác thực..." : "Xác thực"}
+                                </Button>
+                            </Stack>
+                        )}
 
                         <TextField
                             fullWidth

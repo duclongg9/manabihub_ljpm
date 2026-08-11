@@ -16,6 +16,7 @@ import com.manabihub.identity.repository.InternalAdminInvitationRepository;
 import com.manabihub.identity.repository.InternalAdminPasswordResetRepository;
 import com.manabihub.identity.repository.InternalAdminRefreshTokenRepository;
 import com.manabihub.identity.repository.InternalAdminSessionRepository;
+import com.manabihub.identity.repository.PhoneVerificationChallengeRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.service.CurrentUserService;
@@ -92,6 +93,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private AppUserRepository appUserRepository;
+
+    @MockBean
+    private PhoneVerificationChallengeRepository phoneVerificationChallengeRepository;
 
     @MockBean
     private InternalAdminAccountRepository identityInternalAdminAccountRepository;

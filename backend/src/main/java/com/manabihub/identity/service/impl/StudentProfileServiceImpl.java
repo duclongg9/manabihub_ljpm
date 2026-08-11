@@ -10,11 +10,15 @@ import com.manabihub.identity.mapper.StudentProfileMapper;
 import com.manabihub.identity.repository.AppUserRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.service.CurrentUserService;
+import com.manabihub.common.util.PhoneNumberNormalizer;
 import com.manabihub.identity.service.StudentProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
+
+import java.util.Objects;
 
 import java.util.UUID;
 
@@ -71,6 +75,8 @@ public class StudentProfileServiceImpl implements StudentProfileService {
                         .user(user)
                         .build());
 
+        enforcePhonePolicy(user, request.getPhoneNumber());
+
         studentProfileMapper.updateUser(user, request);
 
         studentProfileMapper.updateProfile(profile, request);
@@ -83,6 +89,13 @@ public class StudentProfileServiceImpl implements StudentProfileService {
 
             studentProfileRepository.save(profile);
 
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessException(
+                    MessageCodes.PHONE_VERIFICATION_ALREADY_IN_USE,
+                    "This phone number is already used by another account",
+                    HttpStatus.CONFLICT,
+                    ex
+            );
         } catch (Exception ex) {
 
             throw new BusinessException(
@@ -96,6 +109,28 @@ public class StudentProfileServiceImpl implements StudentProfileService {
 
         return studentProfileMapper.toResponse(user, profile);
 
+    }
+
+    private void enforcePhonePolicy(AppUser user, String requestedPhoneNumber) {
+        String requested = PhoneNumberNormalizer.normalize(requestedPhoneNumber);
+        if (user.getPhoneVerifiedAt() != null && !Objects.equals(user.getPhoneNumber(), requested)) {
+            throw new BusinessException(
+                    MessageCodes.PHONE_VERIFICATION_ALREADY_VERIFIED,
+                    "A verified phone number cannot be changed",
+                    HttpStatus.CONFLICT
+            );
+        }
+        if (requested != null) {
+            appUserRepository.findByPhoneNumber(requested)
+                    .filter(existing -> !Objects.equals(existing.getId(), user.getId()))
+                    .ifPresent(existing -> {
+                        throw new BusinessException(
+                                MessageCodes.PHONE_VERIFICATION_ALREADY_IN_USE,
+                                "This phone number is already used by another account",
+                                HttpStatus.CONFLICT
+                        );
+                    });
+        }
     }
 
 }

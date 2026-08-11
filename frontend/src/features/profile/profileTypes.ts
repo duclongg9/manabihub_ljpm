@@ -15,6 +15,8 @@ export interface UserProfileResponse {
     email: string;
     fullName: string;
     phoneNumber: string | null;
+    phoneVerified: boolean;
+    phoneVerifiedAt: string | null;
     avatarUrl: string | null;
 }
 
@@ -48,6 +50,12 @@ export interface UpdateStudentProfileRequest {
 
     jlptGoal: string;
 
+}
+
+export interface PhoneVerificationResponse {
+    phoneNumber: string;
+    verified: boolean;
+    verifiedAt: string | null;
 }
 
 export interface UpdateTeacherProfileRequest

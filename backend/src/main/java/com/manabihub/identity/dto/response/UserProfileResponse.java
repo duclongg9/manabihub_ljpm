@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.UUID;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -16,6 +17,10 @@ public class UserProfileResponse {
     private String fullName;
 
     private String phoneNumber;
+
+    private boolean phoneVerified;
+
+    private Instant phoneVerifiedAt;
 
     private String avatarUrl;
 }

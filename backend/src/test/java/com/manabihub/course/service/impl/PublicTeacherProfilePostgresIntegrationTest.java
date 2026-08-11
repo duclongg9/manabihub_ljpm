@@ -115,7 +115,12 @@ class PublicTeacherProfilePostgresIntegrationTest {
         user.setId(UUID.randomUUID());
         user.setEmail(label + "-" + UUID.randomUUID() + "@example.test");
         user.setFullName("Private legal name");
-        user.setPhoneNumber("0900000000");
+        user.setPhoneNumber(switch (label) {
+            case "discoverable" -> "0900000001";
+            case "revoked" -> "0900000002";
+            case "locked" -> "0900000003";
+            default -> "0900000009";
+        });
         user.setUserStatus(userStatus);
         user.setProvider("LOCAL");
         entityManager.persist(user);

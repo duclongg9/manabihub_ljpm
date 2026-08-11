@@ -1,11 +1,14 @@
 import {useEffect, useState} from "react";
-import {Alert, Box, Button, Card, CardContent, Snackbar, TextField, Grid, Typography, Divider} from "@mui/material";
+import {Alert, Box, Button, Card, CardContent, Snackbar, TextField, Grid, Typography, Divider, Stack} from "@mui/material";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import {PageHeader} from "../../shared/components/PageHeader/PageHeader";
 import {LoadingState} from "../../shared/components/LoadingState/LoadingState";
 import AvatarUpload from "../../shared/components/AvatarUpload/AvatarUpload";
-import {avatarUploadErrorMessage, getMyStudentProfile, updateMyStudentProfile, uploadAvatar} from "./profileApi";
+import {avatarUploadErrorMessage, confirmStudentPhoneVerification, getMyStudentProfile, requestStudentPhoneVerification, updateMyStudentProfile, uploadAvatar} from "./profileApi";
 import {resolvePublicAssetUrl} from "../../shared/utils/assetUtils";
+import {PHONE_PATTERN, sanitizeOtpInput, sanitizePhoneInput} from "./phoneValidation";
 
 const JLPT_LEVELS = [
     { level: "N5", label: "N5 • 初級" },
@@ -18,6 +21,11 @@ const JLPT_LEVELS = [
 export default function StudentProfilePage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [phoneVerified, setPhoneVerified] = useState(false);
+    const [phoneCode, setPhoneCode] = useState("");
+    const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+    const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
+    const [confirmingPhoneOtp, setConfirmingPhoneOtp] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
     const [errors, setErrors] = useState({ fullName: "", phoneNumber: "" });
     const [form, setForm] = useState({ avatarUrl: "", fullName: "", email: "", phoneNumber: "", displayName: "", jlptGoal: "" });
@@ -40,6 +48,9 @@ export default function StudentProfilePage() {
             };
             setForm(profileData);
             setInitialForm(profileData);
+            setPhoneVerified(profile.phoneVerified === true);
+            setPhoneCode("");
+            setPhoneOtpSent(false);
         } catch (error) {
             console.error(error);
             setSnackbar({ open: true, message: "Không thể tải hồ sơ.", severity: "error" });
@@ -57,8 +68,7 @@ export default function StudentProfilePage() {
             newErrors.fullName = "Họ và tên là bắt buộc.";
             valid = false;
         }
-        const phoneRegex = /^(0\d{9}|\+84\d{9})$/;
-        if (form.phoneNumber && !phoneRegex.test(form.phoneNumber)) {
+        if (form.phoneNumber && !PHONE_PATTERN.test(form.phoneNumber)) {
             newErrors.phoneNumber = "Số điện thoại không hợp lệ.";
             valid = false;
         }
@@ -68,6 +78,10 @@ export default function StudentProfilePage() {
 
     async function handleSave() {
         if (!validate()) return;
+        if (!phoneVerified && form.phoneNumber !== initialForm.phoneNumber) {
+            setSnackbar({ open: true, message: "Hãy xác thực số điện thoại bằng mã SMS trước khi lưu.", severity: "error" });
+            return;
+        }
         try {
             setSaving(true);
             await updateMyStudentProfile({
@@ -90,9 +104,53 @@ export default function StudentProfilePage() {
         }
     }
 
+    function validatePhone() {
+        if (!PHONE_PATTERN.test(form.phoneNumber)) {
+            setErrors((prev) => ({ ...prev, phoneNumber: "Số điện thoại không hợp lệ." }));
+            return false;
+        }
+        return true;
+    }
+
+    async function handleRequestPhoneOtp() {
+        if (phoneVerified || !validatePhone()) return;
+        try {
+            setSendingPhoneOtp(true);
+            await requestStudentPhoneVerification(form.phoneNumber);
+            setPhoneOtpSent(true);
+            setSnackbar({ open: true, message: "Đã gửi mã xác thực SMS.", severity: "success" });
+        } catch (error: any) {
+            const response = error.response?.data;
+            setSnackbar({ open: true, message: response?.message ?? "Không thể gửi mã SMS.", severity: "error" });
+        } finally {
+            setSendingPhoneOtp(false);
+        }
+    }
+
+    async function handleConfirmPhoneOtp() {
+        if (phoneVerified || !validatePhone() || !/^\d{6}$/.test(phoneCode)) {
+            setSnackbar({ open: true, message: "Mã xác thực phải gồm 6 chữ số.", severity: "error" });
+            return;
+        }
+        try {
+            setConfirmingPhoneOtp(true);
+            await confirmStudentPhoneVerification(form.phoneNumber, phoneCode);
+            await loadProfile();
+            setSnackbar({ open: true, message: "Số điện thoại đã được xác thực và được khóa thay đổi.", severity: "success" });
+        } catch (error: any) {
+            const response = error.response?.data;
+            setSnackbar({ open: true, message: response?.message ?? "Mã xác thực không hợp lệ.", severity: "error" });
+        } finally {
+            setConfirmingPhoneOtp(false);
+        }
+    }
+
     function handleChange(field: keyof typeof form) {
         return (event: React.ChangeEvent<HTMLInputElement>) => {
-            setForm({ ...form, [field]: event.target.value });
+            const value = field === "phoneNumber"
+                ? sanitizePhoneInput(event.target.value)
+                : event.target.value;
+            setForm({ ...form, [field]: value });
             if (field === "fullName") setErrors((prev) => ({ ...prev, fullName: "" }));
             if (field === "phoneNumber") setErrors((prev) => ({ ...prev, phoneNumber: "" }));
         };
@@ -247,16 +305,54 @@ export default function StudentProfilePage() {
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, sm: 6 }}>
-                                <TextField
-                                    fullWidth
-                                    label="Số điện thoại"
-                                    value={form.phoneNumber}
-                                            onChange={handleChange("phoneNumber")}
-                                            error={!!errors.phoneNumber}
-                                            helperText={errors.phoneNumber}
-                                            sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+                                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                                    <TextField
+                                        fullWidth
+                                        label="Số điện thoại"
+                                        value={form.phoneNumber}
+                                        disabled={phoneVerified}
+                                        type="tel"
+                                        onChange={handleChange("phoneNumber")}
+                                        error={!!errors.phoneNumber}
+                                        helperText={errors.phoneNumber || (phoneVerified ? "Đã xác thực — không thể thay đổi số điện thoại." : "Bạn cần xác thực số điện thoại bằng SMS.")}
+                                        slotProps={{
+                                            ...(phoneVerified ? { input: { endAdornment: <LockOutlinedIcon fontSize="small" /> } } : {}),
+                                            htmlInput: { inputMode: "tel", maxLength: 12, autoComplete: "tel" },
+                                        }}
+                                        sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+                                    />
+                                    {!phoneVerified && (
+                                        <Button
+                                            variant="outlined"
+                                            onClick={handleRequestPhoneOtp}
+                                            disabled={saving || sendingPhoneOtp || !form.phoneNumber}
+                                            sx={{ minWidth: 150, height: 56, whiteSpace: "nowrap", borderColor: '#C41E3A', color: '#C41E3A' }}
+                                        >
+                                            {sendingPhoneOtp ? "Đang gửi..." : "Gửi mã SMS"}
+                                        </Button>
+                                    )}
+                                </Stack>
+                                {!phoneVerified && phoneOtpSent && (
+                                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1 }}>
+                                        <TextField
+                                            size="small"
+                                            label="Mã SMS 6 số"
+                                            value={phoneCode}
+                                            onChange={(event) => setPhoneCode(sanitizeOtpInput(event.target.value))}
+                                            slotProps={{ htmlInput: { inputMode: "numeric", maxLength: 6 } }}
                                         />
-                                    </Grid>
+                                        <Button
+                                            variant="contained"
+                                            onClick={handleConfirmPhoneOtp}
+                                            disabled={confirmingPhoneOtp || phoneCode.length !== 6}
+                                            startIcon={<VerifiedUserOutlinedIcon />}
+                                            sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#a01830' } }}
+                                        >
+                                            {confirmingPhoneOtp ? "Đang xác thực..." : "Xác thực"}
+                                        </Button>
+                                    </Stack>
+                                )}
+                            </Grid>
                                 </Grid>
 
                                 <Divider sx={{ my: 5 }} />
