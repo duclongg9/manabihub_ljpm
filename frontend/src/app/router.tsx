@@ -75,6 +75,7 @@ import {
   TermsPage,
 } from '../features/help-center/pages/legal/LegalPages';
 import { NotFoundPage } from '../shared/components/NotFoundPage/NotFoundPage';
+import { RouteErrorPage } from '../shared/components/RouteErrorPage';
 
 export const router = createBrowserRouter([
   {
@@ -135,6 +136,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <PublicLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         path: 'auth/callback',
@@ -173,6 +175,7 @@ export const router = createBrowserRouter([
   {
     path: '/student',
     element: <StudentLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         index: true,
@@ -227,6 +230,7 @@ export const router = createBrowserRouter([
   {
     path: '/teacher',
     element: <TeacherLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         index: true,
@@ -281,6 +285,7 @@ export const router = createBrowserRouter([
   {
     path: '/admin',
     element: <AdminLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         index: true,

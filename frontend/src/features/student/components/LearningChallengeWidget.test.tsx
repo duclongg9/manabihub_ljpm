@@ -51,10 +51,11 @@ describe('LearningChallengeWidget', () => {
     await waitFor(() => expect(screen.getByText('2/3 hôm nay')).toBeInTheDocument());
   });
 
-  it('renders nothing when no challenge is published for the current week', async () => {
+  it('renders an actionable empty state when no challenge is published for the current week', async () => {
     vi.mocked(weeklyChallengeService.current).mockResolvedValue(null);
-    const { container } = render(<LearningChallengeWidget />);
+    render(<LearningChallengeWidget />);
     await waitFor(() => expect(weeklyChallengeService.current).toHaveBeenCalled());
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(await screen.findByText('Thử thách tuần đang được chuẩn bị')).toBeInTheDocument();
+    expect(screen.getByText(/trò chơi ghép thẻ và mức thưởng/)).toBeInTheDocument();
   });
 });

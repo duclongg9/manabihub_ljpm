@@ -69,6 +69,10 @@ public class ChallengeRewardSettlementService {
 
         Instant start = rewardDate.atStartOfDay(BUSINESS_ZONE).toInstant();
         Instant end = rewardDate.plusDays(1).atStartOfDay(BUSINESS_ZONE).toInstant();
+        if (challenge.getPublishedAt() != null) {
+            if (!challenge.getPublishedAt().isBefore(end)) return;
+            if (challenge.getPublishedAt().isAfter(start)) start = challenge.getPublishedAt();
+        }
         for (UUID studentId : progressRepository.findStudentsWithCompletedLearningActivity(start, end)) {
             if (attendanceRewardRepository.existsByRewardDateAndStudentId(rewardDate, studentId)) continue;
             BigDecimal amount = challenge.getDailyAttendanceReward();
