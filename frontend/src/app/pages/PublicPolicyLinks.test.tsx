@@ -2,6 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { ROUTES } from '../../shared/constants/routes';
+import { AdminLoginPage } from './AdminLoginPage';
 import { PublicLoginPage } from './PublicLoginPage';
 import { BecomeTeacherBanner } from './PublicHomePage/BecomeTeacherBanner';
 import { LandingFooter } from './PublicHomePage/LandingFooter';
@@ -22,7 +23,7 @@ describe('public policy links', () => {
     expect(screen.getByRole('link', { name: 'Về trang chủ ManabiHub' }).getAttribute('href'))
       .toBe(ROUTES.PUBLIC.HOME);
     expect(screen.getByRole('img', { name: 'ManabiHub' }).getAttribute('src'))
-      .toBe('/manabihub-header-logo.svg');
+      .toBe('/manabihub-header-logo.png');
 
     expect(screen.getByRole('link', { name: 'Điều khoản sử dụng' }).getAttribute('href'))
       .toBe(ROUTES.PUBLIC.TERMS);
@@ -59,5 +60,22 @@ describe('public policy links', () => {
       .toBe(ROUTES.PUBLIC.PRIVACY);
     expect(screen.queryByText(/bạn đồng ý/i)).toBeNull();
     expect(screen.queryByText(/hàng đầu|500\+ học viên/i)).toBeNull();
+  });
+
+  it('uses the system logo on both public and admin login surfaces', () => {
+    const publicLogin = renderInRouter(<PublicLoginPage />);
+
+    expect(screen.getAllByRole('img', { name: 'ManabiHub' })).toHaveLength(2);
+    screen.getAllByRole('img', { name: 'ManabiHub' }).forEach((logo) => {
+      expect(logo.getAttribute('src')).toBe('/manabihub-header-logo.png');
+    });
+
+    publicLogin.unmount();
+    renderInRouter(<AdminLoginPage />);
+
+    expect(screen.getAllByRole('img', { name: 'ManabiHub' })).toHaveLength(2);
+    screen.getAllByRole('img', { name: 'ManabiHub' }).forEach((logo) => {
+      expect(logo.getAttribute('src')).toBe('/manabihub-header-logo.png');
+    });
   });
 });

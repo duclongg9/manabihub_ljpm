@@ -93,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
     <>
       <Box
         component="img"
-        src="/manabihub-header-logo.svg"
+        src="/manabihub-header-logo.png"
         alt="ManabiHub"
         sx={{ display: 'block', flexShrink: 0, height: { xs: 40, sm: 48 }, width: 'auto' }}
       />
@@ -307,7 +307,20 @@ function AccountWalletSummary({ kind, loading, error, wallet, onOpen }: AccountW
         size="small"
         onClick={onOpen}
         endIcon={<ArrowForwardIosOutlinedIcon sx={{ fontSize: '0.75rem !important' }} />}
-        sx={{ p: 0, minWidth: 0, textTransform: 'none', fontWeight: 800, color: '#C41E3A' }}
+        sx={{
+          minWidth: 0,
+          px: 1.25,
+          py: 0.5,
+          borderRadius: 1.25,
+          bgcolor: '#C41E3A',
+          color: '#fff',
+          textTransform: 'none',
+          fontWeight: 800,
+          '&:hover': {
+            bgcolor: '#9D182E',
+            color: '#fff',
+          },
+        }}
       >
         {isStudent ? 'Mở Ví & Thanh toán' : 'Mở ví doanh thu'}
       </Button>

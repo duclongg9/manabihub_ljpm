@@ -109,10 +109,12 @@ export function StudentOnboardingPage() {
     <Box sx={{ minHeight: '100vh', bgcolor: '#F8FAFC', backgroundImage: 'radial-gradient(at 100% 0%, rgba(254, 226, 226, 0.4) 0px, transparent 50%), radial-gradient(at 0% 100%, rgba(255, 237, 213, 0.4) 0px, transparent 50%)', display: 'flex', flexDirection: 'column' }}>
       {/* Minimal Header */}
       <Box sx={{ p: 2, px: 4, bgcolor: 'white', borderBottom: '1px solid', borderColor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography variant="h6" sx={{ fontWeight: 900, color: '#C41E3A', letterSpacing: '-0.5px' }}>
-          <MenuBookIcon sx={{ verticalAlign: 'middle', mr: 1, mb: 0.5 }} />
-          ManabiHub
-        </Typography>
+        <Box
+          component="img"
+          src="/manabihub-header-logo.png"
+          alt="ManabiHub"
+          sx={{ display: 'block', height: 52, width: 'auto' }}
+        />
         <Button
           variant="text"
           color="inherit"

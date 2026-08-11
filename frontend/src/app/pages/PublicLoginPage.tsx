@@ -1,5 +1,4 @@
 import { Alert, Box, Typography, Button, keyframes } from '@mui/material';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getAsset } from '../../shared/utils/assets';
 import {
@@ -67,13 +66,29 @@ export function PublicLoginPage() {
 
         <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', p: 8, height: '100%' }}>
           {/* Logo at top */}
-          <Box component={Link} to={ROUTES.PUBLIC.HOME} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none', flexShrink: 0 }}>
-            <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px 0 rgba(196, 30, 58, 0.39)' }}>
-              <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
-            </Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: 'white', letterSpacing: '-0.5px' }}>
-              ManabiHub
-            </Typography>
+          <Box
+            component={Link}
+            to={ROUTES.PUBLIC.HOME}
+            aria-label="Về trang chủ ManabiHub"
+            sx={{
+              alignSelf: 'flex-start',
+              borderRadius: 2,
+              display: 'inline-flex',
+              flexShrink: 0,
+              textDecoration: 'none',
+            }}
+          >
+            <Box
+              component="img"
+              src="/manabihub-header-logo.png"
+              alt="ManabiHub"
+              sx={{
+                display: 'block',
+                filter: 'drop-shadow(0 0 1px rgba(255, 255, 255, 0.95))',
+                height: 58,
+                width: 'auto',
+              }}
+            />
           </Box>
 
           {/* Content shifted slightly up for vertical balance */}
@@ -118,11 +133,18 @@ export function PublicLoginPage() {
           border: '1px solid #f1f5f9'
         }}>
           {/* Mobile Header Logo */}
-          <Box component={Link} to="/" sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', justifyContent: 'center', gap: 1.5, mb: 6, textDecoration: 'none' }}>
-            <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #C41E3A 0%, #E8432A 100%)', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MenuBookIcon sx={{ fontSize: 24, color: 'white' }} />
-            </Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>ManabiHub</Typography>
+          <Box
+            component={Link}
+            to={ROUTES.PUBLIC.HOME}
+            aria-label="Về trang chủ ManabiHub"
+            sx={{ display: { xs: 'flex', lg: 'none' }, justifyContent: 'center', mb: 6, textDecoration: 'none' }}
+          >
+            <Box
+              component="img"
+              src="/manabihub-header-logo.png"
+              alt="ManabiHub"
+              sx={{ display: 'block', height: 64, width: 'auto' }}
+            />
           </Box>
 
           <Box sx={{ textAlign: 'center', mb: 4 }}>

@@ -25,7 +25,7 @@ export const HelpCenterLayout = () => {
               className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
             >
               <img
-                src="/manabihub-header-logo.svg"
+                src="/manabihub-header-logo.png"
                 alt="ManabiHub"
                 className="h-12 w-auto transition-transform duration-200 hover:scale-105"
               />
