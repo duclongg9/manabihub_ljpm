@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 
 public record CreateCourseDraftRequest(
@@ -45,6 +46,27 @@ public record CreateCourseDraftRequest(
 
         @NotNull
         @Size(min = 4)
-        List<@NotBlank @Size(max = 160) String> learningGoals
+        List<@NotBlank @Size(max = 160) String> learningGoals,
+
+        /** Optional access policy; null keeps the platform default of 180 days. */
+        Integer accessDurationDays,
+
+        /** Optional fixed expiry for exam-cohort courses. */
+        Instant accessExpiresAt
 ) {
+    public CreateCourseDraftRequest(
+            String title,
+            String introduction,
+            JlptLevel jlptLevel,
+            String category,
+            String thumbnailUrl,
+            String outcomes,
+            BigDecimal price,
+            String prerequisites,
+            String targetStudents,
+            List<String> learningGoals
+    ) {
+        this(title, introduction, jlptLevel, category, thumbnailUrl, outcomes, price,
+                prerequisites, targetStudents, learningGoals, null, null);
+    }
 }

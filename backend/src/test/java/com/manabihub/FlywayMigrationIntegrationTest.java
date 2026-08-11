@@ -72,7 +72,7 @@ public class FlywayMigrationIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
-    // ── Test 1: Clean build from V001 to V066 ──────────────────────────────
+    // ── Test 1: Clean build from V001 to V067 ──────────────────────────────
     @Test
     void cleanMigrationToLatestVersion() {
         assertThat(flyway).isNotNull();
@@ -89,13 +89,13 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("066");
+        assertThat(current).isEqualTo("067");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V066 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V067 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");
@@ -278,6 +278,23 @@ public class FlywayMigrationIntegrationTest {
                 "SELECT count(*) FROM information_schema.columns WHERE table_name = 'enrollments' AND column_name = 'protected_materials_fully_downloaded_at' AND table_schema = 'public'",
                 Integer.class);
         assertThat(colEpm).as("enrollments.protected_materials_fully_downloaded_at exists").isEqualTo(1);
+
+        Integer accessColumns = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND "
+                        + "((table_name = 'courses' AND column_name IN ('access_duration_days', 'access_expires_at')) "
+                        + "OR (table_name = 'enrollments' AND column_name = 'expires_at'))",
+                Integer.class);
+        assertThat(accessColumns).as("course/enrollment access expiration columns exist").isEqualTo(3);
+
+        String enrollmentStatusConstraint = jdbcTemplate.queryForObject(
+                "SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c "
+                        + "JOIN pg_namespace n ON n.oid = c.connamespace "
+                        + "WHERE c.conname = 'chk_enrollments_status' AND n.nspname = 'public'",
+                String.class);
+        assertThat(enrollmentStatusConstraint)
+                .as("refund lock and expiration statuses are accepted")
+                .contains("REFUND_PENDING", "EXPIRED");
 
         // MHB-73 server-verification indexes
         Integer pendingVerificationIndex = jdbcTemplate.queryForObject(

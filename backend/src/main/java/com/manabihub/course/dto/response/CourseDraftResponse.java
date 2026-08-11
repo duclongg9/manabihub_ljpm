@@ -25,6 +25,8 @@ public record CourseDraftResponse(
         String targetStudents,
         CourseStatus status,
         List<String> learningGoals,
+        Integer accessDurationDays,
+        Instant accessExpiresAt,
         Instant createdAt,
         Map<String, Object> srsTrace
 ) {

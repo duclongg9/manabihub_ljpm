@@ -167,6 +167,8 @@ public final class MessageCodes {
     // LEARNING — student learning progress
     // ──────────────────────────────────────────────
     public static final String LEARNING_NOT_ENROLLED = "LEARNING_NOT_ENROLLED";
+    public static final String LEARNING_ACCESS_EXPIRED = "LEARNING_ACCESS_EXPIRED";
+    public static final String LEARNING_REFUND_PENDING = "LEARNING_REFUND_PENDING";
     public static final String LEARNING_ALREADY_ENROLLED = "LEARNING_ALREADY_ENROLLED";
     public static final String LEARNING_PROGRESS_UPDATED = "LEARNING_PROGRESS_UPDATED";
     public static final String LEARNING_LESSON_COMPLETED = "LEARNING_LESSON_COMPLETED";

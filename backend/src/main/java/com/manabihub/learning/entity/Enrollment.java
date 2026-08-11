@@ -53,6 +53,10 @@ public class Enrollment {
     @Column(name = "enrolled_at", nullable = false, updatable = false)
     private Instant enrolledAt;
 
+    /** Immutable access deadline for this purchase/enrollment. */
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
     @Column(name = "completed_at")
     private Instant completedAt;
 
@@ -63,4 +67,8 @@ public class Enrollment {
      */
     @Column(name = "protected_materials_fully_downloaded_at")
     private Instant protectedMaterialsFullyDownloadedAt;
+
+    public boolean isExpired(Instant now) {
+        return expiresAt != null && !expiresAt.isAfter(now);
+    }
 }

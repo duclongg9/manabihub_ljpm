@@ -149,8 +149,13 @@ export function CourseLearningPage() {
       .catch((err) => {
         if (!active) return;
         if (isAxiosError(err) && err.response?.status === 403) {
-          // SRS 3a: no active enrollment -> redirect to course detail
-          navigate(`/courses/${courseId}`, { replace: true });
+          const code = err.response.data?.messageCode;
+          if (code === 'LEARNING_ACCESS_EXPIRED' || code === 'LEARNING_REFUND_PENDING') {
+            setError(err.response.data?.message || 'Khóa học hiện chưa thể truy cập.');
+          } else {
+            // SRS 3a: no active enrollment -> redirect to course detail
+            navigate(`/courses/${courseId}`, { replace: true });
+          }
           return;
         }
         setError('Không thể tải nội dung khoá học. Vui lòng thử lại.');
@@ -319,8 +324,11 @@ export function CourseLearningPage() {
 
   if (error && !learning) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 3, maxWidth: 720, mx: 'auto' }}>
         <Alert severity="error">{error}</Alert>
+        <Button sx={{ mt: 2 }} variant="outlined" onClick={() => navigate(`/courses/${courseId}`)}>
+          Xem khóa học / gia hạn
+        </Button>
       </Box>
     );
   }

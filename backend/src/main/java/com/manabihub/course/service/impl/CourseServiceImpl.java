@@ -101,6 +101,8 @@ public class CourseServiceImpl implements CourseService {
                 .currency("VND")
                 .prerequisites(trim(request.prerequisites()))
                 .targetStudents(trim(request.targetStudents()))
+                .accessDurationDays(normalizeAccessDuration(request.accessDurationDays()))
+                .accessExpiresAt(request.accessExpiresAt())
                 .status(CourseStatus.DRAFT)
                 .aiSupported(false)
                 .build();
@@ -255,6 +257,8 @@ public class CourseServiceImpl implements CourseService {
         course.setCurrency("VND");
         course.setPrerequisites(trim(request.prerequisites()));
         course.setTargetStudents(trim(request.targetStudents()));
+        course.setAccessDurationDays(normalizeAccessDuration(request.accessDurationDays()));
+        course.setAccessExpiresAt(request.accessExpiresAt());
         course.getLearningGoals().clear();
         courseRepository.saveAndFlush(course);
 
@@ -438,6 +442,8 @@ public class CourseServiceImpl implements CourseService {
                 .targetStudents(course.getTargetStudents())
                 .publishedAt(course.getPublishedAt())
                 .aiSupported(course.isAiSupported())
+                .accessDurationDays(course.getAccessDurationDays())
+                .accessExpiresAt(course.getAccessExpiresAt())
                 .teacher(PublicCourseDetailResponse.TeacherDto.builder()
                         .id(course.getTeacher().getId())
                         .name(course.getTeacher().getDisplayName())
@@ -527,6 +533,15 @@ public class CourseServiceImpl implements CourseService {
                 BigDecimal.ZERO
         );
 
+        if (request.accessDurationDays() != null && request.accessDurationDays() < 1) {
+            throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST,
+                    "Access duration must be at least one day");
+        }
+        if (request.accessExpiresAt() != null && request.accessExpiresAt().isBefore(Instant.now())) {
+            throw new BusinessException(MessageCodes.COMMON_BAD_REQUEST,
+                    "Fixed access expiry must be in the future");
+        }
+
         if (!StringUtils.hasText(request.category())
                 || !courseCategoryRepository.existsByCodeAndActiveTrue(request.category().trim())) {
             throw new BusinessException(MessageCodes.MSG_COURSE_004, "Course category is invalid");
@@ -564,6 +579,10 @@ public class CourseServiceImpl implements CourseService {
                             + " characters"
             );
         }
+    }
+
+    private int normalizeAccessDuration(Integer requestedDays) {
+        return requestedDays == null ? 180 : requestedDays;
     }
 
     private List<String> normalizeLearningGoals(List<String> learningGoals) {
@@ -660,6 +679,8 @@ public class CourseServiceImpl implements CourseService {
                 course.getTargetStudents(),
                 course.getStatus(),
                 learningGoals,
+                course.getAccessDurationDays(),
+                course.getAccessExpiresAt(),
                 course.getCreatedAt(),
                 srsTrace()
         );

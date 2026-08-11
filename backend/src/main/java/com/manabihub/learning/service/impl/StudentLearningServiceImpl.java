@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.time.Instant;
 import java.util.stream.Collectors;
 
 @Service
@@ -131,10 +132,22 @@ public class StudentLearningServiceImpl implements StudentLearningService {
                 .courseTitle(course.getTitle())
                 .thumbnailUrl(course.getThumbnailUrl())
                 .teacherName(teacherName)
-                .enrollmentStatus(enrollment.getStatus())
+                .enrollmentStatus(enrollment.isExpired(Instant.now())
+                        ? EnrollmentStatus.EXPIRED
+                        : enrollment.getStatus())
                 .enrolledAt(enrollment.getEnrolledAt())
+                .expiresAt(enrollment.getExpiresAt())
+                .daysRemaining(daysRemaining(enrollment.getExpiresAt()))
                 .progressPercentage(progressPercentage)
                 .build();
+    }
+
+    private long daysRemaining(Instant expiresAt) {
+        if (expiresAt == null) {
+            return -1;
+        }
+        long seconds = java.time.Duration.between(Instant.now(), expiresAt).getSeconds();
+        return Math.max(0, (seconds + 86_399) / 86_400);
     }
 
     private double progressPercentage(long completed, long total) {

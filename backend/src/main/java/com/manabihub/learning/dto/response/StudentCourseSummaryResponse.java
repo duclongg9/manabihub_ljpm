@@ -17,5 +17,7 @@ public class StudentCourseSummaryResponse {
     private String teacherName;
     private EnrollmentStatus enrollmentStatus;
     private Instant enrolledAt;
+    private Instant expiresAt;
+    private long daysRemaining;
     private double progressPercentage;
 }

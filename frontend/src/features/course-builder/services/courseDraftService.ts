@@ -17,6 +17,8 @@ export interface CreateCourseDraftPayload {
   prerequisites: string;
   targetStudents: string;
   learningGoals: string[];
+  accessDurationDays?: number | null;
+  accessExpiresAt?: string | null;
 }
 
 export interface CourseDraftResponse {
@@ -35,6 +37,8 @@ export interface CourseDraftResponse {
   targetStudents: string;
   status: CourseStatus;
   learningGoals: string[];
+  accessDurationDays?: number | null;
+  accessExpiresAt?: string | null;
   createdAt?: string | null;
   srsTrace: Record<string, unknown>;
 }

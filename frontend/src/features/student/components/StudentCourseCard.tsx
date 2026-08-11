@@ -13,6 +13,15 @@ interface StudentCourseCardProps {
   course: StudentCourseSummary;
 }
 
+const statusLabelFor = (status: StudentCourseSummary['enrollmentStatus']) => {
+  switch (status) {
+    case 'COMPLETED': return 'Đã hoàn thành';
+    case 'REFUND_PENDING': return 'Đang chờ hoàn tiền';
+    case 'EXPIRED': return 'Đã hết hạn';
+    default: return 'Đang học';
+  }
+};
+
 export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) => {
   const navigate = useNavigate();
   const [imageFailed, setImageFailed] = useState(false);
@@ -23,6 +32,10 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
         return 'success';
       case 'COMPLETED':
         return 'primary';
+      case 'REFUND_PENDING':
+        return 'warning';
+      case 'EXPIRED':
+        return 'error';
       case 'REFUNDED':
       case 'REVOKED':
         return 'error';
@@ -36,10 +49,21 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
   };
 
   const handleStudyCourse = () => {
+    if (course.enrollmentStatus === 'EXPIRED' || course.enrollmentStatus === 'REFUND_PENDING') {
+      handleViewCourse();
+      return;
+    }
     navigate(ROUTES.STUDENT.COURSE_LEARN(course.courseId));
   };
 
   const progress = Math.min(100, Math.max(0, course.progressPercentage || 0));
+  const expiryLabel = course.daysRemaining === undefined || course.daysRemaining < 0
+    ? null
+    : course.daysRemaining === 0
+      ? 'Đã hết hạn'
+      : course.daysRemaining < 15
+        ? `Còn ${course.daysRemaining} ngày hết hạn`
+        : `Hạn dùng: ${course.daysRemaining} ngày`;
   const statusLabel = course.enrollmentStatus === 'COMPLETED' ? 'Đã hoàn thành' : 'Đang học';
 
   return (
@@ -116,10 +140,25 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
           />
         </Box>
 
+        {expiryLabel && (
+          <Typography
+            variant="caption"
+            sx={{
+              mb: 2,
+              color: course.enrollmentStatus === 'EXPIRED' || (course.daysRemaining ?? 99) < 15
+                ? 'warning.dark'
+                : 'text.secondary',
+              fontWeight: 700,
+            }}
+          >
+            {expiryLabel}
+          </Typography>
+        )}
+
         <Box sx={{ mt: 'auto', pt: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Chip
-              label={statusLabel}
+              label={statusLabelFor(course.enrollmentStatus) || statusLabel}
               size="small"
               color={getStatusColor(course.enrollmentStatus)}
               variant="outlined"

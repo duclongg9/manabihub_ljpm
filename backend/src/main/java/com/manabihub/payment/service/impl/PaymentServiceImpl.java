@@ -425,12 +425,17 @@ public class PaymentServiceImpl implements PaymentService {
                     .findByStudentIdAndCourseIdForUpdate(student.getId(), course.getId())
                     .orElse(null);
             if (existing == null) {
+                Instant enrolledAt = Instant.now();
                 enrollmentRepository.save(Enrollment.builder()
                         .student(student)
                         .course(course)
                         .status(EnrollmentStatus.ACTIVE)
+                        .enrolledAt(enrolledAt)
+                        .expiresAt(course.resolveEnrollmentExpiry(enrolledAt))
                         .build());
-            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED) {
+            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED
+                    || existing.getStatus() == EnrollmentStatus.EXPIRED
+                    || existing.isExpired(Instant.now())) {
                 enrollmentProgressResetService.resetForRepurchase(existing);
             }
         }

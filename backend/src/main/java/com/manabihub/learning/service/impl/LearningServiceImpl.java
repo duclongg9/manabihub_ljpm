@@ -165,7 +165,9 @@ public class LearningServiceImpl implements LearningService {
                 completedLessons,
                 progressPercent(completedLessons, allBlocks.size()),
                 courseCompleted,
-                warnings
+                warnings,
+                enrollment.getStatus(),
+                enrollment.getExpiresAt()
         );
     }
 
@@ -352,14 +354,45 @@ public class LearningServiceImpl implements LearningService {
 
         StudentProfile studentProfile = resolveStudentProfile();
 
-        return enrollmentRepository.findByStudent_IdAndCourse_Id(studentProfile.getId(), courseId)
-                .filter(enrollment -> enrollment.getStatus() == EnrollmentStatus.ACTIVE
-                        || enrollment.getStatus() == EnrollmentStatus.COMPLETED)
+        Enrollment enrollment = enrollmentRepository.findByStudent_IdAndCourse_Id(studentProfile.getId(), courseId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.LEARNING_NOT_ENROLLED,
                         "You are not enrolled in this course",
                         HttpStatus.FORBIDDEN
                 ));
+
+        if (enrollment.getStatus() == EnrollmentStatus.REFUND_PENDING) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_REFUND_PENDING,
+                    "Khóa học đang tạm khóa trong thời gian xử lý yêu cầu hoàn tiền. Bạn có thể hủy yêu cầu để tiếp tục học.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        if (enrollment.getStatus() == EnrollmentStatus.REFUNDED
+                || enrollment.getStatus() == EnrollmentStatus.REVOKED) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_NOT_ENROLLED,
+                    "Quyền truy cập khóa học đã bị thu hồi sau khi hoàn tiền.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        if (enrollment.getStatus() == EnrollmentStatus.EXPIRED
+                || enrollment.isExpired(Instant.now())) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_ACCESS_EXPIRED,
+                    "Khóa học đã hết hạn truy cập. Vui lòng gia hạn hoặc mua lại khóa học.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        if (enrollment.getStatus() != EnrollmentStatus.ACTIVE
+                && enrollment.getStatus() != EnrollmentStatus.COMPLETED) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_NOT_ENROLLED,
+                    "You are not enrolled in this course",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        return enrollment;
     }
 
     private StudentProfile resolveStudentProfile() {
