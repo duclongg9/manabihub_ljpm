@@ -61,7 +61,7 @@ export const StatsBar: React.FC = () => {
           sx={{
             bgcolor: '#ffffff',
             py: { xs: 4, md: 5 },
-            px: { xs: 2, md: 4 },
+            px: { xs: 1.5, sm: 2, md: 4 },
             borderRadius: '24px',
             boxShadow: '0 16px 40px rgba(0,0,0,0.08)',
             border: '1px solid rgba(0,0,0,0.04)',
@@ -74,11 +74,12 @@ export const StatsBar: React.FC = () => {
 
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
+              display: { xs: 'grid', sm: 'flex' },
+              gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'none' },
+              flexDirection: { sm: 'row' },
               justifyContent: 'space-around',
-              alignItems: 'center',
-              gap: { xs: 4, sm: 2 },
+              alignItems: { xs: 'stretch', sm: 'center' },
+              gap: { xs: 2, sm: 2 },
             }}
           >
             {HIGHLIGHTS.map((stat, index) => (
@@ -86,8 +87,9 @@ export const StatsBar: React.FC = () => {
                 key={stat.label}
                 sx={{
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
+                  alignItems: { xs: 'flex-start', sm: 'center' },
+                  gap: { xs: 1, sm: 2 },
+                  minWidth: 0,
                   opacity: isVisible ? 1 : 0,
                   transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
                   transition: `all 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.15}s`,
@@ -95,7 +97,8 @@ export const StatsBar: React.FC = () => {
               >
                 <Box
                   sx={{
-                    width: 52, height: 52,
+                    width: { xs: 40, sm: 52 }, height: { xs: 40, sm: 52 },
+                    flexShrink: 0,
                     borderRadius: '14px',
                     bgcolor: `${stat.color}18`,
                     color: stat.color,
@@ -105,11 +108,11 @@ export const StatsBar: React.FC = () => {
                 >
                   {stat.icon}
                 </Box>
-                <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <Typography sx={{ color: '#1A1A2E', fontWeight: 800, fontSize: '1.5rem', lineHeight: 1.2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+                  <Typography sx={{ color: '#1A1A2E', fontWeight: 800, fontSize: { xs: '1rem', sm: '1.5rem' }, lineHeight: 1.2, wordBreak: 'break-word' }}>
                     {stat.value}
                   </Typography>
-                  <Typography sx={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>
+                  <Typography sx={{ color: '#64748b', fontSize: { xs: '0.66rem', sm: '0.8rem' }, fontWeight: 600, lineHeight: 1.35 }}>
                     {stat.label}
                   </Typography>
                 </Box>

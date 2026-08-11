@@ -346,13 +346,13 @@ export const TopCategories: React.FC = () => {
             </Typography>
 
             {/* Checklist */}
-            <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 2, sm: 3 }, alignItems: { xs: 'stretch', sm: 'center' } }}>
               <Box
                 component="img"
                 src={getAsset('course2.png')}
-                sx={{ width: '160px', height: '110px', objectFit: 'cover', borderRadius: 3 }}
+                sx={{ width: { xs: '100%', sm: '160px' }, maxWidth: { xs: 280, sm: 'none' }, height: { xs: 'auto', sm: '110px' }, objectFit: 'cover', borderRadius: 3 }}
               />
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
                 {[
                   'Tìm khóa học phù hợp với trình độ và mục tiêu',
                   'Học theo nội dung và lộ trình của từng khóa học',
