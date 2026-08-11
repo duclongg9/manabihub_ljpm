@@ -21,6 +21,7 @@ import { useStudentCourses } from '../hooks/useStudentCourses';
 import { useStudentStats } from '../hooks/useStudentStats';
 import { StudyGoalsWidget } from '../components/StudyGoalsWidget';
 import { StudyCalendar } from '../components/StudyCalendar';
+import { LearningChallengeWidget } from '../components/LearningChallengeWidget';
 import { OnboardingGuide, type OnboardingStep } from '../../../shared/components/OnboardingGuide/OnboardingGuide';
 
 const BRAND_COLORS = {
@@ -65,7 +66,7 @@ const STUDENT_DASHBOARD_GUIDE: OnboardingStep[] = [
 export function StudentDashboardPage() {
   const navigate = useNavigate();
   const statsQuery = useStudentStats();
-  const coursesQuery = useStudentCourses(0, 3);
+  const coursesQuery = useStudentCourses(0, 50);
   const profileQuery = useQuery({
     queryKey: ['student-profile'],
     queryFn: getMyStudentProfile,
@@ -307,102 +308,110 @@ export function StudentDashboardPage() {
           ))}
         </Grid>
 
-        <Box sx={{ mb: 4 }} data-onboarding-target="student-calendar">
-          <StudyCalendar
-            courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
-          />
-        </Box>
-
-        <Grid container spacing={3.5} sx={{ alignItems: 'stretch' }}>
+        <Grid container spacing={3.5} sx={{ alignItems: 'flex-start' }}>
           <Grid size={{ xs: 12, lg: 8.5 }}>
-            <Stack
-              direction="row"
-              sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}
-            >
-              <Box>
-                <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900 }}>
-                  Khóa học gần đây
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#7A8391', letterSpacing: '0.06em' }}>
-                  最近のコース
-                </Typography>
+            <Stack spacing={4}>
+              <Box data-onboarding-target="student-calendar">
+                <StudyCalendar
+                  courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
+                />
               </Box>
-              {courses.length > 0 && (
-                <Button
-                  size="small"
-                  onClick={() => navigate(ROUTES.STUDENT.MY_COURSES)}
-                  endIcon={<ArrowForwardIcon />}
-                  sx={{ color: 'common.white', fontWeight: 800 }}
-                >
-                  Xem tất cả
-                </Button>
-              )}
-            </Stack>
 
-            {courses.length === 0 ? (
-              <Box
-                sx={{
-                  minHeight: 330,
-                  display: 'grid',
-                  placeItems: 'center',
-                  textAlign: 'center',
-                  p: 4,
-                  border: '1px dashed #CCD2DB',
-                  borderRadius: '8px',
-                  bgcolor: '#FFFFFF',
-                }}
-              >
-                <Box>
-                  <MenuBookOutlinedIcon sx={{ fontSize: 54, color: '#A6AFBC', mb: 1.5 }} />
-                  <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900, mb: 1 }}>
-                    Hành trình JLPT đang chờ bạn
-                  </Typography>
-                  <Typography sx={{ color: '#667085', maxWidth: 430, mx: 'auto', mb: 3 }}>
-                    Khám phá các khóa học đã xuất bản và chọn lộ trình phù hợp với mục tiêu của bạn.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    onClick={() => navigate(ROUTES.STUDENT.BROWSE_COURSES)}
+              <Box>
+                <Stack
+                  direction="row"
+                  sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}
+                >
+                  <Box>
+                    <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900 }}>
+                      Khóa học gần đây
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#7A8391', letterSpacing: '0.06em' }}>
+                      最近のコース
+                    </Typography>
+                  </Box>
+                  {courses.length > 0 && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => navigate(ROUTES.STUDENT.MY_COURSES)}
+                      endIcon={<ArrowForwardIcon />}
+                      sx={{ borderColor: '#CBD5E1', color: BRAND_COLORS.navy, fontWeight: 800 }}
+                    >
+                      Xem tất cả
+                    </Button>
+                  )}
+                </Stack>
+
+                {courses.length === 0 ? (
+                  <Box
                     sx={{
-                      bgcolor: BRAND_COLORS.red,
-                      fontWeight: 800,
-                      '&:hover': { bgcolor: '#A71931' },
+                      minHeight: 330,
+                      display: 'grid',
+                      placeItems: 'center',
+                      textAlign: 'center',
+                      p: 4,
+                      border: '1px dashed #CCD2DB',
+                      borderRadius: '8px',
+                      bgcolor: '#FFFFFF',
                     }}
                   >
-                    Khám phá khóa học
-                  </Button>
-                </Box>
-              </Box>
-            ) : (
-              <Box
-                data-testid="recent-courses-list"
-                sx={{
-                  display: 'flex',
-                  gap: 2.5,
-                  overflowX: 'auto',
-                  pb: 1,
-                  px: 0.25,
-                  scrollSnapType: { xs: 'x mandatory', md: 'none' },
-                  '& > *': {
-                    flex: { xs: '0 0 min(88vw, 360px)', md: '0 0 320px' },
-                    scrollSnapAlign: 'start',
-                  },
-                }}
-              >
-                {courses.slice(0, 3).map((course) => (
-                  <Box key={course.enrollmentId} sx={{ minWidth: 0 }}>
-                    <StudentCourseCard course={course} />
+                    <Box>
+                      <MenuBookOutlinedIcon sx={{ fontSize: 54, color: '#A6AFBC', mb: 1.5 }} />
+                      <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900, mb: 1 }}>
+                        Hành trình JLPT đang chờ bạn
+                      </Typography>
+                      <Typography sx={{ color: '#667085', maxWidth: 430, mx: 'auto', mb: 3 }}>
+                        Khám phá các khóa học đã xuất bản và chọn lộ trình phù hợp với mục tiêu của bạn.
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        onClick={() => navigate(ROUTES.STUDENT.BROWSE_COURSES)}
+                        sx={{
+                          bgcolor: BRAND_COLORS.red,
+                          fontWeight: 800,
+                          '&:hover': { bgcolor: '#A71931' },
+                        }}
+                      >
+                        Khám phá khóa học
+                      </Button>
+                    </Box>
                   </Box>
-                ))}
+                ) : (
+                  <Box
+                    data-testid="recent-courses-list"
+                    sx={{
+                      display: 'flex',
+                      gap: 2.5,
+                      overflowX: 'auto',
+                      pb: 1,
+                      px: 0.25,
+                      scrollSnapType: 'x mandatory',
+                      '& > *': {
+                        flex: { xs: '0 0 min(88vw, 360px)', md: '0 0 min(320px, 45%)' },
+                        scrollSnapAlign: 'start',
+                      },
+                    }}
+                  >
+                    {courses.slice(0, 3).map((course) => (
+                      <Box key={course.enrollmentId} sx={{ minWidth: 0 }}>
+                        <StudentCourseCard course={course} />
+                      </Box>
+                    ))}
+                  </Box>
+                )}
               </Box>
-            )}
+            </Stack>
           </Grid>
 
           <Grid size={{ xs: 12, lg: 3.5 }}>
-            <StudyGoalsWidget
-              jlptGoal={goalLevel}
-              courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
-            />
+            <Stack spacing={2.5} sx={{ position: { lg: 'sticky' }, top: { lg: 24 } }}>
+              <StudyGoalsWidget
+                jlptGoal={goalLevel}
+                courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
+              />
+              <LearningChallengeWidget accountKey={profile?.id ?? profile?.email} />
+            </Stack>
           </Grid>
         </Grid>
 

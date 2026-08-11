@@ -19,6 +19,9 @@ import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import ArrowBackIosNewOutlinedIcon from '@mui/icons-material/ArrowBackIosNewOutlined';
 import ArrowForwardIosOutlinedIcon from '@mui/icons-material/ArrowForwardIosOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
 import { useNavigate } from 'react-router-dom';
@@ -136,7 +139,8 @@ function formatTimeRange(event: CalendarEvent) {
 export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
   const navigate = useNavigate();
   const [plan, setPlan] = useState(readPlan);
-  const [view, setView] = useState<CalendarView>('month');
+  const [view, setView] = useState<CalendarView>('week');
+  const [expanded, setExpanded] = useState(true);
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<Record<string, boolean>>({});
@@ -153,9 +157,8 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
 
   const courseOptions = useMemo(() => {
     const options = new Map<string, string>();
-    const scheduledKeys = new Set(plan.slots.map(slotCourseKey));
     courses.forEach((course) => {
-      if (scheduledKeys.has(course.id)) options.set(course.id, course.title);
+      options.set(course.id, course.title);
     });
     plan.slots.forEach((slot) => {
       const key = slotCourseKey(slot);
@@ -209,15 +212,21 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
   const renderEvent = (event: CalendarEvent, compact = false) => (
     <Box
       key={event.key}
+      data-testid={`calendar-event-${event.key}`}
       sx={{
-        px: compact ? 0.5 : 0.75,
-        py: compact ? 0.25 : 0.5,
-        borderRadius: 0.75,
+        px: compact ? 0.65 : 0.75,
+        py: compact ? 0.35 : 0.5,
+        borderRadius: compact ? 999 : 1,
         bgcolor: `${event.color}18`,
-        borderLeft: `3px solid ${event.color}`,
+        border: `1px solid ${event.color}35`,
+        borderLeft: compact ? undefined : `3px solid ${event.color}`,
         minWidth: 0,
+        display: compact ? 'flex' : 'block',
+        alignItems: compact ? 'center' : undefined,
+        gap: compact ? 0.5 : undefined,
       }}
     >
+      {compact && <Box aria-hidden="true" sx={{ width: 7, height: 7, flexShrink: 0, borderRadius: '50%', bgcolor: event.color }} />}
       <Typography variant="caption" sx={{ display: 'block', color: event.color, fontWeight: 900, lineHeight: 1.2 }}>
         {event.slot.startTime} {event.conflict && '⚠'}
       </Typography>
@@ -243,9 +252,18 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
               {option === 'month' ? 'Tháng' : option === 'week' ? 'Tuần' : 'Hôm nay'}
             </Button>
           ))}
+          <IconButton
+            size="small"
+            aria-label={expanded ? 'Thu gọn lịch học' : 'Mở rộng lịch học'}
+            onClick={() => setExpanded((current) => !current)}
+            sx={{ ml: 0.5, color: '#667085' }}
+          >
+            {expanded ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
+          </IconButton>
         </Stack>
       </Stack>
 
+      {expanded && <>
       <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1, mt: 2 }}>
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
           <IconButton size="small" aria-label="Lịch trước" onClick={() => moveCursor(-1)}><ArrowBackIosNewOutlinedIcon sx={{ fontSize: 15 }} /></IconButton>
@@ -314,13 +332,17 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
       )}
 
       {filteredEvents.some((event) => event.conflict) && <Alert severity="warning" icon={<WarningAmberOutlinedIcon />} sx={{ mt: 1.5, py: 0.25 }}>Có suất học bị trùng giờ. Hãy bấm vào ngày đó để xem và chỉnh lại lịch.</Alert>}
+      </>}
 
       <Dialog open={Boolean(selectedDay)} onClose={() => setSelectedDay(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Lịch học ngày {selectedDay ? formatDate(selectedDay, { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}</DialogTitle>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          Lịch học ngày {selectedDay ? formatDate(selectedDay, { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}
+          <IconButton aria-label="Đóng" size="small" onClick={() => setSelectedDay(null)}><CloseRoundedIcon /></IconButton>
+        </DialogTitle>
         <DialogContent dividers>
-          {selectedDayEvents.length === 0 ? <Alert severity="info">Ngày này chưa có suất học.</Alert> : <Stack spacing={1.25}>{selectedDayEvents.map((event) => <Box key={event.key} sx={{ p: 1.25, border: '1px solid #E4E7EC', borderLeft: `4px solid ${event.color}`, borderRadius: 1 }}><Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 900 }}>{formatTimeRange(event)} · {event.slot.skill}</Typography><Typography variant="caption" color="text.secondary">{event.slot.courseTitle || 'Khóa học chưa chọn'}</Typography></Box><Button size="small" variant="contained" startIcon={<PlayArrowOutlinedIcon />} disabled={!event.slot.courseId} onClick={() => startLesson(event)} sx={{ alignSelf: { sm: 'center' }, bgcolor: '#C41E3A', textTransform: 'none' }}>Vào học ngay</Button></Stack>{event.conflict && <Chip size="small" color="warning" icon={<WarningAmberOutlinedIcon />} label="Trùng lịch" sx={{ mt: 0.75 }} />}</Box>)}</Stack>}
+          {selectedDayEvents.length === 0 ? <Alert severity="info">Ngày này chưa có suất học.</Alert> : <Stack spacing={1.25}>{selectedDayEvents.map((event) => <Box key={event.key} sx={{ p: 1.25, border: '1px solid #E4E7EC', borderLeft: `4px solid ${event.color}`, borderRadius: 1 }}><Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 900 }}>{formatTimeRange(event)} · {event.slot.skill}</Typography><Typography variant="caption" color="text.secondary">{event.slot.courseTitle || 'Khóa học chưa chọn'}</Typography><Typography variant="caption" sx={{ display: 'block', mt: 0.35, color: '#475467', fontWeight: 700 }}>Dự kiến: {event.slot.lessonTitle || 'tiếp tục bài học gần nhất'}</Typography></Box><Button size="small" variant="contained" startIcon={<PlayArrowOutlinedIcon />} disabled={!event.slot.courseId} onClick={() => startLesson(event)} sx={{ alignSelf: { sm: 'center' }, bgcolor: '#C41E3A', textTransform: 'none' }}>Bắt đầu học ngay</Button></Stack>{event.conflict && <Chip size="small" color="warning" icon={<WarningAmberOutlinedIcon />} label="Trùng lịch" sx={{ mt: 0.75 }} />}</Box>)}</Stack>}
         </DialogContent>
-        <DialogActions><Button startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none' }}>Thêm/sửa suất học ngày này</Button><Button onClick={() => setSelectedDay(null)}>Đóng</Button></DialogActions>
+        <DialogActions><Button variant="outlined" startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Thêm/sửa suất học ngày này</Button></DialogActions>
       </Dialog>
     </Paper>
   );

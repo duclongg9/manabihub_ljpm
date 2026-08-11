@@ -29,7 +29,8 @@ describe('StudyCalendar', () => {
       weeklyTargetMinutes: 150,
       slots: [{
         id: 'slot-kanji', dayOfWeek: today.getDay(), startTime: '20:00', durationMinutes: 25,
-        skill: 'Kanji & Từ vựng', courseId: 'course-kanji', courseTitle: 'Kanji N5 nền tảng', enabled: true,
+        skill: 'Kanji & Từ vựng', courseId: 'course-kanji', courseTitle: 'Kanji N5 nền tảng',
+        lessonTitle: 'Bài 3: Bộ thủ cơ bản', enabled: true,
       }],
       focusTotals: {}, attendance: {},
     }));
@@ -40,11 +41,15 @@ describe('StudyCalendar', () => {
     expect(screen.getByRole('button', { name: 'Tháng' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tuần' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Hôm nay' }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('checkbox', { name: 'Kanji N5 nền tảng' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Giao tiếp tiếng Nhật' })).toBeChecked();
+    expect(screen.getByTestId(`calendar-event-slot-kanji-${todayKey(today)}`)).toHaveTextContent('20:00');
 
     fireEvent.click(screen.getByTestId(`calendar-day-${todayKey(today)}`));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(within(screen.getByRole('dialog')).getByText('Kanji N5 nền tảng')).toBeInTheDocument();
-    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Vào học ngay' })).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByText('Dự kiến: Bài 3: Bộ thủ cơ bản')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Bắt đầu học ngay' })).toBeInTheDocument();
   });
 
   it('marks overlapping slots as conflicts and supports course filters', async () => {

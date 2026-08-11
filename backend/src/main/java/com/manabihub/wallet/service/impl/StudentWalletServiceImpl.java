@@ -134,6 +134,34 @@ public class StudentWalletServiceImpl implements StudentWalletService {
 
     @Override
     @Transactional
+    public WalletTransaction creditPromotionalReward(
+            UUID studentId,
+            BigDecimal amount,
+            WalletTransactionType type,
+            String referenceType,
+            UUID referenceId,
+            String idempotencyKey,
+            String note
+    ) {
+        if (type != WalletTransactionType.GAME_REWARD
+                && type != WalletTransactionType.ATTENDANCE_REWARD) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Unsupported promotional reward type",
+                    HttpStatus.BAD_REQUEST);
+        }
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_BAD_REQUEST,
+                    "Reward idempotency key is required",
+                    HttpStatus.BAD_REQUEST);
+        }
+        return credit(studentId, amount, type, referenceType, referenceId,
+                idempotencyKey, note, false);
+    }
+
+    @Override
+    @Transactional
     public WalletTransaction reserveForWithdrawal(
             UUID studentId,
             UUID withdrawalId,

@@ -72,7 +72,7 @@ public class FlywayMigrationIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
-    // ── Test 1: Clean build from V001 to V065 ──────────────────────────────
+    // ── Test 1: Clean build from V001 to V066 ──────────────────────────────
     @Test
     void cleanMigrationToLatestVersion() {
         assertThat(flyway).isNotNull();
@@ -89,13 +89,13 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("065");
+        assertThat(current).isEqualTo("066");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V065 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V066 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");
@@ -338,5 +338,31 @@ public class FlywayMigrationIntegrationTest {
                         + "WHERE id_number = '027204002711' AND active = TRUE",
                 Integer.class);
         assertThat(demoRegistry).as("student demo registry record exists").isEqualTo(1);
+
+        Integer weeklyChallengeTables = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.tables "
+                        + "WHERE table_schema = 'public' AND table_name IN ("
+                        + "'weekly_learning_challenges', 'weekly_learning_challenge_pairs', "
+                        + "'weekly_learning_challenge_attempts', 'weekly_learning_challenge_attempt_cards', "
+                        + "'weekly_learning_challenge_rewards', 'daily_learning_attendance_rewards')",
+                Integer.class);
+        assertThat(weeklyChallengeTables).as("all weekly challenge tables exist").isEqualTo(6);
+
+        Integer dailyRewardIdempotency = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.table_constraints "
+                        + "WHERE table_schema = 'public' "
+                        + "AND constraint_name = 'uq_daily_learning_attendance_student'",
+                Integer.class);
+        assertThat(dailyRewardIdempotency)
+                .as("daily attendance reward is unique per student and business day")
+                .isEqualTo(1);
+
+        String walletTransactionTypeConstraint = jdbcTemplate.queryForObject(
+                "SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c "
+                        + "JOIN pg_namespace n ON n.oid = c.connamespace "
+                        + "WHERE c.conname = 'chk_wallet_tx_type' AND n.nspname = 'public'",
+                String.class);
+        assertThat(walletTransactionTypeConstraint)
+                .contains("GAME_REWARD", "ATTENDANCE_REWARD");
     }
 }

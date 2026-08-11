@@ -86,6 +86,50 @@ class StudentWalletServiceImplTest {
         when(walletRepository.findByOwnerTypeAndStudent_IdForUpdate(WalletOwnerType.STUDENT, studentId)).thenReturn(Optional.of(wallet));
     }
 
+    @Nested
+    @DisplayName("Promotional rewards")
+    class PromotionalRewards {
+
+        @Test
+        void gameReward_increasesPurchasingBalanceButNeverWithdrawableBalance() {
+            UUID challengeId = UUID.randomUUID();
+            String idempotencyKey = "weekly-game:" + challengeId + ":" + studentId;
+            stubExistingWallet();
+            when(walletTransactionRepository.findByIdempotencyKey(idempotencyKey))
+                    .thenReturn(Optional.empty());
+            when(walletTransactionRepository.save(any(WalletTransaction.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+
+            WalletTransaction transaction = service.creditPromotionalReward(
+                    studentId,
+                    new BigDecimal("30000.00"),
+                    WalletTransactionType.GAME_REWARD,
+                    "WEEKLY_CHALLENGE",
+                    challengeId,
+                    idempotencyKey,
+                    "Weekly game reward");
+
+            assertEquals(new BigDecimal("130000.00"), wallet.getBalance());
+            assertEquals(BigDecimal.ZERO, wallet.getWithdrawableBalance());
+            assertEquals(WalletTransactionType.GAME_REWARD, transaction.getTransactionType());
+            assertEquals(idempotencyKey, transaction.getIdempotencyKey());
+        }
+
+        @Test
+        void promotionalReward_rejectsAWithdrawableTransactionType() {
+            assertThrows(BusinessException.class, () -> service.creditPromotionalReward(
+                    studentId,
+                    BigDecimal.ONE,
+                    WalletTransactionType.REFUND,
+                    "REFUND_REQUEST",
+                    UUID.randomUUID(),
+                    "invalid-reward",
+                    "Invalid reward"));
+
+            verify(walletRepository, never()).save(any());
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // Sheet 42 — getWalletOverview (UC-17 Manage My Wallet) — 3 TC
     // ══════════════════════════════════════════════════════════════════════

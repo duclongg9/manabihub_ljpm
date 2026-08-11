@@ -11,12 +11,25 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 @Repository
 public interface LessonBlockProgressRepository extends JpaRepository<LessonBlockProgress, UUID> {
     Optional<LessonBlockProgress> findByEnrollmentIdAndLessonBlockId(UUID enrollmentId, UUID lessonBlockId);
     List<LessonBlockProgress> findByEnrollmentId(UUID enrollmentId);
     int countByEnrollmentIdAndStatus(UUID enrollmentId, LessonProgressStatus status);
+
+    @Query(value = """
+            SELECT DISTINCT enrollment.student_id
+            FROM lesson_block_progress progress
+            JOIN enrollments enrollment ON enrollment.id = progress.enrollment_id
+            WHERE progress.completed_at >= :startInclusive
+              AND progress.completed_at < :endExclusive
+              AND enrollment.enrollment_status IN ('ACTIVE', 'COMPLETED')
+            """, nativeQuery = true)
+    List<UUID> findStudentsWithCompletedLearningActivity(
+            @Param("startInclusive") Instant startInclusive,
+            @Param("endExclusive") Instant endExclusive);
 
     @Query("""
             SELECT progress.enrollmentId AS enrollmentId, COUNT(progress) AS completedCount
