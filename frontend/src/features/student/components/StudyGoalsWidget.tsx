@@ -30,6 +30,7 @@ import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsAc
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
+import { ROUTES } from '../../../shared/constants/routes';
 
 export const STORAGE_KEY = 'manabihub.student.study-plan.v1';
 export const STUDY_PLAN_UPDATED_EVENT = 'manabihub:study-plan-updated';
@@ -73,6 +74,7 @@ export interface StudySlot {
   skill: string;
   courseId?: string;
   courseTitle?: string;
+  lessonTitle?: string;
   enabled: boolean;
 }
 
@@ -209,12 +211,22 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
         scheduled.setHours(hour, minute, 0, 0);
         const difference = scheduled.getTime() - now.getTime();
         const key = `${todayKey(now)}:${slot.id}`;
-        if (difference >= 0 && difference <= 60_000 && !notifiedRef.current.has(key)) {
+        const reminderLeadMs = 15 * 60_000;
+        if (
+          difference <= reminderLeadMs
+          && difference > reminderLeadMs - 60_000
+          && !notifiedRef.current.has(key)
+        ) {
           notifiedRef.current.add(key);
-          new Notification('Đến giờ học trên ManabiHub', {
-            body: `${slot.skill} · ${slot.durationMinutes} phút${slot.courseTitle ? ` · ${slot.courseTitle}` : ''}`,
+          const notification = new Notification('Còn 15 phút nữa là đến giờ học', {
+            body: `${slot.skill} · ${slot.durationMinutes} phút${slot.courseTitle ? ` · ${slot.courseTitle}` : ''}. Mở ManabiHub để chuẩn bị vào học.`,
             icon: '/favicon.ico',
           });
+          notification.onclick = () => {
+            window.focus();
+            if (slot.courseId) window.location.assign(ROUTES.STUDENT.COURSE_LEARN(slot.courseId));
+            notification.close();
+          };
         }
       }
     };
@@ -308,7 +320,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5 }} data-tour="schedule">
         <Button size="small" variant="outlined" startIcon={<AddAlarmOutlinedIcon />} onClick={openSchedule} sx={{ borderColor: '#CBD5E1', color: '#475569', '&:hover': { borderColor: '#C41E3A', color: '#C41E3A', bgcolor: '#FFF7F8' } }}>Thêm lịch học</Button>
         <Button size="small" variant="outlined" startIcon={<NotificationsActiveOutlinedIcon />} onClick={() => void requestReminders()} disabled={reminderPermission === 'granted' || reminderPermission === 'unsupported'} sx={{ borderColor: '#CBD5E1', color: '#475569', '&:hover': { borderColor: '#C41E3A', color: '#C41E3A', bgcolor: '#FFF7F8' } }}>
-          {reminderPermission === 'granted' ? 'Đã bật nhắc' : reminderPermission === 'unsupported' ? 'Trình duyệt không hỗ trợ' : 'Bật nhắc giờ học'}
+          {reminderPermission === 'granted' ? 'Nhắc trước 15 phút' : reminderPermission === 'unsupported' ? 'Trình duyệt không hỗ trợ' : 'Bật nhắc trước 15 phút'}
         </Button>
       </Stack>
 

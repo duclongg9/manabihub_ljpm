@@ -113,11 +113,11 @@ describe('StudentDashboardPage', () => {
     expect(screen.getByText('Chào Long')).toBeInTheDocument();
     expect(screen.getByText('Mục tiêu: JLPT N3 · Trình độ hiện tại: N3')).toBeInTheDocument();
     expect(screen.getByTestId('mini-roadmap')).toBeInTheDocument();
-    expect(screen.getByText('JLPT N3 thực chiến')).toBeInTheDocument();
-    expect(screen.getByTestId('recent-courses-list')).toBeInTheDocument();
-    expect(screen.getByText('Ngữ pháp N5 nền tảng')).toBeInTheDocument();
-    expect(screen.getByText('Luyện nghe N5')).toBeInTheDocument();
-    expect(screen.queryByText('Khóa học thứ tư không hiện trên Dashboard')).not.toBeInTheDocument();
+    const recentCourses = within(screen.getByTestId('recent-courses-list'));
+    expect(recentCourses.getByText('JLPT N3 thực chiến')).toBeInTheDocument();
+    expect(recentCourses.getByText('Ngữ pháp N5 nền tảng')).toBeInTheDocument();
+    expect(recentCourses.getByText('Luyện nghe N5')).toBeInTheDocument();
+    expect(recentCourses.queryByText('Khóa học thứ tư không hiện trên Dashboard')).not.toBeInTheDocument();
     const stats = within(screen.getByTestId('student-stats'));
     expect(stats.getByText('4')).toBeInTheDocument();
     expect(stats.getByText('3')).toBeInTheDocument();

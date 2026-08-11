@@ -5,9 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import type { StudentCourseSummary } from '../types/studentTypes';
 import PersonIcon from '@mui/icons-material/Person';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 import { ROUTES } from '../../../shared/constants/routes';
+import fallbackCourseCover from '../../../assets/course1.png';
 
 interface StudentCourseCardProps {
   course: StudentCourseSummary;
@@ -59,30 +59,14 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
         },
       }}
     >
-      {course.thumbnailUrl && !imageFailed ? (
-        <Box
-          component="img"
-          src={resolvePublicAssetUrl(course.thumbnailUrl)}
-          alt={course.courseTitle}
-          onError={() => setImageFailed(true)}
-          sx={{ width: '100%', height: 180, objectFit: 'cover', bgcolor: 'grey.100' }}
-        />
-      ) : (
-        <Box
-          role="img"
-          aria-label={`No cover image for ${course.courseTitle}`}
-          sx={{
-            height: 180,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            bgcolor: '#F2F4F7',
-            color: '#98A2B3',
-          }}
-        >
-          <ImageNotSupportedOutlinedIcon sx={{ fontSize: 48 }} />
-        </Box>
-      )}
+      <Box
+        component="img"
+        data-testid={!course.thumbnailUrl || imageFailed ? 'course-cover-fallback' : 'course-cover'}
+        src={course.thumbnailUrl && !imageFailed ? resolvePublicAssetUrl(course.thumbnailUrl) : fallbackCourseCover}
+        alt={course.thumbnailUrl && !imageFailed ? course.courseTitle : `Ảnh mặc định cho ${course.courseTitle}`}
+        onError={() => setImageFailed(true)}
+        sx={{ width: '100%', height: 180, objectFit: 'cover', bgcolor: '#F2F4F7' }}
+      />
       <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Typography gutterBottom variant="h6" component="h2" sx={{
