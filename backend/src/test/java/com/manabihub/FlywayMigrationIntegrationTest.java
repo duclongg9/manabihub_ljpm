@@ -73,7 +73,7 @@ public class FlywayMigrationIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
-    // ── Test 1: Clean build from V001 to V070 ──────────────────────────────
+    // ── Test 1: Clean build from V001 to V071 ──────────────────────────────
     @Test
     void cleanMigrationToLatestVersion() {
         assertThat(flyway).isNotNull();
@@ -90,13 +90,13 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("070");
+        assertThat(current).isEqualTo("071");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V070 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V071 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");
@@ -361,6 +361,12 @@ public class FlywayMigrationIntegrationTest {
                 "SELECT count(*) FROM information_schema.tables WHERE table_name = 'wallet_payment_reservations' AND table_schema = 'public'",
                 Integer.class);
         assertThat(tblWpr).as("wallet_payment_reservations exists").isEqualTo(1);
+
+        Integer courseEditDraftTable = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.tables "
+                        + "WHERE table_name = 'course_edit_drafts' AND table_schema = 'public'",
+                Integer.class);
+        assertThat(courseEditDraftTable).as("course_edit_drafts exists").isEqualTo(1);
 
         // uq_wallet_transactions_idempotency_key constraint
         Integer uqWti = jdbcTemplate.queryForObject(

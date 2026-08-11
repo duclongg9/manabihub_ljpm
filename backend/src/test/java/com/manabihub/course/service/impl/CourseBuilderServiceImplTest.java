@@ -18,6 +18,7 @@ import com.manabihub.course.enums.LessonBlockType;
 import com.manabihub.course.repository.CourseModuleRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.repository.LessonBlockRepository;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -58,6 +59,9 @@ class CourseBuilderServiceImplTest {
     @Mock
     private CurrentUserService currentUserService;
 
+    @Mock
+    private CourseEditDraftService courseEditDraftService;
+
     private CourseBuilderServiceImpl service;
     private UUID userId;
     private TeacherProfile approvedTeacher;
@@ -71,8 +75,12 @@ class CourseBuilderServiceImplTest {
                 lessonBlockRepository,
                 teacherProfileRepository,
                 currentUserService,
-                new ObjectMapper()
+                new ObjectMapper(),
+                courseEditDraftService
         );
+        org.mockito.Mockito.lenient()
+                .when(courseEditDraftService.resolveEditableCourse(any(Course.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         userId = UUID.randomUUID();
         approvedTeacher = new TeacherProfile();

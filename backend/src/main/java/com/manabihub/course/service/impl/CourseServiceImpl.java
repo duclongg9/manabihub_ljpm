@@ -21,6 +21,7 @@ import com.manabihub.course.repository.projection.PublicCourseLessonCountProject
 import com.manabihub.course.repository.projection.PublicCourseRankProjection;
 import com.manabihub.course.service.CourseService;
 import com.manabihub.course.service.CourseValidationService;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.course.dto.response.ValidationResultResponse;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
@@ -85,6 +86,7 @@ public class CourseServiceImpl implements CourseService {
     private final SystemSettingValueService settingValueService;
     private final EnrollmentRepository enrollmentRepository;
     private final EscrowLedgerRepository escrowLedgerRepository;
+    private final CourseEditDraftService courseEditDraftService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -247,7 +249,8 @@ public class CourseServiceImpl implements CourseService {
     public CourseDraftResponse updateDraft(UUID draftId, CreateCourseDraftRequest request) {
         UUID currentUserId = currentUserService.getCurrentUserId();
         TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
-        Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
+        Course persistedCourse = resolveDraftForTeacher(draftId, teacherProfile.getId());
+        Course course = courseEditDraftService.resolveEditableCourse(persistedCourse);
         List<String> learningGoals = normalizeLearningGoals(request.learningGoals());
         validateDraftRequest(request, learningGoals);
         String title = normalizeDraftTitle(request.title());
@@ -267,6 +270,15 @@ public class CourseServiceImpl implements CourseService {
         course.setAccessDurationDays(normalizeAccessDuration(request.accessDurationDays()));
         course.setAccessExpiresAt(request.accessExpiresAt());
         course.getLearningGoals().clear();
+
+        if (courseEditDraftService.hasEditDraft(course.getId())) {
+            for (int index = 0; index < learningGoals.size(); index++) {
+                course.addLearningGoal(learningGoals.get(index), index + 1);
+            }
+            courseEditDraftService.saveIfVersioned(course);
+            return toResponse(persistedCourse);
+        }
+
         courseRepository.saveAndFlush(course);
 
         for (int index = 0; index < learningGoals.size(); index++) {
@@ -282,6 +294,13 @@ public class CourseServiceImpl implements CourseService {
         TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
 
+        if (courseEditDraftService.hasEditDraft(course.getId())) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "Không thể xóa khóa học đã từng xuất bản. Hãy tiếp tục chỉnh sửa và gửi duyệt lại.",
+                    HttpStatus.CONFLICT
+            );
+        }
         courseRepository.delete(course);
     }
 
@@ -290,6 +309,7 @@ public class CourseServiceImpl implements CourseService {
         UUID currentUserId = currentUserService.getCurrentUserId();
         TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
+        Course editableCourse = courseEditDraftService.resolveEditableCourse(course);
         CourseStatus previousStatus = course.getStatus();
 
         ValidationResultResponse validationResult = courseValidationService.validateCourse(draftId);
@@ -307,7 +327,7 @@ public class CourseServiceImpl implements CourseService {
         notificationService.createNotificationForAdminRole(
                 "COURSE_MANAGER",
                 "Khóa học mới đang chờ xét duyệt",
-                "Giảng viên đã gửi khóa học \"" + course.getTitle() + "\" để xét duyệt.",
+                "Giảng viên đã gửi khóa học \"" + editableCourse.getTitle() + "\" để xét duyệt.",
                 NotificationTypes.COURSE_REVIEW,
                 "/admin/courses/approvals/" + course.getId()
         );
@@ -320,7 +340,7 @@ public class CourseServiceImpl implements CourseService {
                 course.getId(),
                 Map.of("status", previousStatus.name()),
                 Map.of("status", CourseStatus.PENDING.name()),
-                Map.of("courseTitle", course.getTitle())
+                Map.of("courseTitle", editableCourse.getTitle())
         );
     }
 
@@ -393,8 +413,8 @@ public class CourseServiceImpl implements CourseService {
 
         CourseStatus previousStatus = course.getStatus();
         Instant previousPublishedAt = course.getPublishedAt();
+        courseEditDraftService.beginEditingPublishedCourse(course);
         course.setStatus(CourseStatus.DRAFT);
-        course.setPublishedAt(null);
         courseRepository.saveAndFlush(course);
 
         auditLogService.logUserAction(
@@ -456,6 +476,12 @@ public class CourseServiceImpl implements CourseService {
                     "Course was not found or is not published yet",
                     HttpStatus.NOT_FOUND
             );
+        }
+
+        // Authors and reviewers preview the proposed revision. Enrolled
+        // students deliberately keep reading the last approved live aggregate.
+        if (isAuthor || isAdmin) {
+            course = courseEditDraftService.resolveEditableCourse(course);
         }
 
         CourseReviewAggregateResponse reviewAggregate =
@@ -710,29 +736,31 @@ public class CourseServiceImpl implements CourseService {
     }
 
     private CourseDraftResponse toResponse(Course course) {
-        List<String> learningGoals = course.getLearningGoals().stream()
+        Course responseCourse = courseEditDraftService.resolveEditableCourse(course);
+        List<String> learningGoals = responseCourse.getLearningGoals().stream()
                 .map(CourseLearningGoal::getGoalText)
                 .toList();
 
         return new CourseDraftResponse(
-                course.getId(),
-                course.getTeacher().getId(),
-                course.getTitle(),
-                course.getSlug(),
-                course.getIntroduction(),
-                course.getJlptLevel(),
-                course.getCategory(),
-                course.getThumbnailUrl(),
-                course.getOutcomes(),
-                course.getPrice(),
-                course.getCurrency(),
-                course.getPrerequisites(),
-                course.getTargetStudents(),
-                course.getStatus(),
+                responseCourse.getId(),
+                responseCourse.getTeacher().getId(),
+                responseCourse.getTitle(),
+                responseCourse.getSlug(),
+                responseCourse.getIntroduction(),
+                responseCourse.getJlptLevel(),
+                responseCourse.getCategory(),
+                responseCourse.getThumbnailUrl(),
+                responseCourse.getOutcomes(),
+                responseCourse.getPrice(),
+                responseCourse.getCurrency(),
+                responseCourse.getPrerequisites(),
+                responseCourse.getTargetStudents(),
+                responseCourse.getStatus(),
                 learningGoals,
-                course.getAccessDurationDays(),
-                course.getAccessExpiresAt(),
-                course.getCreatedAt(),
+                responseCourse.getAccessDurationDays(),
+                responseCourse.getAccessExpiresAt(),
+                responseCourse.getCreatedAt(),
+                courseEditDraftService.resolveLastModifiedAt(course),
                 srsTrace()
         );
     }
