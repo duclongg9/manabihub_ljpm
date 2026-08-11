@@ -62,6 +62,10 @@ export const LandingHeader: React.FC = () => {
     <AppBar
       position="sticky"
       sx={{
+        position: { xs: 'relative', md: 'sticky' },
+        zIndex: 1100,
+        width: '100%',
+        overflow: 'hidden',
         bgcolor: scrolled ? 'rgba(255, 255, 255, 0.97)' : 'rgba(255, 255, 255, 0.92)',
         color: '#1A1A2E',
         borderBottom: scrolled ? '1px solid #e8e0d8' : '1px solid transparent',
@@ -70,7 +74,7 @@ export const LandingHeader: React.FC = () => {
         transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
-      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', minWidth: 0, px: { xs: 1.5, md: 4 }, py: 1 }}>
+      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', minWidth: 0, minHeight: { xs: 56, sm: 64 }, px: { xs: 1, sm: 1.5, md: 4 }, py: { xs: 0.5, sm: 1 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <Box
             component={Link}
@@ -79,7 +83,7 @@ export const LandingHeader: React.FC = () => {
           >
             <Box
               sx={{
-                height: { xs: 48, sm: 54 },
+                height: { xs: 40, sm: 54 },
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -91,7 +95,7 @@ export const LandingHeader: React.FC = () => {
                 component="img"
                 src="/manabihub-header-logo.png"
                 alt="ManabiHub"
-                sx={{ display: 'block', height: { xs: 48, sm: 54 }, width: 'auto' }}
+                sx={{ display: 'block', height: { xs: 40, sm: 54 }, width: 'auto', maxWidth: '100%' }}
               />
             </Box>
           </Box>
@@ -215,11 +219,14 @@ export const LandingHeader: React.FC = () => {
                 textTransform: 'none',
                 fontWeight: 600,
                 whiteSpace: 'nowrap',
+                minWidth: 0,
+                maxWidth: { xs: 'calc(100vw - 72px)', sm: 'none' },
                 bgcolor: '#1B2A4A',
                 color: 'white',
                 borderRadius: 2,
-                px: { xs: 1.5, sm: 3 },
-                fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                px: { xs: 1, sm: 3 },
+                py: { xs: 1, sm: 1.25 },
+                fontSize: { xs: '0.72rem', sm: '0.875rem' },
                 transition: 'all 0.3s ease',
                 '&:hover': {
                   bgcolor: '#2A3F6A',
