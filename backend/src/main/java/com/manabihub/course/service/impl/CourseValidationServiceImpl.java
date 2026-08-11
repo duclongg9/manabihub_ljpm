@@ -47,9 +47,7 @@ public class CourseValidationServiceImpl implements CourseValidationService {
     @Override
     @Transactional(readOnly = true)
     public ValidationResultResponse validateCourse(UUID courseId) {
-        Course persistedCourse = courseRepository.findById(courseId)
-                .orElseThrow(() -> new IllegalArgumentException("Course not found"));
-        Course course = courseEditDraftService.resolveEditableCourse(persistedCourse);
+        Course course = resolveCourseForValidation(courseId);
 
         if (course.getTeacher() == null
                 || course.getTeacher().getUser() == null
@@ -57,6 +55,22 @@ public class CourseValidationServiceImpl implements CourseValidationService {
             throw new SecurityException("You do not have permission to validate this course");
         }
 
+        return validateResolvedCourse(course);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ValidationResultResponse validateCourseForReview(UUID courseId) {
+        return validateResolvedCourse(resolveCourseForValidation(courseId));
+    }
+
+    private Course resolveCourseForValidation(UUID courseId) {
+        Course persistedCourse = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("Course not found"));
+        return courseEditDraftService.resolveEditableCourse(persistedCourse);
+    }
+
+    private ValidationResultResponse validateResolvedCourse(Course course) {
         List<ValidationError> errors = new ArrayList<>();
 
         validateMetadata(course, errors);
