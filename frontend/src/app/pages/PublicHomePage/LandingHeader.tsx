@@ -1,52 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Avatar, Menu, MenuItem } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Avatar } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
   clearAuthSession,
   getAuthSession,
-  getDefaultRoute,
   subscribeToAuthSessionChanges,
 } from '../../../shared/auth/authSession';
-import { ROLES } from '../../../shared/constants/roles';
+import { AccountMenu } from '../../../shared/layouts/AccountMenu';
 
 export const LandingHeader: React.FC = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [scrolled, setScrolled] = useState(false);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
   const [session, setSession] = useState(() => getAuthSession('public'));
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
-  const username = session?.email?.split('@')[0] || 'User';
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 60);
-    };
+    const handleScroll = () => setScrolled(window.scrollY > 60);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(
-    () => subscribeToAuthSessionChanges(
-      () => setSession(getAuthSession('public')),
-    ),
+    () => subscribeToAuthSessionChanges(() => setSession(getAuthSession('public'))),
     [],
   );
 
   const handleSearch = () => {
-    if (searchQuery.trim()) {
-      navigate(`${ROUTES.PUBLIC.COURSE_BROWSE}?keyword=${encodeURIComponent(searchQuery.trim())}`);
-    } else {
-      navigate(ROUTES.PUBLIC.COURSE_BROWSE);
-    }
+    navigate(
+      searchQuery.trim()
+        ? `${ROUTES.PUBLIC.COURSE_BROWSE}?keyword=${encodeURIComponent(searchQuery.trim())}`
+        : ROUTES.PUBLIC.COURSE_BROWSE,
+    );
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') handleSearch();
   };
 
   const handleLogout = () => {
@@ -69,9 +61,12 @@ export const LandingHeader: React.FC = () => {
       }}
     >
       <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', minWidth: 0, px: { xs: 1.5, md: 4 }, py: 1 }}>
-        {/* Left section: brand */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Box component={Link} to={ROUTES.PUBLIC.HOME} sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
+          <Box
+            component={Link}
+            to={ROUTES.PUBLIC.HOME}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}
+          >
             <Box
               sx={{
                 height: { xs: 48, sm: 54 },
@@ -79,7 +74,7 @@ export const LandingHeader: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'transform 0.3s ease',
-                '&:hover': { transform: 'scale(1.08)' }
+                '&:hover': { transform: 'scale(1.08)' },
               }}
             >
               <Box
@@ -89,35 +84,33 @@ export const LandingHeader: React.FC = () => {
                 sx={{ display: 'block', height: { xs: 48, sm: 54 }, width: 'auto' }}
               />
             </Box>
-            {/* <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.5px', display: { xs: 'none', sm: 'block' }, color: '#1A1A2E' }}>
-              ManabiHub
-            </Typography> */}
           </Box>
         </Box>
 
-        {/* Center Section: Search Bar */}
         <Box sx={{ flexGrow: 1, maxWidth: 420, mx: 2, display: { xs: 'none', md: 'block' } }}>
-          <Box sx={{
-            display: 'flex', alignItems: 'center',
-            bgcolor: '#FAF8F5',
-            borderRadius: '12px',
-            px: 2, py: 0.5,
-            border: '1.5px solid #e8e0d8',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              borderColor: '#fca5a5',
-            },
-            '&:focus-within': {
-              borderColor: '#C41E3A',
-              bgcolor: '#ffffff',
-              boxShadow: '0 0 0 3px rgba(196, 30, 58, 0.08)'
-            }
-          }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              bgcolor: '#FAF8F5',
+              borderRadius: '12px',
+              px: 2,
+              py: 0.5,
+              border: '1.5px solid #e8e0d8',
+              transition: 'all 0.3s ease',
+              '&:hover': { borderColor: '#fca5a5' },
+              '&:focus-within': {
+                borderColor: '#C41E3A',
+                bgcolor: '#ffffff',
+                boxShadow: '0 0 0 3px rgba(196, 30, 58, 0.08)',
+              },
+            }}
+          >
             <InputBase
               placeholder="Tìm kiếm khóa học, giảng viên..."
               sx={{ ml: 1, flex: 1, fontSize: '0.9rem', color: '#1A1A2E' }}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(event) => setSearchQuery(event.target.value)}
               onKeyDown={handleKeyDown}
             />
             <IconButton
@@ -125,10 +118,9 @@ export const LandingHeader: React.FC = () => {
               sx={{
                 p: '8px',
                 color: '#94a3b8',
-                '.MuiBox-root:focus-within &': { color: '#C41E3A' },
-                '&:hover': { color: '#C41E3A' }
+                '&:hover': { color: '#C41E3A' },
               }}
-              aria-label="search"
+              aria-label="Tìm kiếm"
               onClick={handleSearch}
             >
               <SearchIcon fontSize="small" />
@@ -136,7 +128,6 @@ export const LandingHeader: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Right Section: Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
           {!session && (
             <Typography
@@ -149,7 +140,7 @@ export const LandingHeader: React.FC = () => {
                 fontSize: '0.9rem',
                 display: { xs: 'none', lg: 'block' },
                 transition: 'color 0.3s ease',
-                '&:hover': { color: '#C41E3A' }
+                '&:hover': { color: '#C41E3A' },
               }}
             >
               Trở thành giảng viên
@@ -158,49 +149,30 @@ export const LandingHeader: React.FC = () => {
 
           {session ? (
             <>
-              <IconButton 
-                onClick={(e) => setProfileAnchorEl(e.currentTarget)}
-                sx={{ ml: 1, p: 0.5, border: '2px solid transparent', transition: 'border 0.2s', '&:hover': { borderColor: '#e2e8f0' } }}
-              >
-                <Avatar sx={{ width: 36, height: 36, bgcolor: '#C41E3A', fontSize: '1rem', fontWeight: 700 }}>{avatarLabel}</Avatar>
-              </IconButton>
-              <Menu
-                anchorEl={profileAnchorEl}
-                open={Boolean(profileAnchorEl)}
-                onClose={() => setProfileAnchorEl(null)}
-                disableScrollLock
-                sx={{ 
-                  zIndex: 9999, 
-                  '& .MuiPaper-root': { 
-                    mt: 1.5, 
-                    borderRadius: '12px', 
-                    minWidth: 220, 
-                    boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)', 
-                    border: '1px solid #f1f5f9' 
-                  } 
+              <IconButton
+                onClick={(event) => setProfileAnchorEl(event.currentTarget)}
+                aria-label="Mở menu tài khoản"
+                aria-controls={profileAnchorEl ? 'account-menu' : undefined}
+                aria-haspopup="true"
+                aria-expanded={Boolean(profileAnchorEl)}
+                sx={{
+                  ml: 1,
+                  p: 0.5,
+                  border: '2px solid transparent',
+                  transition: 'border 0.2s',
+                  '&:hover': { borderColor: '#e2e8f0' },
                 }}
               >
-                <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #f1f5f9', mb: 1 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a' }}>{username}</Typography>
-                  <Typography variant="body2" sx={{ color: '#64748b' }}>{session.email}</Typography>
-                </Box>
-                <MenuItem onClick={() => { setProfileAnchorEl(null); navigate(getDefaultRoute(session)); }} sx={{ py: 1.5, fontWeight: 600, color: '#1A1A2E' }}>
-                  Bảng điều khiển
-                </MenuItem>
-                <MenuItem onClick={() => {
-                  setProfileAnchorEl(null);
-                  navigate(
-                    session.roles.includes(ROLES.TEACHER)
-                      ? ROUTES.TEACHER.PROFILE
-                      : ROUTES.STUDENT.PROFILE,
-                  );
-                }} sx={{ py: 1.5, color: '#475569' }}>
-                  Hồ sơ cá nhân
-                </MenuItem>
-                <MenuItem onClick={handleLogout} sx={{ py: 1.5, color: '#C41E3A' }}>
-                  Đăng xuất
-                </MenuItem>
-              </Menu>
+                <Avatar sx={{ width: 36, height: 36, bgcolor: '#C41E3A', fontSize: '1rem', fontWeight: 700 }}>
+                  {avatarLabel}
+                </Avatar>
+              </IconButton>
+              <AccountMenu
+                session={session}
+                anchorEl={profileAnchorEl}
+                onClose={() => setProfileAnchorEl(null)}
+                onLogout={handleLogout}
+              />
             </>
           ) : (
             <Button
@@ -216,7 +188,11 @@ export const LandingHeader: React.FC = () => {
                 px: { xs: 1.5, sm: 3 },
                 fontSize: { xs: '0.8rem', sm: '0.875rem' },
                 transition: 'all 0.3s ease',
-                '&:hover': { bgcolor: '#2A3F6A', transform: 'translateY(-1px)', boxShadow: '0 4px 12px rgba(27, 42, 74, 0.3)' }
+                '&:hover': {
+                  bgcolor: '#2A3F6A',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 12px rgba(27, 42, 74, 0.3)',
+                },
               }}
             >
               Đăng nhập / Đăng ký
