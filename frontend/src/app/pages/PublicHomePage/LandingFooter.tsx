@@ -60,23 +60,24 @@ export const LandingFooter: React.FC = () => {
                 alignItems: 'center',
                 mb: 3,
                 borderRadius: 2,
-                bgcolor: '#ffffff',
-                px: 1.25,
-                py: 0.5,
                 textDecoration: 'none',
-                boxShadow: '0 4px 15px rgba(196, 30, 58, 0.2)',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                transition: 'opacity 0.2s ease, transform 0.2s ease',
                 '&:hover': {
+                  opacity: 0.9,
                   transform: 'translateY(-2px)',
-                  boxShadow: '0 8px 20px rgba(196, 30, 58, 0.28)',
                 },
               }}
             >
               <Box
                 component="img"
-                src="/manabihub-header-logo.svg"
+                src="/manabihub-header-logo.png"
                 alt="ManabiHub"
-                sx={{ display: 'block', height: 64, width: 'auto' }}
+                sx={{
+                  display: 'block',
+                  filter: 'drop-shadow(0 0 1px rgba(255, 255, 255, 0.95))',
+                  height: 64,
+                  width: 'auto',
+                }}
               />
             </Box>
             <Typography variant="body1" sx={{ color: '#94a3b8', lineHeight: 1.8, pr: { md: 4 }, mb: 4, fontWeight: 300 }}>

@@ -12,7 +12,6 @@ import {
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate } from 'react-router-dom';
@@ -86,20 +85,12 @@ export function AdminSetupPasswordPage() {
       <Box sx={{ width: '100%', maxWidth: 520 }}>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', mb: 3 }}>
           <Box
-            sx={{
-              width: 42,
-              height: 42,
-              borderRadius: 1,
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              display: 'grid',
-              placeItems: 'center',
-            }}
-          >
-            <MenuBookIcon />
-          </Box>
+            component="img"
+            src="/manabihub-header-logo.png"
+            alt="ManabiHub"
+            sx={{ display: 'block', height: 58, width: 'auto' }}
+          />
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>ManabiHub</Typography>
             <Typography variant="body2" color="text.secondary">Cổng quản trị nội bộ</Typography>
           </Box>
         </Stack>

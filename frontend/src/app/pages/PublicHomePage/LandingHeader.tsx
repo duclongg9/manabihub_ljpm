@@ -84,7 +84,7 @@ export const LandingHeader: React.FC = () => {
             >
               <Box
                 component="img"
-                src="/manabihub-header-logo.svg"
+                src="/manabihub-header-logo.png"
                 alt="ManabiHub"
                 sx={{ display: 'block', height: { xs: 48, sm: 54 }, width: 'auto' }}
               />

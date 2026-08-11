@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import axios from 'axios';
@@ -201,7 +200,7 @@ export function AdminLoginPage() {
             position: 'absolute',
           }}
         >
-          <Brand color="common.white" />
+          <Brand onDark />
           <Box sx={{ maxWidth: 520 }}>
             <Typography component="h1" sx={{ fontSize: '3rem', fontWeight: 800, mb: 2 }}>
               Cổng quản trị
@@ -225,7 +224,7 @@ export function AdminLoginPage() {
       >
         <Box sx={{ maxWidth: 400, width: '100%' }}>
           <Box sx={{ display: { xs: 'flex', lg: 'none' }, mb: 6 }}>
-            <Brand color="primary.main" />
+            <Brand />
           </Box>
           <Typography component="h1" sx={{ fontSize: '2rem', fontWeight: 800, mb: 1 }}>
             Đăng nhập
@@ -338,13 +337,27 @@ export function AdminLoginPage() {
   );
 }
 
-function Brand({ color }: { color: string }) {
+function Brand({ onDark = false }: { onDark?: boolean }) {
   return (
-    <Box sx={{ alignItems: 'center', color, display: 'flex', gap: 1.5 }}>
-      <MenuBookIcon />
-      <Typography sx={{ fontSize: '1.25rem', fontWeight: 800 }}>
-        ManabiHub
-      </Typography>
+    <Box
+      sx={{
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        borderRadius: 2,
+        display: 'inline-flex',
+      }}
+    >
+      <Box
+        component="img"
+        src="/manabihub-header-logo.png"
+        alt="ManabiHub"
+        sx={{
+          display: 'block',
+          filter: onDark ? 'drop-shadow(0 0 1px rgba(255, 255, 255, 0.95))' : 'none',
+          height: 58,
+          width: 'auto',
+        }}
+      />
     </Box>
   );
 }
