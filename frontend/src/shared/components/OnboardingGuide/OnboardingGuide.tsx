@@ -1,21 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Button,
-  Checkbox,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
-  FormControlLabel,
-  LinearProgress,
+  IconButton,
   Stack,
   Typography,
 } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import HelpOutlineRoundedIcon from '@mui/icons-material/HelpOutlineRounded';
 
 export interface OnboardingStep {
@@ -60,10 +58,61 @@ function markCompleted(key: string) {
   }
 }
 
+type TargetRect = { top: number; right: number; bottom: number; left: number; width: number; height: number };
+type PopoverPlacement = { top: number; left: number; placement: 'above' | 'below' | 'center' };
+
+const POPOVER_WIDTH = 420;
+const VIEWPORT_MARGIN = 16;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getPopoverPlacement(rect: TargetRect | null): PopoverPlacement {
+  if (!rect || typeof window === 'undefined' || rect.width <= 0 || rect.height <= 0) {
+    return { top: 0, left: 0, placement: 'center' };
+  }
+
+  const width = Math.min(POPOVER_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
+  const left = clamp(
+    rect.left + rect.width / 2 - width / 2,
+    VIEWPORT_MARGIN,
+    Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN),
+  );
+  const enoughBelow = window.innerHeight - rect.bottom >= 260;
+  return {
+    top: enoughBelow ? rect.bottom + 14 : rect.top - 14,
+    left,
+    placement: enoughBelow ? 'below' : 'above',
+  };
+}
+
+function SpotlightBackdrop({ target, onClose }: { target: TargetRect | null; onClose: () => void }) {
+  const panelSx = {
+    position: 'fixed' as const,
+    bgcolor: 'rgba(15, 23, 42, 0.56)',
+    zIndex: 1290,
+  };
+
+  if (!target || target.width <= 0 || target.height <= 0) {
+    return <Box aria-hidden="true" onClick={onClose} sx={{ ...panelSx, inset: 0 }} />;
+  }
+
+  return (
+    <>
+      <Box aria-hidden="true" onClick={onClose} sx={{ ...panelSx, top: 0, left: 0, right: 0, height: target.top }} />
+      <Box aria-hidden="true" onClick={onClose} sx={{ ...panelSx, top: target.bottom, left: 0, right: 0, bottom: 0 }} />
+      <Box aria-hidden="true" onClick={onClose} sx={{ ...panelSx, top: target.top, left: 0, width: target.left, height: target.height }} />
+      <Box aria-hidden="true" onClick={onClose} sx={{ ...panelSx, top: target.top, left: target.right, right: 0, height: target.height }} />
+    </>
+  );
+}
+
 /**
- * A small, reusable first-run guide for authenticated workspaces.
- * Closing without checking “không hiển thị lại” only dismisses this visit;
- * the guide will be offered again the next time that account opens the scope.
+ * First-run guide for authenticated workspaces. Steps with a target use a
+ * spotlight and an anchored coachmark; steps without a target fall back to a
+ * centered dialog. Closing with the skip link persists completion for the
+ * current account, while the X only dismisses this visit.
  */
 export function OnboardingGuide({
   scope,
@@ -75,26 +124,31 @@ export function OnboardingGuide({
   const key = useMemo(() => storageKey(scope, accountKey), [scope, accountKey]);
   const [open, setOpen] = useState(() => steps.length > 0 && !readCompleted(key));
   const [stepIndex, setStepIndex] = useState(0);
-  const [doNotShowAgain, setDoNotShowAgain] = useState(false);
+  const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
+  const [placement, setPlacement] = useState<PopoverPlacement>({ top: 0, left: 0, placement: 'center' });
   const highlightedNode = useRef<HTMLElement | null>(null);
-  const previousShadow = useRef<string>('');
+  const previousStyle = useRef({ boxShadow: '', position: '', zIndex: '' });
 
   const activeStep = steps[stepIndex];
 
   useEffect(() => {
     setOpen(steps.length > 0 && !readCompleted(key));
     setStepIndex(0);
-    setDoNotShowAgain(false);
   }, [key, steps.length]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previous = highlightedNode.current;
     if (previous) {
-      previous.style.boxShadow = previousShadow.current;
+      previous.style.boxShadow = previousStyle.current.boxShadow;
+      previous.style.position = previousStyle.current.position;
+      previous.style.zIndex = previousStyle.current.zIndex;
       previous.removeAttribute('data-onboarding-active');
     }
 
     highlightedNode.current = null;
+    setTargetRect(null);
+    setPlacement({ top: 0, left: 0, placement: 'center' });
+
     if (!open || !activeStep?.targetId || typeof document === 'undefined') return undefined;
 
     const node = document.querySelector<HTMLElement>(
@@ -102,14 +156,43 @@ export function OnboardingGuide({
     );
     if (!node) return undefined;
 
-    previousShadow.current = node.style.boxShadow;
-    node.style.boxShadow = '0 0 0 4px rgba(196, 30, 58, 0.22), 0 8px 28px rgba(27, 42, 74, 0.12)';
+    previousStyle.current = {
+      boxShadow: node.style.boxShadow,
+      position: node.style.position,
+      zIndex: node.style.zIndex,
+    };
+    node.style.boxShadow = '0 0 0 4px rgba(196, 30, 58, 0.36), 0 8px 28px rgba(27, 42, 74, 0.16)';
+    if (getComputedStyle(node).position === 'static') node.style.position = 'relative';
+    node.style.zIndex = '1295';
     node.setAttribute('data-onboarding-active', 'true');
     highlightedNode.current = node;
     node.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
 
+    const updatePosition = () => {
+      const rect = node.getBoundingClientRect();
+      const next = {
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      };
+      setTargetRect(next);
+      setPlacement(getPopoverPlacement(next));
+    };
+
+    const frame = window.requestAnimationFrame(updatePosition);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
     return () => {
-      node.style.boxShadow = previousShadow.current;
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+      node.style.boxShadow = previousStyle.current.boxShadow;
+      node.style.position = previousStyle.current.position;
+      node.style.zIndex = previousStyle.current.zIndex;
       node.removeAttribute('data-onboarding-active');
       highlightedNode.current = null;
     };
@@ -117,7 +200,9 @@ export function OnboardingGuide({
 
   useEffect(() => () => {
     if (highlightedNode.current) {
-      highlightedNode.current.style.boxShadow = previousShadow.current;
+      highlightedNode.current.style.boxShadow = previousStyle.current.boxShadow;
+      highlightedNode.current.style.position = previousStyle.current.position;
+      highlightedNode.current.style.zIndex = previousStyle.current.zIndex;
       highlightedNode.current.removeAttribute('data-onboarding-active');
     }
   }, []);
@@ -125,126 +210,180 @@ export function OnboardingGuide({
   if (!open || !activeStep || steps.length === 0) return null;
 
   const isLastStep = stepIndex === steps.length - 1;
-  const closeGuide = () => {
-    if (doNotShowAgain) markCompleted(key);
+  const isAnchored = placement.placement !== 'center' && targetRect !== null;
+  const closeGuide = () => setOpen(false);
+  const skipGuide = () => {
+    markCompleted(key);
     setOpen(false);
   };
 
-  return (
-    <Dialog
-      open={open}
-      onClose={closeGuide}
-      fullWidth
-      maxWidth="sm"
-      aria-labelledby={`${scope}-onboarding-title`}
-      aria-describedby={`${scope}-onboarding-description`}
-    >
-      <DialogTitle
-        id={`${scope}-onboarding-title`}
-        sx={{ display: 'flex', alignItems: 'center', gap: 1.25, pb: 1 }}
-      >
-        <Box
-          sx={{
-            width: 36,
-            height: 36,
-            display: 'grid',
-            placeItems: 'center',
-            borderRadius: '50%',
-            bgcolor: '#FFF1F3',
-            color: '#C41E3A',
-          }}
-        >
-          <HelpOutlineRoundedIcon />
-        </Box>
-        <Box>
-          <Typography component="div" sx={{ fontWeight: 900, color: '#172033' }}>
-            {title}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Hướng dẫn nhanh · Bước {stepIndex + 1}/{steps.length}
-          </Typography>
-        </Box>
-      </DialogTitle>
+  const paperPosition = isAnchored
+    ? {
+        top: placement.top,
+        left: placement.left,
+        width: `min(${POPOVER_WIDTH}px, calc(100vw - ${VIEWPORT_MARGIN * 2}px))`,
+        transform: placement.placement === 'above' ? 'translateY(-100%)' : 'none',
+      }
+    : {
+        top: '50%',
+        left: '50%',
+        width: `min(${POPOVER_WIDTH}px, calc(100vw - ${VIEWPORT_MARGIN * 2}px))`,
+        transform: 'translate(-50%, -50%)',
+      };
 
-      <DialogContent id={`${scope}-onboarding-description`} sx={{ pt: 1 }}>
-        <LinearProgress
-          variant="determinate"
-          value={((stepIndex + 1) / steps.length) * 100}
-          sx={{
-            height: 6,
-            mb: 2.5,
-            borderRadius: 999,
-            bgcolor: '#F4D7DC',
-            '& .MuiLinearProgress-bar': { bgcolor: '#C41E3A', borderRadius: 999 },
-          }}
-        />
-        {stepIndex === 0 && (
-          <Typography sx={{ mb: 2, color: '#5B6472', lineHeight: 1.6 }}>
-            {intro}
-          </Typography>
-        )}
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+  return (
+    <>
+      <SpotlightBackdrop target={isAnchored ? targetRect : null} onClose={closeGuide} />
+      <Dialog
+        open={open}
+        onClose={closeGuide}
+        hideBackdrop
+        fullWidth
+        maxWidth={false}
+        aria-labelledby={`${scope}-onboarding-title`}
+        aria-describedby={`${scope}-onboarding-description`}
+        sx={{
+          zIndex: 1300,
+          '& .MuiDialog-container': { display: 'block' },
+          '& .MuiDialog-paper': {
+            position: 'fixed',
+            m: 0,
+            maxWidth: 'none',
+            maxHeight: 'calc(100vh - 32px)',
+            overflow: 'auto',
+            borderRadius: 2,
+            boxShadow: '0 20px 55px rgba(15, 23, 42, 0.24)',
+            '&::after': isAnchored ? {
+              content: '""',
+              position: 'absolute',
+              width: 16,
+              height: 16,
+              bgcolor: '#fff',
+              transform: 'rotate(45deg)',
+              ...(placement.placement === 'below' ? { top: -7 } : { bottom: -7 }),
+              left: `clamp(24px, ${targetRect ? targetRect.left + targetRect.width / 2 - placement.left : 120}px, calc(100% - 24px))`,
+            } : undefined,
+          },
+        }}
+        slotProps={{ paper: { sx: paperPosition } }}
+      >
+        <DialogTitle
+          id={`${scope}-onboarding-title`}
+          sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, pb: 1.25, pr: 6, position: 'relative' }}
+        >
           <Box
             sx={{
+              width: 32,
+              height: 32,
               flexShrink: 0,
-              width: 34,
-              height: 34,
               display: 'grid',
               placeItems: 'center',
-              borderRadius: 1.5,
-              bgcolor: '#C41E3A',
-              color: 'common.white',
-              fontWeight: 900,
+              borderRadius: '50%',
+              bgcolor: '#FFF1F3',
+              color: '#C41E3A',
             }}
           >
-            {stepIndex + 1}
+            <HelpOutlineRoundedIcon fontSize="small" />
           </Box>
-          <Box>
-            <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900, mb: 0.75 }}>
-              {activeStep.title}
+          <Box sx={{ minWidth: 0 }}>
+            <Typography component="div" sx={{ fontWeight: 900, color: '#172033', lineHeight: 1.25 }}>
+              {title}
             </Typography>
-            <Typography sx={{ color: '#5B6472', lineHeight: 1.65 }}>
-              {activeStep.description}
+            <Typography variant="caption" color="text.secondary">
+              Hướng dẫn nhanh · Bước {stepIndex + 1}/{steps.length}
             </Typography>
           </Box>
-        </Stack>
-      </DialogContent>
-
-      <Divider />
-      <DialogActions sx={{ px: 3, py: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-        <FormControlLabel
-          sx={{ mr: 'auto', color: '#667085' }}
-          control={(
-            <Checkbox
-              checked={doNotShowAgain}
-              onChange={(event) => setDoNotShowAgain(event.target.checked)}
-              slotProps={{ input: { 'aria-label': 'Không hiển thị lại hướng dẫn này' } }}
-              size="small"
-              sx={{ color: '#A8B0BC', '&.Mui-checked': { color: '#C41E3A' } }}
-            />
-          )}
-          label={<Typography variant="caption">Không hiển thị lại trên tài khoản này</Typography>}
-        />
-        <Button onClick={closeGuide} color="inherit">
-          Đóng
-        </Button>
-        {stepIndex > 0 && (
-          <Button
-            onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
-            startIcon={<ArrowBackRoundedIcon />}
+          <IconButton
+            aria-label="Đóng hướng dẫn"
+            onClick={closeGuide}
+            size="small"
+            sx={{ position: 'absolute', top: 12, right: 12, color: '#667085' }}
           >
-            Quay lại
+            <CloseRoundedIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <Box sx={{ px: 3 }} aria-label={`Tiến trình bước ${stepIndex + 1} trên ${steps.length}`}>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            {steps.map((step, index) => (
+              <Box
+                key={step.id}
+                aria-hidden="true"
+                sx={{
+                  height: 5,
+                  flex: 1,
+                  borderRadius: 999,
+                  bgcolor: index <= stepIndex ? '#C41E3A' : '#F4D7DC',
+                  transition: 'background-color 180ms ease',
+                }}
+              />
+            ))}
+          </Stack>
+        </Box>
+
+        <DialogContent id={`${scope}-onboarding-description`} sx={{ pt: 2.25 }}>
+          {stepIndex === 0 && (
+            <Typography sx={{ mb: 2, color: '#5B6472', lineHeight: 1.55 }}>
+              {intro}
+            </Typography>
+          )}
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+            <Box
+              sx={{
+                flexShrink: 0,
+                width: 34,
+                height: 34,
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: 1.5,
+                bgcolor: '#C41E3A',
+                color: 'common.white',
+                fontWeight: 900,
+              }}
+            >
+              {stepIndex + 1}
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900, mb: 0.75, lineHeight: 1.3 }}>
+                {activeStep.title}
+              </Typography>
+              <Typography sx={{ color: '#5B6472', lineHeight: 1.55 }}>
+                {activeStep.description}
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogContent>
+
+        <Divider />
+        <Box sx={{ px: 3, py: 1.75, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            onClick={skipGuide}
+            variant="text"
+            size="small"
+            sx={{ mr: 'auto', color: '#667085', textTransform: 'none', px: 0, '&:hover': { bgcolor: 'transparent', color: '#344054', textDecoration: 'underline' } }}
+          >
+            Bỏ qua hướng dẫn
           </Button>
-        )}
-        <Button
-          variant="contained"
-          onClick={() => (isLastStep ? closeGuide() : setStepIndex((current) => current + 1))}
-          endIcon={isLastStep ? <CheckRoundedIcon /> : <ArrowForwardRoundedIcon />}
-          sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}
-        >
-          {isLastStep ? 'Hoàn tất' : 'Tiếp theo'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          {stepIndex > 0 && (
+            <Button
+              onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
+              variant="outlined"
+              startIcon={<ArrowBackRoundedIcon />}
+              sx={{ borderColor: '#CBD2DC', color: '#475467', '&:hover': { borderColor: '#98A2B3', bgcolor: '#F8FAFC' } }}
+            >
+              Quay lại
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            onClick={() => (isLastStep ? closeGuide() : setStepIndex((current) => current + 1))}
+            endIcon={isLastStep ? <CheckRoundedIcon /> : <ArrowForwardRoundedIcon />}
+            sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}
+          >
+            {isLastStep ? 'Hoàn tất' : 'Tiếp theo'}
+          </Button>
+        </Box>
+      </Dialog>
+    </>
   );
 }
