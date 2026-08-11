@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
+import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 import { ROUTES } from '../../../shared/constants/routes';
 import { WishlistToggleButton } from '../../wishlist/components/WishlistToggleButton';
@@ -178,6 +179,15 @@ export const CourseCatalogCard: React.FC<CourseCatalogCardProps> = ({ course }) 
             </Typography>
             <Typography variant="caption" color="text.secondary">
               ({course.reviewCount})
+            </Typography>
+          </Stack>
+        )}
+
+        {(course.enrollmentCount ?? 0) > 0 && (
+          <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, alignItems: 'center' }}>
+            <PeopleAltRoundedIcon sx={{ color: '#64748B', fontSize: 17 }} />
+            <Typography variant="caption" color="text.secondary">
+              {(course.enrollmentCount ?? 0).toLocaleString('vi-VN')} học viên
             </Typography>
           </Stack>
         )}

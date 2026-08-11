@@ -15,6 +15,8 @@ export interface PublicCourseSummary {
   totalLessons: number;
   averageRating?: number;
   reviewCount?: number;
+  enrollmentCount?: number;
+  publishedAt?: string;
 }
 
 // ─── Catalog Filter Params ───────────────────────────────────────

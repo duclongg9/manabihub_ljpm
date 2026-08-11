@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
 
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
@@ -34,6 +35,28 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             @Param("status") EnrollmentStatus status,
             @Param("startDate") java.time.Instant startDate, 
             @Param("endDate") java.time.Instant endDate);
+
+    /**
+     * Counts active/completed learners in one round trip for the public catalog.
+     * Refunded, revoked and expired enrollments are intentionally excluded from
+     * social proof so the number represents current valid access.
+     */
+    @Query("""
+            SELECT e.course.id AS courseId, COUNT(e.id) AS enrollmentCount
+            FROM Enrollment e
+            WHERE e.course.id IN :courseIds
+              AND e.status IN :statuses
+            GROUP BY e.course.id
+            """)
+    List<CourseEnrollmentCount> countByCourseIdsAndStatuses(
+            @Param("courseIds") Collection<UUID> courseIds,
+            @Param("statuses") Collection<EnrollmentStatus> statuses);
+
+    interface CourseEnrollmentCount {
+        UUID getCourseId();
+
+        long getEnrollmentCount();
+    }
 
     @EntityGraph(attributePaths = {"course", "course.teacher", "course.teacher.user"})
     Page<Enrollment> findByStudentIdAndStatusIn(
