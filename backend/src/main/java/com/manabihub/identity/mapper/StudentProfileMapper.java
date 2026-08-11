@@ -24,6 +24,8 @@ public class StudentProfileMapper {
         response.setEmail(user.getEmail());
         response.setFullName(user.getFullName());
         response.setPhoneNumber(user.getPhoneNumber());
+        response.setPhoneVerified(user.getPhoneVerifiedAt() != null);
+        response.setPhoneVerifiedAt(user.getPhoneVerifiedAt());
         response.setAvatarUrl(user.getAvatarUrl());
 
         response.setDisplayName(profile.getDisplayName());

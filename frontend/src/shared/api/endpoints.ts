@@ -54,6 +54,10 @@ export const ENDPOINTS = {
     student: '/v1/student/profile',
     teacher: '/v1/teacher/profile',
     avatar: '/v1/users/avatar',
+    studentPhoneVerificationRequest: '/v1/student/profile/phone-verification/request',
+    studentPhoneVerificationConfirm: '/v1/student/profile/phone-verification/confirm',
+    teacherPhoneVerificationRequest: '/v1/teacher/profile/phone-verification/request',
+    teacherPhoneVerificationConfirm: '/v1/teacher/profile/phone-verification/confirm',
   },
   teacherDashboard: {
     stats: '/v1/teacher/dashboard',

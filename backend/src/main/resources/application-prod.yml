@@ -60,6 +60,12 @@ management:
       enabled: false
 
 manabihub:
+  phone-verification:
+    # Production must explicitly configure a real provider; OTPs are never
+    # logged in the production profile.
+    sms-mode: ${PHONE_VERIFICATION_SMS_MODE:disabled}
+    sms-webhook-url: ${PHONE_VERIFICATION_SMS_WEBHOOK_URL:}
+    sms-api-key: ${PHONE_VERIFICATION_SMS_API_KEY:}
   payment:
     vnpay:
       # Required in production. Startup also verifies HTTPS, the frontend
