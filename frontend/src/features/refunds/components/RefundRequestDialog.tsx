@@ -78,7 +78,9 @@ export function RefundRequestDialog({
 
   const error = createMutation.error ?? cancelMutation.error;
   const errorCode = getMessageCode(error);
-  const errorMessage = error ? refundErrorMessage(errorCode) : null;
+  const errorMessage = error
+    ? refundErrorMessage(errorCode, getApiMessage(error))
+    : null;
 
   const submit = async () => {
     if (!orderItem || !reason.trim() || !confirmed) return;
@@ -191,7 +193,9 @@ export function RefundRequestDialog({
                 ? 'Yêu cầu đã được hủy.'
                 : createMutation.data?.status === 'APPROVED'
                   ? 'Yêu cầu đủ điều kiện và đã được tự động hoàn toàn bộ tiền vào ví.'
-                  : 'Yêu cầu đã được chuyển sang tranh chấp/xét duyệt thủ công.'}
+                  : createMutation.data?.status === 'PENDING'
+                    ? 'Đã ghi nhận yêu cầu. Hệ thống đang hoàn tiền vào ví; hãy tải lại lịch sử sau ít giây.'
+                    : 'Yêu cầu đã được chuyển sang tranh chấp/xét duyệt thủ công.'}
             </Alert>
           )}
         </Stack>
@@ -258,7 +262,12 @@ function getMessageCode(error: unknown): string | undefined {
   return (error as AxiosError<ApiResponse<unknown>> | undefined)?.response?.data?.messageCode;
 }
 
-function refundErrorMessage(code?: string): string {
+function getApiMessage(error: unknown): string | undefined {
+  const message = (error as AxiosError<ApiResponse<unknown>> | undefined)?.response?.data?.message;
+  return typeof message === 'string' && message.trim() ? message : undefined;
+}
+
+function refundErrorMessage(code?: string, serverMessage?: string): string {
   const messages: Record<string, string> = {
     REFUND_WINDOW_EXPIRED: 'Đã quá thời hạn hoàn tiền tiêu chuẩn. Nếu có lỗi thanh toán hoặc lỗi nền tảng, hãy chọn đúng loại ngoại lệ để Finance xem xét.',
     REFUND_PROGRESS_LIMIT_REACHED: 'Tiến độ đã đạt ngưỡng nên không đủ điều kiện tiêu chuẩn. Chỉ chọn ngoại lệ khi thực sự có lỗi thanh toán hoặc lỗi nền tảng.',
@@ -268,5 +277,6 @@ function refundErrorMessage(code?: string): string {
     REFUND_CANCELLATION_NOT_ALLOWED: 'Finance đã bắt đầu xử lý hoặc yêu cầu không còn ở trạng thái có thể hủy.',
   };
   return (code ? messages[code] : undefined)
+    ?? serverMessage
     ?? 'Không thể xử lý yêu cầu hoàn tiền. Vui lòng kiểm tra thông tin và thử lại.';
 }

@@ -159,7 +159,7 @@ export function AdminRefundDetail() {
         tone: 'success',
         message:
           completedAction === 'approve'
-            ? 'Provider đã xác nhận và khoản hoàn tiền đã được hạch toán thành công.'
+            ? 'Đã ghi có khoản hoàn tiền vào ví học viên và khóa quyền truy cập khóa học.'
             : 'Đã ghi nhận quyết định từ chối.',
       });
       await loadDetail();

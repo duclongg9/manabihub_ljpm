@@ -29,10 +29,13 @@ import com.manabihub.refund.service.StudentRefundService;
 import com.manabihub.systemconfig.model.CommercialPolicy;
 import com.manabihub.systemconfig.service.CommercialPolicyService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -42,6 +45,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StudentRefundServiceImpl implements StudentRefundService {
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
@@ -222,11 +226,53 @@ public class StudentRefundServiceImpl implements StudentRefundService {
                 .ifPresent(enrollmentRecord -> {
                     enrollmentRecord.setStatus(com.manabihub.learning.enums.EnrollmentStatus.REFUND_PENDING);
                     enrollmentRepository.save(enrollmentRecord);
-                });
+        });
         if (standardEligible) {
-            saved = refundDecisionTransactionService.autoApproveToStudentWallet(saved.getId());
+            // Do not settle inside the request transaction. Escrow/wallet data may
+            // require reconciliation; a failed automatic settlement must not
+            // roll back the student's refund request and the REFUND_PENDING lock.
+            // The separate transaction also prevents the outer persistence context
+            // from overwriting a successful wallet settlement with stale PENDING
+            // state at commit time.
+            scheduleAutomaticApproval(saved.getId());
         }
         return toStudentResponse(saved);
+    }
+
+    private void scheduleAutomaticApproval(UUID refundId) {
+        Runnable approvalTask = () -> {
+            try {
+                refundDecisionTransactionService.autoApproveToStudentWallet(refundId);
+            } catch (BusinessException exception) {
+                log.warn(
+                        "Automatic wallet refund approval requires review for {} ({}): {}",
+                        refundId,
+                        exception.getMessageCode(),
+                        exception.getMessage()
+                );
+            } catch (RuntimeException exception) {
+                log.error(
+                        "Automatic wallet refund approval failed for {} without rolling back the request",
+                        refundId,
+                        exception
+                );
+            }
+        };
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // Keeps the service deterministic in non-transactional unit tests and
+            // in command-line tooling that invokes it without a Spring transaction.
+            approvalTask.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        approvalTask.run();
+                    }
+                }
+        );
     }
 
     @Override
