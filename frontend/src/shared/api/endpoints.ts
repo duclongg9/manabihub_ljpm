@@ -130,6 +130,7 @@ export const ENDPOINTS = {
     validate: (id: string) => `/v1/teacher/courses/drafts/${id}/validate`,
     submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`,
     publish: (id: string) => `/v1/teacher/courses/${id}/publish`,
+    unpublish: (id: string) => `/v1/teacher/courses/${id}/unpublish`,
   },
   teacherCourseAssets: {
     thumbnails: '/v1/teacher/courses/assets/thumbnails',

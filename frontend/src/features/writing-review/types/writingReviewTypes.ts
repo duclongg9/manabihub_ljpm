@@ -9,6 +9,7 @@ export interface WritingSubmissionSummary {
   id: string;
   courseId: string;
   courseTitle: string;
+  lessonId: string | null;
   lessonTitle: string;
   studentName: string;
   studentEmail: string;
@@ -16,6 +17,7 @@ export interface WritingSubmissionSummary {
   submittedAt: string;
   hasAiSuggestion: boolean;
   hasTeacherFeedback: boolean;
+  score: number | null;
 }
 
 export interface AiWritingSuggestion {
@@ -45,6 +47,7 @@ export interface WritingSubmissionDetail {
   id: string;
   courseId: string;
   courseTitle: string;
+  lessonId: string | null;
   lessonTitle: string;
   studentName: string;
   studentEmail: string;
@@ -56,6 +59,28 @@ export interface WritingSubmissionDetail {
 }
 
 export interface TeacherWritingFeedbackPayload {
-  score: number | null;
+  score: number;
   comment: string;
+}
+
+export interface WritingReviewLessonOption {
+  id: string;
+  title: string;
+}
+
+export interface WritingReviewCourseOption {
+  id: string;
+  title: string;
+  lessons: WritingReviewLessonOption[];
+}
+
+export interface WritingReviewFacets {
+  courses: WritingReviewCourseOption[];
+}
+
+export interface WritingReviewOverview {
+  totalSubmissions: number;
+  pendingSubmissions: number;
+  reviewedSubmissions: number;
+  averageScore: number | null;
 }

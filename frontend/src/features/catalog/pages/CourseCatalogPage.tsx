@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Grid,
+  IconButton,
   Pagination,
   Stack,
   Typography,
@@ -27,9 +28,11 @@ import type { CourseCatalogFilters } from '../types/catalogTypes';
 import { CourseDiscoverySections } from '../components/CourseDiscoverySections';
 
 const PAGE_SIZE = 12;
-const DEFAULT_SORT = 'publishedAt,desc';
+const DEFAULT_SORT = 'enrollmentCount,desc';
 const ALLOWED_SORTS = new Set([
   DEFAULT_SORT,
+  'averageRating,desc',
+  'publishedAt,desc',
   'price,asc',
   'price,desc',
   'title,asc',
@@ -145,8 +148,19 @@ export const CourseCatalogPage: React.FC = () => {
   const isDiscoveryView = !query.filters.keyword && !query.filters.category
     && query.filters.minPrice === undefined && query.filters.maxPrice === undefined
     && query.page === 0;
-  const { data: discoveryData } = useCourseCatalog(
-    { page: 0, size: 50, sort: DEFAULT_SORT },
+  const discoveryFilters = query.filters.jlptLevel
+    ? { jlptLevel: query.filters.jlptLevel }
+    : {};
+  const { data: latestDiscoveryData } = useCourseCatalog(
+    { ...discoveryFilters, page: 0, size: 4, sort: 'publishedAt,desc' },
+    isDiscoveryView,
+  );
+  const { data: bestSellingData } = useCourseCatalog(
+    { ...discoveryFilters, page: 0, size: 4, sort: 'enrollmentCount,desc' },
+    isDiscoveryView,
+  );
+  const { data: topRatedData } = useCourseCatalog(
+    { ...discoveryFilters, page: 0, size: 4, sort: 'averageRating,desc' },
     isDiscoveryView,
   );
 
@@ -194,6 +208,12 @@ export const CourseCatalogPage: React.FC = () => {
     handleFiltersChange({ ...query.filters, keyword: keyword.trim() || undefined });
   };
 
+  const showAllCourses = () => {
+    requestAnimationFrame(() => {
+      document.getElementById('all-courses')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   const [heroKeyword, setHeroKeyword] = React.useState(query.filters.keyword ?? '');
   useEffect(() => setHeroKeyword(query.filters.keyword ?? ''), [query.filters.keyword]);
 
@@ -226,7 +246,7 @@ export const CourseCatalogPage: React.FC = () => {
                 Chọn khóa học phù hợp với mục tiêu của bạn
               </Typography>
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mb: 2, maxWidth: 720 }}>
-                Lọc theo cấp độ JLPT, kỹ năng và mức học phí. Số sao và lượt học viên đều lấy từ dữ liệu thực tế.
+                Tìm theo tên khóa học, chủ đề hoặc từ khóa; sau đó lọc theo cấp độ JLPT, kỹ năng và mức học phí.
               </Typography>
               <TextField
                 fullWidth
@@ -235,7 +255,22 @@ export const CourseCatalogPage: React.FC = () => {
                 onKeyDown={(event) => { if (event.key === 'Enter') updateKeyword(heroKeyword); }}
                 placeholder="Tìm Kanji, N3, giao tiếp..."
                 aria-label="Tìm khóa học"
-                slotProps={{ input: { endAdornment: <InputAdornment position="end"><Button onClick={() => updateKeyword(heroKeyword)} sx={{ minWidth: 40, color: '#C41E3A' }} aria-label="Tìm kiếm"><SearchRoundedIcon /></Button></InputAdornment> } }}
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => updateKeyword(heroKeyword)}
+                          sx={{ color: '#C41E3A', bgcolor: '#FFF1F2', '&:hover': { bgcolor: '#FFE4E6' } }}
+                          aria-label="Tìm kiếm khóa học"
+                        >
+                          <SearchRoundedIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
+                  htmlInput: { maxLength: 100 },
+                }}
                 sx={{ maxWidth: 760, bgcolor: '#fff', borderRadius: 1.5, '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
               />
               <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 1.5, flexWrap: 'wrap' }}>
@@ -246,13 +281,25 @@ export const CourseCatalogPage: React.FC = () => {
             </Box>
           </Box>
 
-          {isDiscoveryView && discoveryData?.content && discoveryData.content.length > 0 && (
+          {isDiscoveryView && latestDiscoveryData?.content && latestDiscoveryData.content.length > 0 && (
             <CourseDiscoverySections
-              courses={discoveryData.content}
+              latestCourses={latestDiscoveryData.content}
+              bestSellingCourses={bestSellingData?.content ?? []}
+              topRatedCourses={topRatedData?.content ?? []}
               selectedLevel={query.filters.jlptLevel}
               onLevelChange={(level) => handleFiltersChange({ ...query.filters, jlptLevel: level })}
+              onViewAll={showAllCourses}
             />
           )}
+
+          <Box id="all-courses" sx={{ scrollMarginTop: { xs: 88, sm: 80 } }}>
+            <Typography component="h2" variant="h5" sx={{ color: '#14284B', fontWeight: 800, mb: 1 }}>
+              Tất cả khóa học
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748B', mb: 1 }}>
+              Dùng bộ lọc để thu hẹp danh sách; đánh giá và lượt học viên chỉ là thông tin tham khảo trên từng khóa học.
+            </Typography>
+          </Box>
 
           <Box sx={{ position: 'sticky', top: { xs: 72, sm: 64 }, zIndex: 20, bgcolor: 'rgba(250, 249, 246, 0.92)', backdropFilter: 'blur(12px)', py: 2, mx: { xs: -2, sm: -3 }, px: { xs: 2, sm: 3 }, borderRadius: 2, transition: 'all 0.3s' }}>
             <CourseCatalogFiltersBar
@@ -271,7 +318,7 @@ export const CourseCatalogPage: React.FC = () => {
         >
           <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              {data ? `${data.totalElements} khóa học` : 'Danh sách khóa học'}
+              {data ? `${data.totalElements} khóa học phù hợp` : 'Danh sách khóa học'}
             </Typography>
             {/* Active Filter Badges */}
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>

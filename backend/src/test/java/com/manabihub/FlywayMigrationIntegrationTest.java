@@ -22,6 +22,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace.NONE;
 
 @org.springframework.boot.test.context.SpringBootTest(webEnvironment = org.springframework.boot.test.context.SpringBootTest.WebEnvironment.NONE)
@@ -72,7 +73,7 @@ public class FlywayMigrationIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
-    // ── Test 1: Clean build from V001 to V069 ──────────────────────────────
+    // ── Test 1: Clean build from V001 to V070 ──────────────────────────────
     @Test
     void cleanMigrationToLatestVersion() {
         assertThat(flyway).isNotNull();
@@ -89,13 +90,13 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("069");
+        assertThat(current).isEqualTo("070");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V069 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V070 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");
@@ -214,6 +215,116 @@ public class FlywayMigrationIntegrationTest {
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
+
+    @Test
+    void v069UpgradeNormalizesLegacyPhonesAndKeepsVerifiedOwner() {
+        String schema = "phone_upgrade_test";
+        jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
+
+        Flyway beforePhoneVerification = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas(schema)
+                .target("068")
+                .load();
+        beforePhoneVerification.migrate();
+
+        JdbcTemplate legacy = new JdbcTemplate(dataSource);
+        legacy.execute("ALTER TABLE " + schema + ".app_users "
+                + "ALTER COLUMN phone_number TYPE VARCHAR(20), "
+                + "ADD COLUMN phone_verified_at TIMESTAMPTZ");
+
+        UUID oldestUnverified = UUID.randomUUID();
+        UUID verifiedOwner = UUID.randomUUID();
+        UUID trimmedDuplicate = UUID.randomUUID();
+        UUID blankPhone = UUID.randomUUID();
+
+        legacy.update("INSERT INTO " + schema + ".app_users "
+                        + "(id, email, full_name, phone_number, phone_verified_at, created_at) "
+                        + "VALUES (?, 'legacy-oldest@test.com', 'Legacy Oldest', '+84971693378', NULL, "
+                        + "TIMESTAMPTZ '2020-01-01 00:00:00Z')",
+                oldestUnverified);
+        legacy.update("INSERT INTO " + schema + ".app_users "
+                        + "(id, email, full_name, phone_number, phone_verified_at, created_at) "
+                        + "VALUES (?, 'verified-owner@test.com', 'Verified Owner', '0971693378', "
+                        + "TIMESTAMPTZ '2021-01-02 00:00:00Z', TIMESTAMPTZ '2021-01-01 00:00:00Z')",
+                verifiedOwner);
+        legacy.update("INSERT INTO " + schema + ".app_users "
+                        + "(id, email, full_name, phone_number, phone_verified_at, created_at) "
+                        + "VALUES (?, 'trimmed-duplicate@test.com', 'Trimmed Duplicate', ' 0971693378 ', NULL, "
+                        + "TIMESTAMPTZ '2022-01-01 00:00:00Z')",
+                trimmedDuplicate);
+        legacy.update("INSERT INTO " + schema + ".app_users "
+                        + "(id, email, full_name, phone_number, phone_verified_at, created_at) "
+                        + "VALUES (?, 'blank-phone@test.com', 'Blank Phone', '   ', NULL, "
+                        + "TIMESTAMPTZ '2023-01-01 00:00:00Z')",
+                blankPhone);
+
+        Flyway latest = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas(schema)
+                .load();
+        latest.migrate();
+
+        assertThat(legacy.queryForObject(
+                "SELECT phone_number FROM " + schema + ".app_users WHERE id = ?",
+                String.class, verifiedOwner)).isEqualTo("0971693378");
+        assertThat(legacy.queryForObject(
+                "SELECT phone_number FROM " + schema + ".app_users WHERE id = ?",
+                String.class, oldestUnverified)).isNull();
+        assertThat(legacy.queryForObject(
+                "SELECT phone_number FROM " + schema + ".app_users WHERE id = ?",
+                String.class, trimmedDuplicate)).isNull();
+        assertThat(legacy.queryForObject(
+                "SELECT phone_number FROM " + schema + ".app_users WHERE id = ?",
+                String.class, blankPhone)).isNull();
+        assertThat(legacy.queryForObject(
+                "SELECT count(*) FROM " + schema + ".app_users WHERE id IN (?, ?, ?, ?)",
+                Integer.class, oldestUnverified, verifiedOwner, trimmedDuplicate, blankPhone)).isEqualTo(4);
+        assertThat(legacy.queryForObject(
+                "SELECT count(*) FROM pg_indexes WHERE schemaname = ? "
+                        + "AND indexname = 'uq_app_users_phone_number'",
+                Integer.class, schema)).isEqualTo(1);
+
+        UUID conflictingUser = UUID.randomUUID();
+        assertThatThrownBy(() -> legacy.update("INSERT INTO " + schema + ".app_users "
+                        + "(id, email, full_name, phone_number, created_at) "
+                        + "VALUES (?, 'new-conflict@test.com', 'New Conflict', '0971693378', now())",
+                conflictingUser))
+                .hasMessageContaining("uq_app_users_phone_number");
+    }
+
+    @Test
+    void v069UpgradeRejectsMultipleVerifiedOwnersForManualReview() {
+        String schema = "phone_verified_conflict_test";
+        jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
+
+        Flyway beforePhoneVerification = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas(schema)
+                .target("068")
+                .load();
+        beforePhoneVerification.migrate();
+
+        JdbcTemplate legacy = new JdbcTemplate(dataSource);
+        legacy.execute("ALTER TABLE " + schema + ".app_users "
+                + "ADD COLUMN phone_verified_at TIMESTAMPTZ");
+        legacy.update("INSERT INTO " + schema + ".app_users "
+                        + "(id, email, full_name, phone_number, phone_verified_at, created_at) VALUES "
+                        + "(?, 'verified-a@test.com', 'Verified A', '0971693378', now(), now()), "
+                        + "(?, 'verified-b@test.com', 'Verified B', '0971693378', now(), now())",
+                UUID.randomUUID(), UUID.randomUUID());
+
+        Flyway latest = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas(schema)
+                .load();
+
+        assertThatThrownBy(latest::migrate)
+                .hasMessageContaining("manual review is required before retrying");
+        assertThat(legacy.queryForObject(
+                "SELECT count(*) FROM " + schema + ".app_users WHERE phone_number = '0971693378'",
+                Integer.class)).isEqualTo(2);
+    }
 
     private void assertRowExists(JdbcTemplate jt, String schema, String table, UUID id) {
         Integer count = jt.queryForObject(
@@ -381,5 +492,38 @@ public class FlywayMigrationIntegrationTest {
                 String.class);
         assertThat(walletTransactionTypeConstraint)
                 .contains("GAME_REWARD", "ATTENDANCE_REWARD");
+
+        Integer phoneNumberIndex = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_indexes "
+                        + "WHERE indexname = 'uq_app_users_phone_number' "
+                        + "AND schemaname = 'public'",
+                Integer.class);
+        assertThat(phoneNumberIndex).as("uq_app_users_phone_number exists").isEqualTo(1);
+
+        Integer phoneChallengeTable = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.tables "
+                        + "WHERE table_schema = 'public' "
+                        + "AND table_name = 'phone_verification_challenges'",
+                Integer.class);
+        assertThat(phoneChallengeTable).as("phone_verification_challenges exists").isEqualTo(1);
+
+        Integer thumbnailAssetTable = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.tables "
+                        + "WHERE table_schema = 'public' "
+                        + "AND table_name = 'course_thumbnail_assets'",
+                Integer.class);
+        assertThat(thumbnailAssetTable)
+                .as("course thumbnails use persistent database storage")
+                .isEqualTo(1);
+
+        Integer thumbnailFileNameIndex = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_indexes "
+                        + "WHERE schemaname = 'public' "
+                        + "AND tablename = 'course_thumbnail_assets' "
+                        + "AND indexdef LIKE '%UNIQUE%file_name%'",
+                Integer.class);
+        assertThat(thumbnailFileNameIndex)
+                .as("course thumbnail file names are unique")
+                .isEqualTo(1);
     }
 }

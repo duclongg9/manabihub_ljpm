@@ -90,8 +90,8 @@ public class PublicCourseController {
     }
 
     private Pageable buildPageable(int page, int size, String sort) {
-        String[] parts = sort.split(",");
-        String property = parts[0];
+        String[] parts = sort == null ? new String[0] : sort.trim().split(",", -1);
+        String property = parts.length == 0 ? "publishedAt" : parts[0].trim();
         Sort.Direction direction = parts.length > 1 && "asc".equalsIgnoreCase(parts[1])
                 ? Sort.Direction.ASC
                 : Sort.Direction.DESC;
@@ -102,6 +102,14 @@ public class PublicCourseController {
             direction = Sort.Direction.DESC;
         }
 
+        // These are aggregate ranking modes rather than writable entity
+        // properties. They intentionally expose descending leaderboards only;
+        // the repository maps each one to fixed SQL instead of interpolating a
+        // request-controlled ORDER BY expression.
+        if (isAggregateRanking(property)) {
+            direction = Sort.Direction.DESC;
+        }
+
         return PageRequest.of(page, size, Sort.by(direction, property));
     }
 
@@ -109,6 +117,12 @@ public class PublicCourseController {
         return "publishedAt".equals(field)
                 || "price".equals(field)
                 || "title".equals(field)
-                || "createdAt".equals(field);
+                || "createdAt".equals(field)
+                || isAggregateRanking(field);
+    }
+
+    private boolean isAggregateRanking(String field) {
+        return "enrollmentCount".equals(field)
+                || "averageRating".equals(field);
     }
 }

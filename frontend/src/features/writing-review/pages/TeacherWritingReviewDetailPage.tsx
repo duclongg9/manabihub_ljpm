@@ -42,21 +42,25 @@ export function TeacherWritingReviewDetailPage() {
   }, [detail.data]);
 
   const scoreError = useMemo(() => {
-    if (!score.trim()) return '';
+    if (!score.trim()) return 'Vui lòng nhập điểm cho bài viết.';
     const numericScore = Number(score);
     if (!Number.isFinite(numericScore) || numericScore < 0 || numericScore > 10) {
-      return 'Điểm phải nằm trong khoảng 0 đến 10.';
+      return 'Điểm phải nằm trong khoảng từ 0 đến 10.';
     }
     return '';
   }, [score]);
 
   const submitFeedback = async () => {
-    if (!comment.trim() || scoreError) return;
-    await saveFeedback.mutateAsync({
-      score: score.trim() ? Number(score) : null,
-      comment: comment.trim(),
-    });
-    setSavedNoticeOpen(true);
+    if (!comment.trim() || scoreError || comment.length > 5000) return;
+    try {
+      await saveFeedback.mutateAsync({
+        score: Number(score),
+        comment: comment.trim(),
+      });
+      setSavedNoticeOpen(true);
+    } catch {
+      // Mutation state renders the actionable error message below the form.
+    }
   };
 
   if (detail.isPending) {
@@ -74,7 +78,7 @@ export function TeacherWritingReviewDetailPage() {
           severity="error"
           action={<Button color="inherit" onClick={() => detail.refetch()}>Thử lại</Button>}
         >
-          Không thể tải bài viết hoặc bạn không có quyền truy cập.
+          Không thể tải bài viết hoặc bạn không có quyền chấm bài này.
         </Alert>
       </Box>
     );
@@ -89,7 +93,7 @@ export function TeacherWritingReviewDetailPage() {
         onClick={() => navigate(ROUTES.TEACHER.WRITING_REVIEWS)}
         sx={{ mb: 2 }}
       >
-        Danh sách bài viết
+        Danh sách bài Writing
       </Button>
 
       <Stack
@@ -98,14 +102,14 @@ export function TeacherWritingReviewDetailPage() {
         sx={{ justifyContent: 'space-between', alignItems: { md: 'center' }, mb: 3 }}
       >
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>{submission.studentName}</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 800 }}>{submission.studentName}</Typography>
           <Typography color="text.secondary">
             {submission.courseTitle} · {submission.lessonTitle}
           </Typography>
         </Box>
         <Chip
           color={submission.teacherFeedback ? 'success' : 'warning'}
-          label={submission.teacherFeedback ? 'Đã phản hồi' : 'Chờ phản hồi'}
+          label={submission.teacherFeedback ? 'Đã chấm' : 'Chờ chấm'}
         />
       </Stack>
 
@@ -138,25 +142,25 @@ export function TeacherWritingReviewDetailPage() {
             <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 2 }}>
                 <AutoAwesomeOutlinedIcon color="info" />
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>Gợi ý AI tham khảo</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>Gợi ý AI để tham khảo</Typography>
               </Stack>
 
               {!submission.aiSuggestion && (
                 <Typography variant="body2" color="text.secondary">
-                  Bài viết này không có gợi ý AI.
+                  Bài viết này không có gợi ý AI. Giáo viên vẫn chấm bài độc lập như bình thường.
                 </Typography>
               )}
 
               {submission.aiSuggestion?.status === 'FAILED' && (
                 <Alert severity="warning">
-                  Gợi ý AI không khả dụng. Giáo viên vẫn có thể phản hồi bài viết độc lập.
+                  Không thể tạo gợi ý AI. Đây không phải là kết quả chấm và không ngăn giáo viên phản hồi.
                 </Alert>
               )}
 
               {submission.aiSuggestion?.status === 'READY' && (
                 <Stack spacing={2}>
                   <Alert severity="info">
-                    Nội dung dưới đây chỉ là gợi ý sơ bộ. Phản hồi của giáo viên là kết quả có thẩm quyền.
+                    Nội dung AI chỉ là gợi ý sơ bộ. Điểm và nhận xét của giáo viên là kết quả chính thức.
                   </Alert>
                   <SuggestionGroup title="Ngữ pháp" value={submission.aiSuggestion.grammarSuggestions} />
                   <SuggestionGroup title="Từ vựng" value={submission.aiSuggestion.vocabularySuggestions} />
@@ -180,19 +184,20 @@ export function TeacherWritingReviewDetailPage() {
             variant="outlined"
             sx={{ p: { xs: 2, md: 3 }, position: { lg: 'sticky' }, top: { lg: 24 } }}
           >
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Phản hồi của giáo viên</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Kết quả chấm của giáo viên</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Điểm số là tùy chọn; nhận xét là bắt buộc.
+              Nhận xét là bắt buộc. Lưu lại lần nữa sẽ cập nhật kết quả hiện có, không tạo bản chấm trùng.
             </Typography>
 
             <Stack spacing={2.5}>
               <TextField
+                required
                 label="Điểm (0–10)"
                 type="number"
                 value={score}
                 onChange={(event) => setScore(event.target.value)}
                 error={Boolean(scoreError)}
-                helperText={scoreError || 'Có thể để trống nếu bài học không yêu cầu điểm.'}
+                helperText={scoreError || 'Điểm bắt buộc, được nhập từ 0 đến 10.'}
                 slotProps={{ htmlInput: { min: 0, max: 10, step: 0.25 } }}
               />
               <TextField
@@ -207,17 +212,29 @@ export function TeacherWritingReviewDetailPage() {
               />
 
               {saveFeedback.isError && (
-                <Alert severity="error">Không thể lưu phản hồi. Vui lòng thử lại.</Alert>
+                <Alert severity="error">
+                  Không thể lưu kết quả. Hãy kiểm tra điểm, nội dung nhận xét và thử lại.
+                </Alert>
               )}
 
               <Button
                 variant="contained"
                 size="large"
                 startIcon={<SaveOutlinedIcon />}
-                disabled={!comment.trim() || Boolean(scoreError) || saveFeedback.isPending}
+                disabled={
+                  !comment.trim()
+                  || !score.trim()
+                  || Boolean(scoreError)
+                  || comment.length > 5000
+                  || saveFeedback.isPending
+                }
                 onClick={submitFeedback}
               >
-                {saveFeedback.isPending ? 'Đang lưu...' : 'Lưu phản hồi'}
+                {saveFeedback.isPending
+                  ? 'Đang lưu...'
+                  : submission.teacherFeedback
+                    ? 'Cập nhật kết quả'
+                    : 'Lưu kết quả chấm'}
               </Button>
             </Stack>
           </Paper>
@@ -228,7 +245,7 @@ export function TeacherWritingReviewDetailPage() {
         open={savedNoticeOpen}
         autoHideDuration={3500}
         onClose={() => setSavedNoticeOpen(false)}
-        message="Đã lưu phản hồi và gửi thông báo cho học viên."
+        message="Đã lưu kết quả và gửi thông báo cho học viên."
       />
     </Box>
   );

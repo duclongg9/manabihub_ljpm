@@ -175,6 +175,14 @@ export async function publishCourse(courseId: string) {
   return response.data;
 }
 
+export async function unpublishCourse(courseId: string) {
+  const response = await axiosClient.post<ApiResponse<CourseDraftResponse>>(
+    ENDPOINTS.teacherCourses.unpublish(courseId),
+  );
+
+  return response.data;
+}
+
 export async function fetchCourseBuilder(draftId: string) {
   const response = await axiosClient.get<ApiResponse<CourseBuilderResponse>>(ENDPOINTS.teacherCourses.builder(draftId));
 

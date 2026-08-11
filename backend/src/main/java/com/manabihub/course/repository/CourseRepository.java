@@ -2,6 +2,11 @@ package com.manabihub.course.repository;
 
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
+import com.manabihub.course.repository.projection.PublicCourseCardProjection;
+import com.manabihub.course.repository.projection.PublicCourseLessonCountProjection;
+import com.manabihub.course.repository.projection.PublicCourseRankProjection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -14,6 +19,42 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecificationExecutor<Course> {
+
+    String PUBLIC_COURSE_RANK_SELECT = """
+            SELECT course.id AS "courseId",
+                   COUNT(DISTINCT enrollment.id) AS "enrollmentCount",
+                   COALESCE(AVG(review.rating), 0) AS "averageRating",
+                   COUNT(DISTINCT review.id) AS "reviewCount"
+            FROM courses course
+            LEFT JOIN enrollments enrollment
+                   ON enrollment.course_id = course.id
+                  AND enrollment.enrollment_status IN ('ACTIVE', 'COMPLETED')
+            LEFT JOIN course_reviews review
+                   ON review.enrollment_id = enrollment.id
+                  AND review.review_status = 'APPROVED'
+            WHERE course.status = 'PUBLISHED'
+              AND (CAST(:keywordPattern AS text) IS NULL
+                   OR LOWER(course.title) LIKE CAST(:keywordPattern AS text)
+                   OR LOWER(COALESCE(course.description, '')) LIKE CAST(:keywordPattern AS text))
+              AND (CAST(:category AS text) IS NULL OR course.category = CAST(:category AS text))
+              AND (CAST(:jlptLevel AS text) IS NULL OR course.level_code = CAST(:jlptLevel AS text))
+              AND (CAST(:minPrice AS numeric) IS NULL OR course.price >= CAST(:minPrice AS numeric))
+              AND (CAST(:maxPrice AS numeric) IS NULL OR course.price <= CAST(:maxPrice AS numeric))
+            GROUP BY course.id, course.published_at
+            """;
+
+    String PUBLIC_COURSE_RANK_COUNT = """
+            SELECT COUNT(course.id)
+            FROM courses course
+            WHERE course.status = 'PUBLISHED'
+              AND (CAST(:keywordPattern AS text) IS NULL
+                   OR LOWER(course.title) LIKE CAST(:keywordPattern AS text)
+                   OR LOWER(COALESCE(course.description, '')) LIKE CAST(:keywordPattern AS text))
+              AND (CAST(:category AS text) IS NULL OR course.category = CAST(:category AS text))
+              AND (CAST(:jlptLevel AS text) IS NULL OR course.level_code = CAST(:jlptLevel AS text))
+              AND (CAST(:minPrice AS numeric) IS NULL OR course.price >= CAST(:minPrice AS numeric))
+              AND (CAST(:maxPrice AS numeric) IS NULL OR course.price <= CAST(:maxPrice AS numeric))
+            """;
 
     boolean existsBySlug(String slug);
 
@@ -83,4 +124,91 @@ public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecif
             "WHERE admin.id = :adminId AND role.code IN (:roleCodes) AND admin.account_status = 'ACTIVE')", nativeQuery = true)
     boolean hasAdminRole(@org.springframework.data.repository.query.Param("adminId") UUID adminId,
             @org.springframework.data.repository.query.Param("roleCodes") java.util.Collection<String> roleCodes);
+
+    /**
+     * Ranks the complete filtered public catalogue by current valid
+     * enrolments before applying LIMIT/OFFSET. The fixed SQL order is an
+     * intentional whitelist: no request-controlled identifier is interpolated.
+     */
+    @Query(
+            value = PUBLIC_COURSE_RANK_SELECT + """
+                    ORDER BY COUNT(DISTINCT enrollment.id) DESC,
+                             CASE WHEN course.published_at IS NULL THEN 1 ELSE 0 END,
+                             course.published_at DESC,
+                             course.id ASC
+                    """,
+            countQuery = PUBLIC_COURSE_RANK_COUNT,
+            nativeQuery = true
+    )
+    Page<PublicCourseRankProjection> findPublicCoursesRankedByEnrollments(
+            @Param("keywordPattern") String keywordPattern,
+            @Param("category") String category,
+            @Param("jlptLevel") String jlptLevel,
+            @Param("minPrice") java.math.BigDecimal minPrice,
+            @Param("maxPrice") java.math.BigDecimal maxPrice,
+            Pageable pageable
+    );
+
+    /**
+     * Ranks by approved-review average, then review volume. Enrolment volume,
+     * publication time and UUID make ties deterministic across page requests.
+     */
+    @Query(
+            value = PUBLIC_COURSE_RANK_SELECT + """
+                    ORDER BY COALESCE(AVG(review.rating), 0) DESC,
+                             COUNT(DISTINCT review.id) DESC,
+                             COUNT(DISTINCT enrollment.id) DESC,
+                             CASE WHEN course.published_at IS NULL THEN 1 ELSE 0 END,
+                             course.published_at DESC,
+                             course.id ASC
+                    """,
+            countQuery = PUBLIC_COURSE_RANK_COUNT,
+            nativeQuery = true
+    )
+    Page<PublicCourseRankProjection> findPublicCoursesRankedByRating(
+            @Param("keywordPattern") String keywordPattern,
+            @Param("category") String category,
+            @Param("jlptLevel") String jlptLevel,
+            @Param("minPrice") java.math.BigDecimal minPrice,
+            @Param("maxPrice") java.math.BigDecimal maxPrice,
+            Pageable pageable
+    );
+
+    @Query(value = """
+            SELECT course.id AS "courseId",
+                   course.title AS title,
+                   course.slug AS slug,
+                   course.thumbnail_url AS "thumbnailUrl",
+                   course.level_code AS "jlptLevel",
+                   course.category AS category,
+                   course.price AS price,
+                   course.currency AS currency,
+                   teacher.id AS "teacherId",
+                   COALESCE(teacher.display_name, app_user.full_name) AS "teacherName",
+                   app_user.avatar_url AS "teacherAvatarUrl",
+                   course.published_at AS "publishedAt"
+            FROM courses course
+            JOIN teacher_profiles teacher ON teacher.id = course.teacher_id
+            JOIN app_users app_user ON app_user.id = teacher.user_id
+            WHERE course.status = 'PUBLISHED'
+              AND course.id IN (:courseIds)
+            """, nativeQuery = true)
+    List<PublicCourseCardProjection> findPublicCourseCardsByIds(@Param("courseIds") java.util.Collection<UUID> courseIds);
+
+    @Query(value = """
+            SELECT course.id AS "courseId",
+                   COUNT(block.id) AS "totalLessons"
+            FROM courses course
+            LEFT JOIN course_modules module ON module.course_id = course.id
+            LEFT JOIN course_lesson_blocks block
+                   ON block.module_id = module.id
+                  AND block.moderation_hidden = FALSE
+            WHERE course.status = 'PUBLISHED'
+              AND course.id IN (:courseIds)
+            GROUP BY course.id
+            """, nativeQuery = true)
+    List<PublicCourseLessonCountProjection> countVisibleLessonsForPublicCourses(
+            @Param("courseIds") java.util.Collection<UUID> courseIds
+    );
+
 }

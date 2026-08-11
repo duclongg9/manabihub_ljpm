@@ -33,6 +33,13 @@ public interface CourseService {
 
     void publishCourse(UUID courseId);
 
+    /**
+     * Takes a published course out of the public catalogue and returns it to
+     * the teacher draft workspace so its cover/content can be edited safely.
+     * Existing enrolments are not revoked by this transition.
+     */
+    CourseDraftResponse unpublishCourse(UUID courseId);
+
     com.manabihub.course.dto.response.PublicCourseDetailResponse getPublicCourseDetail(String identifier);
 
     Page<PublicCourseSummaryResponse> searchPublicCourses(

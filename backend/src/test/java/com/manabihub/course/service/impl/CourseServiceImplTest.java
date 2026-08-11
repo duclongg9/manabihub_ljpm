@@ -638,6 +638,77 @@ class CourseServiceImplTest {
         assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
         verify(courseRepository, never()).findByIdAndTeacher_Id(any(), any());
     }
+
+    @Test
+    @Order(6)
+    @DisplayName("UTCID06 (N) - published course -> DRAFT for safe editing + audit")
+    void unpublishCourse_WhenPublished_ShouldReturnDraftForEditing() {
+        UUID courseId = UUID.randomUUID();
+        java.time.Instant publishedAt = java.time.Instant.parse("2026-08-10T10:15:30Z");
+        Course publishedCourse = Course.builder()
+                .id(courseId)
+                .teacher(approvedTeacher)
+                .title("JLPT N5 Foundation")
+                .slug("jlpt-n5-foundation")
+                .status(CourseStatus.PUBLISHED)
+                .publishedAt(publishedAt)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_Id(courseId, approvedTeacher.getId()))
+                .thenReturn(Optional.of(publishedCourse));
+
+        CourseDraftResponse response = courseService.unpublishCourse(courseId);
+
+        assertEquals(CourseStatus.DRAFT, publishedCourse.getStatus());
+        assertNull(publishedCourse.getPublishedAt());
+        assertEquals(CourseStatus.DRAFT, response.status());
+        verify(courseRepository).saveAndFlush(publishedCourse);
+        verify(auditLogService).logUserAction(
+                userId,
+                "TEACHER",
+                "UNPUBLISH_COURSE",
+                "COURSE",
+                courseId,
+                Map.of(
+                        "status", CourseStatus.PUBLISHED.name(),
+                        "publishedAt", publishedAt.toString()
+                ),
+                Map.of("status", CourseStatus.DRAFT.name()),
+                Map.of("courseTitle", publishedCourse.getTitle(), "reason", "Teacher requested editing")
+        );
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("UTCID07 (A) - non-published course cannot be hidden")
+    void unpublishCourse_WhenCourseIsNotPublished_ShouldRejectTransition() {
+        UUID courseId = UUID.randomUUID();
+        Course draft = Course.builder()
+                .id(courseId)
+                .teacher(approvedTeacher)
+                .title("Draft course")
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_Id(courseId, approvedTeacher.getId()))
+                .thenReturn(Optional.of(draft));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> courseService.unpublishCourse(courseId)
+        );
+
+        assertEquals(MessageCodes.MSG_COURSE_007, exception.getMessageCode());
+        assertEquals(HttpStatus.CONFLICT, exception.getHttpStatus());
+        verify(courseRepository, never()).saveAndFlush(any());
+        verify(auditLogService, never()).logUserAction(
+                any(), any(), any(), any(), any(), any(), any(), any()
+        );
+    }
     }
 
     @Nested
