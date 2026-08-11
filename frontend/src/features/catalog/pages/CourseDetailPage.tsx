@@ -11,6 +11,7 @@ import { RefreshCw, Target, CheckCircle2 } from 'lucide-react';
 import { CourseReviewsSection } from '../../course-reviews/components/CourseReviewsSection';
 import { RichTextContent } from '../../../shared/components/RichTextContent/RichTextContent';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
+import { RelatedCoursesSection } from '../components/RelatedCoursesSection';
 
 export const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -154,6 +155,8 @@ export const CourseDetailPage = () => {
 
             {/* Teacher Profile */}
             <TeacherProfile teacher={course.teacher} />
+
+            <RelatedCoursesSection course={course} />
 
             <CourseReviewsSection
               courseId={course.id}
