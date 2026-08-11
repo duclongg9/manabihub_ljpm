@@ -35,31 +35,31 @@ const STUDENT_DASHBOARD_GUIDE: OnboardingStep[] = [
   {
     id: 'roadmap',
     title: 'Bắt đầu từ mục tiêu của bạn',
-    description: 'Lộ trình JLPT cho biết bạn đang học cấp độ nào và còn những chặng nào trước mục tiêu. Nếu mục tiêu thay đổi, bạn có thể cập nhật trong Hồ sơ cá nhân.',
+    description: 'Xem cấp độ hiện tại và đích JLPT của bạn trên cùng một lộ trình.',
     targetId: 'student-roadmap',
   },
   {
     id: 'progress',
     title: 'Theo dõi tiến độ mỗi ngày',
-    description: 'Ba thẻ tổng quan cho biết số khóa đã ghi danh, khóa đang học và khóa đã hoàn thành. Hãy chọn Học tiếp ở khóa gần đây để quay lại đúng bài đang dở.',
+    description: 'Ba thẻ này tóm tắt khóa đã ghi danh, đang học và đã hoàn thành.',
     targetId: 'student-stats',
   },
   {
     id: 'calendar',
     title: 'Xem lịch học tổng quát',
-    description: 'Lịch học gom các buổi của nhiều khóa vào một nơi. Bạn có thể lọc khóa học, chuyển giữa tháng/tuần/hôm nay, phát hiện trùng lịch và bấm Vào học ngay từ một buổi đã đặt.',
+    description: 'Gom lịch tất cả khóa học vào một nơi. Bấm vào buổi học để Vào học ngay.',
     targetId: 'student-calendar',
   },
   {
     id: 'focus',
     title: 'Đặt lịch và tích điểm tập trung',
-    description: 'Mục tiêu học tập lưu lịch cố định, mục tiêu phút theo tuần và điểm Pomodoro theo kỹ năng/khóa học. Pomodoro được mở trong lúc học để thời gian hoàn thành được ghi nhận đúng bài.',
+    description: 'Đặt lịch cố định, bật Pomodoro trong bài học và tích điểm theo kỹ năng.',
     targetId: 'student-goals',
   },
   {
     id: 'payments',
     title: 'Khi cần mua khóa học hoặc xem hoàn tiền',
-    description: 'Mục Ví & Thanh toán là nơi xem đơn hàng, thanh toán và các khoản hoàn hợp lệ. Chỉ số dư được phép rút mới có thể gửi yêu cầu rút sau khi xác thực theo quy định.',
+    description: 'Ví & Thanh toán lưu đơn hàng, thanh toán và các khoản hoàn hợp lệ.',
   },
 ];
 
@@ -418,7 +418,7 @@ export function StudentDashboardPage() {
         <OnboardingGuide
           scope="student-dashboard"
           title="Làm quen với bảng điều khiển học viên"
-          intro="ManabiHub chia dashboard thành các khu vực nhỏ để bạn biết nên bắt đầu từ đâu và không bỏ sót tiến độ học. Bạn có thể xem lại hướng dẫn bằng cách xóa dữ liệu trang của tài khoản nếu cần."
+          intro="Một vòng nhanh để bạn biết mỗi khu vực trên bảng điều khiển dùng làm gì."
           steps={STUDENT_DASHBOARD_GUIDE}
           accountKey={profile?.id ?? profile?.email}
         />

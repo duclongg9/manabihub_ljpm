@@ -249,7 +249,7 @@ export const TeacherDashboardPage: React.FC = () => {
       <OnboardingGuide
         scope="teacher-dashboard"
         title="Làm quen với bảng điều khiển giảng viên"
-        intro="Dashboard giúp bạn đi từ việc hoàn thiện khóa học đến theo dõi doanh thu. Hướng dẫn này chỉ xuất hiện lần đầu trên từng tài khoản; bạn có thể đóng tạm thời hoặc chọn không hiển thị lại."
+        intro="Một vòng nhanh để bạn bắt đầu quản lý khóa học và doanh thu."
         steps={TEACHER_DASHBOARD_GUIDE}
         accountKey={teacherId}
       />

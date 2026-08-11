@@ -38,8 +38,7 @@ describe('OnboardingGuide', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tiếp theo' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('Tiếp tục từ đây');
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Không hiển thị lại hướng dẫn này' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Hoàn tất' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Bỏ qua hướng dẫn' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(window.localStorage.getItem('manabihub.onboarding.v1.student-dashboard.student-1')).toBe('completed');
 
@@ -66,7 +65,7 @@ describe('OnboardingGuide', () => {
         steps={steps}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Đóng' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Đóng hướng dẫn' }));
     expect(window.localStorage.length).toBe(0);
     unmount();
 
