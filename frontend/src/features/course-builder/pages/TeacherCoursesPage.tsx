@@ -295,7 +295,7 @@ export function TeacherCoursesPage() {
       const response = await unpublishCourse(course.id);
       setFeedback({
         severity: 'success',
-        message: response.message || 'Khóa học đã được ẩn khỏi danh mục. Bạn có thể chỉnh sửa ảnh bìa và nội dung rồi gửi duyệt lại.',
+        message: response.message || 'Khóa học đã được ẩn khỏi danh mục. Học viên hiện tại vẫn học phiên bản đã duyệt trong khi bạn chuẩn bị bản cập nhật.',
       });
       await loadDrafts();
       setUnpublishCandidate(null);
@@ -643,7 +643,7 @@ export function TeacherCoursesPage() {
               {unpublishCandidate ? displayDraftTitle(unpublishCandidate) : ''}
             </Typography>
             <Alert severity="info">
-              Khóa học sẽ tạm thời không xuất hiện trong danh mục và trạng thái chuyển về bản nháp. Học viên đã ghi danh vẫn giữ quyền học; sau khi sửa ảnh bìa hoặc nội dung, bạn cần gửi duyệt lại trước khi xuất bản.
+              Khóa học sẽ tạm thời không xuất hiện trong danh mục. Học viên đã ghi danh vẫn học nguyên phiên bản đã duyệt; các thay đổi của bạn chỉ được chuyển tới học viên sau khi Course Manager phê duyệt. Sau đó, bạn có thể xuất bản lại khóa học trên danh mục.
             </Alert>
           </Stack>
         </DialogContent>

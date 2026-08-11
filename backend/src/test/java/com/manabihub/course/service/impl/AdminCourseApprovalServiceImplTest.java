@@ -11,6 +11,7 @@ import com.manabihub.course.enums.CourseApprovalDecisionEnum;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseApprovalDecisionRepository;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.notification.service.NotificationService;
@@ -64,6 +65,9 @@ class AdminCourseApprovalServiceImplTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private CourseEditDraftService courseEditDraftService;
+
     @InjectMocks
     private AdminCourseApprovalServiceImpl courseApprovalService;
 
@@ -96,6 +100,9 @@ class AdminCourseApprovalServiceImplTest {
 
         org.mockito.Mockito.lenient()
                 .when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        org.mockito.Mockito.lenient()
+                .when(courseEditDraftService.resolveEditableCourse(any(Course.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     // ══════════════════════════════════════════════════════════════════════

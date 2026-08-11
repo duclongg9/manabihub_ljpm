@@ -15,6 +15,7 @@ import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseApprovalDecisionRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.AdminCourseApprovalService;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.notification.NotificationTypes;
 import com.manabihub.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     private final AuditLogRepository auditLogRepository;
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
+    private final CourseEditDraftService courseEditDraftService;
 
     private String requireReviewerRole(UUID adminId) {
         if (courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN"))) {
@@ -62,18 +64,21 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
         requireReviewerRole(adminId);
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException("MSG-COM-001", "Course not found"));
+        Course reviewCourse = courseEditDraftService.resolveEditableCourse(course);
 
-        int lessonBlocksCount = courseRepository.countLessonBlocksByCourseId(courseId);
-        boolean finalTestIncluded = courseRepository.hasFinalTestByCourseId(courseId);
+        int lessonBlocksCount = reviewCourse.getModules().stream()
+                .mapToInt(module -> module.getBlocks().size())
+                .sum();
+        boolean finalTestIncluded = reviewCourse.getFinalTest() != null;
 
         return CourseApprovalDetailResponse.builder()
                 .id(course.getId())
-                .courseName(course.getTitle())
+                .courseName(reviewCourse.getTitle())
                 .teacherName(course.getTeacher().getUser().getFullName())
                 .teacherEmail(course.getTeacher().getUser().getEmail())
                 .submittedAt(course.getSubmittedAt())
                 .status(course.getStatus())
-                .curriculumSummary(course.getDescription())
+                .curriculumSummary(reviewCourse.getDescription())
                 .lessonBlocksCount(lessonBlocksCount)
                 .finalTestIncluded(finalTestIncluded)
                 .build();
@@ -90,6 +95,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
         if (course.getStatus() != CourseStatus.PENDING) {
             throw new BusinessException("MSG-COM-004", "Course is not in PENDING state");
         }
+        Course reviewCourse = courseEditDraftService.resolveEditableCourse(course);
 
         CourseStatus oldStatus = course.getStatus();
         CourseApprovalDecisionEnum decisionEnum;
@@ -98,6 +104,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
 
         switch (request.getAction().toUpperCase()) {
             case "APPROVE":
+                courseEditDraftService.applyApprovedDraft(course);
                 course.setStatus(CourseStatus.APPROVED);
                 course.setApprovedBy(adminId);
                 course.setApprovedAt(Instant.now());
@@ -115,7 +122,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
                 course.setRejectionReason(request.getReason());
                 decisionEnum = CourseApprovalDecisionEnum.REJECTED;
                 actionLog = "COURSE_REJECTED";
-                notificationMessage = "Khóa học \"" + course.getTitle()
+                notificationMessage = "Khóa học \"" + reviewCourse.getTitle()
                         + "\" đã bị từ chối. Lý do: " + request.getReason();
                 break;
             case "REQUEST_CORRECTION":
@@ -126,7 +133,7 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
                 course.setRejectionReason(request.getReason());
                 decisionEnum = CourseApprovalDecisionEnum.CORRECTION_REQUIRED;
                 actionLog = "COURSE_CORRECTION_REQUESTED";
-                notificationMessage = "Khóa học \"" + course.getTitle()
+                notificationMessage = "Khóa học \"" + reviewCourse.getTitle()
                         + "\" cần được chỉnh sửa trước khi phê duyệt. Nội dung cần sửa: "
                         + request.getReason();
                 break;
@@ -176,9 +183,10 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     }
 
     private CourseApprovalQueueResponse mapToQueueResponse(Course course) {
+        Course reviewCourse = courseEditDraftService.resolveEditableCourse(course);
         return CourseApprovalQueueResponse.builder()
                 .id(course.getId())
-                .courseName(course.getTitle())
+                .courseName(reviewCourse.getTitle())
                 .teacherName(course.getTeacher().getUser().getFullName())
                 .teacherEmail(course.getTeacher().getUser().getEmail())
                 .submittedAt(course.getSubmittedAt())
