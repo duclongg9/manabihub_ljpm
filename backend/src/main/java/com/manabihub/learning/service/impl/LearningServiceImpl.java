@@ -196,7 +196,8 @@ public class LearningServiceImpl implements LearningService {
             );
         }
 
-        int durationSeconds = videoDurationSeconds(block);
+        LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
+        int durationSeconds = resolveVideoDurationSeconds(block, progress, request.mediaDurationSeconds());
         if (request.positionSeconds() > durationSeconds) {
             throw new BusinessException(
                     MessageCodes.LEARNING_INVALID_VIDEO_POSITION,
@@ -205,7 +206,10 @@ public class LearningServiceImpl implements LearningService {
             );
         }
 
-        LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
+        if (progress.getVideoDurationSeconds() == null
+                && isAcceptableObservedDuration(block, request.mediaDurationSeconds())) {
+            progress.setVideoDurationSeconds(request.mediaDurationSeconds());
+        }
         progress.setLastVideoPositionSeconds(request.positionSeconds());
         int reportedWatchedSeconds = request.watchedSeconds() == null ? 0 : request.watchedSeconds();
         if (reportedWatchedSeconds > durationSeconds) {
@@ -293,7 +297,7 @@ public class LearningServiceImpl implements LearningService {
         if (block.getType() == LessonBlockType.VIDEO
                 && progress.getStatus() != LessonProgressStatus.COMPLETED
                 && (progress.getWatchedVideoSeconds() == null
-                || progress.getWatchedVideoSeconds() < videoDurationSeconds(block))) {
+                || progress.getWatchedVideoSeconds() < effectiveStoredVideoDuration(block, progress))) {
             throw new BusinessException(
                     MessageCodes.COMMON_BAD_REQUEST,
                     "Watch the full video before completing this lesson.",
@@ -430,6 +434,32 @@ public class LearningServiceImpl implements LearningService {
 
     private int videoDurationSeconds(LessonBlock block) {
         return Math.max(1, (block.getDurationMinutes() == null ? 0 : block.getDurationMinutes()) * 60);
+    }
+
+    private int effectiveStoredVideoDuration(LessonBlock block, LessonBlockProgress progress) {
+        return progress.getVideoDurationSeconds() != null && progress.getVideoDurationSeconds() > 0
+                ? progress.getVideoDurationSeconds()
+                : videoDurationSeconds(block);
+    }
+
+    private int resolveVideoDurationSeconds(LessonBlock block, LessonBlockProgress progress, Integer observedDurationSeconds) {
+        if (progress.getVideoDurationSeconds() != null && progress.getVideoDurationSeconds() > 0) {
+            return progress.getVideoDurationSeconds();
+        }
+        return isAcceptableObservedDuration(block, observedDurationSeconds)
+                ? observedDurationSeconds
+                : videoDurationSeconds(block);
+    }
+
+    /** Accept actual media metadata while rejecting implausibly short client values. */
+    private boolean isAcceptableObservedDuration(LessonBlock block, Integer observedDurationSeconds) {
+        if (observedDurationSeconds == null || observedDurationSeconds < 30) {
+            return false;
+        }
+        int declared = videoDurationSeconds(block);
+        int minimum = Math.max(30, (int) Math.ceil(declared * 0.25d));
+        int maximum = Math.max(declared * 4, declared + 60);
+        return observedDurationSeconds >= minimum && observedDurationSeconds <= maximum;
     }
 
     private void ensureBlockUnlocked(Enrollment enrollment, LessonBlock block) {

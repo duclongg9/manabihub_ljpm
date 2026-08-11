@@ -382,7 +382,7 @@ export function CourseLearningPage() {
         <Paper variant="outlined" sx={{ width: { xs: '100%', md: 360 }, flexShrink: 0, alignSelf: 'flex-start' }}>
           {learning.modules.map((module) => (
             <Box key={module.id}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, px: 2, pt: 2, pb: 1, color: 'text.secondary' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, px: 2, pt: 2, pb: 1, color: '#1F2937' }}>
                 {module.orderIndex}. {module.title}
               </Typography>
               <List dense disablePadding>
@@ -392,7 +392,14 @@ export function CourseLearningPage() {
                     selected={block.id === selectedBlockId}
                     disabled={block.locked || completing || selectedContentLoading}
                     onClick={() => handleSelectBlock(block)}
-                    sx={{ alignItems: 'flex-start', py: 1.25 }}
+                    sx={{
+                      alignItems: 'flex-start',
+                      py: 1.25,
+                      '&.Mui-disabled': { opacity: 0.82 },
+                      '&.Mui-disabled .MuiListItemText-primary, &.Mui-disabled .MuiListItemText-secondary': {
+                        color: '#4B5563',
+                      },
+                    }}
                   >
                     <ListItemIcon sx={{ minWidth: 34 }}>
                       {block.locked ? (
@@ -409,13 +416,13 @@ export function CourseLearningPage() {
                       disableTypography
                       primary={
                         <Tooltip title={block.title} placement="top-start">
-                          <Typography variant="body2" sx={{ whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.3 }}>
+                          <Typography variant="body2" sx={{ color: '#1F2937', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.3 }}>
                             {block.title}
                           </Typography>
                         </Tooltip>
                       }
                       secondary={
-                        <Typography variant="caption" color="text.secondary" component="div">
+                        <Typography variant="caption" sx={{ color: '#4B5563' }} component="div">
                           {blockTypeLabel(block)}
                         </Typography>
                       }
@@ -429,7 +436,6 @@ export function CourseLearningPage() {
         </Paper>
 
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          <CoursePomodoroPanel courseTitle={learning.courseTitle} />
           {selectedBlock ? (
             <Card variant="outlined">
               <CardContent>
@@ -510,24 +516,28 @@ export function CourseLearningPage() {
                   >
                     Bài trước
                   </Button>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    startIcon={<CheckCircleIcon />}
-                    disabled={
-                      completing ||
-                      selectedContentLoading ||
-                      selectedBlock.progressStatus === 'COMPLETED' ||
-                      ['VIDEO', 'QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
-                    }
-                    onClick={handleMarkComplete}
-                  >
-                    {selectedBlock.progressStatus === 'COMPLETED'
-                      ? 'Đã hoàn thành'
-                      : selectedBlock.type === 'VIDEO'
+                  {selectedBlock.type === 'VIDEO' && selectedBlock.progressStatus !== 'COMPLETED' ? (
+                    <Chip color="warning" variant="outlined" label={'Video ch\u01b0a xem \u0111\u1ee7'} />
+                  ) : (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      startIcon={<CheckCircleIcon />}
+                      disabled={
+                        completing ||
+                        selectedContentLoading ||
+                        selectedBlock.progressStatus === 'COMPLETED' ||
+                        ['VIDEO', 'QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
+                      }
+                      onClick={handleMarkComplete}
+                    >
+                      {selectedBlock.progressStatus === 'COMPLETED'
+                        ? 'Đã hoàn thành'
+                        : selectedBlock.type === 'VIDEO'
                         ? 'Xem hết video để hoàn thành'
                         : 'Hoàn thành bài học'}
-                  </Button>
+                    </Button>
+                  )}
                   <Button
                     endIcon={<ArrowForwardIcon />}
                     disabled={
@@ -547,6 +557,9 @@ export function CourseLearningPage() {
           ) : learning.modules.length === 0 ? (
             <Alert severity="info">Khoá học chưa có nội dung bài học.</Alert>
           ) : null}
+          <Box sx={{ mt: 2 }}>
+            <CoursePomodoroPanel courseTitle={learning.courseTitle} />
+          </Box>
         </Box>
       </Box>
 
@@ -687,6 +700,7 @@ function VideoBlock({
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
   const watchedSecondsRef = useRef(block.watchedVideoSeconds ?? 0);
   const lastSavedWatchedRef = useRef(block.watchedVideoSeconds ?? 0);
+  const mediaDurationRef = useRef<number | null>(null);
   const lastObservedTimeRef = useRef<number | null>(null);
   const isSeekingRef = useRef(false);
   const isReadyRef = useRef(false);
@@ -721,7 +735,12 @@ function VideoBlock({
         let success = false;
 
         learningService
-          .saveVideoProgress(block.id, positionToSave, Math.floor(watchedSecondsRef.current))
+          .saveVideoProgress(
+            block.id,
+            positionToSave,
+            Math.floor(watchedSecondsRef.current),
+            mediaDurationRef.current ?? undefined,
+          )
           .then((progress) => {
             lastSavedRef.current = positionToSave;
             lastSavedWatchedRef.current = progress.watchedVideoSeconds ?? watchedSecondsRef.current;
@@ -755,6 +774,9 @@ function VideoBlock({
 
   const handleReady = () => {
     const video = playerRef.current;
+    if (video && Number.isFinite(video.duration) && video.duration > 0) {
+      mediaDurationRef.current = video.duration;
+    }
     if (video && !isReadyRef.current && block.lastVideoPositionSeconds && block.lastVideoPositionSeconds > 0) {
       isReadyRef.current = true;
       video.currentTime = Math.min(block.lastVideoPositionSeconds, video.duration || block.lastVideoPositionSeconds);
@@ -794,6 +816,9 @@ function VideoBlock({
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
+    if (Number.isFinite(video.duration) && video.duration > 0) {
+      mediaDurationRef.current = video.duration;
+    }
     if (video.paused) {
       lastObservedTimeRef.current = video.currentTime;
       return;
@@ -830,6 +855,9 @@ function VideoBlock({
   const handleEnded = () => {
     const video = playerRef.current;
     if (!video) return;
+    if (Number.isFinite(video.duration) && video.duration > 0) {
+      mediaDurationRef.current = video.duration;
+    }
     if (video.duration && watchedSecondsRef.current >= video.duration - WATCHED_DELTA_MAX_SECONDS) {
       watchedSecondsRef.current = Math.max(watchedSecondsRef.current, Math.floor(video.duration));
     }
