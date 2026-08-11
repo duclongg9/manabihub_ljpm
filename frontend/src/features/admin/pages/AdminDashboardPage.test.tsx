@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 
 describe('AdminDashboardPage for Course Manager', () => {
-  it('shows the pending violation queue as a third overview card', async () => {
+  it('shows the operational queues and a discoverable weekly game entry', async () => {
     render(
       <MemoryRouter>
         <AdminDashboardPage />
@@ -62,6 +62,8 @@ describe('AdminDashboardPage for Course Manager', () => {
     expect(screen.getByText('Báo cáo chờ xem xét')).toBeTruthy();
     expect(screen.getByText('3')).toBeTruthy();
     expect(screen.getByRole('button', { name: /Đến hàng đợi Vi phạm/i })).toBeTruthy();
+    expect(screen.getByText('Trò chơi & thưởng tuần')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Quản lý trò chơi tuần/i })).toBeTruthy();
 
     await waitFor(() => {
       expect(adminViolationService.getViolationQueue).toHaveBeenCalledWith({

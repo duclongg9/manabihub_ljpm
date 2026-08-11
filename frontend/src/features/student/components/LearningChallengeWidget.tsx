@@ -100,7 +100,20 @@ export function LearningChallengeWidget(_props: LearningChallengeWidgetProps) {
   if (loading) {
     return <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}><CircularProgress size={28} /></Paper>;
   }
-  if (!challenge) return null;
+  if (!challenge) {
+    return <Paper elevation={0} sx={{ p: 2.25, border: '1px dashed #D0D5DD', borderRadius: 2, bgcolor: '#FCFCFD' }}>
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
+        <SportsEsportsOutlinedIcon sx={{ color: '#98A2B3', mt: 0.25 }} />
+        <Box>
+          <Typography variant="subtitle1" sx={{ color: '#344054', fontWeight: 900 }}>Thử thách tuần đang được chuẩn bị</Typography>
+          <Typography variant="body2" sx={{ mt: 0.5, color: '#667085' }}>
+            Khi nội dung tuần này được công khai, trò chơi ghép thẻ và mức thưởng sẽ xuất hiện tại đây.
+          </Typography>
+          {error && <Alert severity="error" sx={{ mt: 1.5 }}>{error}</Alert>}
+        </Box>
+      </Stack>
+    </Paper>;
+  }
   const remaining = Math.max(0, challenge.dailyRankedLimit - challenge.rankedAttemptsToday);
   const displayedTime = attempt?.totalMillis ?? elapsed + (attempt?.penaltyMillis ?? 0);
 
