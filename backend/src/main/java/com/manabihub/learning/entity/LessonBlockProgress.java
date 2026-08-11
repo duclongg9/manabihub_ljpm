@@ -41,6 +41,10 @@ public class LessonBlockProgress {
     @Column(name = "watched_video_seconds", nullable = false)
     private Integer watchedVideoSeconds = 0;
 
+    /** Duration observed from player metadata; lesson durationMinutes is editorial. */
+    @Column(name = "video_duration_seconds")
+    private Integer videoDurationSeconds;
+
     @Column(name = "completed_at")
     private Instant completedAt;
 

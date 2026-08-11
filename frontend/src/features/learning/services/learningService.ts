@@ -45,10 +45,14 @@ export const learningService = {
     blockId: string,
     positionSeconds: number,
     watchedSeconds = 0,
+    mediaDurationSeconds?: number,
   ): Promise<LessonProgress> => {
     const response = await axiosClient.put(ENDPOINTS.LEARNING.VIDEO_PROGRESS(blockId), {
       positionSeconds,
       watchedSeconds,
+      ...(mediaDurationSeconds && mediaDurationSeconds > 0
+        ? { mediaDurationSeconds: Math.floor(mediaDurationSeconds) }
+        : {}),
     });
     return response.data.data;
   },

@@ -412,6 +412,24 @@ class LearningServiceImplTest {
     }
 
     @Test
+    @DisplayName("YouTube/upload player duration can complete a lesson whose editorial duration is only an estimate")
+    void testSaveVideoProgress_UsesObservedMediaDuration() {
+        videoBlock.setDurationMinutes(12);
+        when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
+        mockActiveEnrollment();
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LessonProgressResponse response = learningService.saveVideoProgress(
+                blockVideoId,
+                new SaveVideoProgressRequest(214, 214, 214)
+        );
+
+        assertEquals(LessonProgressStatus.COMPLETED, response.status());
+        verify(lessonBlockProgressRepository).save(argThat(progress -> progress.getVideoDurationSeconds() == 214));
+    }
+
+    @Test
     @Order(207)
     @DisplayName("UTC07: Resume video - update existing IN_PROGRESS (SRS 5b)")
     void testSaveVideoProgress_UTC07_UpdateInProgress() {
