@@ -53,6 +53,8 @@ describe('StudentWithdrawalPanel', () => {
           currency: 'VND',
         }}
         minimumAmount={100000}
+        identityVerified
+        onVerifyIdentity={vi.fn()}
         onChanged={onChanged}
       />,
     );
@@ -68,7 +70,6 @@ describe('StudentWithdrawalPanel', () => {
     fireEvent.change(screen.getByLabelText('Tên chủ tài khoản'), {
       target: { value: 'Nguyen Van A' },
     });
-    fireEvent.click(screen.getByLabelText('Đã xác minh chính chủ'));
     fireEvent.click(screen.getByRole('button', { name: 'Gửi OTP xác nhận' }));
 
     await waitFor(() => expect(sendStudentWithdrawalOtp).toHaveBeenCalledTimes(1));
@@ -108,6 +109,8 @@ describe('StudentWithdrawalPanel', () => {
           currency: 'VND',
         }}
         minimumAmount={100000}
+        identityVerified={false}
+        onVerifyIdentity={vi.fn()}
         onChanged={vi.fn().mockResolvedValue(undefined)}
       />,
     );

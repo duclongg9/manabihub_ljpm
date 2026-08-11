@@ -20,5 +20,7 @@ public enum WalletTransactionType {
     WITHDRAWAL_REJECTED,
     WITHDRAWAL_CANCELLED,
     ADMIN_ADJUSTMENT,
-    TOP_UP
+    TOP_UP,
+    GAME_REWARD,
+    ATTENDANCE_REWARD
 }

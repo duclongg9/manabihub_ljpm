@@ -37,6 +37,8 @@ export interface PublicCourseDetail {
   targetStudents?: string;
   publishedAt?: string;
   aiSupported: boolean;
+  accessDurationDays?: number;
+  accessExpiresAt?: string | null;
   teacher: PublicTeacherProfile;
   isEnrolled: boolean;
   isTeacherOwner?: boolean;

@@ -21,6 +21,8 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -175,6 +177,30 @@ class StudentProfileServiceImplTest {
 
         assertNull(userCaptor.getValue().getPhoneNumber());
         assertNull(response.getPhoneNumber());
+    }
+
+    @Test
+    void verifiedPhoneNumberCannotBeChangedFromProfileUpdate() {
+        UUID userId = UUID.randomUUID();
+        AppUser user = AppUser.builder()
+                .id(userId)
+                .email("student@manabihub.local")
+                .fullName("Google Name")
+                .phoneNumber("0912345678")
+                .phoneVerifiedAt(java.time.Instant.now())
+                .build();
+        StudentProfile profile = StudentProfile.builder().id(UUID.randomUUID()).user(user).build();
+        UpdateStudentProfileRequest request = request("Nguyen Van A", "0987654321", "N3");
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(profile));
+
+        var exception = assertThrows(com.manabihub.common.exception.BusinessException.class,
+                () -> studentProfileService.updateMyProfile(request));
+
+        assertEquals("PHONE_VERIFICATION_ALREADY_VERIFIED", exception.getMessageCode());
+        verify(appUserRepository, never()).save(any(AppUser.class));
     }
 
     private UpdateStudentProfileRequest request(String name, String phoneNumber, String jlptGoal) {

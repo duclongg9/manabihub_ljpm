@@ -1,11 +1,12 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CourseStickyCard } from './CourseStickyCard';
 
 const mocks = vi.hoisted(() => ({
   createCheckout: vi.fn(),
   getAuthSession: vi.fn(),
+  getStudentWallet: vi.fn(),
   navigate: vi.fn(),
 }));
 
@@ -25,6 +26,10 @@ vi.mock('../../../shared/auth/authSession', () => ({
   getAuthSession: mocks.getAuthSession,
 }));
 
+vi.mock('../../wallet/services/studentWalletService', () => ({
+  getStudentWallet: mocks.getStudentWallet,
+}));
+
 vi.mock('../../wishlist/components/WishlistToggleButton', () => ({
   WishlistToggleButton: () => null,
 }));
@@ -32,6 +37,10 @@ vi.mock('../../wishlist/components/WishlistToggleButton', () => ({
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+beforeEach(() => {
+  mocks.getStudentWallet.mockResolvedValue({ availableBalance: 250_000 });
 });
 
 const course = {
@@ -50,6 +59,24 @@ const course = {
 };
 
 describe('CourseStickyCard', () => {
+  it('shows one purchase trigger and opens payment methods on demand', () => {
+    render(
+      <MemoryRouter>
+        <CourseStickyCard course={{ ...course, price: 250_000 }} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Mua ngay' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Thanh toán bằng ví' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mua ngay' }));
+
+    expect(screen.getByRole('dialog', { name: 'Chọn phương thức thanh toán' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Thanh toán toàn bộ qua VNPay/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Thanh toán toàn bộ bằng ví/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ví \+ VNPay phần còn lại/ })).not.toBeInTheDocument();
+  });
+
   it('resolves relative thumbnail URLs through the backend origin', () => {
     render(
       <MemoryRouter>
@@ -86,12 +113,38 @@ describe('CourseStickyCard', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Thanh toán bằng ví' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mua ngay' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Thanh toán toàn bộ bằng ví/ }));
 
     expect(await screen.findByText(
       'Thanh toán chưa hoàn tất và số dư ví chưa bị trừ. Vui lòng thử lại.',
     )).toBeInTheDocument();
     expect(mocks.createCheckout).toHaveBeenCalledWith('course-1', 'WALLET');
+  });
+
+  it('reveals combined payment and cancel only after wallet balance is insufficient', async () => {
+    mocks.getAuthSession.mockReturnValue({ token: 'student-token' });
+    mocks.createCheckout.mockRejectedValue({
+      response: { data: { messageCode: 'WALLET_INSUFFICIENT_BALANCE' } },
+    });
+
+    render(
+      <MemoryRouter>
+        <CourseStickyCard course={{ ...course, price: 250_000 }} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mua ngay' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Thanh toán toàn bộ bằng ví/ }));
+
+    expect(await screen.findByText('Số dư ví không đủ. Bạn có thể chọn ví + VNPay phần còn lại hoặc hủy.'))
+      .toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ví \+ VNPay phần còn lại/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hủy' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Chọn phương thức thanh toán' })).not.toBeInTheDocument();
   });
 
   it('confirms free enrollment without calling it a payment or navigating automatically', async () => {
@@ -128,7 +181,8 @@ describe('CourseStickyCard', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Thanh toán bằng ví' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mua ngay' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Thanh toán toàn bộ bằng ví/ }));
 
     expect(await screen.findByRole('dialog', { name: 'Thanh toán thành công' }))
       .toBeInTheDocument();
@@ -139,5 +193,28 @@ describe('CourseStickyCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Học ngay' }));
 
     expect(mocks.navigate).toHaveBeenCalledWith('/student/courses/course-1/learn');
+  });
+
+  it('offers a split wallet and VNPay checkout when the wallet only covers part of the price', async () => {
+    mocks.getAuthSession.mockReturnValue({ token: 'student-token' });
+    mocks.getStudentWallet.mockResolvedValue({ availableBalance: 250_000 });
+    mocks.createCheckout.mockResolvedValue({ orderId: 'split-order', paymentUrl: 'https://vnpay.test' });
+
+    render(
+      <MemoryRouter>
+        <CourseStickyCard course={{ ...course, price: 500_000 }} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mua ngay' }));
+    const splitButton = await screen.findByRole('button', {
+      name: /Dùng ví 250\.000 ₫ \+ VNPay phần còn lại/,
+    });
+    fireEvent.click(splitButton);
+
+    expect(mocks.createCheckout).toHaveBeenCalledWith('course-1', 'WALLET_VNPAY');
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/checkout/split-order', {
+      state: { paymentUrl: 'https://vnpay.test' },
+    }));
   });
 });

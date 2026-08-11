@@ -9,6 +9,7 @@ import type {
     TeacherProfileResponse,
     UpdateStudentProfileRequest,
     UpdateTeacherProfileRequest,
+    PhoneVerificationResponse,
 } from "./profileTypes";
 
 /* ==========================
@@ -121,4 +122,36 @@ export function avatarUploadErrorMessage(error: unknown): string {
     }
 
     return "Failed to upload avatar. Please try again.";
+}
+
+export async function requestStudentPhoneVerification(phoneNumber: string) {
+    const response = await axiosClient.post<ApiEnvelope<PhoneVerificationResponse>>(
+        ENDPOINTS.profile.studentPhoneVerificationRequest,
+        { phoneNumber }
+    );
+    return response.data.data;
+}
+
+export async function confirmStudentPhoneVerification(phoneNumber: string, code: string) {
+    const response = await axiosClient.post<ApiEnvelope<PhoneVerificationResponse>>(
+        ENDPOINTS.profile.studentPhoneVerificationConfirm,
+        { phoneNumber, code }
+    );
+    return response.data.data;
+}
+
+export async function requestTeacherPhoneVerification(phoneNumber: string) {
+    const response = await axiosClient.post<ApiEnvelope<PhoneVerificationResponse>>(
+        ENDPOINTS.profile.teacherPhoneVerificationRequest,
+        { phoneNumber }
+    );
+    return response.data.data;
+}
+
+export async function confirmTeacherPhoneVerification(phoneNumber: string, code: string) {
+    const response = await axiosClient.post<ApiEnvelope<PhoneVerificationResponse>>(
+        ENDPOINTS.profile.teacherPhoneVerificationConfirm,
+        { phoneNumber, code }
+    );
+    return response.data.data;
 }

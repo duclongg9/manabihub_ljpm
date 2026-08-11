@@ -5,13 +5,22 @@ import { useNavigate } from 'react-router-dom';
 import type { StudentCourseSummary } from '../types/studentTypes';
 import PersonIcon from '@mui/icons-material/Person';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import ImageNotSupportedOutlinedIcon from '@mui/icons-material/ImageNotSupportedOutlined';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 import { ROUTES } from '../../../shared/constants/routes';
+import fallbackCourseCover from '../../../assets/course1.png';
 
 interface StudentCourseCardProps {
   course: StudentCourseSummary;
 }
+
+const statusLabelFor = (status: StudentCourseSummary['enrollmentStatus']) => {
+  switch (status) {
+    case 'COMPLETED': return 'Đã hoàn thành';
+    case 'REFUND_PENDING': return 'Đang chờ hoàn tiền';
+    case 'EXPIRED': return 'Đã hết hạn';
+    default: return 'Đang học';
+  }
+};
 
 export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) => {
   const navigate = useNavigate();
@@ -23,6 +32,10 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
         return 'success';
       case 'COMPLETED':
         return 'primary';
+      case 'REFUND_PENDING':
+        return 'warning';
+      case 'EXPIRED':
+        return 'error';
       case 'REFUNDED':
       case 'REVOKED':
         return 'error';
@@ -36,10 +49,21 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
   };
 
   const handleStudyCourse = () => {
+    if (course.enrollmentStatus === 'EXPIRED' || course.enrollmentStatus === 'REFUND_PENDING') {
+      handleViewCourse();
+      return;
+    }
     navigate(ROUTES.STUDENT.COURSE_LEARN(course.courseId));
   };
 
   const progress = Math.min(100, Math.max(0, course.progressPercentage || 0));
+  const expiryLabel = course.daysRemaining === undefined || course.daysRemaining < 0
+    ? null
+    : course.daysRemaining === 0
+      ? 'Đã hết hạn'
+      : course.daysRemaining < 15
+        ? `Còn ${course.daysRemaining} ngày hết hạn`
+        : `Hạn dùng: ${course.daysRemaining} ngày`;
   const statusLabel = course.enrollmentStatus === 'COMPLETED' ? 'Đã hoàn thành' : 'Đang học';
 
   return (
@@ -59,30 +83,14 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
         },
       }}
     >
-      {course.thumbnailUrl && !imageFailed ? (
-        <Box
-          component="img"
-          src={resolvePublicAssetUrl(course.thumbnailUrl)}
-          alt={course.courseTitle}
-          onError={() => setImageFailed(true)}
-          sx={{ width: '100%', height: 180, objectFit: 'cover', bgcolor: 'grey.100' }}
-        />
-      ) : (
-        <Box
-          role="img"
-          aria-label={`No cover image for ${course.courseTitle}`}
-          sx={{
-            height: 180,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            bgcolor: '#F2F4F7',
-            color: '#98A2B3',
-          }}
-        >
-          <ImageNotSupportedOutlinedIcon sx={{ fontSize: 48 }} />
-        </Box>
-      )}
+      <Box
+        component="img"
+        data-testid={!course.thumbnailUrl || imageFailed ? 'course-cover-fallback' : 'course-cover'}
+        src={course.thumbnailUrl && !imageFailed ? resolvePublicAssetUrl(course.thumbnailUrl) : fallbackCourseCover}
+        alt={course.thumbnailUrl && !imageFailed ? course.courseTitle : `Ảnh mặc định cho ${course.courseTitle}`}
+        onError={() => setImageFailed(true)}
+        sx={{ width: '100%', height: 180, objectFit: 'cover', bgcolor: '#F2F4F7' }}
+      />
       <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Typography gutterBottom variant="h6" component="h2" sx={{
@@ -132,10 +140,25 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
           />
         </Box>
 
+        {expiryLabel && (
+          <Typography
+            variant="caption"
+            sx={{
+              mb: 2,
+              color: course.enrollmentStatus === 'EXPIRED' || (course.daysRemaining ?? 99) < 15
+                ? 'warning.dark'
+                : 'text.secondary',
+              fontWeight: 700,
+            }}
+          >
+            {expiryLabel}
+          </Typography>
+        )}
+
         <Box sx={{ mt: 'auto', pt: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Chip
-              label={statusLabel}
+              label={statusLabelFor(course.enrollmentStatus) || statusLabel}
               size="small"
               color={getStatusColor(course.enrollmentStatus)}
               variant="outlined"

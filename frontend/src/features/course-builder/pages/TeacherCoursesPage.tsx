@@ -10,6 +10,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import {
   Alert,
   Box,
@@ -44,6 +45,7 @@ import {
   fetchCourseCategories,
   fetchCourseDrafts,
   publishCourse,
+  unpublishCourse,
   type CourseCategory,
   type CourseDraftResponse,
   type JlptLevel,
@@ -100,6 +102,8 @@ export function TeacherCoursesPage() {
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishCandidate, setPublishCandidate] = useState<CourseDraftResponse | null>(null);
+  const [unpublishingId, setUnpublishingId] = useState<string | null>(null);
+  const [unpublishCandidate, setUnpublishCandidate] = useState<CourseDraftResponse | null>(null);
   const [analyticsCourse, setAnalyticsCourse] = useState<{ id: string; title: string } | null>(null);
 
   const categoryNames = useMemo(
@@ -275,6 +279,37 @@ export function TeacherCoursesPage() {
     } finally {
       setPublishingId(null);
       setPublishCandidate(null);
+    }
+  }
+
+  async function unpublishPublishedCourse() {
+    if (!unpublishCandidate) {
+      return;
+    }
+
+    const course = unpublishCandidate;
+    setUnpublishingId(course.id);
+    setFeedback(null);
+
+    try {
+      const response = await unpublishCourse(course.id);
+      setFeedback({
+        severity: 'success',
+        message: response.message || 'Khóa học đã được ẩn khỏi danh mục. Bạn có thể chỉnh sửa ảnh bìa và nội dung rồi gửi duyệt lại.',
+      });
+      await loadDrafts();
+      setUnpublishCandidate(null);
+
+      if (response.data) {
+        editDraft(response.data);
+      }
+    } catch {
+      setFeedback({
+        severity: 'error',
+        message: 'Không thể ẩn khóa học để chỉnh sửa. Vui lòng tải lại và thử lại.',
+      });
+    } finally {
+      setUnpublishingId(null);
     }
   }
 
@@ -465,6 +500,7 @@ export function TeacherCoursesPage() {
                     onDelete={() => void deleteDraft(course)}
                     onEdit={() => editDraft(course)}
                     onPublish={() => setPublishCandidate(course)}
+                    onUnpublish={() => setUnpublishCandidate(course)}
                     onSubmit={() => void submitDraft(course)}
                     onView={() => navigate(ROUTES.PUBLIC.COURSE_DETAIL.replace(':id', course.slug || course.id))}
                     onAnalytics={() => setAnalyticsCourse({ id: course.id, title: displayDraftTitle(course) })}
@@ -586,6 +622,52 @@ export function TeacherCoursesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog
+        open={Boolean(unpublishCandidate)}
+        onClose={() => {
+          if (!unpublishingId) {
+            setUnpublishCandidate(null);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+        aria-labelledby="unpublish-course-dialog-title"
+      >
+        <DialogTitle id="unpublish-course-dialog-title" sx={{ fontWeight: 800 }}>
+          Ẩn khóa học để chỉnh sửa?
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5}>
+            <Typography variant="body1" sx={{ fontWeight: 700 }}>
+              {unpublishCandidate ? displayDraftTitle(unpublishCandidate) : ''}
+            </Typography>
+            <Alert severity="info">
+              Khóa học sẽ tạm thời không xuất hiện trong danh mục và trạng thái chuyển về bản nháp. Học viên đã ghi danh vẫn giữ quyền học; sau khi sửa ảnh bìa hoặc nội dung, bạn cần gửi duyệt lại trước khi xuất bản.
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ gap: 1, px: 3, py: 2 }}>
+          <Button
+            color="inherit"
+            disabled={Boolean(unpublishingId)}
+            onClick={() => setUnpublishCandidate(null)}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            Hủy
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            disabled={Boolean(unpublishingId)}
+            onClick={() => void unpublishPublishedCourse()}
+            startIcon={unpublishingId ? <CircularProgress color="inherit" size={16} /> : <VisibilityOffOutlinedIcon />}
+            sx={{ fontWeight: 700, textTransform: 'none' }}
+          >
+            {unpublishingId ? 'Đang ẩn...' : 'Ẩn & chỉnh sửa'}
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       <CourseAnalyticsDialog
         courseId={analyticsCourse?.id ?? null}
@@ -619,6 +701,7 @@ interface CourseDraftRowProps {
   onDelete: () => void;
   onEdit: () => void;
   onPublish: () => void;
+  onUnpublish: () => void;
   onView: () => void;
   onAnalytics: () => void;
   publishing: boolean;
@@ -638,6 +721,7 @@ function CourseDraftRow({
   onDelete,
   onEdit,
   onPublish,
+  onUnpublish,
   onSubmit,
   onView,
   onAnalytics,
@@ -820,6 +904,16 @@ function CourseDraftRow({
           )}
           {course.status === 'PUBLISHED' && (
             <>
+              <Button
+                variant="outlined"
+                color="warning"
+                size="small"
+                onClick={onUnpublish}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+                startIcon={<VisibilityOffOutlinedIcon />}
+              >
+                Ẩn & chỉnh sửa
+              </Button>
               <Button
                 variant="outlined"
                 color="info"

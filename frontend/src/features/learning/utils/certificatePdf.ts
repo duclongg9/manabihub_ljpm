@@ -194,7 +194,7 @@ function loadSystemLogo() {
       window.clearTimeout(timeout);
       resolve(null);
     };
-    image.src = '/manabihub-header-logo.svg';
+    image.src = '/manabihub-header-logo.png';
   });
 }
 

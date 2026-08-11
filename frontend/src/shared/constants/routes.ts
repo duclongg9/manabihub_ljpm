@@ -50,6 +50,7 @@ export const ROUTES = {
     SYSTEM_SETTINGS: '/admin/settings',
     USERS: '/admin/users',
     COURSE_APPROVAL: '/admin/courses/approvals',
+    WEEKLY_CHALLENGES: '/admin/weekly-challenges',
     KYC_REVIEW: '/admin/kyc',
     PAYOUTS: '/admin/payouts',
     VIOLATIONS: '/admin/violations',

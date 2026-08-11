@@ -1,6 +1,7 @@
 package com.manabihub.learning.service.impl;
 
 import com.manabihub.learning.entity.Enrollment;
+import com.manabihub.course.entity.Course;
 import com.manabihub.learning.enums.EnrollmentStatus;
 import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.learning.service.EnrollmentProgressResetService;
@@ -11,6 +12,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -64,6 +67,15 @@ public class EnrollmentProgressResetServiceImpl implements EnrollmentProgressRes
         enrollment.setCompletedAt(null);
         enrollment.setProtectedMaterialsFullyDownloadedAt(null);
         enrollment.setStatus(EnrollmentStatus.ACTIVE);
+        // The course association may be intentionally lazy/detached when this
+        // service is called (and in a few command-line/test flows). Keep the
+        // repurchase reset safe in that case while preserving the course policy
+        // whenever the association is available.
+        Course course = enrollment.getCourse();
+        Instant repurchaseAt = Instant.now();
+        enrollment.setExpiresAt(course == null
+                ? repurchaseAt.plus(180, ChronoUnit.DAYS)
+                : course.resolveEnrollmentExpiry(repurchaseAt));
         enrollmentRepository.save(enrollment);
     }
 }

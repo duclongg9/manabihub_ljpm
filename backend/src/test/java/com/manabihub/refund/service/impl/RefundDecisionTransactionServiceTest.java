@@ -298,6 +298,31 @@ class RefundDecisionTransactionServiceTest {
 
         @Test
         @org.junit.jupiter.api.Order(2)
+        @DisplayName("UTCID01b (N) - legacy admin without role still settles and records audit")
+        void approvalWithMissingLegacyRoleDoesNotRollbackWalletSettlement() {
+            WalletTransaction walletCredit = stubSuccessfulSettlement();
+            InternalAdminAccount legacyAdmin = financeAdmin(adminId);
+            legacyAdmin.setRole(null);
+            when(adminAccountRepository.findById(adminId)).thenReturn(Optional.of(legacyAdmin));
+
+            RefundStatus outcome = service.approveToStudentWallet(
+                    refund.getId(), approvalDecision(), adminId);
+
+            assertEquals(RefundStatus.APPROVED, outcome);
+            assertEquals(walletCredit.getId(), refund.getWalletTransactionId());
+            verify(auditLogService).logAdminAction(
+                    eq(adminId),
+                    eq("INTERNAL_ADMIN"),
+                    eq("APPROVE_REFUND_TO_WALLET"),
+                    eq("REFUND_REQUEST"),
+                    eq(refund.getId()),
+                    any(),
+                    any(),
+                    any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(3)
         @DisplayName("UTCID02 (N) - RECONCILIATION_REQUIRED can be approved again -> APPROVED")
         void reconciliationRequiredRequestCanStillBeApproved() {
             refund.setStatus(RefundStatus.RECONCILIATION_REQUIRED);

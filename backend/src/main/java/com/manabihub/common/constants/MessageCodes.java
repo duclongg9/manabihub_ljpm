@@ -167,6 +167,8 @@ public final class MessageCodes {
     // LEARNING — student learning progress
     // ──────────────────────────────────────────────
     public static final String LEARNING_NOT_ENROLLED = "LEARNING_NOT_ENROLLED";
+    public static final String LEARNING_ACCESS_EXPIRED = "LEARNING_ACCESS_EXPIRED";
+    public static final String LEARNING_REFUND_PENDING = "LEARNING_REFUND_PENDING";
     public static final String LEARNING_ALREADY_ENROLLED = "LEARNING_ALREADY_ENROLLED";
     public static final String LEARNING_PROGRESS_UPDATED = "LEARNING_PROGRESS_UPDATED";
     public static final String LEARNING_LESSON_COMPLETED = "LEARNING_LESSON_COMPLETED";
@@ -238,6 +240,7 @@ public final class MessageCodes {
     public static final String ORDER_COURSE_NOT_PUBLISHED = "ORDER_COURSE_NOT_PUBLISHED";
     public static final String ORDER_ALREADY_ENROLLED = "ORDER_ALREADY_ENROLLED";
     public static final String ORDER_ALREADY_PAID = "ORDER_ALREADY_PAID";
+    public static final String ORDER_CANCELLED = "ORDER_CANCELLED";
 
     // ──────────────────────────────────────────────
     // PAYMENT — payment processing
@@ -295,6 +298,12 @@ public final class MessageCodes {
     public static final String PAYOUT_EMAIL_REQUIRED = "PAYOUT_EMAIL_REQUIRED";
     public static final String PAYOUT_INVALID_OTP = "PAYOUT_INVALID_OTP";
     public static final String PAYOUT_OTP_RATE_LIMITED = "PAYOUT_OTP_RATE_LIMITED";
+    public static final String PHONE_VERIFICATION_OTP_SENT = "PHONE_VERIFICATION_OTP_SENT";
+    public static final String PHONE_VERIFICATION_INVALID_OTP = "PHONE_VERIFICATION_INVALID_OTP";
+    public static final String PHONE_VERIFICATION_RATE_LIMITED = "PHONE_VERIFICATION_RATE_LIMITED";
+    public static final String PHONE_VERIFICATION_ALREADY_VERIFIED = "PHONE_VERIFICATION_ALREADY_VERIFIED";
+    public static final String PHONE_VERIFICATION_ALREADY_IN_USE = "PHONE_VERIFICATION_ALREADY_IN_USE";
+    public static final String PHONE_VERIFICATION_SMS_NOT_CONFIGURED = "PHONE_VERIFICATION_SMS_NOT_CONFIGURED";
     public static final String PAYOUT_NOT_FOUND = "PAYOUT_NOT_FOUND";
     public static final String PAYOUT_INVALID_STATUS = "PAYOUT_INVALID_STATUS";
     public static final String PAYOUT_SETTLEMENT_PROCESSING = "PAYOUT_SETTLEMENT_PROCESSING";

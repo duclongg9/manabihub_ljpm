@@ -44,6 +44,7 @@ import com.manabihub.wallet.service.StudentWalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -89,7 +90,7 @@ public class RefundDecisionTransactionService {
         requireApprovableState(refund);
 
         refund.setDecidedBy(admin);
-        refund.setDecisionNote(decision.getNote().trim());
+        refund.setDecisionNote(normalizeDecisionNote(decision.getNote()));
         refund.setDecisionReasonCode(decision.getReasonCode());
         refund.setDecidedAt(Instant.now());
         refund.setSettlementMethod(RefundSettlementMethod.WALLET);
@@ -103,7 +104,7 @@ public class RefundDecisionTransactionService {
      * persisted before this method is called; settlement still uses the same
      * locked, idempotent wallet-refund path as a manual Finance approval.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public RefundRequest autoApproveToStudentWallet(UUID refundId) {
         RefundRequest refund = lockRefund(refundId);
         if (refund.getStatus() == RefundStatus.APPROVED) {
@@ -220,7 +221,7 @@ public class RefundDecisionTransactionService {
         } else {
             auditLogService.logAdminAction(
                     admin.getId(),
-                    admin.getRole().getCode().name(),
+                    adminRoleCode(admin),
                     "APPROVE_REFUND_TO_WALLET",
                     "REFUND_REQUEST",
                     refund.getId(),
@@ -277,7 +278,7 @@ public class RefundDecisionTransactionService {
         requireApprovableState(refund);
 
         refund.setDecidedBy(admin);
-        refund.setDecisionNote(decision.getNote().trim());
+        refund.setDecisionNote(normalizeDecisionNote(decision.getNote()));
         refund.setDecisionReasonCode(decision.getReasonCode());
         refund.setDecidedAt(Instant.now());
 
@@ -424,7 +425,7 @@ public class RefundDecisionTransactionService {
         InternalAdminAccount admin = requireAdmin(refund.getDecidedBy().getId());
         auditLogService.logAdminAction(
                 admin.getId(),
-                admin.getRole().getCode().name(),
+                adminRoleCode(admin),
                 "APPROVE_REFUND",
                 "REFUND_REQUEST",
                 refund.getId(),
@@ -492,14 +493,15 @@ public class RefundDecisionTransactionService {
         RefundStatus statusBefore = refund.getStatus();
         refund.setStatus(RefundStatus.REJECTED);
         refund.setDecisionReasonCode(decision.getReasonCode());
-        refund.setDecisionNote(decision.getNote().trim());
+        refund.setDecisionNote(normalizeDecisionNote(decision.getNote()));
         refund.setDecidedBy(admin);
         refund.setDecidedAt(Instant.now());
+        reopenEnrollmentIfPending(refund);
         refundRequestRepository.save(refund);
 
         auditLogService.logAdminAction(
                 admin.getId(),
-                admin.getRole().getCode().name(),
+                adminRoleCode(admin),
                 "REJECT_REFUND",
                 "REFUND_REQUEST",
                 refund.getId(),
@@ -511,6 +513,23 @@ public class RefundDecisionTransactionService {
                 Map.of()
         );
         scheduleNotifications(refund, RefundStatus.REJECTED);
+    }
+
+    private void reopenEnrollmentIfPending(RefundRequest refund) {
+        if (refund.getStudent() == null || refund.getOrderItem() == null
+                || refund.getOrderItem().getCourse() == null) {
+            return;
+        }
+        enrollmentRepository.findByStudentIdAndCourseIdForUpdate(
+                        refund.getStudent().getId(), refund.getOrderItem().getCourse().getId())
+                .ifPresent(enrollment -> {
+                    if (enrollment.getStatus() == EnrollmentStatus.REFUND_PENDING) {
+                        enrollment.setStatus(enrollment.isExpired(Instant.now())
+                                ? EnrollmentStatus.EXPIRED
+                                : EnrollmentStatus.ACTIVE);
+                        enrollmentRepository.save(enrollment);
+                    }
+                });
     }
 
     private ValidationContext validateBeforeProvider(
@@ -716,7 +735,7 @@ public class RefundDecisionTransactionService {
     ) {
         auditLogService.logAdminAction(
                 admin.getId(),
-                admin.getRole().getCode().name(),
+                adminRoleCode(admin),
                 "REFUND_RECONCILIATION_REQUIRED",
                 "REFUND_REQUEST",
                 refund.getId(),
@@ -778,6 +797,30 @@ public class RefundDecisionTransactionService {
             );
         }
         return admin;
+    }
+
+    /**
+     * Legacy admin rows can exist before a role assignment was backfilled.  The
+     * role is audit metadata, not a prerequisite for the already-authorized
+     * refund settlement, so a missing mapping must not turn a successful wallet
+     * refund into a 500/rollback.
+     */
+    private String adminRoleCode(InternalAdminAccount admin) {
+        if (admin == null || admin.getRole() == null || admin.getRole().getCode() == null) {
+            return "INTERNAL_ADMIN";
+        }
+        return admin.getRole().getCode().name();
+    }
+
+    private String normalizeDecisionNote(String note) {
+        if (note == null || note.isBlank()) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "A decision note is required",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        return note.trim();
     }
 
     private void requireApprovableState(RefundRequest refund) {

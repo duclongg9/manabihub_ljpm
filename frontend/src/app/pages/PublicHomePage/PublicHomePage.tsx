@@ -13,7 +13,7 @@ import { LandingFooter } from './LandingFooter';
 
 export const PublicHomePage: React.FC = () => {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#FBF9F5' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#FBF9F5', overflowX: 'hidden' }}>
       <LandingHeader />
 
       <Box component="main" sx={{ flexGrow: 1 }}>

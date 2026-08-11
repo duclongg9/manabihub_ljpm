@@ -16,14 +16,14 @@ const WAVE_PATTERN = `url("data:image/svg+xml,%3Csvg width='100' height='20' vie
 // they sit in (see HERO_CTA_GROUP_SX), never from their own label, so the two stay
 // equal even though one label is longer and only the other carries an icon.
 const HERO_BUTTON_BASE_SX: SxProps<Theme> = {
-  py: 1.8,
-  px: 5,
+  py: { xs: 1.35, sm: 1.8 },
+  px: { xs: 2, sm: 5 },
   width: '100%',
   borderRadius: '12px',
   color: '#ffffff',
   fontWeight: 700,
   textTransform: 'none',
-  fontSize: '1.1rem',
+  fontSize: { xs: '0.98rem', sm: '1.1rem' },
   transition: 'all 0.3s ease',
 };
 
@@ -33,8 +33,10 @@ const HERO_BUTTON_BASE_SX: SxProps<Theme> = {
 // the column shrink on narrow screens instead of overflowing the viewport.
 const HERO_CTA_GROUP_SX: SxProps<Theme> = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, max-content)',
-  gap: 2,
+  gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'minmax(0, max-content)' },
+  width: { xs: '100%', sm: 'auto' },
+  maxWidth: { xs: 420, sm: 'none' },
+  gap: { xs: 1.5, sm: 2 },
 };
 
 export const HeroSection: React.FC = () => {
@@ -44,7 +46,7 @@ export const HeroSection: React.FC = () => {
     <Box
       sx={{
         position: 'relative',
-        minHeight: { xs: '75vh', md: '85vh' },
+        minHeight: { xs: 'auto', md: '85vh' },
         // StatsBar deliberately overlaps this section by 48px (xs) / 64px (md) via a
         // negative margin. Reserve more than that here so hero content — especially the
         // CTA row once it wraps — never ends up underneath (and unclickable behind) it.
@@ -102,9 +104,10 @@ export const HeroSection: React.FC = () => {
         <Box
           sx={{
             display: 'flex',
-            flexDirection: { xs: 'column-reverse', md: 'row' },
+            flexDirection: { xs: 'column', md: 'row' },
             alignItems: 'center',
-            gap: { xs: 4, md: 6 }
+            gap: { xs: 5, md: 6 },
+            py: { xs: 6, md: 0 },
           }}
         >
           {/* Left Content (Text + Buttons) - 50% */}
@@ -139,7 +142,7 @@ export const HeroSection: React.FC = () => {
                   color: '#ffffff',
                   lineHeight: 1.15,
                   mb: 3,
-                  fontSize: { xs: '2.4rem', md: '3.5rem' },
+                  fontSize: { xs: '2rem', sm: '2.4rem', md: '3.5rem' },
                   letterSpacing: '-1px'
                 }}
               >
@@ -164,7 +167,7 @@ export const HeroSection: React.FC = () => {
                   color: '#b0bdd0',
                   fontWeight: 400,
                   lineHeight: 1.7,
-                  mb: 5,
+                  mb: { xs: 3.5, md: 5 },
                   fontSize: { xs: '1rem', md: '1.1rem' },
                   pr: { md: 2 },
                   maxWidth: 520,
@@ -260,7 +263,7 @@ export const HeroSection: React.FC = () => {
               alt="Học tiếng Nhật cùng ManabiHub"
               sx={{
                 width: '100%',
-                maxWidth: { xs: 360, md: 520 },
+                maxWidth: { xs: 320, sm: 360, md: 520 },
                 height: 'auto',
                 objectFit: 'contain',
                 position: 'relative',

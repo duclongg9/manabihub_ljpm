@@ -54,6 +54,10 @@ export const ENDPOINTS = {
     student: '/v1/student/profile',
     teacher: '/v1/teacher/profile',
     avatar: '/v1/users/avatar',
+    studentPhoneVerificationRequest: '/v1/student/profile/phone-verification/request',
+    studentPhoneVerificationConfirm: '/v1/student/profile/phone-verification/confirm',
+    teacherPhoneVerificationRequest: '/v1/teacher/profile/phone-verification/request',
+    teacherPhoneVerificationConfirm: '/v1/teacher/profile/phone-verification/confirm',
   },
   teacherDashboard: {
     stats: '/v1/teacher/dashboard',
@@ -89,11 +93,22 @@ export const ENDPOINTS = {
     withdrawals: '/v1/student/withdrawals',
     withdrawalDetail: (id: string) => `/v1/student/withdrawals/${id}`,
     cancelWithdrawal: (id: string) => `/v1/student/withdrawals/${id}/cancel`,
+    identityVerificationStatus: '/v1/student/identity-verifications/status',
+    identityVerification: '/v1/student/identity-verifications',
     sendWithdrawalOtp: '/v1/student/withdrawals/send-otp',
     withdrawalBankAccounts: '/v1/student/withdrawals/bank-accounts',
     walletTransactions: '/v1/student/wallet/transactions',
     walletTransactionDetail: (transactionId: string) =>
       `/v1/student/wallet/transactions/${transactionId}`,
+    weeklyChallenge: '/v1/student/weekly-challenge',
+    startWeeklyChallenge: (challengeId: string) => `/v1/student/weekly-challenge/${challengeId}/attempts`,
+    matchWeeklyChallenge: (attemptId: string) => `/v1/student/weekly-challenge/attempts/${attemptId}/matches`,
+  },
+  ADMIN_WEEKLY_CHALLENGES: {
+    LIST: '/v1/admin/weekly-challenges',
+    DETAIL: (id: string) => `/v1/admin/weekly-challenges/${id}`,
+    PUBLISH: (id: string) => `/v1/admin/weekly-challenges/${id}/publish`,
+    UNPUBLISH: (id: string) => `/v1/admin/weekly-challenges/${id}/unpublish`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>
@@ -115,6 +130,7 @@ export const ENDPOINTS = {
     validate: (id: string) => `/v1/teacher/courses/drafts/${id}/validate`,
     submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`,
     publish: (id: string) => `/v1/teacher/courses/${id}/publish`,
+    unpublish: (id: string) => `/v1/teacher/courses/${id}/unpublish`,
   },
   teacherCourseAssets: {
     thumbnails: '/v1/teacher/courses/assets/thumbnails',
@@ -138,6 +154,7 @@ export const ENDPOINTS = {
     create: '/v1/orders',
     list: '/v1/orders',
     detail: (orderId: string) => `/v1/orders/${orderId}`,
+    cancel: (orderId: string) => `/v1/orders/${orderId}/cancel`,
   },
   studentRefunds: {
     create: '/v1/student/refunds',
@@ -149,6 +166,7 @@ export const ENDPOINTS = {
     // Local dev simulator for the VNPay IPN callback (no tunnel needed).
     devIpn: '/v1/payments/dev/ipn',
     // Confirms an order from the browser return redirect (checksum-verified backend-side).
+    vnpayReturn: '/v1/payments/vnpay/confirm-return',
   },
   LEARNING: {
     COURSE_LEARN: (courseId: string) => `/v1/student/courses/${courseId}/learn`,
@@ -164,6 +182,7 @@ export const ENDPOINTS = {
     FINAL_TEST_SUBMIT: (courseId: string) => `/v1/student/courses/${courseId}/final-test/submissions`,
     CERTIFICATE: (courseId: string) => `/v1/student/courses/${courseId}/certificate`,
     WRITING_SUBMISSION_GET: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions/me`,
+    WRITING_SUBMISSION_DRAFT: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions/draft`,
     WRITING_SUBMISSION_POST: (blockId: string) => `/v1/student/lessons/${blockId}/writing-submissions`,
     WRITING_SUBMISSION_AI: (blockId: string, submissionId: string) => `/v1/student/lessons/${blockId}/writing-submissions/${submissionId}/ai-assistance`,
   },

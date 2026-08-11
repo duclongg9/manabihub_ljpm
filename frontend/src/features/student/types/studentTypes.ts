@@ -4,7 +4,7 @@ export interface StudentDashboardStats {
   completedCourses: number;
 }
 
-export type EnrollmentStatus = 'ACTIVE' | 'REFUNDED' | 'REVOKED' | 'COMPLETED';
+export type EnrollmentStatus = 'ACTIVE' | 'REFUND_PENDING' | 'REFUNDED' | 'REVOKED' | 'COMPLETED' | 'EXPIRED';
 
 export interface StudentCourseSummary {
   enrollmentId: string;
@@ -14,5 +14,7 @@ export interface StudentCourseSummary {
   teacherName: string | null;
   enrollmentStatus: EnrollmentStatus;
   enrolledAt: string;
+  expiresAt?: string | null;
+  daysRemaining?: number;
   progressPercentage: number;
 }

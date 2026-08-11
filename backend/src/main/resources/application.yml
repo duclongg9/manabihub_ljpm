@@ -33,8 +33,15 @@ management:
       show-details: always
 
 manabihub:
+  phone-verification:
+    sms-mode: ${PHONE_VERIFICATION_SMS_MODE:console}
+    sms-webhook-url: ${PHONE_VERIFICATION_SMS_WEBHOOK_URL:}
+    sms-api-key: ${PHONE_VERIFICATION_SMS_API_KEY:}
   kyc:
     identity-secret: ${KYC_IDENTITY_SECRET:}
+    # SERVER is the production-safe default. DIRECT_SDK_MOCK is an explicit
+    # demo/UAT mode that uses the browser SDK result plus the synthetic registry.
+    identity-verification-mode: ${KYC_IDENTITY_VERIFICATION_MODE:server}
   payout:
     security-secret: ${PAYOUT_SECURITY_SECRET:}
   ai:

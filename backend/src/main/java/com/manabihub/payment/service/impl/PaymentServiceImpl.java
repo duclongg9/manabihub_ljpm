@@ -17,6 +17,7 @@ import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.dto.IpnAckResponse;
+import com.manabihub.payment.config.VnPayProperties;
 import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.enums.PaymentStatus;
 import com.manabihub.payment.event.PaymentNotificationEvent;
@@ -62,6 +63,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final StudentWalletService studentWalletService;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
+    private final VnPayProperties vnPayProperties;
 
     @Override
     @Transactional
@@ -86,7 +88,22 @@ public class PaymentServiceImpl implements PaymentService {
             return IpnAckResponse.of("97", "Invalid Checksum");
         }
 
-        // Pessimistic lock serializes concurrent IPN callbacks for the same order,
+        return processVerifiedProviderCallback(params, result, false);
+    }
+
+    /**
+     * Applies a callback only after its VNPay HMAC has been verified. Browser returns and
+     * IPNs share this transaction so either arrival order remains idempotent. The browser
+     * redirect is therefore a safe fallback for demo/sandbox environments where VNPay
+     * cannot reach the IPN endpoint, without trusting any unsigned client-side value.
+     */
+    private IpnAckResponse processVerifiedProviderCallback(
+            Map<String, String> params,
+            PaymentCallbackResult result,
+            boolean browserReturn
+    ) {
+
+        // Pessimistic lock serializes concurrent provider callbacks for the same order,
         // which — together with the PAID status check below — makes processing idempotent.
         Order order = orderRepository.findByOrderCodeForUpdate(result.orderCode()).orElse(null);
         if (order == null) {
@@ -95,16 +112,28 @@ public class PaymentServiceImpl implements PaymentService {
 
         long expectedMinor = order.getGatewayAmount().multiply(MINOR_UNIT_FACTOR).longValue();
         if (result.amount() != expectedMinor) {
-            log.warn("[{}] Payment IPN amount mismatch for order {}: expected {}, got {}",
+            log.warn("[{}] Payment callback amount mismatch for order {}: expected {}, got {}",
                     MessageCodes.MSG_PAY_004, order.getOrderCode(), expectedMinor, result.amount());
             return IpnAckResponse.of("04", "Invalid Amount");
         }
 
         if (order.getStatus() == OrderStatus.PAID) {
             // Duplicate/replayed callback — already processed.
-            log.info("[{}] Duplicate payment IPN for already-paid order {}",
+            log.info("[{}] Duplicate payment callback for already-paid order {}",
                     MessageCodes.MSG_PAY_005, order.getOrderCode());
-            return IpnAckResponse.of("02", "Order already confirmed");
+            // VNPay expects 02 for duplicate IPNs. The browser endpoint returns 00
+            // so the frontend can poll and render the already-paid order.
+            return browserReturn
+                    ? IpnAckResponse.of("00", "Payment already confirmed")
+                    : IpnAckResponse.of("02", "Order already confirmed");
+        }
+
+        // A cancelled/failed/expired order is terminal. A late success callback
+        // must never reopen it or create a second enrollment/escrow hold.
+        if (order.getStatus() != OrderStatus.PENDING) {
+            log.warn("[{}] Ignored payment callback for closed order {} (status={})",
+                    MessageCodes.MSG_PAY_005, order.getOrderCode(), order.getStatus());
+            return IpnAckResponse.of("02", "Order already closed");
         }
 
         PaymentTransaction transaction = latestOrNewGatewayTransaction(order);
@@ -114,13 +143,13 @@ public class PaymentServiceImpl implements PaymentService {
         if (!result.paymentSuccessful()) {
             transaction.setStatus(PaymentStatus.FAILED);
             paymentTransactionRepository.save(transaction);
-            failWalletComponent(order);
-            studentWalletService.releaseForOrder(order.getId(), Instant.now());
-            order.setStatus(OrderStatus.FAILED);
-            orderRepository.save(order);
+            OrderStatus terminalStatus = "24".equals(result.responseCode())
+                    ? OrderStatus.CANCELLED
+                    : OrderStatus.FAILED;
+            closePendingOrder(order, terminalStatus, Instant.now());
             notifyPaymentFailed(order);
-            log.info("[{}] Recorded FAILED payment for order {} (responseCode={})",
-                    MessageCodes.MSG_PAY_003, order.getOrderCode(), result.responseCode());
+            log.info("[{}] Recorded {} payment for order {} (responseCode={})",
+                    MessageCodes.MSG_PAY_003, terminalStatus, order.getOrderCode(), result.responseCode());
             return IpnAckResponse.of("00", "Confirm Success");
         }
 
@@ -167,6 +196,60 @@ public class PaymentServiceImpl implements PaymentService {
         order.setStatus(OrderStatus.PAID);
         orderRepository.save(order);
         return IpnAckResponse.of("00", "Confirm Success");
+    }
+
+    @Override
+    @Transactional
+    public IpnAckResponse handleVnPayReturn(Map<String, String> params) {
+        PaymentCallbackResult result = paymentGateway.parseCallback(params);
+        if (!result.signatureValid()) {
+            log.warn("[{}] Rejected VNPay browser return with invalid checksum, txnRef={}",
+                    MessageCodes.MSG_PAY_004, result.orderCode());
+            return IpnAckResponse.of("97", "Invalid Checksum");
+        }
+
+        return processVerifiedProviderCallback(params, result, true);
+    }
+
+    @Override
+    @Transactional
+    public void expirePendingPayments() {
+        long expiryMinutes = Math.max(1, vnPayProperties.getPaymentExpiryMinutes());
+        Instant cutoff = Instant.now().minus(Duration.ofMinutes(expiryMinutes));
+        orderRepository
+                .findTop100ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(OrderStatus.PENDING, cutoff)
+                .forEach(order -> expirePendingOrder(order.getId()));
+    }
+
+    private void expirePendingOrder(UUID orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId).orElse(null);
+        if (order == null || order.getStatus() != OrderStatus.PENDING) {
+            return;
+        }
+        closePendingOrder(order, OrderStatus.CANCELLED, Instant.now());
+        log.info("[{}] Expired pending payment order {} after {} minutes",
+                MessageCodes.MSG_PAY_003, order.getOrderCode(), vnPayProperties.getPaymentExpiryMinutes());
+    }
+
+    /**
+     * Closes a pending order exactly once and releases any wallet reservation.
+     * The caller must already hold the order row lock when this is used from a
+     * callback; the expiry path acquires that lock before calling it.
+     */
+    private void closePendingOrder(Order order, OrderStatus terminalStatus, Instant closedAt) {
+        if (order.getStatus() != OrderStatus.PENDING) {
+            return;
+        }
+        paymentTransactionRepository
+                .findByOrder_IdAndStatusInOrderByCreatedAtAsc(
+                        order.getId(), List.of(PaymentStatus.PENDING))
+                .forEach(payment -> {
+                    payment.setStatus(PaymentStatus.FAILED);
+                    paymentTransactionRepository.save(payment);
+                });
+        studentWalletService.releaseForOrder(order.getId(), closedAt);
+        order.setStatus(terminalStatus);
+        orderRepository.save(order);
     }
 
     @Override
@@ -218,6 +301,30 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("[{}] Paid order {} with wallet — enrollment + escrow created",
                 MessageCodes.MSG_PAY_002, order.getOrderCode());
         return order;
+    }
+
+    @Override
+    @Transactional
+    public void cancelPendingOrder(UUID orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.ORDER_NOT_FOUND,
+                        "Order was not found",
+                        HttpStatus.NOT_FOUND));
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            return;
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "Only a pending order can be cancelled",
+                    HttpStatus.CONFLICT);
+        }
+
+        closePendingOrder(order, OrderStatus.CANCELLED, Instant.now());
+        log.info("[{}] Cancelled pending order {} at the student's request",
+                MessageCodes.MSG_PAY_003, order.getOrderCode());
     }
 
     @Override
@@ -310,17 +417,6 @@ public class PaymentServiceImpl implements PaymentService {
         paymentTransactionRepository.save(walletPayment);
     }
 
-    private void failWalletComponent(Order order) {
-        paymentTransactionRepository
-                .findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(order.getId(), WALLET_PROVIDER)
-                .ifPresent(walletPayment -> {
-                    if (walletPayment.getStatus() == PaymentStatus.PENDING) {
-                        walletPayment.setStatus(PaymentStatus.FAILED);
-                        paymentTransactionRepository.save(walletPayment);
-                    }
-                });
-    }
-
     private void createEnrollments(Order order) {
         StudentProfile student = order.getStudent();
         for (OrderItem item : orderItemRepository.findByOrder_Id(order.getId())) {
@@ -329,12 +425,17 @@ public class PaymentServiceImpl implements PaymentService {
                     .findByStudentIdAndCourseIdForUpdate(student.getId(), course.getId())
                     .orElse(null);
             if (existing == null) {
+                Instant enrolledAt = Instant.now();
                 enrollmentRepository.save(Enrollment.builder()
                         .student(student)
                         .course(course)
                         .status(EnrollmentStatus.ACTIVE)
+                        .enrolledAt(enrolledAt)
+                        .expiresAt(course.resolveEnrollmentExpiry(enrolledAt))
                         .build());
-            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED) {
+            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED
+                    || existing.getStatus() == EnrollmentStatus.EXPIRED
+                    || existing.isExpired(Instant.now())) {
                 enrollmentProgressResetService.resetForRepurchase(existing);
             }
         }

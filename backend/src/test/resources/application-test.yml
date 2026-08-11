@@ -3,6 +3,7 @@ manabihub:
     mock-jwt: true
   kyc:
     identity-secret: test-only-identity-secret-key-32chars-minimum-length
+    identity-verification-mode: server
   payout:
     security-secret: test-only-payout-secret-key-32chars-minimum-length
   admin-auth:

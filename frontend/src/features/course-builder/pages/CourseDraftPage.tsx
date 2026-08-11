@@ -61,6 +61,8 @@ interface CourseDraftForm {
   prerequisites: string;
   targetStudents: string;
   learningGoals: string[];
+  accessDurationDays: string;
+  accessExpiresAt: string;
 }
 
 interface RichTextEditorProps {
@@ -107,6 +109,8 @@ const initialForm: CourseDraftForm = {
   prerequisites: '',
   targetStudents: '',
   learningGoals: ['', '', '', ''],
+  accessDurationDays: '180',
+  accessExpiresAt: '',
 };
 
 function buildInitialForm(draft?: CourseDraftResponse): CourseDraftForm {
@@ -130,6 +134,8 @@ function buildInitialForm(draft?: CourseDraftResponse): CourseDraftForm {
     prerequisites: sanitizeRichText(draft.prerequisites),
     targetStudents: sanitizeRichText(draft.targetStudents),
     learningGoals: withMinimumGoals(draft.learningGoals),
+    accessDurationDays: String(draft.accessDurationDays ?? 180),
+    accessExpiresAt: draft.accessExpiresAt ? draft.accessExpiresAt.slice(0, 10) : '',
   };
 }
 
@@ -182,7 +188,7 @@ export function CourseDraftPage() {
   );
 
   function updateField(field: keyof CourseDraftForm) {
-    return (event: ChangeEvent<HTMLInputElement>) => {
+    return (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
       clearFieldError(field);
     };
@@ -330,6 +336,8 @@ export function CourseDraftPage() {
         prerequisites: sanitizeRichText(form.prerequisites),
         targetStudents: sanitizeRichText(form.targetStudents),
         learningGoals: form.learningGoals.map((goal) => goal.trim()).filter(Boolean),
+        accessDurationDays: Number(form.accessDurationDays || 180),
+        accessExpiresAt: form.accessExpiresAt ? `${form.accessExpiresAt}T23:59:59Z` : null,
       };
       const draft = editingDraft
         ? await updateCourseDraft(editingDraft.id, payload)
@@ -596,6 +604,37 @@ export function CourseDraftPage() {
                 placeholder="Ví dụ: Người mới bắt đầu học tiếng Nhật, sinh viên chuẩn bị thi JLPT N5 hoặc người cần nền tảng giao tiếp cơ bản."
                 error={errors.targetStudents}
               />
+
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Thời hạn truy cập khóa học
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Học viên được truy cập theo số ngày kể từ khi ghi danh; có thể đặt hạn cố định cho khóa luyện thi.
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Số ngày truy cập"
+                    value={form.accessDurationDays}
+                    onChange={(event) => updateField('accessDurationDays')(event)}
+                    slotProps={{ htmlInput: { min: 1 } }}
+                    error={Boolean(errors.accessDurationDays)}
+                    helperText={errors.accessDurationDays || 'Mặc định 180 ngày'}
+                  />
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="Hạn cố định (tùy chọn)"
+                    value={form.accessExpiresAt}
+                    onChange={(event) => updateField('accessExpiresAt')(event)}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    error={Boolean(errors.accessExpiresAt)}
+                    helperText={errors.accessExpiresAt || 'Để trống nếu dùng số ngày'}
+                  />
+                </Stack>
+              </Paper>
 
               <Box>
                 <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
@@ -1062,6 +1101,14 @@ function collectStepErrors(step: number, form: CourseDraftForm, categoryLoadErro
       nextErrors.targetStudents = 'Vui lòng nhập đối tượng học viên phù hợp.';
     }
 
+    const accessDays = Number(form.accessDurationDays);
+    if (!Number.isInteger(accessDays) || accessDays < 1) {
+      nextErrors.accessDurationDays = 'Thời hạn truy cập phải từ 1 ngày trở lên.';
+    }
+    if (form.accessExpiresAt && new Date(`${form.accessExpiresAt}T23:59:59Z`) <= new Date()) {
+      nextErrors.accessExpiresAt = 'Hạn cố định phải nằm trong tương lai.';
+    }
+
     const validGoals = form.learningGoals
       .map((goal) => goal.trim())
       .filter((goal) => goal.length > 0 && goal.length <= maxGoalLength);
@@ -1089,7 +1136,7 @@ function clearStepErrors(step: number, learningGoals: string[]) {
   const keysByStep: Record<number, string[]> = {
     0: ['title', 'category', 'price'],
     1: ['thumbnailUrl', 'introduction', 'outcomes'],
-    2: ['prerequisites', 'targetStudents', 'learningGoals', ...learningGoals.map((_, index) => `goal-${index}`)],
+    2: ['prerequisites', 'targetStudents', 'accessDurationDays', 'accessExpiresAt', 'learningGoals', ...learningGoals.map((_, index) => `goal-${index}`)],
   };
 
   return Object.fromEntries(keysByStep[step].map((key) => [key, '']));

@@ -38,6 +38,11 @@ public interface StudentWalletService {
     WalletTransaction creditRefund(UUID studentId, BigDecimal amount,
                                    UUID refundRequestId, String note);
 
+    /** Credits non-withdrawable promotional money with a caller-owned idempotency key. */
+    WalletTransaction creditPromotionalReward(UUID studentId, BigDecimal amount,
+                                              WalletTransactionType type, String referenceType,
+                                              UUID referenceId, String idempotencyKey, String note);
+
     WalletTransaction reserveForWithdrawal(UUID studentId, UUID withdrawalId,
                                            BigDecimal amount);
 

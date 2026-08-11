@@ -48,6 +48,7 @@ import com.manabihub.ai.service.AiUsageLogService;
 import com.manabihub.ai.enums.AiUsageRequestStatus;
 import com.manabihub.writing.enums.WritingSubmissionStatus;
 import com.manabihub.writing.dto.request.WritingSubmissionRequest;
+import com.manabihub.writing.dto.request.WritingDraftRequest;
 import com.manabihub.writing.dto.response.StudentWritingSubmissionResponse;
 import com.manabihub.writing.dto.response.AiWritingSuggestionResponse;
 import com.manabihub.writing.dto.response.TeacherWritingFeedbackResponse;
@@ -164,7 +165,9 @@ public class LearningServiceImpl implements LearningService {
                 completedLessons,
                 progressPercent(completedLessons, allBlocks.size()),
                 courseCompleted,
-                warnings
+                warnings,
+                enrollment.getStatus(),
+                enrollment.getExpiresAt()
         );
     }
 
@@ -193,7 +196,8 @@ public class LearningServiceImpl implements LearningService {
             );
         }
 
-        int durationSeconds = videoDurationSeconds(block);
+        LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
+        int durationSeconds = resolveVideoDurationSeconds(block, progress, request.mediaDurationSeconds());
         if (request.positionSeconds() > durationSeconds) {
             throw new BusinessException(
                     MessageCodes.LEARNING_INVALID_VIDEO_POSITION,
@@ -202,7 +206,10 @@ public class LearningServiceImpl implements LearningService {
             );
         }
 
-        LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
+        if (progress.getVideoDurationSeconds() == null
+                && isAcceptableObservedDuration(block, request.mediaDurationSeconds())) {
+            progress.setVideoDurationSeconds(request.mediaDurationSeconds());
+        }
         progress.setLastVideoPositionSeconds(request.positionSeconds());
         int reportedWatchedSeconds = request.watchedSeconds() == null ? 0 : request.watchedSeconds();
         if (reportedWatchedSeconds > durationSeconds) {
@@ -290,7 +297,7 @@ public class LearningServiceImpl implements LearningService {
         if (block.getType() == LessonBlockType.VIDEO
                 && progress.getStatus() != LessonProgressStatus.COMPLETED
                 && (progress.getWatchedVideoSeconds() == null
-                || progress.getWatchedVideoSeconds() < videoDurationSeconds(block))) {
+                || progress.getWatchedVideoSeconds() < effectiveStoredVideoDuration(block, progress))) {
             throw new BusinessException(
                     MessageCodes.COMMON_BAD_REQUEST,
                     "Watch the full video before completing this lesson.",
@@ -351,14 +358,45 @@ public class LearningServiceImpl implements LearningService {
 
         StudentProfile studentProfile = resolveStudentProfile();
 
-        return enrollmentRepository.findByStudent_IdAndCourse_Id(studentProfile.getId(), courseId)
-                .filter(enrollment -> enrollment.getStatus() == EnrollmentStatus.ACTIVE
-                        || enrollment.getStatus() == EnrollmentStatus.COMPLETED)
+        Enrollment enrollment = enrollmentRepository.findByStudent_IdAndCourse_Id(studentProfile.getId(), courseId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.LEARNING_NOT_ENROLLED,
                         "You are not enrolled in this course",
                         HttpStatus.FORBIDDEN
                 ));
+
+        if (enrollment.getStatus() == EnrollmentStatus.REFUND_PENDING) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_REFUND_PENDING,
+                    "Khóa học đang tạm khóa trong thời gian xử lý yêu cầu hoàn tiền. Bạn có thể hủy yêu cầu để tiếp tục học.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        if (enrollment.getStatus() == EnrollmentStatus.REFUNDED
+                || enrollment.getStatus() == EnrollmentStatus.REVOKED) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_NOT_ENROLLED,
+                    "Quyền truy cập khóa học đã bị thu hồi sau khi hoàn tiền.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        if (enrollment.getStatus() == EnrollmentStatus.EXPIRED
+                || enrollment.isExpired(Instant.now())) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_ACCESS_EXPIRED,
+                    "Khóa học đã hết hạn truy cập. Vui lòng gia hạn hoặc mua lại khóa học.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        if (enrollment.getStatus() != EnrollmentStatus.ACTIVE
+                && enrollment.getStatus() != EnrollmentStatus.COMPLETED) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_NOT_ENROLLED,
+                    "You are not enrolled in this course",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        return enrollment;
     }
 
     private StudentProfile resolveStudentProfile() {
@@ -396,6 +434,32 @@ public class LearningServiceImpl implements LearningService {
 
     private int videoDurationSeconds(LessonBlock block) {
         return Math.max(1, (block.getDurationMinutes() == null ? 0 : block.getDurationMinutes()) * 60);
+    }
+
+    private int effectiveStoredVideoDuration(LessonBlock block, LessonBlockProgress progress) {
+        return progress.getVideoDurationSeconds() != null && progress.getVideoDurationSeconds() > 0
+                ? progress.getVideoDurationSeconds()
+                : videoDurationSeconds(block);
+    }
+
+    private int resolveVideoDurationSeconds(LessonBlock block, LessonBlockProgress progress, Integer observedDurationSeconds) {
+        if (progress.getVideoDurationSeconds() != null && progress.getVideoDurationSeconds() > 0) {
+            return progress.getVideoDurationSeconds();
+        }
+        return isAcceptableObservedDuration(block, observedDurationSeconds)
+                ? observedDurationSeconds
+                : videoDurationSeconds(block);
+    }
+
+    /** Accept actual media metadata while rejecting implausibly short client values. */
+    private boolean isAcceptableObservedDuration(LessonBlock block, Integer observedDurationSeconds) {
+        if (observedDurationSeconds == null || observedDurationSeconds < 30) {
+            return false;
+        }
+        int declared = videoDurationSeconds(block);
+        int minimum = Math.max(30, (int) Math.ceil(declared * 0.25d));
+        int maximum = Math.max(declared * 4, declared + 60);
+        return observedDurationSeconds >= minimum && observedDurationSeconds <= maximum;
     }
 
     private void ensureBlockUnlocked(Enrollment enrollment, LessonBlock block) {
@@ -601,6 +665,44 @@ public class LearningServiceImpl implements LearningService {
 
     @Override
     @Transactional
+    public StudentWritingSubmissionResponse saveWritingDraft(UUID lessonBlockId, WritingDraftRequest request) {
+        LessonBlock block = resolveLessonBlock(lessonBlockId);
+        Enrollment enrollment = enrollmentRepository.findByIdForUpdate(
+                        resolveActiveEnrollment(block.getModule().getCourse().getId()).getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COMMON_NOT_FOUND, "Enrollment not found", HttpStatus.NOT_FOUND));
+
+        if (block.getType() != LessonBlockType.WRITING) {
+            throw new BusinessException(
+                    MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Not a writing block", HttpStatus.BAD_REQUEST);
+        }
+
+        WritingSubmission submission = writingSubmissionRepository
+                .findByEnrollmentIdAndLessonBlockIdForUpdate(enrollment.getId(), lessonBlockId)
+                .orElse(null);
+
+        if (submission != null && submission.getStatus() != WritingSubmissionStatus.DRAFT) {
+            // Autosave must never modify a submitted assignment or its review lifecycle.
+            return mapToWritingSubmissionDetailResponse(submission);
+        }
+
+        if (submission == null) {
+            submission = WritingSubmission.builder()
+                    .enrollment(enrollment)
+                    .student(enrollment.getStudent())
+                    .lessonBlockId(lessonBlockId)
+                    .legacyLessonId(null)
+                    .status(WritingSubmissionStatus.DRAFT)
+                    .submittedAt(Instant.now())
+                    .build();
+        }
+        submission.setContent(request.content());
+        submission.setStatus(WritingSubmissionStatus.DRAFT);
+        return mapToWritingSubmissionDetailResponse(writingSubmissionRepository.saveAndFlush(submission));
+    }
+
+    @Override
+    @Transactional
     public StudentWritingSubmissionResponse submitWriting(UUID lessonBlockId, WritingSubmissionRequest request) {
         LessonBlock block = resolveLessonBlock(lessonBlockId);
         // Pessimistic lock enrollment to prevent race conditions during submission processing
@@ -612,15 +714,28 @@ public class LearningServiceImpl implements LearningService {
             throw new BusinessException(MessageCodes.LEARNING_INVALID_BLOCK_TYPE, "Not a writing block", HttpStatus.BAD_REQUEST);
         }
 
-        WritingSubmission submission = WritingSubmission.builder()
-                .enrollment(enrollment)
-                .student(enrollment.getStudent())
-                .lessonBlockId(lessonBlockId)
-                .legacyLessonId(null)
-                .content(request.content())
-                .status(WritingSubmissionStatus.SUBMITTED)
-                .submittedAt(Instant.now())
-                .build();
+        WritingSubmission submission = writingSubmissionRepository
+                .findByEnrollmentIdAndLessonBlockIdForUpdate(enrollment.getId(), lessonBlockId)
+                .orElse(null);
+
+        if (submission != null && submission.getStatus() != WritingSubmissionStatus.DRAFT) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "You have already submitted this assignment.",
+                    HttpStatus.CONFLICT);
+        }
+
+        if (submission == null) {
+            submission = WritingSubmission.builder()
+                    .enrollment(enrollment)
+                    .student(enrollment.getStudent())
+                    .lessonBlockId(lessonBlockId)
+                    .legacyLessonId(null)
+                    .build();
+        }
+        submission.setContent(request.content());
+        submission.setStatus(WritingSubmissionStatus.SUBMITTED);
+        submission.setSubmittedAt(Instant.now());
 
         try {
             submission = writingSubmissionRepository.saveAndFlush(submission);

@@ -16,6 +16,7 @@ import com.manabihub.identity.repository.InternalAdminInvitationRepository;
 import com.manabihub.identity.repository.InternalAdminPasswordResetRepository;
 import com.manabihub.identity.repository.InternalAdminRefreshTokenRepository;
 import com.manabihub.identity.repository.InternalAdminSessionRepository;
+import com.manabihub.identity.repository.PhoneVerificationChallengeRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.identity.service.CurrentUserService;
@@ -94,6 +95,9 @@ class ManabiHubApplicationTests {
     private AppUserRepository appUserRepository;
 
     @MockBean
+    private PhoneVerificationChallengeRepository phoneVerificationChallengeRepository;
+
+    @MockBean
     private InternalAdminAccountRepository identityInternalAdminAccountRepository;
 
     @MockBean
@@ -137,6 +141,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private CourseRepository courseRepository;
+
+    @MockBean
+    private com.manabihub.course.repository.CourseThumbnailAssetRepository courseThumbnailAssetRepository;
 
     @MockBean
     private CourseCategoryRepository courseCategoryRepository;
@@ -262,6 +269,24 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private com.manabihub.violation.repository.ViolationReportRepository violationReportRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengeRepository weeklyLearningChallengeRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptRepository weeklyLearningChallengeAttemptRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengePairRepository weeklyLearningChallengePairRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptCardRepository weeklyLearningChallengeAttemptCardRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.WeeklyLearningChallengeRewardRepository weeklyLearningChallengeRewardRepository;
+
+    @MockBean
+    private com.manabihub.challenge.repository.DailyLearningAttendanceRewardRepository dailyLearningAttendanceRewardRepository;
 
     @Test
     void contextLoads() {

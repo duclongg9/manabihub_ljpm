@@ -51,6 +51,10 @@ public class AppUser {
     @Column(name = "phone_number")
     private String phoneNumber;
 
+    /** Set only after the owner has completed the phone OTP challenge. */
+    @Column(name = "phone_verified_at")
+    private Instant phoneVerifiedAt;
+
     @Builder.Default
     @Column(nullable = false)
     private String provider = "GOOGLE";

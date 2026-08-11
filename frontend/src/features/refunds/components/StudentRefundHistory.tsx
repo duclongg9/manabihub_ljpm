@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Chip, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, Pagination, Stack, Typography } from '@mui/material';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import type { StudentRefundResponse } from '../types';
 
@@ -25,9 +25,21 @@ interface StudentRefundHistoryProps {
   error: boolean;
   onRetry: () => void;
   onOpen: (refund: StudentRefundResponse) => void;
+  page?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
 }
 
-export function StudentRefundHistory({ refunds, loading, error, onRetry, onOpen }: StudentRefundHistoryProps) {
+export function StudentRefundHistory({
+  refunds,
+  loading,
+  error,
+  onRetry,
+  onOpen,
+  page = 0,
+  totalPages = 1,
+  onPageChange,
+}: StudentRefundHistoryProps) {
   if (loading) return <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>Đang tải danh sách yêu cầu hoàn tiền…</Typography>;
 
   if (error) {
@@ -112,6 +124,30 @@ export function StudentRefundHistory({ refunds, loading, error, onRetry, onOpen 
           </Box>
         );
       })}
+      {totalPages > 1 && onPageChange && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
+          <Pagination
+            count={totalPages}
+            page={page + 1}
+            onChange={(_, value) => onPageChange(value - 1)}
+            aria-label="Phân trang lịch sử hoàn tiền"
+            sx={{
+              '& .MuiPaginationItem-root': {
+                borderRadius: 2,
+                fontWeight: 700,
+                color: '#475569',
+                border: '1px solid #E2E8F0',
+                bgcolor: '#FFFFFF',
+                '&.Mui-selected': {
+                  bgcolor: '#C41E3A !important',
+                  color: '#FFFFFF !important',
+                  borderColor: '#C41E3A',
+                },
+              },
+            }}
+          />
+        </Box>
+      )}
     </Stack>
   );
 }

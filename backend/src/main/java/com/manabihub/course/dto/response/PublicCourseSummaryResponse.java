@@ -31,4 +31,5 @@ public class PublicCourseSummaryResponse {
     private Instant publishedAt;
     private BigDecimal averageRating;
     private Long reviewCount;
+    private Long enrollmentCount;
 }

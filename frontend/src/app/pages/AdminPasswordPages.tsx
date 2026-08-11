@@ -19,7 +19,6 @@ import {
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import axios from 'axios';
@@ -465,8 +464,12 @@ function AdminAuthPageShell({
           }}
           to={ROUTES.PUBLIC.HOME}
         >
-          <MenuBookIcon />
-          ManabiHub
+          <Box
+            component="img"
+            src="/manabihub-header-logo.png"
+            alt="ManabiHub"
+            sx={{ display: 'block', height: 58, width: 'auto' }}
+          />
         </Link>
         <Typography component="h1" sx={{ fontSize: '1.75rem', fontWeight: 800, mb: 1 }}>
           {title}

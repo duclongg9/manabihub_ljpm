@@ -112,6 +112,8 @@ export interface CourseLearning {
   progressPercent: number;
   courseCompleted: boolean;
   warnings: string[];
+  accessStatus?: 'ACTIVE' | 'REFUND_PENDING' | 'REFUNDED' | 'REVOKED' | 'COMPLETED' | 'EXPIRED';
+  expiresAt?: string | null;
 }
 
 export interface CertificateEligibility {

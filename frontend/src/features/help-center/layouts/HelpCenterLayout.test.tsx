@@ -18,6 +18,6 @@ describe('HelpCenterLayout', () => {
     expect(screen.getByRole('link', { name: 'Về trang chủ ManabiHub' }).getAttribute('href'))
       .toBe('/');
     expect(screen.getByRole('img', { name: 'ManabiHub' }).getAttribute('src'))
-      .toBe('/manabihub-header-logo.svg');
+      .toBe('/manabihub-header-logo.png');
   });
 });

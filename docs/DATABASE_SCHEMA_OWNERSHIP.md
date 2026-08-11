@@ -3,13 +3,13 @@
 ## Goal
 Clarify physical table ownership by JPA entities, ensuring a clean single source of truth per table.
 
-## Physical Table Inventory (V002–V055)
+## Physical Table Inventory (V002–V070)
 
 All tables are created by Flyway migrations. "Latest migration" = most recent migration that alters the table schema (not seed/reference).
 
 | Table | Created | Latest Schema Migration | Writable Owner | Compat. Mapping | State |
 |---|---|---|---|---|---|
-| `app_users` | V002 | V013 (add phone_number) | `identity.entity.AppUser` | `kyc.domain.AppUser` (`@Immutable`) | Active |
+| `app_users` | V002 | V069 (verified phone uniqueness) | `identity.entity.AppUser` | `kyc.domain.AppUser` (`@Immutable`) | Active |
 | `roles` | V002 | V002 | `identity.entity.Role` | — | Active |
 | `permissions` | V002 | V002 | `identity.entity.Permission` | — | Active |
 | `user_roles` | V002 | V002 | — (join table) | — | Active |
@@ -18,7 +18,7 @@ All tables are created by Flyway migrations. "Latest migration" = most recent mi
 | `internal_admin_roles` | V002 | V002 | — (join table) | — | Active |
 | `system_settings` | V002 | V002 | `systemconfig.entity.SystemSetting` | — | Active |
 | `audit_logs` | V002 | V002 | `common.entity.AuditLog` | — | Active |
-| `student_profiles` | V002 | V002 | `identity.entity.StudentProfile` | — | Active |
+| `student_profiles` | V002 | V065 (mock identity verification) | `identity.entity.StudentProfile` | — | Active |
 | `teacher_profiles` | V002 | V002 | `identity.entity.TeacherProfile` | — | Active |
 | `kyc_requests` | V002 | V006 (modular workflow) | `kyc.domain.KycRequest` | — | Active |
 | `kyc_documents` | V002 | V004 (extend metadata) | `kyc.domain.KycDocument` | — | Active |
@@ -37,11 +37,11 @@ All tables are created by Flyway migrations. "Latest migration" = most recent mi
 | `order_items` | V002 | V002 | `order.entity.OrderItem` | — | Active |
 | `payment_transactions` | V002 | V051 (success time) | `payment.entity.PaymentTransaction` | — | Active |
 | `wallets` | V002 | V054 (harden wallet) | `wallet.entity.Wallet` | — | Active |
-| `wallet_transactions` | V002 | V054 (harden wallet) | `wallet.entity.WalletTransaction` | — | Active |
+| `wallet_transactions` | V002 | V066 (promotional reward types) | `wallet.entity.WalletTransaction` | — | Active |
 | `wallet_payment_reservations` | V054 | V054 | `wallet.entity.WalletPaymentReservation` | — | Active |
 | `escrow_ledger` | V002 | V002 | `wallet.entity.EscrowLedger` | — | Active |
 | `refund_requests` | V002 | V055 (refund policy) | `refund.entity.RefundRequest` | — | Active |
-| `withdrawal_requests` | V002 | V040 (secure withdrawal) | `payout.entity.WithdrawalRequest` | — | Active |
+| `withdrawal_requests` | V002 | V060 (bank ownership verification) | `payout.entity.WithdrawalRequest` | — | Active |
 | `payout_settlements` | V002 | V036 (uc33 payout) | `payout.entity.PayoutSettlement` | — | Active |
 | `violation_reports` | V002 | V047 (harden moderation) | `moderation.entity.ViolationReport` | — | Active |
 | `moderation_decisions` | V002 | V002 | `moderation.entity.ModerationDecision` | — | Active |
@@ -51,6 +51,7 @@ All tables are created by Flyway migrations. "Latest migration" = most recent mi
 | `course_learning_goals` | V016 | V016 | `course.entity.CourseLearningGoal` | — | Active |
 | `course_categories` | V017 | V017 | `course.entity.CourseCategory` | — | Active |
 | `course_lesson_blocks` | V018 | V047 (violation target) | `course.entity.LessonBlock` | — | Active |
+| `course_thumbnail_assets` | V070 | V070 | `course.entity.CourseThumbnailAsset` | — | Active |
 | `final_tests` | V020 | V020 | `finaltest.entity.FinalTest` | — | Active |
 | `final_test_questions` | V020 | V020 | `finaltest.entity.FinalTestQuestion` | — | Active |
 | `final_test_choices` | V020 | V020 | `finaltest.entity.FinalTestChoice` | — | Active |
@@ -65,7 +66,7 @@ All tables are created by Flyway migrations. "Latest migration" = most recent mi
 | `payout_reconciliation_logs` | V036 | V036 | `payout.entity.PayoutReconciliationLog` | — | Active |
 | `teacher_certificate_claims` | V038 | V038 | `kyc.domain.TeacherCertificateClaim` | — | Active |
 | `withdrawal_otp_challenges` | V040 | V040 | `payout.entity.WithdrawalOtpChallenge` | — | Active |
-| `course_reviews` | V041 | V041 | `review.entity.CourseReview` | — | Active |
+| `course_reviews` | V041 | V064 (teacher reply) | `review.entity.CourseReview` | — | Active |
 | `order_item_snapshots` | V044 | V044 | `order.entity.OrderItemSnapshot` | — | Active |
 | `platform_commission_ledgers` | V044 | V044 | `wallet.entity.PlatformCommissionLedger` | — | Active |
 | `internal_admin_invitations` | V045 | V045 | `identity.entity.InternalAdminInvitation` | — | Active |
@@ -76,6 +77,12 @@ All tables are created by Flyway migrations. "Latest migration" = most recent mi
 | `internal_admin_refresh_tokens` | V049 | V049 | `identity.entity.InternalAdminRefreshToken` | — | Active |
 | `internal_admin_password_resets` | V049 | V049 | `identity.entity.InternalAdminPasswordReset` | — | Active |
 | `internal_admin_auth_rate_limits` | V049 | V049 | `identity.entity.InternalAdminAuthRateLimit` | — | Active |
+| `weekly_learning_challenges` | V066 | V066 | `challenge.entity.WeeklyLearningChallenge` | — | Active |
+| `weekly_learning_challenge_pairs` | V066 | V066 | `challenge.entity.WeeklyLearningChallengePair` | — | Active |
+| `weekly_learning_challenge_attempts` | V066 | V066 | `challenge.entity.WeeklyLearningChallengeAttempt` | — | Active |
+| `weekly_learning_challenge_attempt_cards` | V066 | V066 | `challenge.entity.WeeklyLearningChallengeAttemptCard` | — | Active |
+| `weekly_learning_challenge_rewards` | V066 | V066 | `challenge.entity.WeeklyLearningChallengeReward` | — | Active |
+| `daily_learning_attendance_rewards` | V066 | V066 | `challenge.entity.DailyLearningAttendanceReward` | — | Active |
 
 > Entity class names use shortened package paths (e.g., `identity.entity.AppUser` = `com.manabihub.identity.entity.AppUser`).
 

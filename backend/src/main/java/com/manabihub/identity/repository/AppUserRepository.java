@@ -17,6 +17,8 @@ import org.springframework.data.repository.query.Param;
 public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     Optional<AppUser> findByEmail(String email);
 
+    Optional<AppUser> findByPhoneNumber(String phoneNumber);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM IdentityAppUser u WHERE u.id = :id")
     Optional<AppUser> findByIdForUpdate(@Param("id") UUID id);

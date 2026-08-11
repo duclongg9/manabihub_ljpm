@@ -1,35 +1,39 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Box,
-  Typography,
+  Button,
   Card,
   CardContent,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
-  TableRow,
   TablePagination,
+  TableRow,
   TextField,
-  Button,
-  Grid,
-  CircularProgress,
-  Alert,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useQuery } from '@tanstack/react-query';
-import type { AuditLogFilterParams } from '../api/adminAuditApi';
-import { adminAuditApi } from '../api/adminAuditApi';
-import { AdminAuditLogDetailPage } from './AdminAuditLogDetailPage';
-import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
-import { ROLES } from '../../../shared/constants/roles';
 import { Navigate } from 'react-router-dom';
+import type { PageResponse } from '../../../shared/types/api';
+import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROUTES } from '../../../shared/constants/routes';
+import { ROLES } from '../../../shared/constants/roles';
+import { adminAuditApi, type AuditLogDto, type AuditLogFilterParams } from '../api/adminAuditApi';
+import { AdminAuditLogDetailPage } from './AdminAuditLogDetailPage';
+
+const DEFAULT_PAGE_SIZE = 10;
 
 export const AdminAuditLogPage: React.FC = () => {
   const session = getAuthSession('admin');
@@ -37,157 +41,174 @@ export const AdminAuditLogPage: React.FC = () => {
 
   const [filterParams, setFilterParams] = useState<AuditLogFilterParams>({
     page: 0,
-    size: 10,
+    size: DEFAULT_PAGE_SIZE,
   });
-
   const [filterDraft, setFilterDraft] = useState<AuditLogFilterParams>({
     page: 0,
-    size: 10,
+    size: DEFAULT_PAGE_SIZE,
   });
-
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery<PageResponse<AuditLogDto>, Error>({
     queryKey: ['audit-logs', filterParams],
     queryFn: () => adminAuditApi.getAuditLogs(filterParams),
     enabled: isSystemAdmin,
+    // Keep the previous page visible while the next page is fetched. This
+    // prevents the table from jumping to an empty state on every page click.
+    placeholderData: (previous) => previous,
   });
 
   if (!isSystemAdmin) {
     return <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />;
   }
 
+  const updateDraft = (field: keyof AuditLogFilterParams, value: string) => {
+    setFilterDraft((current) => ({ ...current, [field]: value }));
+  };
+
   const handleApplyFilter = () => {
-    setFilterParams({ ...filterDraft, page: 0 });
+    setFilterParams({ ...filterDraft, page: 0, size: filterParams.size ?? DEFAULT_PAGE_SIZE });
   };
 
   const handleClearFilter = () => {
-    const emptyFilters = { page: 0, size: filterDraft.size };
+    const emptyFilters: AuditLogFilterParams = {
+      page: 0,
+      size: filterParams.size ?? DEFAULT_PAGE_SIZE,
+    };
     setFilterDraft(emptyFilters);
     setFilterParams(emptyFilters);
   };
 
-  return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold' }}>
-        Nhật ký hệ thống (Audit Logs)
-      </Typography>
+  const logs = data?.content ?? [];
+  const page = filterParams.page ?? 0;
+  const size = filterParams.size ?? DEFAULT_PAGE_SIZE;
 
-      <Card sx={{ mb: 3 }}>
+  return (
+    <Box sx={{ p: { xs: 1.5, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
+      <Stack sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1, mb: 2 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            Nhật ký hệ thống (Audit Logs)
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Theo dõi các thay đổi quan trọng của hệ thống; dữ liệu được tải theo từng trang.
+          </Typography>
+        </Box>
+        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => refetch()} disabled={isFetching}>
+          Làm mới
+        </Button>
+      </Stack>
+
+      <Card sx={{ mb: 2 }}>
         <CardContent>
-          <Grid container spacing={2} sx={{ alignItems: 'center' }}>
+          <Grid container spacing={1.5} sx={{ alignItems: 'center' }}>
             <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 fullWidth
                 size="small"
                 label="Người thực hiện (Tên/Email/ID)"
-                value={filterDraft.actor || ''}
-                onChange={(e) => setFilterDraft({ ...filterDraft, actor: e.target.value })}
+                value={filterDraft.actor ?? ''}
+                onChange={(event) => updateDraft('actor', event.target.value)}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}>
               <TextField
                 fullWidth
                 size="small"
-                label="Vai trò (Role)"
-                value={filterDraft.role || ''}
-                onChange={(e) => setFilterDraft({ ...filterDraft, role: e.target.value })}
+                label="Vai trò"
+                value={filterDraft.role ?? ''}
+                onChange={(event) => updateDraft('role', event.target.value)}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}>
               <TextField
                 fullWidth
                 size="small"
                 label="Loại đối tượng"
-                value={filterDraft.targetType || ''}
-                onChange={(e) => setFilterDraft({ ...filterDraft, targetType: e.target.value })}
+                value={filterDraft.targetType ?? ''}
+                onChange={(event) => updateDraft('targetType', event.target.value)}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 2 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}>
               <TextField
                 fullWidth
                 size="small"
                 label="Hành động"
-                value={filterDraft.action || ''}
-                onChange={(e) => setFilterDraft({ ...filterDraft, action: e.target.value })}
+                value={filterDraft.action ?? ''}
+                onChange={(event) => updateDraft('action', event.target.value)}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }} sx={{ display: 'flex', gap: 1 }}>
-              <Button variant="contained" onClick={handleApplyFilter} fullWidth>
-                Lọc
-              </Button>
-              <Button variant="outlined" onClick={handleClearFilter} fullWidth>
-                Xóa lọc
-              </Button>
+            <Grid size={{ xs: 12, md: 3 }}>
+              <Stack direction="row" spacing={1}>
+                <Button variant="contained" onClick={handleApplyFilter} sx={{ flex: 1 }}>
+                  Lọc
+                </Button>
+                <Button variant="outlined" onClick={handleClearFilter} sx={{ flex: 1 }}>
+                  Xóa lọc
+                </Button>
+              </Stack>
             </Grid>
           </Grid>
         </CardContent>
       </Card>
 
-      {error && <Alert severity="error" sx={{ mb: 3 }}>Không thể tải nhật ký. {(error as any)?.message}</Alert>}
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => refetch()}>
+              Thử lại
+            </Button>
+          }
+        >
+          Không thể tải nhật ký. {error.message}
+        </Alert>
+      )}
 
       <Card>
-        <TableContainer>
-          <Table size="small">
+        <TableContainer sx={{ overflowX: 'auto' }}>
+          <Table sx={{ minWidth: 920 }} aria-label="Bảng nhật ký hệ thống">
             <TableHead>
               <TableRow>
-                <TableCell>Thời gian</TableCell>
-                <TableCell>Người thực hiện</TableCell>
-                <TableCell>Vai trò</TableCell>
-                <TableCell>Hành động</TableCell>
-                <TableCell>Đối tượng</TableCell>
-                <TableCell align="right">Chi tiết</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Thời gian</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Người thực hiện</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Vai trò</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Hành động</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Đối tượng</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700 }}>Chi tiết</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                    <CircularProgress size={30} />
+                  <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                    <CircularProgress size={30} aria-label="Đang tải nhật ký" />
                   </TableCell>
                 </TableRow>
-              ) : data?.content.length === 0 ? (
+              ) : logs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                    Không tìm thấy kết quả phù hợp.
+                  <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>Không có nhật ký phù hợp</Typography>
+                    <Typography variant="body2" color="text.secondary">Thử đổi bộ lọc hoặc làm mới dữ liệu.</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                data?.content.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>{new Date(log.createdAt).toLocaleString('vi-VN')}</TableCell>
+                logs.map((log) => (
+                  <TableRow hover key={log.id}>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(log.createdAt).toLocaleString('vi-VN')}</TableCell>
                     <TableCell>
-                      {log.actorDisplayName ? (
-                        <>
-                          <Typography variant="body2">{log.actorDisplayName}</Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {log.actorEmail}
-                          </Typography>
-                        </>
-                      ) : (
-                        <Typography variant="caption" color="textSecondary">
-                          {log.actorUserId || log.actorAdminId || 'Hệ thống'}
-                        </Typography>
-                      )}
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{log.actorDisplayName || 'Hệ thống'}</Typography>
+                      {log.actorEmail && <Typography variant="caption" color="text.secondary">{log.actorEmail}</Typography>}
                     </TableCell>
-                    <TableCell>
-                      {log.actorRoleCode && <Chip size="small" label={log.actorRoleCode} />}
-                    </TableCell>
-                    <TableCell>
-                      <Chip size="small" variant="outlined" color="primary" label={log.action} />
-                    </TableCell>
+                    <TableCell>{log.actorRoleCode ? <Chip size="small" label={log.actorRoleCode} /> : '—'}</TableCell>
+                    <TableCell><Chip size="small" variant="outlined" color="primary" label={log.action} /></TableCell>
                     <TableCell>
                       <Typography variant="body2">{log.targetType}</Typography>
-                      {log.targetId && (
-                        <Typography variant="caption" color="textSecondary">
-                          {log.targetId.substring(0, 8)}...
-                        </Typography>
-                      )}
+                      {log.targetId && <Typography variant="caption" color="text.secondary">{log.targetId.substring(0, 8)}…</Typography>}
                     </TableCell>
                     <TableCell align="right">
-                      <Button size="small" onClick={() => setSelectedAuditId(log.id)}>
-                        Xem
-                      </Button>
+                      <Button size="small" onClick={() => setSelectedAuditId(log.id)}>Xem</Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -197,23 +218,22 @@ export const AdminAuditLogPage: React.FC = () => {
         </TableContainer>
         <TablePagination
           component="div"
-          count={data?.totalElements || 0}
-          page={filterParams.page || 0}
-          onPageChange={(_, newPage) => setFilterParams({ ...filterParams, page: newPage })}
-          rowsPerPage={filterParams.size || 10}
-          onRowsPerPageChange={(e) =>
-            setFilterParams({ ...filterParams, size: parseInt(e.target.value, 10), page: 0 })
-          }
+          count={data?.totalElements ?? 0}
+          page={page}
+          onPageChange={(_, nextPage) => setFilterParams((current) => ({ ...current, page: nextPage }))}
+          rowsPerPage={size}
+          onRowsPerPageChange={(event) => setFilterParams((current) => ({
+            ...current,
+            size: Number.parseInt(event.target.value, 10),
+            page: 0,
+          }))}
           rowsPerPageOptions={[10, 20, 50]}
+          labelRowsPerPage="Số dòng/trang"
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} trên ${count}`}
         />
       </Card>
 
-      <Dialog
-        open={!!selectedAuditId}
-        onClose={() => setSelectedAuditId(null)}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={selectedAuditId !== null} onClose={() => setSelectedAuditId(null)} maxWidth="md" fullWidth>
         <DialogTitle>Chi tiết nhật ký</DialogTitle>
         <DialogContent dividers>
           {selectedAuditId && <AdminAuditLogDetailPage id={selectedAuditId} />}

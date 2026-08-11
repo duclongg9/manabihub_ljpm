@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.ZoneOffset;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
 import java.util.List;
@@ -83,8 +84,8 @@ public class OrderServiceImpl implements OrderService {
 
         boolean alreadyOwned = enrollmentRepository
                 .findByStudent_IdAndCourse_Id(student.getId(), courseId)
-                .map(Enrollment::getStatus)
-                .filter(OWNED_STATUSES::contains)
+                .filter(enrollment -> OWNED_STATUSES.contains(enrollment.getStatus())
+                        && !enrollment.isExpired(Instant.now()))
                 .isPresent();
         if (alreadyOwned) {
             throw new BusinessException(
@@ -151,12 +152,17 @@ public class OrderServiceImpl implements OrderService {
                     .findByStudentIdAndCourseIdForUpdate(student.getId(), course.getId())
                     .orElse(null);
             if (existing == null) {
+                Instant enrolledAt = Instant.now();
                 enrollmentRepository.save(Enrollment.builder()
                         .student(student)
                         .course(course)
                         .status(EnrollmentStatus.ACTIVE)
+                        .enrolledAt(enrolledAt)
+                        .expiresAt(course.resolveEnrollmentExpiry(enrolledAt))
                         .build());
-            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED) {
+            } else if (existing.getStatus() == EnrollmentStatus.REFUNDED
+                    || existing.getStatus() == EnrollmentStatus.EXPIRED
+                    || existing.isExpired(Instant.now())) {
                 enrollmentProgressResetService.resetForRepurchase(existing);
             }
         }

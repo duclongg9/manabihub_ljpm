@@ -17,6 +17,7 @@ import com.manabihub.order.enums.OrderType;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderRepository;
 import com.manabihub.payment.dto.IpnAckResponse;
+import com.manabihub.payment.config.VnPayProperties;
 import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.enums.PaymentStatus;
 import com.manabihub.payment.event.PaymentNotificationEvent;
@@ -92,7 +93,7 @@ class PaymentServiceImplTest {
                 paymentGateway, orderRepository, orderItemRepository, paymentTransactionRepository,
                 enrollmentRepository, enrollmentProgressResetService, escrowService,
                 studentWalletService, eventPublisher,
-                new ObjectMapper());
+                new ObjectMapper(), new VnPayProperties());
 
         AppUser user = AppUser.builder().id(UUID.randomUUID()).email("student@test.dev").build();
         StudentProfile student = StudentProfile.builder().id(UUID.randomUUID()).user(user).build();
@@ -432,8 +433,8 @@ class PaymentServiceImplTest {
 
         @Test
         @org.junit.jupiter.api.Order(8)
-        @DisplayName("UTCID08 (A) - provider response 24 -> order FAILED + failure notify")
-        void handleIpn_failedPaymentAtProvider_recordsFailedAndReturns00() {
+        @DisplayName("UTCID08 (N) - provider response 24 -> order CANCELLED + failure notify")
+        void handleIpn_cancelledPaymentAtProvider_recordsCancelledAndReturns00() {
             when(paymentGateway.parseCallback(params)).thenReturn(result(true, false, 10_000L));
             when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
             when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
@@ -444,7 +445,7 @@ class PaymentServiceImplTest {
             IpnAckResponse ack = service.handleIpn(params);
 
             assertEquals("00", ack.rspCode());
-            assertEquals(OrderStatus.FAILED, order.getStatus());
+            assertEquals(OrderStatus.CANCELLED, order.getStatus());
             verify(enrollmentRepository, never()).save(any());
             verify(escrowService, never()).holdForOrder(any());
             verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
@@ -472,6 +473,141 @@ class PaymentServiceImplTest {
             assertEquals("04", service.handleIpn(params).rspCode());
             assertEquals(OrderStatus.PENDING, order.getStatus());
             verify(escrowService, never()).holdForOrder(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(11)
+        @DisplayName("UTCID11 (N) - signed browser return 24 -> CANCELLED and wallet released")
+        void handleVnPayReturn_cancelledPayment_closesOrderAndReleasesWallet() {
+            PaymentTransaction gatewayPayment = PaymentTransaction.builder()
+                    .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build();
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, false, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+            when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                    order.getId(), "VNPAY")).thenReturn(Optional.of(gatewayPayment));
+            when(paymentTransactionRepository.findByOrder_IdAndStatusInOrderByCreatedAtAsc(
+                    eq(order.getId()), any())).thenReturn(List.of());
+
+            IpnAckResponse ack = service.handleVnPayReturn(params);
+
+            assertEquals("00", ack.rspCode());
+            assertEquals(OrderStatus.CANCELLED, order.getStatus());
+            assertEquals(PaymentStatus.FAILED, gatewayPayment.getStatus());
+            verify(studentWalletService).releaseForOrder(eq(order.getId()), any(Instant.class));
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(12)
+        @DisplayName("UTCID12 (A) - late successful IPN cannot reopen cancelled order")
+        void handleIpn_lateSuccessAfterCancellation_doesNotReopenOrder() {
+            order.setStatus(OrderStatus.CANCELLED);
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+
+            IpnAckResponse ack = service.handleIpn(params);
+
+            assertEquals("02", ack.rspCode());
+            assertEquals(OrderStatus.CANCELLED, order.getStatus());
+            verify(paymentTransactionRepository, never()).save(any());
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(13)
+        @DisplayName("UTCID13 (N) - pending VNPay payment older than TTL -> CANCELLED")
+        void expirePendingPayments_oldPendingPayment_closesOrder() {
+            PaymentTransaction pendingPayment = PaymentTransaction.builder()
+                    .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build();
+            when(orderRepository.findTop100ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
+                    eq(OrderStatus.PENDING), any(Instant.class)))
+                    .thenReturn(List.of(order));
+            when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+            when(paymentTransactionRepository.findByOrder_IdAndStatusInOrderByCreatedAtAsc(
+                    eq(order.getId()), any())).thenReturn(List.of(pendingPayment));
+
+            service.expirePendingPayments();
+
+            assertEquals(OrderStatus.CANCELLED, order.getStatus());
+            assertEquals(PaymentStatus.FAILED, pendingPayment.getStatus());
+            verify(studentWalletService).releaseForOrder(eq(order.getId()), any(Instant.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(14)
+        @DisplayName("UTCID14 (N) - signed browser return with another error -> FAILED")
+        void handleVnPayReturn_otherProviderError_marksOrderFailed() {
+            PaymentTransaction gatewayPayment = PaymentTransaction.builder()
+                    .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build();
+            when(paymentGateway.parseCallback(params)).thenReturn(new PaymentCallbackResult(
+                    true, "OD1", "99999", 10_000L, "51", "02", false));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+            when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                    order.getId(), "VNPAY")).thenReturn(Optional.of(gatewayPayment));
+            when(paymentTransactionRepository.findByOrder_IdAndStatusInOrderByCreatedAtAsc(
+                    eq(order.getId()), any())).thenReturn(List.of());
+
+            assertEquals("00", service.handleVnPayReturn(params).rspCode());
+            assertEquals(OrderStatus.FAILED, order.getStatus());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(15)
+        @DisplayName("UTCID15 (A) - invalid browser return checksum -> no state change")
+        void handleVnPayReturn_invalidSignature_returns97AndDoesNothing() {
+            when(paymentGateway.parseCallback(params)).thenReturn(result(false, false, 10_000L));
+
+            assertEquals("97", service.handleVnPayReturn(params).rspCode());
+            assertEquals(OrderStatus.PENDING, order.getStatus());
+            verify(orderRepository, never()).findByOrderCodeForUpdate(anyString());
+            verify(paymentTransactionRepository, never()).save(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(16)
+        @DisplayName("UTCID16 (N) - signed successful browser return confirms pending order")
+        void handleVnPayReturn_success_confirmsPaymentAndFulfilsOrder() {
+            PaymentTransaction gatewayPayment = PaymentTransaction.builder()
+                    .order(order).provider("VNPAY").status(PaymentStatus.PENDING).build();
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+            when(paymentTransactionRepository.findFirstByOrder_IdAndProviderOrderByCreatedAtDesc(
+                    order.getId(), "VNPAY")).thenReturn(Optional.of(gatewayPayment));
+            when(orderItemRepository.findByOrder_Id(order.getId()))
+                    .thenReturn(List.of(OrderItem.builder()
+                            .order(order).course(course).price(new BigDecimal("100.00")).build()));
+            when(enrollmentRepository.findByStudentIdAndCourseIdForUpdate(any(), any()))
+                    .thenReturn(Optional.empty());
+
+            IpnAckResponse ack = service.handleVnPayReturn(params);
+
+            assertEquals("00", ack.rspCode());
+            assertEquals(OrderStatus.PAID, order.getStatus());
+            assertEquals(PaymentStatus.SUCCESS, gatewayPayment.getStatus());
+            assertEquals("99999", gatewayPayment.getProviderTransactionId());
+            verify(enrollmentRepository).save(any(Enrollment.class));
+            verify(escrowService).holdForOrder(order);
+            verify(eventPublisher).publishEvent(any(PaymentNotificationEvent.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(17)
+        @DisplayName("UTCID17 (A) - signed return after IPN is replay-safe for frontend")
+        void handleVnPayReturn_alreadyPaid_returns00WithoutDuplicateFulfilment() {
+            order.setStatus(OrderStatus.PAID);
+            when(paymentGateway.parseCallback(params)).thenReturn(result(true, true, 10_000L));
+            when(orderRepository.findByOrderCodeForUpdate("OD1")).thenReturn(Optional.of(order));
+
+            IpnAckResponse ack = service.handleVnPayReturn(params);
+
+            assertEquals("00", ack.rspCode());
+            assertEquals(OrderStatus.PAID, order.getStatus());
+            verify(paymentTransactionRepository, never()).save(any());
+            verify(enrollmentRepository, never()).save(any());
+            verify(escrowService, never()).holdForOrder(any());
+            verify(eventPublisher, never()).publishEvent(any(PaymentNotificationEvent.class));
         }
     }
 
