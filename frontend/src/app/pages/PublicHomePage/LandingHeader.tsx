@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Avatar } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Avatar, Badge, Tooltip } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
@@ -8,15 +9,23 @@ import {
   getAuthSession,
   subscribeToAuthSessionChanges,
 } from '../../../shared/auth/authSession';
+import { ROLES } from '../../../shared/constants/roles';
 import { AccountMenu } from '../../../shared/layouts/AccountMenu';
+import { NotificationMenu } from '../../../shared/layouts/NotificationMenu';
+import { useUnreadCount } from '../../../features/notifications/hooks/useNotifications';
 
 export const LandingHeader: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [scrolled, setScrolled] = useState(false);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
   const [session, setSession] = useState(() => getAuthSession('public'));
   const avatarLabel = session?.email?.trim().charAt(0).toUpperCase() || 'U';
+  const notificationPath = session?.roles.includes(ROLES.TEACHER)
+    ? ROUTES.TEACHER.NOTIFICATIONS
+    : ROUTES.STUDENT.NOTIFICATIONS;
+  const { data: unreadCount = 0 } = useUnreadCount(Boolean(session));
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 60);
@@ -43,6 +52,7 @@ export const LandingHeader: React.FC = () => {
 
   const handleLogout = () => {
     setProfileAnchorEl(null);
+    setNotificationAnchorEl(null);
     setSession(null);
     clearAuthSession('public');
     window.location.replace(ROUTES.PUBLIC.HOME);
@@ -149,6 +159,29 @@ export const LandingHeader: React.FC = () => {
 
           {session ? (
             <>
+              <Tooltip title="Thông báo">
+                <IconButton
+                  onClick={(event) => setNotificationAnchorEl(event.currentTarget)}
+                  aria-label="Mở thông báo"
+                  aria-controls={notificationAnchorEl ? 'notification-menu' : undefined}
+                  aria-haspopup="true"
+                  aria-expanded={Boolean(notificationAnchorEl)}
+                  sx={{ color: '#475569' }}
+                >
+                  <Badge badgeContent={unreadCount} color="error" max={99}>
+                    <NotificationsIcon />
+                  </Badge>
+                </IconButton>
+              </Tooltip>
+              <NotificationMenu
+                anchorEl={notificationAnchorEl}
+                onClose={() => setNotificationAnchorEl(null)}
+                onViewAll={() => {
+                  setNotificationAnchorEl(null);
+                  navigate(notificationPath);
+                }}
+                scopeKey={session.subject}
+              />
               <IconButton
                 onClick={(event) => setProfileAnchorEl(event.currentTarget)}
                 aria-label="Mở menu tài khoản"
