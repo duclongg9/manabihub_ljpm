@@ -1,6 +1,7 @@
 package com.manabihub.writing.repository;
 
 import com.manabihub.writing.entity.WritingSubmission;
+import com.manabihub.writing.repository.projection.WritingReviewFacetProjection;
 import com.manabihub.writing.repository.projection.WritingSubmissionQueueProjection;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -11,6 +12,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +29,12 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
             LEFT JOIN course_lesson_blocks lesson_block ON lesson_block.id = ws.lesson_block_id
             WHERE c.teacher_id = :teacherId
               AND ws.status <> 'DRAFT'
+              AND (:courseId IS NULL OR c.id = :courseId)
+              AND (
+                  :lessonId IS NULL
+                  OR COALESCE(legacy_lesson.id, lesson_block.id) = :lessonId
+              )
+              AND (:status IS NULL OR ws.status = :status)
               AND (
                   :searchQuery = ''
                   OR LOWER(COALESCE(NULLIF(sp.display_name, ''), au.full_name, au.email))
@@ -52,6 +61,7 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
                     SELECT ws.id AS id,
                            c.id AS courseId,
                            c.title AS courseTitle,
+                           COALESCE(legacy_lesson.id, lesson_block.id) AS lessonId,
                            COALESCE(legacy_lesson.title, lesson_block.title, 'Writing activity') AS lessonTitle,
                            COALESCE(NULLIF(sp.display_name, ''), au.full_name, au.email) AS studentName,
                            au.email AS studentEmail,
@@ -64,7 +74,14 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
                            EXISTS (
                                SELECT 1 FROM teacher_writing_feedback twf
                                WHERE twf.writing_submission_id = ws.id
-                           ) AS hasTeacherFeedback
+                           ) AS hasTeacherFeedback,
+                           (
+                               SELECT twf.score
+                               FROM teacher_writing_feedback twf
+                               WHERE twf.writing_submission_id = ws.id
+                               ORDER BY twf.created_at DESC
+                               LIMIT 1
+                           ) AS score
                     """ + QUEUE_FROM + " ORDER BY ws.submitted_at DESC",
             countQuery = "SELECT COUNT(*) " + QUEUE_FROM,
             nativeQuery = true
@@ -73,8 +90,56 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
             @Param("teacherId") UUID teacherId,
             @Param("searchQuery") String searchQuery,
             @Param("reviewed") Boolean reviewed,
+            @Param("courseId") UUID courseId,
+            @Param("lessonId") UUID lessonId,
+            @Param("status") String status,
             Pageable pageable
     );
+
+    @Query(value = "SELECT COUNT(*) " + QUEUE_FROM, nativeQuery = true)
+    long countOwnedQueue(
+            @Param("teacherId") UUID teacherId,
+            @Param("searchQuery") String searchQuery,
+            @Param("reviewed") Boolean reviewed,
+            @Param("courseId") UUID courseId,
+            @Param("lessonId") UUID lessonId,
+            @Param("status") String status
+    );
+
+    @Query(value = """
+            SELECT AVG((
+                SELECT twf.score
+                FROM teacher_writing_feedback twf
+                WHERE twf.writing_submission_id = ws.id
+                ORDER BY twf.created_at DESC
+                LIMIT 1
+            ))
+            """ + QUEUE_FROM, nativeQuery = true)
+    BigDecimal averageOwnedScore(
+            @Param("teacherId") UUID teacherId,
+            @Param("searchQuery") String searchQuery,
+            @Param("reviewed") Boolean reviewed,
+            @Param("courseId") UUID courseId,
+            @Param("lessonId") UUID lessonId,
+            @Param("status") String status
+    );
+
+    @Query(value = """
+            SELECT DISTINCT
+                   c.id AS courseId,
+                   c.title AS courseTitle,
+                   COALESCE(legacy_lesson.id, lesson_block.id) AS lessonId,
+                   COALESCE(legacy_lesson.title, lesson_block.title, 'Writing activity') AS lessonTitle
+            FROM writing_submissions ws
+            JOIN enrollments e ON e.id = ws.enrollment_id
+            JOIN courses c ON c.id = e.course_id
+            LEFT JOIN lessons legacy_lesson ON legacy_lesson.id = ws.lesson_id
+            LEFT JOIN course_lesson_blocks lesson_block ON lesson_block.id = ws.lesson_block_id
+            WHERE c.teacher_id = :teacherId
+              AND ws.status <> 'DRAFT'
+            ORDER BY c.title, lessonTitle
+            """, nativeQuery = true)
+    List<WritingReviewFacetProjection> findOwnedFacets(@Param("teacherId") UUID teacherId);
 
     @EntityGraph(attributePaths = {
             "enrollment", "enrollment.course", "student", "student.user"
@@ -84,6 +149,7 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
             FROM WritingSubmission ws
             WHERE ws.id = :submissionId
               AND ws.enrollment.course.teacher.id = :teacherId
+              AND ws.status <> com.manabihub.writing.enums.WritingSubmissionStatus.DRAFT
             """)
     Optional<WritingSubmission> findOwnedById(
             @Param("submissionId") UUID submissionId,
@@ -99,6 +165,7 @@ public interface WritingSubmissionRepository extends JpaRepository<WritingSubmis
             FROM WritingSubmission ws
             WHERE ws.id = :submissionId
               AND ws.enrollment.course.teacher.id = :teacherId
+              AND ws.status <> com.manabihub.writing.enums.WritingSubmissionStatus.DRAFT
             """)
     Optional<WritingSubmission> findOwnedByIdForUpdate(
             @Param("submissionId") UUID submissionId,

@@ -15,9 +15,12 @@ import { CourseCatalogCard } from './CourseCatalogCard';
 import type { PublicCourseSummary } from '../types/catalogTypes';
 
 interface CourseDiscoverySectionsProps {
-  courses: PublicCourseSummary[];
+  latestCourses: PublicCourseSummary[];
+  bestSellingCourses: PublicCourseSummary[];
+  topRatedCourses: PublicCourseSummary[];
   selectedLevel?: string;
   onLevelChange: (level?: string) => void;
+  onViewAll: () => void;
 }
 
 const LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
@@ -42,7 +45,7 @@ function CourseRail({
   if (courses.length === 0) return null;
 
   return (
-    <Box sx={{ mb: { xs: 4, md: 5 } }}>
+    <Box component="section" aria-label={title} sx={{ mb: { xs: 4, md: 5 } }}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', mb: 2 }}>
         <Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -72,22 +75,20 @@ function CourseRail({
 }
 
 export const CourseDiscoverySections: React.FC<CourseDiscoverySectionsProps> = ({
-  courses,
+  latestCourses,
+  bestSellingCourses,
+  topRatedCourses,
   selectedLevel,
   onLevelChange,
+  onViewAll,
 }) => {
-  const levelCourses = selectedLevel
-    ? courses.filter((course) => course.jlptLevel === selectedLevel)
-    : courses;
   const bestSellers = takeDistinct(
-    [...levelCourses].filter((course) => (course.enrollmentCount ?? 0) > 0).sort((a, b) => (b.enrollmentCount ?? 0) - (a.enrollmentCount ?? 0)),
+    bestSellingCourses.filter((course) => (course.enrollmentCount ?? 0) > 0),
     4,
   );
-  const featured = bestSellers.length > 0 ? bestSellers : takeDistinct([...levelCourses].sort((a, b) => (new Date(b.publishedAt ?? 0).getTime() - new Date(a.publishedAt ?? 0).getTime())), 4);
+  const featured = bestSellers.length > 0 ? bestSellers : takeDistinct(latestCourses, 4);
   const topRated = takeDistinct(
-    [...levelCourses]
-      .filter((course) => (course.reviewCount ?? 0) >= 2 && (course.averageRating ?? 0) >= 4.5)
-      .sort((a, b) => (b.averageRating ?? 0) - (a.averageRating ?? 0) || (b.reviewCount ?? 0) - (a.reviewCount ?? 0)),
+    topRatedCourses.filter((course) => (course.reviewCount ?? 0) > 0 && (course.averageRating ?? 0) > 0),
     4,
   );
 
@@ -135,14 +136,14 @@ export const CourseDiscoverySections: React.FC<CourseDiscoverySectionsProps> = (
         icon={<LocalFireDepartmentRoundedIcon />}
         subtitle={bestSellers.length > 0 ? 'Được nhiều học viên đang có quyền truy cập lựa chọn.' : 'Những khóa học mới và phù hợp để bắt đầu.'}
         courses={featured}
-        onViewAll={() => onLevelChange(undefined)}
+        onViewAll={onViewAll}
       />
       <CourseRail
         title="Được đánh giá cao"
         icon={<StarRoundedIcon />}
-        subtitle="Chỉ hiển thị khi có đủ đánh giá đã được hệ thống duyệt."
+        subtitle="Xếp theo điểm trung bình và số đánh giá đã được hệ thống xác minh."
         courses={topRated}
-        onViewAll={() => onLevelChange(undefined)}
+        onViewAll={onViewAll}
       />
     </Box>
   );

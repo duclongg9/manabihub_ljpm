@@ -3,6 +3,9 @@ import { ENDPOINTS } from '../../../shared/api/endpoints';
 import type { ApiResponse, PageResponse } from '../../../shared/types/api';
 import type {
   TeacherWritingFeedbackPayload,
+  WritingReviewFacets,
+  WritingReviewOverview,
+  WritingSubmissionStatus,
   WritingSubmissionDetail,
   WritingSubmissionSummary,
 } from '../types/writingReviewTypes';
@@ -12,7 +15,15 @@ export interface WritingReviewListParams {
   size: number;
   query?: string;
   reviewed?: boolean;
+  courseId?: string;
+  lessonId?: string;
+  status?: WritingSubmissionStatus;
 }
+
+export type WritingReviewOverviewParams = Pick<
+  WritingReviewListParams,
+  'query' | 'courseId' | 'lessonId' | 'status'
+>;
 
 export const writingReviewService = {
   async listSubmissions(
@@ -21,6 +32,21 @@ export const writingReviewService = {
     const response = await axiosClient.get<
       ApiResponse<PageResponse<WritingSubmissionSummary>>
     >(ENDPOINTS.teacherWriting.submissions, { params });
+    return response.data.data;
+  },
+
+  async getFacets(): Promise<WritingReviewFacets> {
+    const response = await axiosClient.get<ApiResponse<WritingReviewFacets>>(
+      `${ENDPOINTS.teacherWriting.submissions}/facets`,
+    );
+    return response.data.data;
+  },
+
+  async getOverview(params: WritingReviewOverviewParams): Promise<WritingReviewOverview> {
+    const response = await axiosClient.get<ApiResponse<WritingReviewOverview>>(
+      `${ENDPOINTS.teacherWriting.submissions}/overview`,
+      { params },
+    );
     return response.data.data;
   },
 

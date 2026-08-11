@@ -205,6 +205,8 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
           onChange={handleSortChange}
           sx={{ '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
         >
+          <MenuItem value="enrollmentCount,desc">Bán chạy nhất</MenuItem>
+          <MenuItem value="averageRating,desc">Đánh giá cao</MenuItem>
           <MenuItem value="publishedAt,desc">Mới xuất bản</MenuItem>
           <MenuItem value="price,asc">Giá thấp đến cao</MenuItem>
           <MenuItem value="price,desc">Giá cao đến thấp</MenuItem>

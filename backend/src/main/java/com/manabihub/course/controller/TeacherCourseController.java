@@ -75,6 +75,16 @@ public class TeacherCourseController {
         ));
     }
 
+    @PostMapping("/{courseId}/unpublish")
+    public ResponseEntity<ApiResponse<CourseDraftResponse>> unpublishCourse(@PathVariable UUID courseId) {
+        CourseDraftResponse response = courseService.unpublishCourse(courseId);
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.COURSE_UPDATED,
+                "Course hidden from the public catalogue and returned to drafts for editing.",
+                response
+        ));
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<List<CourseDraftResponse>>> listCourses() {
         List<CourseDraftResponse> response = courseService.listMyCourses();
