@@ -50,16 +50,22 @@ class AdminAuditLogControllerTest {
         when(auditLogService.getAuditLogs(any(AuditLogFilterDto.class), any()))
                 .thenReturn(PageResponse.<com.manabihub.audit.dto.AuditLogDto>builder()
                         .content(List.of())
-                        .totalElements(0)
-                        .page(0)
+                        .totalElements(42)
+                        .page(2)
                         .size(20)
-                        .totalPages(0)
+                        .totalPages(3)
                         .build());
 
         mockMvc.perform(get("/api/v1/admin/audit-logs")
+                        .param("page", "2")
+                        .param("size", "20")
+                        .param("sort", "createdAt,desc")
                         .with(adminJwt("SYSTEM_ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.messageCode").value("COMMON_SUCCESS"));
+                .andExpect(jsonPath("$.messageCode").value("COMMON_SUCCESS"))
+                .andExpect(jsonPath("$.data.page").value(2))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(42));
     }
 
     @Test

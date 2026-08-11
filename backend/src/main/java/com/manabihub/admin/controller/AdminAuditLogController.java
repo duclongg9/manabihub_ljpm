@@ -37,7 +37,7 @@ public class AdminAuditLogController {
             @RequestParam(required = false) String action,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant toDate,
-            @PageableDefault(sort = {"createdAt", "id"}, direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable
+            @PageableDefault(size = 20, sort = {"createdAt", "id"}, direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable
     ) {
         AuditLogFilterDto filter = AuditLogFilterDto.builder()
                 .actor(actor)

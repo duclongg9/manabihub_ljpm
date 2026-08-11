@@ -15,6 +15,7 @@ import com.manabihub.identity.repository.AppUserRepository;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -115,20 +116,16 @@ public class AuditLogServiceImpl implements AuditLogService {
             validOrders.add(org.springframework.data.domain.Sort.Order.desc("id"));
         }
         
-        Pageable safePageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), org.springframework.data.domain.Sort.by(validOrders));
+        int safePage = Math.max(pageable.getPageNumber(), 0);
+        int safeSize = Math.min(Math.max(pageable.getPageSize(), 1), 100);
+        Pageable safePageable = PageRequest.of(safePage, safeSize, org.springframework.data.domain.Sort.by(validOrders));
 
         List<UUID> actorIds = null;
         if (filter.getActor() != null && !filter.getActor().isBlank()) {
             actorIds = resolveActorIds(filter.getActor());
             if (actorIds.isEmpty()) {
                 // If actor filter yields no results, return empty page immediately
-                return PageResponse.<AuditLogDto>builder()
-                        .content(new ArrayList<>())
-                        .totalElements(0)
-                        .page(safePageable.getPageNumber())
-                        .size(safePageable.getPageSize())
-                        .totalPages(0)
-                        .build();
+                return PageResponse.from(Page.empty(safePageable));
             }
         }
 
@@ -145,24 +142,12 @@ public class AuditLogServiceImpl implements AuditLogService {
         Page<AuditLog> page = auditLogRepository.findAll(spec, safePageable);
 
         if (page.isEmpty()) {
-            return PageResponse.<AuditLogDto>builder()
-                    .content(new ArrayList<>())
-                    .totalElements(0)
-                    .page(safePageable.getPageNumber())
-                    .size(safePageable.getPageSize())
-                    .totalPages(0)
-                    .build();
+            return PageResponse.from(Page.empty(safePageable));
         }
 
         List<AuditLogDto> dtoList = mapToDtoList(page.getContent());
 
-        return PageResponse.<AuditLogDto>builder()
-                .content(dtoList)
-                .totalElements(page.getTotalElements())
-                .page(safePageable.getPageNumber())
-                .size(safePageable.getPageSize())
-                .totalPages(page.getTotalPages())
-                .build();
+        return PageResponse.from(new PageImpl<>(dtoList, safePageable, page.getTotalElements()));
     }
 
     @Override
