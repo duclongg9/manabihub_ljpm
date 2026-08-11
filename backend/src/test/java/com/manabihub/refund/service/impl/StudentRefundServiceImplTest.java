@@ -38,6 +38,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -162,6 +164,34 @@ class StudentRefundServiceImplTest {
 
         @Test
         @org.junit.jupiter.api.Order(2)
+        @DisplayName("UTCID01b (N) - wallet settlement runs only after refund request commits")
+        void standardRefund_defersWalletSettlementUntilAfterCommit() {
+            stubCommon(StudentRefundType.STANDARD);
+            when(learningProgressDomainService.calculateProgress(orderItem.getCourse().getId(), enrollment.getId()))
+                    .thenReturn(new LearningProgressDomainService.ProgressResult(1, 10, 10.0));
+            when(refundRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+                RefundRequest saved = invocation.getArgument(0);
+                saved.setId(UUID.randomUUID());
+                return saved;
+            });
+
+            TransactionSynchronizationManager.initSynchronization();
+            try {
+                var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
+
+                assertEquals(RefundStatus.PENDING, response.status());
+                verify(refundDecisionTransactionService, never()).autoApproveToStudentWallet(any());
+
+                TransactionSynchronizationManager.getSynchronizations()
+                        .forEach(TransactionSynchronization::afterCommit);
+                verify(refundDecisionTransactionService).autoApproveToStudentWallet(any());
+            } finally {
+                TransactionSynchronizationManager.clearSynchronization();
+            }
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(3)
         @DisplayName("UTCID02 (B) - day 14 + exactly 20% (both upper bounds) -> auto-approved")
         void standardRefund_dayFourteenAndExactlyTwentyPercent_autoApprovesToWallet() {
             payment.setSucceededAt(Instant.now().minus(14, ChronoUnit.DAYS));

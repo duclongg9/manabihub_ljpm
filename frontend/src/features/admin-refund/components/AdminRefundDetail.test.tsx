@@ -132,7 +132,7 @@ describe('AdminRefundDetail', () => {
       });
     });
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Provider đã xác nhận và khoản hoàn tiền đã được hạch toán thành công.',
+      'Đã ghi có khoản hoàn tiền vào ví học viên và khóa quyền truy cập khóa học.',
     );
     expect(await screen.findByText('Đã hoàn tiền')).toBeInTheDocument();
   });
