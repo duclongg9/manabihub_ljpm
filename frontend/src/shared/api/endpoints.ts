@@ -103,12 +103,14 @@ export const ENDPOINTS = {
     weeklyChallenge: '/v1/student/weekly-challenge',
     startWeeklyChallenge: (challengeId: string) => `/v1/student/weekly-challenge/${challengeId}/attempts`,
     matchWeeklyChallenge: (attemptId: string) => `/v1/student/weekly-challenge/attempts/${attemptId}/matches`,
+    weeklyChallengeLeaderboard: (challengeId: string) => `/v1/student/weekly-challenge/${challengeId}/leaderboard`,
   },
   ADMIN_WEEKLY_CHALLENGES: {
     LIST: '/v1/admin/weekly-challenges',
     DETAIL: (id: string) => `/v1/admin/weekly-challenges/${id}`,
     PUBLISH: (id: string) => `/v1/admin/weekly-challenges/${id}/publish`,
     UNPUBLISH: (id: string) => `/v1/admin/weekly-challenges/${id}/unpublish`,
+    LEADERBOARD: (id: string) => `/v1/admin/weekly-challenges/${id}/leaderboard`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>

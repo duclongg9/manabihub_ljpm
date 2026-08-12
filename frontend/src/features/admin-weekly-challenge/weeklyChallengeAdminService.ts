@@ -1,5 +1,6 @@
 import { axiosClient } from '../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../shared/api/endpoints';
+import type { WeeklyChallengeLeaderboard } from '../../shared/types/weeklyChallengeLeaderboard';
 
 export interface ChallengePair { id?: string; prompt: string; answer: string; orderIndex?: number }
 export interface ManagedWeeklyChallenge {
@@ -26,4 +27,8 @@ export const weeklyChallengeAdminService = {
   async publish(id: string): Promise<void> { await axiosClient.post(ENDPOINTS.ADMIN_WEEKLY_CHALLENGES.PUBLISH(id)); },
   async unpublish(id: string): Promise<void> { await axiosClient.post(ENDPOINTS.ADMIN_WEEKLY_CHALLENGES.UNPUBLISH(id)); },
   async remove(id: string): Promise<void> { await axiosClient.delete(ENDPOINTS.ADMIN_WEEKLY_CHALLENGES.DETAIL(id)); },
+  async leaderboard(id: string): Promise<WeeklyChallengeLeaderboard> {
+    const response = await axiosClient.get(ENDPOINTS.ADMIN_WEEKLY_CHALLENGES.LEADERBOARD(id));
+    return response.data.data;
+  },
 };

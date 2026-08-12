@@ -40,6 +40,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -117,6 +118,8 @@ class AdminCourseApprovalServiceImplTest {
 
         org.mockito.Mockito.lenient()
                 .when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        org.mockito.Mockito.lenient()
+                .when(courseRepository.findByIdForApprovalReview(courseId)).thenReturn(Optional.of(course));
         org.mockito.Mockito.lenient()
                 .when(courseEditDraftService.resolveEditableCourse(any(Course.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -207,7 +210,7 @@ class AdminCourseApprovalServiceImplTest {
     @DisplayName("UTCID05 (A) - course not found -> MSG-COM-001")
     void reviewCourse_CourseNotFound_IsRejected() {
         mockCourseManagerAccess();
-        when(courseRepository.findById(courseId)).thenReturn(Optional.empty());
+        when(courseRepository.findByIdForApprovalReview(courseId)).thenReturn(Optional.empty());
 
         BusinessException error = assertThrows(
                 BusinessException.class,
@@ -221,17 +224,23 @@ class AdminCourseApprovalServiceImplTest {
 
     @Test
     @Order(6)
-    @DisplayName("UTCID06 (A) - course is not PENDING -> MSG-COM-004")
+    @DisplayName("UTCID06 (A) - course is not PENDING -> 409 conflict")
     void reviewCourse_CourseNotPending_IsRejected() {
         mockCourseManagerAccess();
         course.setStatus(CourseStatus.APPROVED);
+        when(courseRepository.findByIdForApprovalReview(courseId)).thenReturn(Optional.of(course));
 
         BusinessException error = assertThrows(
                 BusinessException.class,
                 () -> courseApprovalService.reviewCourse(adminId, courseId, approve())
         );
 
-        assertEquals("MSG-COM-004", error.getMessageCode());
+        assertEquals("MSG-COURSE-REVIEW-STATE", error.getMessageCode());
+        assertEquals(HttpStatus.CONFLICT, error.getHttpStatus());
+        assertEquals(
+                "Yêu cầu xét duyệt này đã được xử lý. Chỉ khóa học đang chờ phê duyệt mới có thể nhận quyết định.",
+                error.getMessage()
+        );
         assertEquals(CourseStatus.APPROVED, course.getStatus());
         verify(decisionRepository, never()).save(any());
     }

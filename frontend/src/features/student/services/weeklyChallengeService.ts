@@ -1,5 +1,6 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
+import type { WeeklyChallengeLeaderboard } from '../../../shared/types/weeklyChallengeLeaderboard';
 
 export interface WeeklyChallenge {
   id: string;
@@ -52,6 +53,10 @@ export const weeklyChallengeService = {
       firstCardId,
       secondCardId,
     });
+    return response.data.data;
+  },
+  async leaderboard(challengeId: string): Promise<WeeklyChallengeLeaderboard> {
+    const response = await axiosClient.get(ENDPOINTS.student.weeklyChallengeLeaderboard(challengeId));
     return response.data.data;
   },
 };

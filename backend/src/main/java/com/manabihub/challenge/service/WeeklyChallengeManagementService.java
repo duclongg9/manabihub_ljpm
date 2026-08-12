@@ -183,7 +183,7 @@ public class WeeklyChallengeManagementService {
     }
 
     private void audit(UUID adminId, String action, UUID targetId, Map<String, Object> metadata) {
-        auditLogRepository.save(AuditLog.builder().actorType("ADMIN").actorAdminId(adminId)
+        auditLogRepository.save(AuditLog.builder().actorType("INTERNAL_ADMIN").actorAdminId(adminId)
                 .actorRoleCode("COURSE_MANAGER").action(action).targetType("WEEKLY_CHALLENGE")
                 .targetId(targetId).metadata(metadata).build());
     }

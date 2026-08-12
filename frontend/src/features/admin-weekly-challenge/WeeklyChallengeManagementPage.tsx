@@ -9,11 +9,14 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import PublicRoundedIcon from '@mui/icons-material/PublicRounded';
 import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined';
+import LeaderboardOutlinedIcon from '@mui/icons-material/LeaderboardOutlined';
 import {
   weeklyChallengeAdminService, type ChallengePair, type ManagedWeeklyChallenge,
   type WeeklyChallengePayload,
 } from './weeklyChallengeAdminService';
 import { mondayOfCurrentWeek } from './weeklyChallengeDate';
+import { WeeklyChallengeLeaderboardDialog } from '../../shared/components/WeeklyChallengeLeaderboardDialog';
+import type { WeeklyChallengeLeaderboard } from '../../shared/types/weeklyChallengeLeaderboard';
 
 const PAGE_SIZE = 6;
 
@@ -43,6 +46,11 @@ export function WeeklyChallengeManagementPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<WeeklyChallengePayload>(emptyPayload);
   const [page, setPage] = useState(1);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [leaderboard, setLeaderboard] = useState<WeeklyChallengeLeaderboard | null>(null);
+  const [leaderboardChallengeId, setLeaderboardChallengeId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -76,6 +84,16 @@ export function WeeklyChallengeManagementPage() {
     try { await action(); await load(); }
     catch (err: unknown) { setError((err as { response?: { data?: { message?: string } } }).response?.data?.message || 'Thao tác thất bại.'); }
     finally { setBusy(false); }
+  };
+  const loadLeaderboard = async (challengeId: string) => {
+    setLeaderboardLoading(true); setLeaderboardError(null);
+    try { setLeaderboard(await weeklyChallengeAdminService.leaderboard(challengeId)); }
+    catch { setLeaderboardError('Không thể tải bảng xếp hạng. Vui lòng thử lại.'); }
+    finally { setLeaderboardLoading(false); }
+  };
+  const openLeaderboard = (challengeId: string) => {
+    setLeaderboardChallengeId(challengeId); setLeaderboard(null); setLeaderboardOpen(true);
+    void loadLeaderboard(challengeId);
   };
   const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const visibleItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -112,6 +130,7 @@ export function WeeklyChallengeManagementPage() {
           <Chip label={`Hạng 3: ${item.thirdPrize.toLocaleString('vi-VN')} ₫`} />
         </Stack>
       </CardContent><CardActions>
+        <Button startIcon={<LeaderboardOutlinedIcon />} onClick={() => openLeaderboard(item.id)}>Bảng xếp hạng</Button>
         {item.status === 'DRAFT' && <Button startIcon={<EditOutlinedIcon />} onClick={() => openEdit(item)}>Sửa nội dung</Button>}
         {item.status === 'DRAFT' && <Button startIcon={<PublicRoundedIcon />} onClick={() => act(() => weeklyChallengeAdminService.publish(item.id))}>Công khai</Button>}
         {item.status === 'PUBLISHED' && <Button color="warning" onClick={() => act(() => weeklyChallengeAdminService.unpublish(item.id))}>Ẩn</Button>}
@@ -146,5 +165,9 @@ export function WeeklyChallengeManagementPage() {
       </Grid></DialogContent>
       <DialogActions><Button onClick={() => setOpen(false)} disabled={busy}>Hủy</Button><Button variant="contained" onClick={save} disabled={busy}>{busy ? 'Đang lưu...' : 'Lưu bản nháp'}</Button></DialogActions>
     </Dialog>
+    <WeeklyChallengeLeaderboardDialog open={leaderboardOpen} loading={leaderboardLoading}
+      error={leaderboardError} data={leaderboard}
+      onRetry={() => leaderboardChallengeId && void loadLeaderboard(leaderboardChallengeId)}
+      onClose={() => setLeaderboardOpen(false)} />
   </Box>;
 }

@@ -8,6 +8,7 @@ vi.mock('../services/weeklyChallengeService', () => ({
     current: vi.fn(),
     start: vi.fn(),
     match: vi.fn(),
+    leaderboard: vi.fn(),
   },
 }));
 
@@ -33,6 +34,15 @@ describe('LearningChallengeWidget', () => {
     vi.clearAllMocks();
     vi.mocked(weeklyChallengeService.current).mockResolvedValue(challenge);
     vi.mocked(weeklyChallengeService.start).mockResolvedValue(attempt);
+    vi.mocked(weeklyChallengeService.leaderboard).mockResolvedValue({
+      challengeId: 'challenge-1', challengeTitle: challenge.title,
+      weekStart: challenge.weekStart, weekEnd: challenge.weekEnd, settled: false,
+      generatedAt: '2026-08-12T10:00:00Z', totalParticipants: 1,
+      entries: [{ rank: 1, displayName: 'Nguyễn An', avatarUrl: null,
+        bestMillis: 12340, rewardAmount: 30000, currentStudent: true }],
+      currentStudent: { rank: 1, displayName: 'Nguyễn An', avatarUrl: null,
+        bestMillis: 12340, rewardAmount: 30000, currentStudent: true },
+    });
   });
 
   afterEach(cleanup);
@@ -57,5 +67,44 @@ describe('LearningChallengeWidget', () => {
     await waitFor(() => expect(weeklyChallengeService.current).toHaveBeenCalled());
     expect(await screen.findByText('Thử thách tuần đang được chuẩn bị')).toBeInTheDocument();
     expect(screen.getByText(/trò chơi ghép thẻ và mức thưởng/)).toBeInTheDocument();
+  });
+
+  it('opens the server leaderboard for students', async () => {
+    render(<LearningChallengeWidget />);
+    await screen.findByText('Manabi Match · Kanji N5');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xem bảng xếp hạng' }));
+
+    expect(await screen.findByText('Nguyễn An')).toBeInTheDocument();
+    expect(screen.getByText('00:12.34')).toBeInTheDocument();
+    expect(weeklyChallengeService.leaderboard).toHaveBeenCalledWith('challenge-1');
+  });
+
+  it('submits a selected pair once and refreshes the weekly result after completion', async () => {
+    const completedAttempt = {
+      ...attempt,
+      cards: attempt.cards.map((card) => ({ ...card, matched: true })),
+      matchedPairs: 4,
+      totalMillis: 12340,
+      completed: true,
+    };
+    vi.mocked(weeklyChallengeService.current)
+      .mockResolvedValueOnce(challenge)
+      .mockResolvedValueOnce({ ...challenge, personalBestMillis: 12340, rankedAttemptsToday: 1 });
+    vi.mocked(weeklyChallengeService.match).mockResolvedValue(completedAttempt);
+    render(<LearningChallengeWidget accountKey="student-1" />);
+
+    await screen.findByText('Manabi Match · Kanji N5');
+    fireEvent.click(screen.getByRole('button', { name: 'Vào chơi ngay' }));
+    const dialog = await screen.findByRole('dialog');
+    const hiddenCards = within(dialog).getAllByRole('button', { name: 'Thẻ đang úp' });
+    fireEvent.click(hiddenCards[0]);
+    fireEvent.click(hiddenCards[1]);
+    fireEvent.click(hiddenCards[1]);
+
+    await waitFor(() => expect(weeklyChallengeService.match).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(weeklyChallengeService.current).toHaveBeenCalledTimes(2));
+    expect(within(dialog).getAllByText(/00:12\.34/)).toHaveLength(2);
+    expect(screen.queryByText(/Không thể xác nhận cặp thẻ/)).not.toBeInTheDocument();
   });
 });

@@ -115,4 +115,21 @@ describe('CourseApprovalDetailPage', () => {
       expect(screen.getByRole('button', { name: 'Phê duyệt khóa học' })).toBeEnabled();
     });
   });
+
+  it('khóa toàn bộ quyết định khi yêu cầu đã được phê duyệt', async () => {
+    vi.mocked(courseApprovalService.getDetail).mockResolvedValue({
+      ...detail,
+      status: 'APPROVED',
+      approvalReady: true,
+      validationErrors: [],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText(/Yêu cầu này đã được xử lý với trạng thái/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Phê duyệt khóa học' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Yêu cầu chỉnh sửa' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Từ chối khóa học' })).toBeDisabled();
+    expect(courseApprovalService.reviewCourse).not.toHaveBeenCalled();
+  });
 });

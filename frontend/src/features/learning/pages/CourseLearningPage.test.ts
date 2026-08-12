@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applySequentialLocks } from './CourseLearningPage';
+import { normalizeWatchedSecondsAtVideoEnd } from '../utils/videoProgress';
 import type { LearningLessonBlock, LearningModule } from '../types';
 
 function lesson(id: string, status: LearningLessonBlock['progressStatus']): LearningLessonBlock {
@@ -47,5 +48,19 @@ describe('CourseLearningPage access guards', () => {
     }];
 
     expect(applySequentialLocks(modules)[0].blocks.map((block) => block.locked)).toEqual([false, false, false]);
+  });
+});
+
+describe('CourseLearningPage video completion guards', () => {
+  it('normalizes minor browser timing gaps when playback reaches the real end', () => {
+    expect(normalizeWatchedSecondsAtVideoEnd(286, 300)).toBe(300);
+  });
+
+  it('does not complete a video that was mostly skipped', () => {
+    expect(normalizeWatchedSecondsAtVideoEnd(120, 300)).toBe(120);
+  });
+
+  it('keeps the watched value when media duration is unavailable', () => {
+    expect(normalizeWatchedSecondsAtVideoEnd(120, Number.NaN)).toBe(120);
   });
 });

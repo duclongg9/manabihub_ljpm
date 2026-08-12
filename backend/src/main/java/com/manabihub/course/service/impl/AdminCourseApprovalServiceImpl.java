@@ -37,6 +37,7 @@ import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.notification.NotificationTypes;
 import com.manabihub.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -157,11 +158,15 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     public void reviewCourse(UUID adminId, UUID courseId, CourseReviewRequest request) {
         String actorRoleCode = requireReviewerRole(adminId);
 
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new BusinessException("MSG-COM-001", "Course not found"));
+        Course course = courseRepository.findByIdForApprovalReview(courseId)
+                .orElseThrow(() -> new BusinessException("MSG-COM-001", "Không tìm thấy khóa học."));
 
         if (course.getStatus() != CourseStatus.PENDING) {
-            throw new BusinessException("MSG-COM-004", "Course is not in PENDING state");
+            throw new BusinessException(
+                    "MSG-COURSE-REVIEW-STATE",
+                    "Yêu cầu xét duyệt này đã được xử lý. Chỉ khóa học đang chờ phê duyệt mới có thể nhận quyết định.",
+                    HttpStatus.CONFLICT
+            );
         }
         Course reviewCourse = courseEditDraftService.resolveEditableCourse(course);
 

@@ -1,6 +1,7 @@
 package com.manabihub.challenge.controller;
 
 import com.manabihub.challenge.dto.*;
+import com.manabihub.challenge.service.WeeklyChallengeLeaderboardService;
 import com.manabihub.challenge.service.WeeklyChallengeManagementService;
 import com.manabihub.common.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -17,6 +18,7 @@ import java.util.*;
 @PreAuthorize("hasRole('COURSE_MANAGER')")
 public class AdminWeeklyChallengeController {
     private final WeeklyChallengeManagementService service;
+    private final WeeklyChallengeLeaderboardService leaderboardService;
 
     @GetMapping
     public ApiResponse<List<WeeklyChallengeResponse>> list(@AuthenticationPrincipal Jwt jwt) {
@@ -49,5 +51,12 @@ public class AdminWeeklyChallengeController {
     public ApiResponse<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         service.delete(UUID.fromString(jwt.getSubject()), id);
         return ApiResponse.success(null);
+    }
+
+    @GetMapping("/{id}/leaderboard")
+    public ApiResponse<WeeklyChallengeLeaderboardResponse> leaderboard(@AuthenticationPrincipal Jwt jwt,
+                                                                       @PathVariable UUID id) {
+        return ApiResponse.success(leaderboardService.forCourseManager(
+                UUID.fromString(jwt.getSubject()), id));
     }
 }
