@@ -39,6 +39,7 @@ import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,6 +64,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
@@ -115,7 +117,7 @@ public class TeacherKycService {
             EntityManager entityManager,
             VnptVerificationCoordinator verificationCoordinator,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot,
-            @Value("${manabihub.kyc.identity-verification-mode:server}") String identityVerificationMode
+            @Value("${manabihub.kyc.identity-verification-mode:direct-sdk-mock}") String identityVerificationMode
     ) {
         this.teacherProfileRepository = teacherProfileRepository;
         this.kycRequestRepository = kycRequestRepository;
@@ -181,7 +183,7 @@ public class TeacherKycService {
             throw new BusinessException(MessageCodes.MSG_KYC_002, "Provider transaction ID and session ID are required");
         }
 
-        VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
+        VnptSdkDecision sdkDecision = VnptSdkResultEvaluator.evaluate(request.sdkResult());
 
         VnptVerificationCoordinator.VerificationOutcome outcome = verificationCoordinator.orchestrate(
             userId, request, sdkDecision, ipAddress, userAgent
@@ -198,7 +200,7 @@ public class TeacherKycService {
     /**
      * Direct SDK mode is intentionally explicit. It is useful for the AWS demo/UAT
      * deployment where the VNPT browser SDK is available but server-to-server
-     * verification is not. The production-safe default remains SERVER.
+     * verification is not. Production tenants can opt into SERVER explicitly.
      */
     private KycIdentityVerificationResponse verifyIdentityFromSdk(
             UUID userId,
@@ -209,11 +211,44 @@ public class TeacherKycService {
     ) {
         TeacherProfile teacherProfile = resolveTeacher(userId);
         AppUser user = teacherProfile.getUser();
+        String providerTransactionId = blankToNull(request.providerTransactionId());
+        String providerSessionId = blankToNull(request.providerSessionId());
+
+        if (providerTransactionId != null) {
+            KycRequest boundRequest = kycRequestRepository
+                    .findByEkycProviderAndProviderTransactionId("VNPT_EKYC_WEB_SDK", providerTransactionId)
+                    .orElse(null);
+            if (boundRequest != null) {
+                boolean sameTeacher = boundRequest.getTeacherProfile() != null
+                        && teacherProfile.getId().equals(boundRequest.getTeacherProfile().getId());
+                boolean sameSession = Objects.equals(
+                        blankToNull(boundRequest.getProviderSessionId()), providerSessionId);
+                if (sameTeacher && sameSession) {
+                    // A browser callback can be retried after a slow network response.
+                    // Return the canonical stored outcome without claiming the identity twice.
+                    return buildIdentityResponse(teacherProfile, boundRequest, false);
+                }
+                securityAuditService.logVerificationEvent(
+                        "DUPLICATE_TRANSACTION",
+                        teacherProfile.getId(),
+                        boundRequest.getId(),
+                        user.getId(),
+                        ipAddress,
+                        userAgent
+                );
+                throw new BusinessException(
+                        MessageCodes.MSG_KYC_008,
+                        "VNPT transaction is already bound to another verification session",
+                        HttpStatus.CONFLICT
+                );
+            }
+        }
+
         KycRequest latestRequest = findLatestRequest(teacherProfile);
         validateIdentityAllowed(user, teacherProfile, latestRequest);
 
         KycRequest kycRequest = findReusableRealtimeRequest(teacherProfile, latestRequest);
-        VnptSdkDecision sdkDecision = evaluateSdkResult(request.sdkResult());
+        VnptSdkDecision sdkDecision = VnptSdkResultEvaluator.evaluate(request.sdkResult());
         boolean verified = sdkDecision.verified();
         List<String> failureReasons = new ArrayList<>(sdkDecision.failureReasons());
         Map<String, String> identityOcr = sdkDecision.identityOcr();
@@ -251,8 +286,8 @@ public class TeacherKycService {
         kycRequest.setTeacherProfile(teacherProfile);
         kycRequest.setEkycProvider(VNPT_PROVIDER);
         kycRequest.setEkycReferenceId("VNPT-SDK-" + UUID.randomUUID());
-        kycRequest.setProviderSessionId(blankToNull(request.providerSessionId()));
-        kycRequest.setProviderTransactionId(blankToNull(request.providerTransactionId()));
+        kycRequest.setProviderSessionId(providerSessionId);
+        kycRequest.setProviderTransactionId(providerTransactionId);
         kycRequest.setIdentityStatus(verified ? IdentityVerificationStatus.VERIFIED : IdentityVerificationStatus.FAILED);
         kycRequest.setIdentityVerifiedAt(verified ? now : null);
         kycRequest.setCertificateStatus(
@@ -268,12 +303,34 @@ public class TeacherKycService {
         verificationPayload.put("providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED");
         verificationPayload.put("identityOcr", identityOcr);
         verificationPayload.put("failureReasons", failureReasons);
+        verificationPayload.put("messageCode", verified ? "KYC_IDENTITY_VERIFIED" : MessageCodes.MSG_KYC_002);
         verificationPayload.put("certificateManualAuthenticityReviewRequired", true);
         verificationPayload.put("autoApproval", false);
         verificationPayload.put("srs", srsTrace());
         kycRequest.setVerificationPayload(verificationPayload);
 
-        KycRequest savedRequest = kycRequestRepository.save(kycRequest);
+        KycRequest savedRequest;
+        try {
+            savedRequest = kycRequestRepository.saveAndFlush(kycRequest);
+        } catch (DataIntegrityViolationException exception) {
+            if (providerTransactionId != null && isProviderTransactionConstraint(exception)) {
+                securityAuditService.logVerificationEvent(
+                        "DUPLICATE_TRANSACTION",
+                        teacherProfile.getId(),
+                        null,
+                        user.getId(),
+                        ipAddress,
+                        userAgent
+                );
+                throw new BusinessException(
+                        MessageCodes.MSG_KYC_008,
+                        "VNPT transaction is already bound to another verification session",
+                        HttpStatus.CONFLICT,
+                        exception
+                );
+            }
+            throw exception;
+        }
         boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
         return buildIdentityResponse(teacherProfile, savedRequest, auditLogged);
     }
@@ -320,7 +377,7 @@ public class TeacherKycService {
     }
 
     private String normalizedIdentityVerificationMode() {
-        return (identityVerificationMode == null ? "SERVER" : identityVerificationMode)
+        return (identityVerificationMode == null ? "DIRECT_SDK_MOCK" : identityVerificationMode)
                 .trim()
                 .toUpperCase(Locale.ROOT)
                 .replace('-', '_');
@@ -564,11 +621,23 @@ public class TeacherKycService {
 
     private KycRequest findReusableRealtimeRequest(TeacherProfile teacherProfile, KycRequest latestRequest) {
         return java.util.Optional.ofNullable(latestRequest)
-                .filter(request -> (request.getStatus() == KycRequestStatus.DRAFT
+                .filter(request -> request.getStatus() == KycRequestStatus.DRAFT
                         && request.getIdentityStatus() == IdentityVerificationStatus.NOT_STARTED
                         && request.getProviderTransactionId() == null)
-                        || request.getIdentityStatus() == IdentityVerificationStatus.FAILED)
                 .orElseGet(KycRequest::new);
+    }
+
+    private boolean isProviderTransactionConstraint(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase(Locale.ROOT)
+                    .contains("uq_kyc_requests_provider_tx")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private PreparedFile prepareCertificateFile(MultipartFile file) {

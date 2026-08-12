@@ -90,7 +90,7 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("070");
+        assertThat(current).isEqualTo("071");
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
@@ -326,6 +326,134 @@ public class FlywayMigrationIntegrationTest {
                 Integer.class)).isEqualTo(2);
     }
 
+    @Test
+    void v071CanonicalizesExistingSyntheticStudentIdentityFixture() {
+        String schema = "student_identity_fixture_upgrade_test";
+        jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
+
+        Flyway beforeFixtureRepair = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas(schema)
+                .target("070")
+                .load();
+        beforeFixtureRepair.migrate();
+
+        JdbcTemplate legacy = new JdbcTemplate(dataSource);
+        legacy.update("UPDATE " + schema + ".mock_national_id_registry SET "
+                + "full_name = 'LEGACY NAME', date_of_birth = DATE '1999-01-01', "
+                + "gender = 'Unknown', permanent_address = 'LEGACY', "
+                + "issue_date = DATE '2000-01-01', expiry_date = DATE '2001-01-01', "
+                + "issue_place = 'LEGACY', document_status = 'INVALID', "
+                + "front_back_match_status = 'MISMATCH', corner_blur_status = 'YES', "
+                + "id_quality_status = 'BAD', issue_date_status = 'BAD', "
+                + "expiry_status = 'EXPIRED', document_identification_status = 'UPLOAD', "
+                + "warning_status = 'WARNING', overlay_image_status = 'YES', "
+                + "open_eyes_status = 'NO', blurred_face_status = 'YES', "
+                + "face_validation_status = 'INVALID', covered_face_status = 'YES', "
+                + "face_matching_score = 1, source_provider = 'LEGACY_PROVIDER', "
+                + "source_reference = 'LEGACY_REFERENCE', raw_payload = '{\"legacy\":true,\"synthetic\":true}'::jsonb, "
+                + "active = FALSE WHERE id_number = '027204002711'");
+
+        Flyway latest = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas(schema)
+                .load();
+        latest.migrate();
+
+        Integer canonical = legacy.queryForObject(
+                "SELECT count(*) FROM " + schema + ".mock_national_id_registry "
+                        + "WHERE id_number = '027204002711' "
+                        + "AND full_name = 'NGUYEN XUAN DAT' "
+                        + "AND date_of_birth = DATE '2004-08-31' "
+                        + "AND gender = 'Nam' "
+                        + "AND issue_date = DATE '2021-04-25' "
+                        + "AND expiry_date = DATE '2029-08-31' "
+                        + "AND document_status = 'VALID' "
+                        + "AND front_back_match_status = 'IDENTICAL' "
+                        + "AND id_quality_status = 'GOOD' "
+                        + "AND expiry_status = 'UNEXPIRED' "
+                        + "AND face_validation_status = 'VALID' "
+                        + "AND face_matching_score = 97.7800 "
+                        + "AND source_provider = 'VNPT_EKYC_DEMO' "
+                        + "AND source_reference = 'STUDENT_WITHDRAWAL_DEMO' "
+                        + "AND raw_payload ->> 'synthetic' = 'true' "
+                        + "AND active = TRUE",
+                Integer.class);
+        assertThat(canonical)
+                .as("the complete synthetic student identity fixture is canonical after upgrade")
+                .isEqualTo(1);
+    }
+
+    @Test
+    void kycIdentityConstraintsRejectCrossAccountReplayAndDuplicateClaims() {
+        String schema = "kyc_identity_uniqueness_test";
+        jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
+        Flyway isolated = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas(schema)
+                .load();
+        isolated.migrate();
+
+        JdbcTemplate jt = new JdbcTemplate(dataSource);
+        UUID teacherUserA = UUID.randomUUID();
+        UUID teacherUserB = UUID.randomUUID();
+        UUID teacherA = UUID.randomUUID();
+        UUID teacherB = UUID.randomUUID();
+        UUID studentUserA = UUID.randomUUID();
+        UUID studentUserB = UUID.randomUUID();
+        UUID studentA = UUID.randomUUID();
+        UUID studentB = UUID.randomUUID();
+
+        jt.update("INSERT INTO " + schema + ".app_users (id, email, full_name, created_at) "
+                        + "VALUES (?, 'kyc-teacher-a@test.com', 'Teacher A', now()), "
+                        + "(?, 'kyc-teacher-b@test.com', 'Teacher B', now()), "
+                        + "(?, 'kyc-student-a@test.com', 'Student A', now()), "
+                        + "(?, 'kyc-student-b@test.com', 'Student B', now())",
+                teacherUserA, teacherUserB, studentUserA, studentUserB);
+        jt.update("INSERT INTO " + schema + ".teacher_profiles (id, user_id, created_at) "
+                        + "VALUES (?, ?, now()), (?, ?, now())",
+                teacherA, teacherUserA, teacherB, teacherUserB);
+        jt.update("INSERT INTO " + schema + ".student_profiles (id, user_id, created_at) "
+                        + "VALUES (?, ?, now()), (?, ?, now())",
+                studentA, studentUserA, studentB, studentUserB);
+
+        jt.update("INSERT INTO " + schema + ".kyc_requests "
+                        + "(id, teacher_id, status, ekyc_provider, provider_transaction_id, "
+                        + "identity_status, certificate_status, created_at) "
+                        + "VALUES (?, ?, 'PENDING', 'VNPT_EKYC', 'replayed-provider-tx', "
+                        + "'PROCESSING', 'LOCKED', now())",
+                UUID.randomUUID(), teacherA);
+        assertThatThrownBy(() -> jt.update("INSERT INTO " + schema + ".kyc_requests "
+                        + "(id, teacher_id, status, ekyc_provider, provider_transaction_id, "
+                        + "identity_status, certificate_status, created_at) "
+                        + "VALUES (?, ?, 'PENDING', 'VNPT_EKYC', 'replayed-provider-tx', "
+                        + "'PROCESSING', 'LOCKED', now())",
+                UUID.randomUUID(), teacherB))
+                .hasMessageContaining("uq_kyc_requests_provider_tx");
+
+        // Provider transaction identifiers are provider-scoped, not globally scoped.
+        assertThat(jt.update("INSERT INTO " + schema + ".kyc_requests "
+                        + "(id, teacher_id, status, ekyc_provider, provider_transaction_id, "
+                        + "identity_status, certificate_status, created_at) "
+                        + "VALUES (?, ?, 'PENDING', 'OTHER_EKYC', 'replayed-provider-tx', "
+                        + "'PROCESSING', 'LOCKED', now())",
+                UUID.randomUUID(), teacherB)).isEqualTo(1);
+
+        jt.update("INSERT INTO " + schema + ".teacher_identity_claims "
+                        + "(teacher_id, identity_fingerprint) VALUES (?, 'shared-teacher-fingerprint')",
+                teacherA);
+        assertThatThrownBy(() -> jt.update("INSERT INTO " + schema + ".teacher_identity_claims "
+                        + "(teacher_id, identity_fingerprint) VALUES (?, 'shared-teacher-fingerprint')",
+                teacherB))
+                .hasMessageContaining("uk_teacher_identity_claims_fingerprint");
+
+        jt.update("UPDATE " + schema + ".student_profiles "
+                + "SET identity_fingerprint = 'shared-student-fingerprint' WHERE id = ?", studentA);
+        assertThatThrownBy(() -> jt.update("UPDATE " + schema + ".student_profiles "
+                        + "SET identity_fingerprint = 'shared-student-fingerprint' WHERE id = ?", studentB))
+                .hasMessageContaining("uq_student_profiles_identity_fingerprint");
+    }
+
     private void assertRowExists(JdbcTemplate jt, String schema, String table, UUID id) {
         Integer count = jt.queryForObject(
                 "SELECT count(*) FROM " + schema + "." + table + " WHERE id = ?",
@@ -463,9 +591,15 @@ public class FlywayMigrationIntegrationTest {
 
         Integer demoRegistry = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM mock_national_id_registry "
-                        + "WHERE id_number = '027204002711' AND active = TRUE",
+                        + "WHERE id_number = '027204002711' "
+                        + "AND full_name = 'NGUYEN XUAN DAT' "
+                        + "AND date_of_birth = DATE '2004-08-31' "
+                        + "AND source_provider = 'VNPT_EKYC_DEMO' "
+                        + "AND source_reference = 'STUDENT_WITHDRAWAL_DEMO' "
+                        + "AND raw_payload ->> 'synthetic' = 'true' "
+                        + "AND active = TRUE",
                 Integer.class);
-        assertThat(demoRegistry).as("student demo registry record exists").isEqualTo(1);
+        assertThat(demoRegistry).as("canonical student demo registry record exists").isEqualTo(1);
 
         Integer weeklyChallengeTables = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM information_schema.tables "

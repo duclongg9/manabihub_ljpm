@@ -35,6 +35,7 @@ import { useCommercialPolicy } from '../../help-center/hooks/useCommercialPolicy
 import { StudentWithdrawalModal } from '../../wallet/components/StudentWithdrawalModal';
 import { StudentWithdrawalHistory } from '../../wallet/components/StudentWithdrawalHistory';
 import { getStudentIdentityVerificationStatus } from '../../wallet/services/studentIdentityVerificationService';
+import { getMyStudentProfile } from '../../profile/profileApi';
 
 interface FilterOption {
   label: string;
@@ -102,6 +103,7 @@ export function StudentPaymentsPage() {
   const [wallet, setWallet] = useState<StudentWalletResponse | null>(null);
   const [loadingWallet, setLoadingWallet] = useState(true);
   const [identityVerified, setIdentityVerified] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
   const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
 
   // Withdrawals history state
@@ -113,6 +115,7 @@ export function StudentPaymentsPage() {
 
   const policyQuery = useCommercialPolicy();
   const minimumAmount = policyQuery.data?.payoutThreshold ?? 100000;
+  const canWithdraw = phoneVerified && identityVerified;
 
   const selectedFilter = FILTERS[filterIndex];
   const ordersQuery = useOrderHistory({ page, size: 10, status: selectedFilter.status });
@@ -137,6 +140,14 @@ export function StudentPaymentsPage() {
       setIdentityVerified(identity.verified);
     } catch {
       // A stale backend must not prevent the wallet/history from rendering.
+      setIdentityVerified(false);
+    }
+    try {
+      const profile = await getMyStudentProfile();
+      setPhoneVerified(profile.phoneVerified === true);
+      setIdentityVerified((current) => current && profile.phoneVerified === true);
+    } catch {
+      setPhoneVerified(false);
       setIdentityVerified(false);
     }
   }, []);
@@ -304,10 +315,16 @@ export function StudentPaymentsPage() {
                 </Typography>
                 <Button
                   variant="contained"
-                  disabled={loadingWallet || (identityVerified && (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount)}
+                  disabled={loadingWallet || (canWithdraw && (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount)}
                   onClick={() => {
+                    if (!phoneVerified) {
+                      navigate(ROUTES.STUDENT.PROFILE);
+                      return;
+                    }
                     if (!identityVerified) {
-                      navigate('/student/identity-verification');
+                      navigate(
+                        `${ROUTES.STUDENT.IDENTITY_VERIFICATION}?returnTo=${encodeURIComponent(ROUTES.STUDENT.PAYMENTS)}`,
+                      );
                       return;
                     }
                     setWithdrawalModalOpen(true);

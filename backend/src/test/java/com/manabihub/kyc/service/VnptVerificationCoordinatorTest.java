@@ -139,7 +139,7 @@ class VnptVerificationCoordinatorTest {
 
         when(teacherProfileRepository.findForUpdateByUserId(userId)).thenReturn(Optional.of(teacherProfile));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())).thenReturn(Optional.empty());
-        when(kycRequestRepository.existsByProviderTransactionId(anyString())).thenReturn(false);
+        when(kycRequestRepository.existsByEkycProviderAndProviderTransactionId(anyString(), anyString())).thenReturn(false);
         when(kycRequestRepository.saveAndFlush(any())).thenReturn(mockRequest);
         when(selfProvider.getObject()).thenReturn(coordinator);
 
@@ -345,7 +345,7 @@ class VnptVerificationCoordinatorTest {
     void pendingBind_certificateRemainsLocked() {
         when(teacherProfileRepository.findForUpdateByUserId(userId)).thenReturn(Optional.of(teacherProfile));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())).thenReturn(Optional.empty());
-        when(kycRequestRepository.existsByProviderTransactionId(anyString())).thenReturn(false);
+        when(kycRequestRepository.existsByEkycProviderAndProviderTransactionId(anyString(), anyString())).thenReturn(false);
         when(kycRequestRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         BindResult result = coordinator.bindVerificationAttempt(userId, req("session", "tx"), passSdk(), "127.0.0.1", "agent");
@@ -393,7 +393,7 @@ class VnptVerificationCoordinatorTest {
 
         when(teacherProfileRepository.findForUpdateByUserId(userId)).thenReturn(Optional.of(teacherProfile));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())).thenReturn(Optional.empty());
-        when(kycRequestRepository.existsByProviderTransactionId(anyString())).thenReturn(false);
+        when(kycRequestRepository.existsByEkycProviderAndProviderTransactionId(anyString(), anyString())).thenReturn(false);
         when(kycRequestRepository.saveAndFlush(any())).thenThrow(dive);
 
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(teacherProfile));

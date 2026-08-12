@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { ROUTES } from '../../shared/constants/routes';
@@ -10,13 +10,14 @@ const apiMocks = vi.hoisted(() => ({
   submitTeacherCertificate: vi.fn(),
   verifyTeacherIdentity: vi.fn(),
 }));
-
-vi.mock('./teacherKycApi', () => apiMocks);
-vi.mock('./certificateOcr', () => ({ recognizeJlptCertificate: vi.fn() }));
-vi.mock('./vnptIdentitySdk', () => ({
+const sdkMocks = vi.hoisted(() => ({
   launchVnptIdentitySdk: vi.fn(),
   resetVnptIdentitySdkRuntime: vi.fn(),
 }));
+
+vi.mock('./teacherKycApi', () => apiMocks);
+vi.mock('./certificateOcr', () => ({ recognizeJlptCertificate: vi.fn() }));
+vi.mock('./vnptIdentitySdk', () => sdkMocks);
 
 beforeEach(() => {
   apiMocks.getTeacherKycStatus.mockResolvedValue({
@@ -64,5 +65,43 @@ describe('TeacherKycPage policy links', () => {
     expect(screen.getByRole('checkbox', {
       name: 'Tôi đã đọc Điều khoản dành cho giảng viên và chấp nhận cam kết trách nhiệm bản quyền: tôi có quyền sử dụng hợp lệ đối với nội dung số mình gửi lên ManabiHub.',
     }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('keeps terminal VNPT callback errors visible and allows an immediate retry', async () => {
+    apiMocks.getTeacherKycStatus.mockResolvedValue({
+      teacherId: 'teacher-1',
+      userId: 'user-1',
+      teacherKycStatus: 'NOT_STARTED',
+      teacherKycStatusLabel: 'Chưa xác minh',
+      canPublishCourse: false,
+      identityVerification: {
+        status: 'NOT_STARTED',
+        statusLabel: 'Chưa xác minh',
+        canInteract: true,
+      },
+      certificateVerification: {
+        status: 'LOCKED',
+        statusLabel: 'Chưa mở khóa',
+        canInteract: false,
+      },
+      latestRequest: null,
+      srsTrace: {},
+    });
+    sdkMocks.launchVnptIdentitySdk.mockImplementation(async (_onResult, options) => {
+      options?.onError?.(new Error('VNPT chưa trả về đủ mã phiên và mã giao dịch.'));
+    });
+
+    render(
+      <MemoryRouter>
+        <TeacherKycPage />
+      </MemoryRouter>,
+    );
+
+    const startButton = await screen.findByRole('button', { name: 'Bắt đầu xác minh danh tính' });
+    fireEvent.click(startButton);
+
+    expect(await screen.findByText('VNPT chưa trả về đủ mã phiên và mã giao dịch.')).toBeInTheDocument();
+    await waitFor(() => expect(startButton).not.toBeDisabled());
+    expect(localStorage.getItem('manabihub_kyc_identity_launch_cooldown_until')).toBeNull();
   });
 });

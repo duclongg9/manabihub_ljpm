@@ -10,6 +10,8 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.identity.service.StudentIdentityVerificationService;
 import com.manabihub.kyc.port.NationalIdRecordDto;
 import com.manabihub.kyc.port.NationalIdRegistryPort;
+import com.manabihub.kyc.service.VnptSdkDecision;
+import com.manabihub.kyc.service.VnptSdkResultEvaluator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -57,6 +59,9 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
     @Value("${manabihub.kyc.identity-secret:}")
     private String identitySecret;
 
+    @Value("${manabihub.kyc.identity-verification-mode:direct-sdk-mock}")
+    private String identityVerificationMode;
+
     @Override
     @Transactional(readOnly = true)
     public StudentIdentityVerificationResponse getStatus() {
@@ -67,9 +72,22 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
     @Transactional
     public StudentIdentityVerificationResponse verify(StudentIdentityVerificationRequest request) {
         StudentProfile student = requireStudent();
-        String idNumber = normalizeId(firstValue(request.sdkResult(), ID_KEYS));
-        String fullName = firstValue(request.sdkResult(), NAME_KEYS);
-        String dateOfBirthRaw = firstValue(request.sdkResult(), DOB_KEYS);
+        if (!isDirectSdkDemo()
+                && (!StringUtils.hasText(request.providerSessionId())
+                || !StringUtils.hasText(request.providerTransactionId()))) {
+            throw invalidIdentity("Thiếu mã phiên và mã giao dịch xác minh VNPT.");
+        }
+        VnptSdkDecision decision = VnptSdkResultEvaluator.evaluate(request.sdkResult());
+        if (!decision.verified()) {
+            String reason = decision.failureReasons().isEmpty()
+                    ? "VNPT eKYC verification was not successful"
+                    : decision.failureReasons().get(0);
+            throw invalidIdentity(reason);
+        }
+
+        String idNumber = normalizeId(decision.identityOcr().get("idNumber"));
+        String fullName = decision.identityOcr().get("fullName");
+        String dateOfBirthRaw = decision.identityOcr().get("dateOfBirth");
         LocalDate dateOfBirth = parseDate(dateOfBirthRaw);
 
         NationalIdRecordDto registry = nationalIdRegistry.findActiveByIdNumber(idNumber)
@@ -79,7 +97,18 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
         }
 
         ensureSecret();
-        student.setIdentityFingerprint(fingerprint(idNumber));
+        String identityFingerprint = fingerprint(idNumber);
+        if (student.getIdentityVerifiedAt() != null) {
+            if (identityFingerprint.equals(student.getIdentityFingerprint())) {
+                return toResponse(student);
+            }
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_008,
+                    "A verified CCCD cannot be replaced on this account",
+                    HttpStatus.CONFLICT);
+        }
+
+        student.setIdentityFingerprint(identityFingerprint);
         student.setIdentityProvider(PROVIDER);
         student.setIdentityFullName(registry.fullName());
         student.setIdentityDateOfBirth(registry.dateOfBirth());
@@ -91,7 +120,7 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
             // identity or database constraint to the client.
             throw new BusinessException(
                     MessageCodes.MSG_KYC_008,
-                    "CCCD này đã được liên kết với một tài khoản khác.",
+                "CCCD này đã được liên kết với một tài khoản khác.",
                     HttpStatus.CONFLICT);
         }
     }
@@ -201,6 +230,10 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
         if (!StringUtils.hasText(identitySecret) || identitySecret.trim().length() < 32) {
             throw new BusinessException(MessageCodes.COMMON_INTERNAL_ERROR, "KYC_IDENTITY_SECRET chưa được cấu hình đủ mạnh", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private boolean isDirectSdkDemo() {
+        return "direct-sdk-mock".equalsIgnoreCase(identityVerificationMode);
     }
 
     private BusinessException invalidIdentity(String message) {

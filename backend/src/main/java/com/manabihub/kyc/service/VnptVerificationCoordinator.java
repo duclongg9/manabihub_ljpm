@@ -177,7 +177,7 @@ public class VnptVerificationCoordinator {
                     String mismatchType = !txMatch ? "TRANSACTION_MISMATCH" : "SESSION_MISMATCH";
                     if (incTxId == null || incSessionId == null) {
                         mismatchType = "MISSING_PROVIDER_IDENTIFIERS";
-                    } else if (kycRequestRepository.existsByProviderTransactionId(incTxId)) {
+                    } else if (kycRequestRepository.existsByEkycProviderAndProviderTransactionId(VNPT_PROVIDER, incTxId)) {
                         mismatchType = "DUPLICATE_TRANSACTION_ID";
                     }
 
@@ -205,7 +205,7 @@ public class VnptVerificationCoordinator {
         }
 
         // Fast-path duplicate check (non-authoritative; DB constraint is the real guard)
-        boolean isDuplicate = kycRequestRepository.existsByProviderTransactionId(incTxId);
+        boolean isDuplicate = kycRequestRepository.existsByEkycProviderAndProviderTransactionId(VNPT_PROVIDER, incTxId);
         if (isDuplicate) {
             securityAuditService.logVerificationEvent("DUPLICATE_TRANSACTION_ID", teacherProfile.getId(), kycRequest.getId(), user.getId(), ipAddress, userAgent);
             throw new BusinessException(MessageCodes.MSG_KYC_008, "Duplicate transaction id", HttpStatus.CONFLICT);
