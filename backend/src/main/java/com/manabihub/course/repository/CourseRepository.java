@@ -92,6 +92,16 @@ public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecif
             """)
     Optional<Course> findByIdForModeration(@Param("courseId") UUID courseId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT course
+            FROM Course course
+            JOIN FETCH course.teacher teacher
+            JOIN FETCH teacher.user
+            WHERE course.id = :courseId
+            """)
+    Optional<Course> findByIdForApprovalReview(@Param("courseId") UUID courseId);
+
     List<Course> findAllByStatusInOrderBySubmittedAtDesc(java.util.Collection<CourseStatus> statuses);
 
     List<Course> findAllByStatusOrderBySubmittedAtAsc(CourseStatus status);

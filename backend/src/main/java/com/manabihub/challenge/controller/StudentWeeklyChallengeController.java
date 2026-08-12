@@ -2,6 +2,7 @@ package com.manabihub.challenge.controller;
 
 import com.manabihub.challenge.dto.*;
 import com.manabihub.challenge.service.WeeklyChallengeGameService;
+import com.manabihub.challenge.service.WeeklyChallengeLeaderboardService;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.identity.service.CurrentUserService;
 import jakarta.validation.Valid;
@@ -16,6 +17,7 @@ import java.util.UUID;
 @PreAuthorize("hasRole('STUDENT')")
 public class StudentWeeklyChallengeController {
     private final WeeklyChallengeGameService service;
+    private final WeeklyChallengeLeaderboardService leaderboardService;
     private final CurrentUserService currentUserService;
 
     @GetMapping
@@ -32,5 +34,11 @@ public class StudentWeeklyChallengeController {
     public ApiResponse<ChallengeAttemptResponse> match(@PathVariable UUID attemptId,
                                                        @Valid @RequestBody MatchCardsRequest request) {
         return ApiResponse.success(service.match(currentUserService.getCurrentUserId(), attemptId, request));
+    }
+
+    @GetMapping("/{challengeId}/leaderboard")
+    public ApiResponse<WeeklyChallengeLeaderboardResponse> leaderboard(@PathVariable UUID challengeId) {
+        return ApiResponse.success(leaderboardService.forStudent(
+                currentUserService.getCurrentUserId(), challengeId));
     }
 }

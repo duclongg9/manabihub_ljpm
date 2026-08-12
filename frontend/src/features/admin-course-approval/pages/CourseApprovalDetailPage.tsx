@@ -381,9 +381,17 @@ export const CourseApprovalDetailPage: React.FC = () => {
     () => detail?.validationErrors?.map((error) => `- ${error.message}`).join('\n') ?? '',
     [detail],
   );
+  const isReviewable = detail?.status === 'PENDING';
 
   const handleAction = async (action: 'APPROVE' | 'REJECT' | 'REQUEST_CORRECTION') => {
     if (!detail || !id || submitting) return;
+    if (!isReviewable) {
+      setFeedback({
+        message: 'Yêu cầu xét duyệt này đã được xử lý. Không thể gửi thêm quyết định.',
+        severity: 'warning',
+      });
+      return;
+    }
     if (action === 'APPROVE' && !detail.approvalReady) {
       setFeedback({ message: 'Khóa học còn điều kiện chưa đạt nên chưa thể phê duyệt.', severity: 'warning' });
       return;
@@ -565,11 +573,13 @@ export const CourseApprovalDetailPage: React.FC = () => {
               <Divider />
               <Box sx={{ p: 2.5 }}>
                 <Alert
-                  severity={detail.reviewDataAvailable === false ? 'warning' : detail.approvalReady ? 'success' : 'error'}
+                  severity={detail.reviewDataAvailable === false ? 'warning' : !isReviewable ? 'info' : detail.approvalReady ? 'success' : 'error'}
                   sx={{ mb: 2 }}
                 >
                   {detail.reviewDataAvailable === false
                     ? 'Chưa nhận được dữ liệu xét duyệt từ backend. Vui lòng tải lại trang sau khi backend đã cập nhật.'
+                    : !isReviewable
+                    ? `Yêu cầu đã được xử lý với trạng thái ${getCourseApprovalStatusLabel(detail.status)}. Checklist bên dưới chỉ dùng để đối chiếu.`
                     : detail.approvalReady
                     ? 'Khóa học đã đáp ứng các điều kiện kỹ thuật để phê duyệt.'
                     : `Khóa học còn ${detail.validationErrors.length} vấn đề cần xử lý trước khi có thể phê duyệt.`}
@@ -607,7 +617,13 @@ export const CourseApprovalDetailPage: React.FC = () => {
             </Box>
             <Divider />
             <Box sx={{ p: 2.5 }}>
-              {!detail.approvalReady && (
+              {!isReviewable && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Yêu cầu này đã được xử lý với trạng thái <strong>{getCourseApprovalStatusLabel(detail.status)}</strong>.
+                  Không thể thay đổi quyết định từ màn hình này.
+                </Alert>
+              )}
+              {isReviewable && !detail.approvalReady && (
                 <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ mb: 2 }}>
                   Không thể phê duyệt khi checklist còn mục chưa đạt.
                 </Alert>
@@ -625,10 +641,11 @@ export const CourseApprovalDetailPage: React.FC = () => {
                 placeholder="Mô tả rõ nội dung cần chỉnh sửa để giảng viên có thể xử lý..."
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
+                disabled={!isReviewable || submitting}
                 slotProps={{ htmlInput: { maxLength: 2000 } }}
                 helperText={`${reason.length}/2.000 ký tự`}
               />
-              {!detail.approvalReady && suggestedReason && (
+              {isReviewable && !detail.approvalReady && suggestedReason && (
                 <Button
                   fullWidth
                   variant="text"
@@ -644,7 +661,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
                   variant="contained"
                   color="success"
                   startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <CheckCircleOutlineIcon />}
-                  disabled={!detail.approvalReady || submitting}
+                  disabled={!isReviewable || !detail.approvalReady || submitting}
                   onClick={() => void handleAction('APPROVE')}
                   sx={{ py: 1.25, textTransform: 'none', fontWeight: 700 }}
                 >
@@ -654,7 +671,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
                   fullWidth
                   variant="contained"
                   startIcon={<EditNoteIcon />}
-                  disabled={submitting || !reason.trim()}
+                  disabled={!isReviewable || submitting || !reason.trim()}
                   onClick={() => void handleAction('REQUEST_CORRECTION')}
                   sx={{ py: 1.25, textTransform: 'none', fontWeight: 700, bgcolor: '#eab308', '&:hover': { bgcolor: '#ca8a04' } }}
                 >
@@ -665,7 +682,7 @@ export const CourseApprovalDetailPage: React.FC = () => {
                   variant="outlined"
                   color="error"
                   startIcon={<HighlightOffIcon />}
-                  disabled={submitting || !reason.trim()}
+                  disabled={!isReviewable || submitting || !reason.trim()}
                   onClick={() => void handleAction('REJECT')}
                   sx={{ py: 1.25, textTransform: 'none', fontWeight: 700 }}
                 >

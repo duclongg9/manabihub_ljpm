@@ -2,8 +2,12 @@ package com.manabihub.identity.repository;
 
 import com.manabihub.identity.entity.StudentProfile;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,4 +16,8 @@ public interface StudentProfileRepository extends JpaRepository<StudentProfile, 
     Optional<StudentProfile> findByUser_Id(UUID userId);
 
     boolean existsByUserId(UUID userId);
+
+    @Query("select distinct student from StudentProfile student left join fetch student.user "
+            + "where student.id in :ids")
+    List<StudentProfile> findAllWithUserByIdIn(@Param("ids") Collection<UUID> ids);
 }

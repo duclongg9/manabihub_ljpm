@@ -1,6 +1,9 @@
 package com.manabihub.challenge.service;
 
+import com.manabihub.audit.entity.AuditLog;
 import com.manabihub.audit.repository.AuditLogRepository;
+import com.manabihub.challenge.dto.ChallengePairRequest;
+import com.manabihub.challenge.dto.UpsertWeeklyChallengeRequest;
 import com.manabihub.challenge.entity.WeeklyLearningChallenge;
 import com.manabihub.challenge.enums.ChallengeStatus;
 import com.manabihub.challenge.repository.DailyLearningAttendanceRewardRepository;
@@ -13,9 +16,11 @@ import com.manabihub.course.repository.CourseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -76,6 +81,40 @@ class WeeklyChallengeManagementServiceTest {
 
         verify(challengeRepository, never()).delete(any());
         verifyNoInteractions(auditLogRepository);
+    }
+
+    @Test
+    void create_writesDatabaseCompatibleInternalAdminAuditActorType() {
+        LocalDate weekStart = LocalDate.of(2026, 8, 17);
+        UpsertWeeklyChallengeRequest request = new UpsertWeeklyChallengeRequest(
+                weekStart,
+                "Thử thách Kanji tuần",
+                "Ghép từ Kanji với cách đọc tương ứng.",
+                "N5",
+                3,
+                2,
+                BigDecimal.valueOf(1000),
+                BigDecimal.valueOf(30000),
+                BigDecimal.valueOf(20000),
+                BigDecimal.valueOf(10000),
+                List.of(
+                        new ChallengePairRequest("日", "mặt trời"),
+                        new ChallengePairRequest("月", "mặt trăng"),
+                        new ChallengePairRequest("火", "lửa"),
+                        new ChallengePairRequest("水", "nước")
+                ));
+        when(challengeRepository.findByWeekStart(weekStart)).thenReturn(Optional.empty());
+        when(pairRepository.findByChallengeIdOrderByOrderIndex(any(UUID.class))).thenReturn(List.of());
+
+        service.create(managerId, request);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog auditLog = auditCaptor.getValue();
+        assertEquals("INTERNAL_ADMIN", auditLog.getActorType());
+        assertEquals(managerId, auditLog.getActorAdminId());
+        assertEquals("COURSE_MANAGER", auditLog.getActorRoleCode());
+        assertEquals("WEEKLY_CHALLENGE_CREATED", auditLog.getAction());
     }
 
     private WeeklyLearningChallenge challenge(UUID id, ChallengeStatus status) {

@@ -88,18 +88,23 @@ public class WeeklyChallengeGameService {
         WeeklyLearningChallenge challenge = challengeRepository.findById(attempt.getChallengeId())
                 .orElseThrow(() -> invalid("Thử thách không còn tồn tại"));
         expireIfNeeded(attempt);
-        if (attempt.getState() != ChallengeAttemptState.IN_PROGRESS) {
-            throw conflict("Lượt chơi đã kết thúc hoặc hết hạn");
-        }
         if (request.firstCardId().equals(request.secondCardId())) throw invalid("Phải chọn hai thẻ khác nhau");
         List<WeeklyLearningChallengeAttemptCard> selected = cardRepository.findByIdInAndAttemptId(
                 List.of(request.firstCardId(), request.secondCardId()), attemptId);
-        if (selected.size() != 2 || selected.stream().anyMatch(WeeklyLearningChallengeAttemptCard::isMatched)) {
-            throw invalid("Thẻ không hợp lệ hoặc đã được ghép");
-        }
+        if (selected.size() != 2) throw invalid("Thẻ không hợp lệ hoặc không thuộc lượt chơi này");
         WeeklyLearningChallengeAttemptCard first = selected.get(0);
         WeeklyLearningChallengeAttemptCard second = selected.get(1);
         boolean matched = first.getPairId().equals(second.getPairId()) && first.getCardKind() != second.getCardKind();
+        boolean bothAlreadyMatched = first.isMatched() && second.isMatched();
+        if (bothAlreadyMatched && matched) {
+            return currentAttemptResponse(attempt, challenge, student.getId());
+        }
+        if (attempt.getState() != ChallengeAttemptState.IN_PROGRESS) {
+            throw conflict("Lượt chơi đã kết thúc hoặc hết hạn");
+        }
+        if (first.isMatched() || second.isMatched()) {
+            throw invalid("Thẻ không hợp lệ hoặc đã được ghép");
+        }
         if (matched) {
             first.setMatched(true);
             second.setMatched(true);
@@ -117,9 +122,16 @@ public class WeeklyChallengeGameService {
             attempt.setTotalMillis(Duration.between(attempt.getStartedAt(), now).toMillis() + attempt.getPenaltyMillis());
         }
         attemptRepository.save(attempt);
+        return currentAttemptResponse(attempt, challenge, student.getId());
+    }
+
+    private ChallengeAttemptResponse currentAttemptResponse(WeeklyLearningChallengeAttempt attempt,
+                                                            WeeklyLearningChallenge challenge,
+                                                            UUID studentId) {
         long rankedToday = attemptRepository.countByChallengeIdAndStudentIdAndRankedDayAndRankedTrue(
-                challenge.getId(), student.getId(), LocalDate.now(BUSINESS_ZONE));
-        return mapAttempt(attempt, cardRepository.findByAttemptIdOrderByPosition(attemptId),
+                challenge.getId(), studentId, LocalDate.now(BUSINESS_ZONE));
+        int totalPairs = (int) pairRepository.countByChallengeId(challenge.getId());
+        return mapAttempt(attempt, cardRepository.findByAttemptIdOrderByPosition(attempt.getId()),
                 Math.max(0, challenge.getDailyRankedLimit() - (int) rankedToday), totalPairs);
     }
 

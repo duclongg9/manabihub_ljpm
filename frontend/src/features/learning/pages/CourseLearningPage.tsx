@@ -71,6 +71,7 @@ import {
   type FinalTestViolationType,
 } from '../utils/finalTestProctoring';
 import { downloadCertificatePdf, formatCertificateDate } from '../utils/certificatePdf';
+import { normalizeWatchedSecondsAtVideoEnd } from '../utils/videoProgress';
 import { CoursePomodoroPanel } from '../components/CoursePomodoroPanel';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
@@ -207,8 +208,44 @@ export function CourseLearningPage() {
     });
   }, []);
 
+  const syncedCompletedBlocksRef = useRef(new Set<string>());
+
+  const refreshLearningAfterCompletion = useCallback(async (
+    completedBlockId: string,
+    preferredBlockId: string = completedBlockId,
+  ) => {
+    if (!courseId || syncedCompletedBlocksRef.current.has(completedBlockId)) return;
+
+    syncedCompletedBlocksRef.current.add(completedBlockId);
+    setSelectedContentLoading(true);
+    try {
+      const data = await learningService.openCourse(courseId);
+      const modules = applySequentialLocks(data.modules);
+      const blocks = modules.flatMap((module) => module.blocks);
+      const availableBlockIds = new Set(blocks.map((block) => block.id));
+      const nextSelectedBlockId = availableBlockIds.has(preferredBlockId)
+        ? preferredBlockId
+        : data.currentLessonBlockId && availableBlockIds.has(data.currentLessonBlockId)
+          ? data.currentLessonBlockId
+          : blocks[0]?.id ?? null;
+
+      setLearning({ ...data, modules });
+      setSelectedBlockId(nextSelectedBlockId);
+      setError(null);
+    } catch {
+      syncedCompletedBlocksRef.current.delete(completedBlockId);
+      setError('Đã lưu kết quả bài học nhưng chưa thể tải nội dung bài tiếp theo. Vui lòng thử lại.');
+    } finally {
+      setSelectedContentLoading(false);
+    }
+  }, [courseId]);
+
   const handleMarkComplete = async () => {
     if (!selectedBlock || completing || selectedContentLoading || selectedBlock.locked) return;
+    if (!selectedBlock.contentAvailable) {
+      setError('Nội dung bài học chưa được tải đầy đủ. Vui lòng tải lại trước khi hoàn thành bài.');
+      return;
+    }
     setCompleting(true);
     try {
       const progress = await learningService.markLessonComplete(selectedBlock.id);
@@ -217,9 +254,7 @@ export function CourseLearningPage() {
         completedAt: progress.completedAt,
       });
       const next = allBlocks[selectedIndex + 1];
-      if (next) {
-        setSelectedBlockId(next.id);
-      }
+      await refreshLearningAfterCompletion(selectedBlock.id, next?.id ?? selectedBlock.id);
     } catch {
       setError('Không thể lưu trạng thái hoàn thành. Vui lòng thử lại.');
     } finally {
@@ -245,9 +280,16 @@ export function CourseLearningPage() {
         watchedVideoSeconds,
         progressStatus: status,
       });
+      if (status === 'COMPLETED') {
+        void refreshLearningAfterCompletion(blockId);
+      }
     },
-    [updateBlock],
+    [refreshLearningAfterCompletion, updateBlock],
   );
+
+  const handleVideoProgressError = useCallback(() => {
+    setError('Không thể lưu tiến độ video. Vui lòng kiểm tra kết nối và thử lại.');
+  }, []);
 
   const handleFlashcardProgressSaved = useCallback(
     (blockId: string, cardIndex: number, status: 'REMEMBERED' | 'NEEDS_REVIEW', progressStatus: LearningLessonBlock['progressStatus']) => {
@@ -275,8 +317,11 @@ export function CourseLearningPage() {
           courseCompleted: totalLessons > 0 && completedLessons === totalLessons,
         };
       });
+      if (progressStatus === 'COMPLETED') {
+        void refreshLearningAfterCompletion(blockId);
+      }
     },
-    [],
+    [refreshLearningAfterCompletion],
   );
 
   const handleWritingProgressSaved = useCallback((blockId: string) => {
@@ -305,13 +350,17 @@ export function CourseLearningPage() {
         courseCompleted: newTotal > 0 && newCompleted === newTotal,
       };
     });
-  }, []);
+    void refreshLearningAfterCompletion(blockId);
+  }, [refreshLearningAfterCompletion]);
 
   const handleQuizProgressSaved = useCallback(
     (blockId: string, status: LearningLessonBlock['progressStatus']) => {
       updateBlock(blockId, { progressStatus: status });
+      if (status === 'COMPLETED') {
+        void refreshLearningAfterCompletion(blockId);
+      }
     },
-    [updateBlock],
+    [refreshLearningAfterCompletion, updateBlock],
   );
 
   if (loading) {
@@ -469,6 +518,7 @@ export function CourseLearningPage() {
                     block={selectedBlock}
                     onContentLoadingChange={setSelectedContentLoading}
                     onVideoProgressSaved={handleVideoProgressSaved}
+                    onVideoProgressError={handleVideoProgressError}
                     onQuizProgressSaved={handleQuizProgressSaved}
                     onFlashcardProgressSaved={handleFlashcardProgressSaved}
                     onWritingProgressSaved={handleWritingProgressSaved}
@@ -489,6 +539,7 @@ export function CourseLearningPage() {
                       block={selectedBlock}
                       onContentLoadingChange={setSelectedContentLoading}
                       onVideoProgressSaved={handleVideoProgressSaved}
+                      onVideoProgressError={handleVideoProgressError}
                       onQuizProgressSaved={handleQuizProgressSaved}
                       onFlashcardProgressSaved={handleFlashcardProgressSaved}
                       onWritingProgressSaved={handleWritingProgressSaved}
@@ -527,6 +578,7 @@ export function CourseLearningPage() {
                         completing ||
                         selectedContentLoading ||
                         selectedBlock.progressStatus === 'COMPLETED' ||
+                        !selectedBlock.contentAvailable ||
                         ['VIDEO', 'QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
                       }
                       onClick={handleMarkComplete}
@@ -630,6 +682,7 @@ interface BlockContentProps {
     status: LearningLessonBlock['progressStatus'],
     watchedVideoSeconds: number,
   ) => void;
+  onVideoProgressError: () => void;
   onFlashcardProgressSaved: (
     blockId: string,
     cardIndex: number,
@@ -647,6 +700,7 @@ function BlockContent({
   block,
   onContentLoadingChange,
   onVideoProgressSaved,
+  onVideoProgressError,
   onQuizProgressSaved,
   onFlashcardProgressSaved,
   onWritingProgressSaved,
@@ -658,6 +712,7 @@ function BlockContent({
           key={block.id}
           block={block}
           onProgressSaved={onVideoProgressSaved}
+          onProgressSaveError={onVideoProgressError}
           onLoadingChange={onContentLoadingChange}
         />
       );
@@ -689,10 +744,12 @@ function BlockContent({
 function VideoBlock({
   block,
   onProgressSaved,
+  onProgressSaveError,
   onLoadingChange,
 }: {
   block: LearningLessonBlock;
   onProgressSaved: BlockContentProps['onVideoProgressSaved'];
+  onProgressSaveError: BlockContentProps['onVideoProgressError'];
   onLoadingChange: BlockContentProps['onContentLoadingChange'];
 }) {
   const [playerLoading, setPlayerLoading] = useState(true);
@@ -758,10 +815,18 @@ function VideoBlock({
             if (pendingPositionRef.current === null) {
               pendingPositionRef.current = positionToSave;
             }
+            onProgressSaveError();
           })
           .finally(() => {
             isSavingRef.current = false;
-            if (success && pendingPositionRef.current !== null && pendingPositionRef.current !== lastSavedRef.current) {
+            if (
+              success
+              && pendingPositionRef.current !== null
+              && (
+                pendingPositionRef.current !== lastSavedRef.current
+                || Math.floor(watchedSecondsRef.current) !== lastSavedWatchedRef.current
+              )
+            ) {
               flush();
             }
           });
@@ -769,7 +834,7 @@ function VideoBlock({
 
       flush();
     },
-    [block.id, onProgressSaved],
+    [block.id, onProgressSaveError, onProgressSaved],
   );
 
   const handleReady = () => {
@@ -858,9 +923,10 @@ function VideoBlock({
     if (Number.isFinite(video.duration) && video.duration > 0) {
       mediaDurationRef.current = video.duration;
     }
-    if (video.duration && watchedSecondsRef.current >= video.duration - WATCHED_DELTA_MAX_SECONDS) {
-      watchedSecondsRef.current = Math.max(watchedSecondsRef.current, Math.floor(video.duration));
-    }
+    watchedSecondsRef.current = normalizeWatchedSecondsAtVideoEnd(
+      watchedSecondsRef.current,
+      video.duration,
+    );
     savePosition(Math.floor(video.currentTime));
   };
 

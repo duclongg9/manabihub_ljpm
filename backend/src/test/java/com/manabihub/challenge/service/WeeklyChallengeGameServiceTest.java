@@ -1,9 +1,13 @@
 package com.manabihub.challenge.service;
 
 import com.manabihub.challenge.dto.ChallengeAttemptResponse;
+import com.manabihub.challenge.dto.MatchCardsRequest;
 import com.manabihub.challenge.entity.WeeklyLearningChallenge;
+import com.manabihub.challenge.entity.WeeklyLearningChallengeAttempt;
 import com.manabihub.challenge.entity.WeeklyLearningChallengeAttemptCard;
 import com.manabihub.challenge.entity.WeeklyLearningChallengePair;
+import com.manabihub.challenge.enums.ChallengeAttemptState;
+import com.manabihub.challenge.enums.ChallengeCardKind;
 import com.manabihub.challenge.enums.ChallengeStatus;
 import com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptCardRepository;
 import com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptRepository;
@@ -20,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
@@ -82,5 +87,48 @@ class WeeklyChallengeGameServiceTest {
         ArgumentCaptor<List<WeeklyLearningChallengeAttemptCard>> cards = ArgumentCaptor.forClass(List.class);
         verify(cardRepository).saveAll(cards.capture());
         assertEquals(8, cards.getValue().size());
+    }
+
+    @Test
+    void match_returnsCompletedResultWhenClientRetriesLastSuccessfulPair() {
+        UUID userId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID challengeId = UUID.randomUUID();
+        UUID attemptId = UUID.randomUUID();
+        UUID pairId = UUID.randomUUID();
+        UUID firstCardId = UUID.randomUUID();
+        UUID secondCardId = UUID.randomUUID();
+        StudentProfile student = StudentProfile.builder().id(studentId).build();
+        WeeklyLearningChallenge challenge = WeeklyLearningChallenge.builder()
+                .id(challengeId).dailyRankedLimit(3).wrongPenaltySeconds(2).build();
+        WeeklyLearningChallengeAttempt attempt = WeeklyLearningChallengeAttempt.builder()
+                .id(attemptId).challengeId(challengeId).studentId(studentId)
+                .state(ChallengeAttemptState.COMPLETED).ranked(true)
+                .rankedDay(LocalDate.now()).matchedPairs(4).penaltyMillis(0)
+                .startedAt(Instant.now().minusSeconds(20)).completedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60)).totalMillis(20000L).build();
+        List<WeeklyLearningChallengeAttemptCard> selected = List.of(
+                WeeklyLearningChallengeAttemptCard.builder().id(firstCardId).attemptId(attemptId)
+                        .pairId(pairId).cardKind(ChallengeCardKind.PROMPT).matched(true).position(0).build(),
+                WeeklyLearningChallengeAttemptCard.builder().id(secondCardId).attemptId(attemptId)
+                        .pairId(pairId).cardKind(ChallengeCardKind.ANSWER).matched(true).position(1).build());
+
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+        when(attemptRepository.findOwnedByIdForUpdate(attemptId, studentId)).thenReturn(Optional.of(attempt));
+        when(challengeRepository.findById(challengeId)).thenReturn(Optional.of(challenge));
+        when(cardRepository.findByIdInAndAttemptId(anyCollection(), eq(attemptId))).thenReturn(selected);
+        when(cardRepository.findByAttemptIdOrderByPosition(attemptId)).thenReturn(selected);
+        when(pairRepository.countByChallengeId(challengeId)).thenReturn(4L);
+        when(attemptRepository.countByChallengeIdAndStudentIdAndRankedDayAndRankedTrue(
+                eq(challengeId), eq(studentId), any(LocalDate.class))).thenReturn(1L);
+
+        ChallengeAttemptResponse response = service.match(userId, attemptId,
+                new MatchCardsRequest(firstCardId, secondCardId));
+
+        assertTrue(response.completed());
+        assertEquals(4, response.matchedPairs());
+        assertEquals(20000L, response.totalMillis());
+        verify(attemptRepository, never()).save(any());
+        verify(cardRepository, never()).saveAll(any());
     }
 }

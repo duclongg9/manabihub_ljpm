@@ -7,7 +7,10 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined';
 import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
+import LeaderboardOutlinedIcon from '@mui/icons-material/LeaderboardOutlined';
 import { weeklyChallengeService, type ChallengeAttempt, type WeeklyChallenge } from '../services/weeklyChallengeService';
+import { WeeklyChallengeLeaderboardDialog } from '../../../shared/components/WeeklyChallengeLeaderboardDialog';
+import type { WeeklyChallengeLeaderboard } from '../../../shared/types/weeklyChallengeLeaderboard';
 
 interface LearningChallengeWidgetProps { accountKey?: string | null }
 
@@ -30,7 +33,12 @@ export function LearningChallengeWidget(_props: LearningChallengeWidgetProps) {
   const [open, setOpen] = useState(false);
   const [flipped, setFlipped] = useState<string[]>([]);
   const [elapsed, setElapsed] = useState(0);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [leaderboard, setLeaderboard] = useState<WeeklyChallengeLeaderboard | null>(null);
   const startedAt = useRef(0);
+  const matchInFlight = useRef(false);
 
   useEffect(() => {
     weeklyChallengeService.current()
@@ -69,8 +77,26 @@ export function LearningChallengeWidget(_props: LearningChallengeWidgetProps) {
     }
   };
 
+  const loadLeaderboard = async () => {
+    if (!challenge) return;
+    setLeaderboardLoading(true);
+    setLeaderboardError(null);
+    try {
+      setLeaderboard(await weeklyChallengeService.leaderboard(challenge.id));
+    } catch {
+      setLeaderboardError('Không thể tải bảng xếp hạng. Vui lòng thử lại.');
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  };
+
+  const openLeaderboard = () => {
+    setLeaderboardOpen(true);
+    void loadLeaderboard();
+  };
+
   const selectCard = async (cardId: string) => {
-    if (!attempt || busy || attempt.completed || flipped.includes(cardId)) return;
+    if (!attempt || busy || matchInFlight.current || attempt.completed || flipped.includes(cardId)) return;
     const card = attempt.cards.find((item) => item.id === cardId);
     if (!card || card.matched) return;
     if (flipped.length === 0) {
@@ -78,12 +104,21 @@ export function LearningChallengeWidget(_props: LearningChallengeWidgetProps) {
       return;
     }
     const firstId = flipped[0];
+    matchInFlight.current = true;
     setFlipped([firstId, cardId]);
     setBusy(true);
+    setError(null);
     const previousMatched = attempt.matchedPairs;
     try {
       const next = await weeklyChallengeService.match(attempt.attemptId, firstId, cardId);
       setAttempt(next);
+      if (next.completed) {
+        weeklyChallengeService.current()
+          .then((refreshedChallenge) => {
+            if (refreshedChallenge) setChallenge(refreshedChallenge);
+          })
+          .catch(() => undefined);
+      }
       if (next.matchedPairs > previousMatched) {
         window.setTimeout(() => setFlipped([]), 220);
       } else {
@@ -93,6 +128,7 @@ export function LearningChallengeWidget(_props: LearningChallengeWidgetProps) {
       setFlipped([]);
       setError('Không thể xác nhận cặp thẻ. Lượt chơi đã được giữ an toàn trên máy chủ.');
     } finally {
+      matchInFlight.current = false;
       setBusy(false);
     }
   };
@@ -142,10 +178,16 @@ export function LearningChallengeWidget(_props: LearningChallengeWidgetProps) {
         </Box>
       </Stack>
       {error && <Alert severity="error" sx={{ mt: 1.5 }}>{error}</Alert>}
-      <Button fullWidth variant="contained" disabled={busy} startIcon={<SportsEsportsOutlinedIcon />}
-        onClick={start} sx={{ mt: 1.5, bgcolor: '#C41E3A', fontWeight: 900, '&:hover': { bgcolor: '#A71931' } }}>
-        {remaining > 0 ? 'Vào chơi ngay' : 'Luyện tập tự do'}
-      </Button>
+      <Stack spacing={1} sx={{ mt: 1.5 }}>
+        <Button fullWidth variant="contained" disabled={busy} startIcon={<SportsEsportsOutlinedIcon />}
+          onClick={start} sx={{ bgcolor: '#C41E3A', fontWeight: 900, '&:hover': { bgcolor: '#A71931' } }}>
+          {remaining > 0 ? 'Vào chơi ngay' : 'Luyện tập tự do'}
+        </Button>
+        <Button fullWidth variant="outlined" startIcon={<LeaderboardOutlinedIcon />} onClick={openLeaderboard}
+          sx={{ borderColor: '#CBD5E1', color: '#1B2A4A', fontWeight: 900 }}>
+          Xem bảng xếp hạng
+        </Button>
+      </Stack>
       <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#98A2B3' }}>
         Nội dung và lượt chơi do máy chủ quản lý; tiền thưởng là số dư khuyến mại dùng mua khóa học và không thể rút.
       </Typography>
@@ -182,6 +224,9 @@ export function LearningChallengeWidget(_props: LearningChallengeWidgetProps) {
         </DialogContent>
         <DialogActions><Button onClick={() => setOpen(false)} disabled={busy}>Đóng</Button></DialogActions>
       </Dialog>
+      <WeeklyChallengeLeaderboardDialog open={leaderboardOpen} loading={leaderboardLoading}
+        error={leaderboardError} data={leaderboard} onRetry={() => void loadLeaderboard()}
+        onClose={() => setLeaderboardOpen(false)} />
     </Paper>
   );
 }
