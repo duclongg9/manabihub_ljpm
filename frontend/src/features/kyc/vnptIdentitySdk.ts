@@ -1,4 +1,4 @@
-﻿type VnptSdkCallback = (result: unknown) => Promise<void> | void;
+type VnptSdkCallback = (result: unknown) => Promise<void> | void;
 
 const DEFAULT_VNPT_SDK_SCRIPT_URLS = [
   '/web-sdk-version-3.2.1.0.js',
@@ -18,12 +18,33 @@ const MAX_SDK_ARRAY_ITEMS = 50;
 const MAX_SDK_STRING_LENGTH = 4_096;
 const OMITTED = Symbol('omitted');
 
+/**
+ * Heuristic error matching for VNPT's web-sdk-version-3.2.1.0.js crash when
+ * authentication credentials are invalid or expired.
+ * Different browsers produce different TypeErrors (e.g., "Cannot read properties of undefined (reading 'hash')"
+ * vs "undefined is not an object (evaluating '...hash')" vs "xyz is undefined").
+ */
+const isVnptVendorCrash = (message: string, stack?: string) => {
+  // ALL matches require evidence that the error originated from VNPT vendor code.
+  // Without a VNPT stack trace we must not swallow unrelated application errors.
+  const isFromVnpt = Boolean(stack && /vnpt|web-sdk-version/i.test(stack));
+  if (!isFromVnpt) return false;
+  // Different browsers produce different TypeErrors when the SDK config is invalid:
+  //   Chrome:  "Cannot read properties of undefined (reading 'hash')"
+  //   Safari:  "undefined is not an object (evaluating 'e.dataConfig.hash')"
+  //   Firefox: "xyz is undefined"
+  return /hash/i.test(message) || /undefined/i.test(message) || /null/i.test(message);
+};
+
 declare global {
   interface Window {
     SDK?: {
       launch: (config: Record<string, unknown>) => void;
     };
     __MANABIHUB_LAST_VNPT_CONFIG__?: Record<string, unknown>;
+    __MANABIHUB_VNPT_ACTIVE_LAUNCH__?: {
+      cleanup: () => void;
+    };
   }
 }
 
@@ -50,28 +71,58 @@ export function cleanupLegacyVnptIdentityStorage() {
 }
 
 export function resetVnptIdentitySdkRuntime() {
+  if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__) {
+    window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__.cleanup();
+    delete window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__;
+  }
   delete window.SDK;
   delete window.__MANABIHUB_LAST_VNPT_CONFIG__;
   document.querySelectorAll<HTMLScriptElement>('script[data-vnpt-sdk]').forEach((script) => script.remove());
   cleanupLegacyVnptIdentityStorage();
 }
 
+/**
+ * Local-only early warning for JWT tokens that appear to have expired based on
+ * the `exp` claim. This does NOT authenticate the token — server-side
+ * validation is the only source of truth. Opaque tokens (non-JWT) are treated
+ * as unverifiable and pass through without error.
+ *
+ * Supports standard base64 and base64url-encoded payloads.
+ */
+function isJwtExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false; // Opaque token — cannot check expiry locally
+    const base64Url = parts[1];
+    // Convert base64url to standard base64
+    const base64 = base64Url
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(base64Url.length + ((4 - (base64Url.length % 4)) % 4), '=');
+    const payload = JSON.parse(atob(base64));
+    // Allow up to 5 minutes of clock skew to avoid blocking users with slightly inaccurate system clocks.
+    const CLOCK_SKEW_MS = 5 * 60 * 1000;
+    if (payload.exp && payload.exp * 1000 < Date.now() - CLOCK_SKEW_MS) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false; // Cannot parse — treat as opaque / unverifiable
+  }
+}
+
 export async function launchVnptIdentitySdk(
   onResult: (result: VnptIdentityResult) => Promise<void> | void,
   options: VnptIdentitySdkOptions = {},
 ) {
+  cleanupLegacyVnptIdentityStorage();
   const env = getVnptEnv();
 
   if (!env.enabled) {
     throw new Error('VNPT eKYC SDK đang tắt. Hãy đặt VITE_VNPT_EKYC_ENABLED=true trong môi trường chạy.');
   }
 
-  await loadVnptScripts(env.scriptUrls);
-
-  if (!window.SDK?.launch) {
-    throw new Error('Không tải được VNPT eKYC SDK. Kiểm tra frontend/public/web-sdk-version-3.2.1.0.js và frontend/public/lib/.');
-  }
-
+  // Validate all required config BEFORE loading vendor scripts into the page
   const missingConfig = [
     { label: 'VITE_VNPT_EKYC_BACKEND_URL', value: env.backendUrl },
     { label: 'VITE_VNPT_EKYC_TOKEN_ID', value: env.tokenId },
@@ -83,12 +134,79 @@ export async function launchVnptIdentitySdk(
     throw new Error(`Thiếu cấu hình VNPT eKYC: ${missingConfig.map((item) => item.label).join(', ')}`);
   }
 
+  if (isJwtExpired(env.accessToken)) {
+    throw new Error('Phiên xác thực VNPT đã hết hạn hoặc cấu hình chưa hợp lệ. Vui lòng cập nhật thông tin xác thực và thử lại.');
+  }
+
+  if (!env.challengeCode) {
+    throw new Error(
+      'Thiếu VITE_VNPT_EKYC_CHALLENGE_CODE. Challenge code là bắt buộc khi VNPT eKYC được bật.',
+    );
+  }
+
+  await loadVnptScripts(env.scriptUrls);
+
+  if (!window.SDK?.launch) {
+    throw new Error('Không tải được VNPT eKYC SDK. Kiểm tra frontend/public/web-sdk-version-3.2.1.0.js và frontend/public/lib/.');
+  }
+
+  // --- Per-launch state: fresh for every launch, cleaned up on terminal event ---
   let documentResult: Record<string, unknown> | null = null;
   let callbackResult: Record<string, unknown> | null = null;
   let finalResultHandled = false;
+  let errorFired = false;
+  let isCleanedUp = false;
+
+  // Clean up any previous active launch before starting a new one
+  if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__) {
+    window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__.cleanup();
+  }
+
+  const onWindowError = (event: ErrorEvent | PromiseRejectionEvent) => {
+    if (isCleanedUp) return;
+
+    let message = '';
+    let stack = '';
+    if (event instanceof ErrorEvent) {
+      message = event.error?.message || event.message;
+      stack = event.error?.stack || '';
+    } else {
+      message = event.reason?.message || String(event.reason);
+      stack = event.reason?.stack || '';
+    }
+
+    // Only handle the exact VNPT vendor crash — do not swallow unrelated errors
+    if (isVnptVendorCrash(message, stack)) {
+      event.preventDefault();
+      cleanupLaunch();
+      if (!errorFired) {
+        errorFired = true;
+        options.onError?.(new Error(
+          'Phiên xác thực VNPT đã hết hạn hoặc cấu hình chưa hợp lệ. Vui lòng cập nhật thông tin xác thực và thử lại.',
+        ));
+      }
+    }
+    // Intentionally NOT calling event.preventDefault() for unmatched errors — let them propagate
+  };
+
+  const cleanupLaunch = () => {
+    isCleanedUp = true;
+    window.removeEventListener('error', onWindowError);
+    window.removeEventListener('unhandledrejection', onWindowError as EventListener);
+    if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__?.cleanup === cleanupLaunch) {
+      delete window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__;
+    }
+  };
+
+  window.addEventListener('error', onWindowError);
+  window.addEventListener('unhandledrejection', onWindowError as EventListener);
+  window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__ = { cleanup: cleanupLaunch };
 
   const reportCallbackError = (error: unknown) => {
-    options.onError?.(toError(error));
+    if (!errorFired) {
+      errorFired = true;
+      options.onError?.(toError(error));
+    }
   };
 
   const submitTerminalResult = async (terminalResult: Record<string, unknown>) => {
@@ -101,6 +219,7 @@ export async function launchVnptIdentitySdk(
     const providerTransactionId = findExactValue(compactResult, PROVIDER_TRANSACTION_ID_ALIASES);
 
     finalResultHandled = true;
+    cleanupLaunch();
     await onResult({
       providerSessionId,
       providerTransactionId,
@@ -120,16 +239,18 @@ export async function launchVnptIdentitySdk(
   };
 
   const handleEndFlowResult: VnptSdkCallback = (sdkResult) => {
+    if (isCleanedUp) return;
     void submitTerminalResult(compactSdkResult(sdkResult)).catch(reportCallbackError);
   };
 
   // Config follows VNPT eKYC Web SDK 3.2.1 docs. Callbacks stay in-process; this
   // flow never reuses the OAuth /auth/callback route.
-  const dataConfig = {
+  const dataConfig: Record<string, unknown> = {
     BACKEND_URL: env.backendUrl,
     TOKEN_KEY: env.tokenKey,
     TOKEN_ID: env.tokenId,
     ACCESS_TOKEN: env.accessToken,
+    CHALLENGE_CODE: env.challengeCode,
     CALL_BACK: handleCallbackResult,
     CALL_BACK_END_FLOW: handleEndFlowResult,
     CALL_BACK_DOCUMENT_RESULT: handleDocumentResult,
@@ -172,6 +293,7 @@ function getVnptEnv() {
     tokenId: (import.meta.env.VITE_VNPT_EKYC_TOKEN_ID ?? '').trim(),
     tokenKey: (import.meta.env.VITE_VNPT_EKYC_TOKEN_KEY ?? '').trim(),
     accessToken: sanitizeAccessToken(import.meta.env.VITE_VNPT_EKYC_ACCESS_TOKEN),
+    challengeCode: (import.meta.env.VITE_VNPT_EKYC_CHALLENGE_CODE ?? '').trim(),
   };
 }
 
@@ -366,6 +488,7 @@ function safeDebugConfig(config: Record<string, unknown>) {
     TOKEN_KEY_EXISTS: Boolean(config.TOKEN_KEY),
     ACCESS_TOKEN_EXISTS: Boolean(config.ACCESS_TOKEN),
     ACCESS_TOKEN_HAS_BEARER_PREFIX: String(config.ACCESS_TOKEN ?? '').toLowerCase().startsWith('bearer '),
+    CHALLENGE_CODE_EXISTS: Boolean(config.CHALLENGE_CODE),
     SDK_FLOW: config.SDK_FLOW,
     FLOW_TAKEN: config.FLOW_TAKEN,
     USE_METHOD: config.USE_METHOD,
