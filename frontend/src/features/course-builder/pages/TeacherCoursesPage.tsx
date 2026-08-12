@@ -8,6 +8,7 @@ import PublishIcon from '@mui/icons-material/Publish';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
+import SortIcon from '@mui/icons-material/Sort';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
@@ -33,7 +34,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
 import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
@@ -65,7 +66,10 @@ type Feedback = {
   severity: 'success' | 'error';
 } | null;
 
+type CourseSortOrder = 'UPDATED_DESC' | 'UPDATED_ASC';
+
 const allFilterValue = 'ALL';
+const defaultSortOrder: CourseSortOrder = 'UPDATED_DESC';
 const draftPageSize = 6;
 const jlptLevels: JlptLevel[] = ['N5', 'N4', 'N3', 'N2', 'N1'];
 
@@ -94,6 +98,7 @@ export function TeacherCoursesPage() {
   const [query, setQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState(allFilterValue);
   const [categoryFilter, setCategoryFilter] = useState(allFilterValue);
+  const [sortOrder, setSortOrder] = useState<CourseSortOrder>(defaultSortOrder);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -126,8 +131,11 @@ export function TeacherCoursesPage() {
       return (!normalizedQuery || searchText.includes(normalizedQuery))
         && (levelFilter === allFilterValue || course.jlptLevel === levelFilter)
         && (categoryFilter === allFilterValue || course.category === categoryFilter);
+    }).sort((first, second) => {
+      const difference = courseLastModifiedAt(first) - courseLastModifiedAt(second);
+      return sortOrder === 'UPDATED_DESC' ? -difference : difference;
     });
-  }, [categoryFilter, categoryNames, drafts, levelFilter, query]);
+  }, [categoryFilter, categoryNames, drafts, levelFilter, query, sortOrder]);
 
   const pageCount = Math.max(1, Math.ceil(filteredDrafts.length / draftPageSize));
   const pagedDrafts = useMemo(() => {
@@ -160,7 +168,7 @@ export function TeacherCoursesPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [categoryFilter, levelFilter, query]);
+  }, [categoryFilter, levelFilter, query, sortOrder]);
 
   useEffect(() => {
     if (currentPage > pageCount) {
@@ -172,6 +180,7 @@ export function TeacherCoursesPage() {
     setQuery('');
     setLevelFilter(allFilterValue);
     setCategoryFilter(allFilterValue);
+    setSortOrder(defaultSortOrder);
   }
 
   function editDraft(course: CourseDraftResponse) {
@@ -295,7 +304,7 @@ export function TeacherCoursesPage() {
       const response = await unpublishCourse(course.id);
       setFeedback({
         severity: 'success',
-        message: response.message || 'Khóa học đã được ẩn khỏi danh mục. Bạn có thể chỉnh sửa ảnh bìa và nội dung rồi gửi duyệt lại.',
+        message: response.message || 'Khóa học đã được ẩn khỏi danh mục. Học viên hiện tại vẫn học phiên bản đã duyệt trong khi bạn chuẩn bị bản cập nhật.',
       });
       await loadDrafts();
       setUnpublishCandidate(null);
@@ -423,9 +432,9 @@ export function TeacherCoursesPage() {
               onChange={(event) => setLevelFilter(event.target.value)}
               sx={{ minWidth: { xs: '100%', md: 150 } }}
             >
-              <MenuItemValue value={allFilterValue}>Tất cả</MenuItemValue>
+              <MenuItem value={allFilterValue}>Tất cả</MenuItem>
               {jlptLevels.map((level) => (
-                <MenuItemValue key={level} value={level}>{level}</MenuItemValue>
+                <MenuItem key={level} value={level}>{level}</MenuItem>
               ))}
             </TextField>
             <TextField
@@ -436,12 +445,28 @@ export function TeacherCoursesPage() {
               onChange={(event) => setCategoryFilter(event.target.value)}
               sx={{ minWidth: { xs: '100%', md: 210 } }}
             >
-              <MenuItemValue value={allFilterValue}>Tất cả danh mục</MenuItemValue>
+              <MenuItem value={allFilterValue}>Tất cả danh mục</MenuItem>
               {categories.map((category) => (
-                <MenuItemValue key={category.code} value={category.code}>
+                <MenuItem key={category.code} value={category.code}>
                   {category.name}
-                </MenuItemValue>
+                </MenuItem>
               ))}
+            </TextField>
+            <TextField
+              select
+              size="small"
+              label="Sắp xếp"
+              value={sortOrder}
+              onChange={(event) => setSortOrder(event.target.value as CourseSortOrder)}
+              sx={{ minWidth: { xs: '100%', md: 190 } }}
+              slotProps={{
+                select: {
+                  IconComponent: SortIcon,
+                },
+              }}
+            >
+              <MenuItem value="UPDATED_DESC">Mới cập nhật</MenuItem>
+              <MenuItem value="UPDATED_ASC">Cũ cập nhật</MenuItem>
             </TextField>
             <Button
               variant="text"
@@ -643,7 +668,7 @@ export function TeacherCoursesPage() {
               {unpublishCandidate ? displayDraftTitle(unpublishCandidate) : ''}
             </Typography>
             <Alert severity="info">
-              Khóa học sẽ tạm thời không xuất hiện trong danh mục và trạng thái chuyển về bản nháp. Học viên đã ghi danh vẫn giữ quyền học; sau khi sửa ảnh bìa hoặc nội dung, bạn cần gửi duyệt lại trước khi xuất bản.
+              Khóa học sẽ tạm thời không xuất hiện trong danh mục. Học viên đã ghi danh vẫn học nguyên phiên bản đã duyệt; các thay đổi của bạn chỉ được chuyển tới học viên sau khi Course Manager phê duyệt. Sau đó, bạn có thể xuất bản lại khóa học trên danh mục.
             </Alert>
           </Stack>
         </DialogContent>
@@ -675,19 +700,6 @@ export function TeacherCoursesPage() {
         onClose={() => setAnalyticsCourse(null)}
       />
     </Box>
-  );
-}
-
-interface MenuItemValueProps {
-  children: ReactNode;
-  value: string;
-}
-
-function MenuItemValue({ children, value }: MenuItemValueProps) {
-  return (
-    <MenuItem value={value}>
-      {children}
-    </MenuItem>
   );
 }
 
@@ -823,7 +835,7 @@ function CourseDraftRow({
             {formatPrice(course.price)}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Lưu lúc {formatDate(course.createdAt)}
+            Cập nhật lúc {formatDate(course.updatedAt || course.createdAt)}
           </Typography>
         </Stack>
 
@@ -1065,4 +1077,9 @@ function normalizeSearch(value: string) {
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
     .trim();
+}
+
+function courseLastModifiedAt(course: CourseDraftResponse) {
+  const timestamp = Date.parse(course.updatedAt || course.createdAt || '');
+  return Number.isNaN(timestamp) ? 0 : timestamp;
 }

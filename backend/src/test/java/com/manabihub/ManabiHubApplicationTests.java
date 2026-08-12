@@ -7,6 +7,7 @@ import com.manabihub.course.repository.CourseModuleRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.repository.CourseThumbnailAssetRepository;
 import com.manabihub.course.repository.LessonBlockRepository;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.finaltest.repository.FinalTestRepository;
 import com.manabihub.identity.mapper.StudentProfileMapper;
 import com.manabihub.identity.mapper.TeacherProfileMapper;
@@ -142,6 +143,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private CourseRepository courseRepository;
+
+    @MockBean
+    private CourseEditDraftService courseEditDraftService;
 
     @MockBean
     private CourseThumbnailAssetRepository courseThumbnailAssetRepository;

@@ -11,6 +11,7 @@ import com.manabihub.course.enums.JlptLevel;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.CourseValidationService;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -87,6 +88,9 @@ class CourseServiceImplTest {
     @Mock
     private EscrowLedgerRepository escrowLedgerRepository;
 
+    @Mock
+    private CourseEditDraftService courseEditDraftService;
+
     @InjectMocks
     private CourseServiceImpl courseService;
     private UUID userId;
@@ -105,8 +109,12 @@ class CourseServiceImplTest {
                 courseReviewService,
                 settingValueService,
                 enrollmentRepository,
-                escrowLedgerRepository
+                escrowLedgerRepository,
+                courseEditDraftService
         );
+        org.mockito.Mockito.lenient()
+                .when(courseEditDraftService.resolveEditableCourse(any(Course.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         org.mockito.Mockito.lenient()
                 .when(settingValueService.getInteger(any(String.class), any(Integer.class)))
                 .thenAnswer(invocation -> invocation.getArgument(1));
@@ -662,8 +670,9 @@ class CourseServiceImplTest {
         CourseDraftResponse response = courseService.unpublishCourse(courseId);
 
         assertEquals(CourseStatus.DRAFT, publishedCourse.getStatus());
-        assertNull(publishedCourse.getPublishedAt());
+        assertEquals(publishedAt, publishedCourse.getPublishedAt());
         assertEquals(CourseStatus.DRAFT, response.status());
+        verify(courseEditDraftService).beginEditingPublishedCourse(publishedCourse);
         verify(courseRepository).saveAndFlush(publishedCourse);
         verify(auditLogService).logUserAction(
                 userId,

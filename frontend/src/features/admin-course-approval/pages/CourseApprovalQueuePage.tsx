@@ -138,15 +138,25 @@ export const CourseApprovalQueuePage: React.FC = () => {
             setPage(1);
           }}
           sx={{
-            bgcolor: '#4f46e5',
-            color: 'white',
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
             borderRadius: 2,
             textTransform: 'none',
             px: 4,
             py: 1,
             fontWeight: 'bold',
-            boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2)',
-            '&:hover': { bgcolor: '#4338ca', boxShadow: '0 6px 8px -1px rgba(79, 70, 229, 0.3)' }
+            boxShadow: '0 4px 10px rgba(196, 30, 58, 0.2)',
+            '&:hover': {
+              bgcolor: 'primary.dark',
+              color: 'primary.contrastText',
+              boxShadow: '0 6px 14px rgba(196, 30, 58, 0.28)',
+            },
+            '&:focus, &:active, &:visited': {
+              color: 'primary.contrastText',
+            },
+            '& .MuiButton-startIcon': {
+              color: 'inherit',
+            },
           }}
         >
           Áp dụng

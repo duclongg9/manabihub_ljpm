@@ -80,7 +80,7 @@ public class TeacherCourseController {
         CourseDraftResponse response = courseService.unpublishCourse(courseId);
         return ResponseEntity.ok(ApiResponse.success(
                 MessageCodes.COURSE_UPDATED,
-                "Course hidden from the public catalogue and returned to drafts for editing.",
+                "Khóa học đã được ẩn khỏi danh mục. Học viên hiện tại tiếp tục học phiên bản đã duyệt trong khi bạn chỉnh sửa bản mới.",
                 response
         ));
     }

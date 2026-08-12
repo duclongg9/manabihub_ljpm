@@ -40,6 +40,7 @@ export interface CourseDraftResponse {
   accessDurationDays?: number | null;
   accessExpiresAt?: string | null;
   createdAt?: string | null;
+  updatedAt?: string | null;
   srsTrace: Record<string, unknown>;
 }
 

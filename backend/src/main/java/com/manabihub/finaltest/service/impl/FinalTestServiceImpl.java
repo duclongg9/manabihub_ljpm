@@ -5,6 +5,7 @@ import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.finaltest.dto.request.FinalTestChoiceDto;
 import com.manabihub.finaltest.dto.request.FinalTestQuestionDto;
 import com.manabihub.finaltest.dto.request.UpdateFinalTestRequest;
@@ -37,13 +38,16 @@ public class FinalTestServiceImpl implements FinalTestService {
     private final FinalTestRepository finalTestRepository;
     private final CourseRepository courseRepository;
     private final CurrentUserService currentUserService;
+    private final CourseEditDraftService courseEditDraftService;
 
     @Override
     @Transactional(readOnly = true)
     public FinalTestResponse getFinalTest(UUID courseId) {
-        Course course = validateAndGetCourse(courseId, currentUserService.getCurrentUserId());
-        FinalTest finalTest = finalTestRepository.findByCourseId(courseId)
-                .orElse(null);
+        Course persistedCourse = validateAndGetCourse(courseId, currentUserService.getCurrentUserId());
+        Course course = courseEditDraftService.resolveEditableCourse(persistedCourse);
+        FinalTest finalTest = courseEditDraftService.hasEditDraft(courseId)
+                ? course.getFinalTest()
+                : finalTestRepository.findByCourseId(courseId).orElse(null);
 
         if (finalTest == null) {
             return null; // Return empty or 404, usually if it's draft, null is fine for GET.
@@ -55,13 +59,22 @@ public class FinalTestServiceImpl implements FinalTestService {
     @Override
     @Transactional
     public FinalTestResponse updateFinalTest(UUID courseId, UpdateFinalTestRequest request) {
-        Course course = validateAndGetCourse(courseId, currentUserService.getCurrentUserId());
+        Course persistedCourse = validateAndGetCourse(courseId, currentUserService.getCurrentUserId());
+        Course course = courseEditDraftService.resolveEditableCourse(persistedCourse);
 
         // Validation for Questions
         validateQuestions(request.getQuestions());
 
-        FinalTest finalTest = finalTestRepository.findByCourseId(courseId)
-                .orElseGet(() -> FinalTest.builder().course(course).build());
+        boolean versionedEdit = courseEditDraftService.hasEditDraft(courseId);
+        FinalTest finalTest = versionedEdit
+                ? course.getFinalTest()
+                : finalTestRepository.findByCourseId(courseId).orElse(null);
+        if (finalTest == null) {
+            finalTest = FinalTest.builder()
+                    .id(versionedEdit ? UUID.randomUUID() : null)
+                    .course(course)
+                    .build();
+        }
 
         finalTest.setTimeLimitMinutes(request.getTimeLimitMinutes());
         finalTest.setPassingScore(request.getPassingScore());
@@ -75,6 +88,7 @@ public class FinalTestServiceImpl implements FinalTestService {
         int qOrder = 0;
         for (FinalTestQuestionDto qDto : request.getQuestions()) {
             FinalTestQuestion question = FinalTestQuestion.builder()
+                    .id(versionedEdit ? UUID.randomUUID() : null)
                     .finalTest(finalTest)
                     .content(qDto.getContent())
                     .explanation(qDto.getExplanation())
@@ -84,6 +98,7 @@ public class FinalTestServiceImpl implements FinalTestService {
             int cOrder = 0;
             for (FinalTestChoiceDto cDto : qDto.getChoices()) {
                 FinalTestChoice choice = FinalTestChoice.builder()
+                        .id(versionedEdit ? UUID.randomUUID() : null)
                         .question(question)
                         .content(cDto.getContent())
                         .isCorrect(cDto.getIsCorrect())
@@ -92,6 +107,12 @@ public class FinalTestServiceImpl implements FinalTestService {
                 question.getChoices().add(choice);
             }
             finalTest.getQuestions().add(question);
+        }
+
+        if (versionedEdit) {
+            course.setFinalTest(finalTest);
+            courseEditDraftService.saveIfVersioned(course);
+            return mapToResponse(finalTest);
         }
 
         FinalTest saved = finalTestRepository.save(finalTest);
