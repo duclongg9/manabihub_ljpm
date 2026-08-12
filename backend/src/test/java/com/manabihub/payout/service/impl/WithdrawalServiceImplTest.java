@@ -2,7 +2,12 @@ package com.manabihub.payout.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.identity.entity.AppUser;
+import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.kyc.domain.IdentityVerificationStatus;
+import com.manabihub.kyc.domain.KycRequest;
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.payout.dto.request.BankAccountDto;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
@@ -57,6 +62,8 @@ class WithdrawalServiceImplTest {
     @Mock private WalletRepository walletRepository;
     @Mock private TeacherBankAccountRepository bankAccountRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
+    @Mock private KycRequestRepository kycRequestRepository;
+    @Mock private AppUserRepository appUserRepository;
     @Mock private WalletService walletService;
     @Mock private WithdrawalMapper withdrawalMapper;
     @Mock private WithdrawalNotificationService notificationService;
@@ -85,6 +92,22 @@ class WithdrawalServiceImplTest {
         teacherProfile.setId(teacherProfileId);
         org.mockito.Mockito.lenient().when(teacherProfileRepository.findByUserId(userId))
                 .thenReturn(Optional.of(teacherProfile));
+
+        AppUser user = AppUser.builder()
+                .id(userId)
+                .email("verified-teacher@test.com")
+                .fullName("Verified Teacher")
+                .phoneNumber("+84912345678")
+                .phoneVerifiedAt(Instant.now())
+                .build();
+        org.mockito.Mockito.lenient().when(appUserRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+        KycRequest verifiedKyc = new KycRequest();
+        verifiedKyc.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
+        org.mockito.Mockito.lenient()
+                .when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(
+                        teacherProfileId))
+                .thenReturn(Optional.of(verifiedKyc));
 
         wallet = Wallet.builder()
                 .id(UUID.randomUUID())
@@ -347,6 +370,48 @@ class WithdrawalServiceImplTest {
         );
 
         assertEquals(MessageCodes.PAYOUT_MONTHLY_LIMIT_EXCEEDED, exception.getMessageCode());
+        verifyNoInteractions(otpService, walletService);
+        verify(withdrawalRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("UTCID10 (A) - phone is not verified -> reject before wallet and OTP")
+    void createWithdrawalRequest_RequiresVerifiedPhoneBeforeWalletAndOtp() {
+        CreateWithdrawalRequest request = newRequest();
+        AppUser unverified = AppUser.builder()
+                .id(userId)
+                .email("unverified-phone@test.com")
+                .fullName("Unverified Phone")
+                .build();
+        when(appUserRepository.findById(userId)).thenReturn(Optional.of(unverified));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> withdrawalService.createWithdrawalRequest(userIdString, request));
+
+        assertEquals(MessageCodes.PHONE_VERIFICATION_REQUIRED, exception.getMessageCode());
+        verify(walletRepository, never()).findByOwnerTypeAndTeacher_IdForUpdate(any(), any());
+        verifyNoInteractions(otpService, walletService);
+        verify(withdrawalRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("UTCID11 (A) - CCCD is not verified -> reject before wallet and OTP")
+    void createWithdrawalRequest_RequiresVerifiedIdentityBeforeWalletAndOtp() {
+        CreateWithdrawalRequest request = newRequest();
+        KycRequest pendingKyc = new KycRequest();
+        pendingKyc.setIdentityStatus(IdentityVerificationStatus.PROCESSING);
+        when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(
+                teacherProfileId)).thenReturn(Optional.of(pendingKyc));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> withdrawalService.createWithdrawalRequest(userIdString, request));
+
+        assertEquals(MessageCodes.MSG_KYC_002, exception.getMessageCode());
+        verify(walletRepository, never()).findByOwnerTypeAndTeacher_IdForUpdate(any(), any());
         verifyNoInteractions(otpService, walletService);
         verify(withdrawalRepository, never()).saveAndFlush(any());
     }

@@ -66,7 +66,10 @@ class StudentIdentityVerificationServiceTest {
                 Map.of("result", Map.of(
                         "idNumber", "027 204 002 711",
                         "fullName", "Nguyễn Xuân Đạt",
-                        "dateOfBirth", "31/08/2004")));
+                        "dateOfBirth", "31/08/2004"),
+                "liveness_face", Map.of("liveness", "success"),
+                "compare", Map.of("result", "match", "prob", 0.98D),
+                "masked", Map.of("masked", "false")));
 
         var response = service.verify(request);
 
@@ -78,10 +81,6 @@ class StudentIdentityVerificationServiceTest {
 
     @Test
     void verify_rejectsPayloadThatDoesNotMatchSyntheticRegistry() {
-        when(nationalIdRegistry.findActiveByIdNumber("027204002711"))
-                .thenReturn(Optional.of(new NationalIdRecordDto(
-                        "027204002711", "NGUYEN XUAN DAT", LocalDate.of(2004, 8, 31))));
-
         StudentIdentityVerificationRequest request = new StudentIdentityVerificationRequest(
                 null,
                 null,

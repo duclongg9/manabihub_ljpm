@@ -23,6 +23,7 @@ export const ROUTES = {
     WISHLIST: '/student/wishlist',
     COURSE_LEARN: (courseId: string) => `/student/courses/${courseId}/learn`,
     PAYMENTS: '/student/payments',
+    IDENTITY_VERIFICATION: '/student/identity-verification',
     WALLET: '/student/wallet',
     NOTIFICATIONS: '/student/notifications',
     PROFILE: '/student/profile',

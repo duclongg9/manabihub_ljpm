@@ -5,6 +5,7 @@ import com.manabihub.ai.repository.AiUsageLogRepository;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseModuleRepository;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.repository.CourseThumbnailAssetRepository;
 import com.manabihub.course.repository.LessonBlockRepository;
 import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.finaltest.repository.FinalTestRepository;
@@ -147,7 +148,7 @@ class ManabiHubApplicationTests {
     private CourseEditDraftService courseEditDraftService;
 
     @MockBean
-    private com.manabihub.course.repository.CourseThumbnailAssetRepository courseThumbnailAssetRepository;
+    private CourseThumbnailAssetRepository courseThumbnailAssetRepository;
 
     @MockBean
     private CourseCategoryRepository courseCategoryRepository;

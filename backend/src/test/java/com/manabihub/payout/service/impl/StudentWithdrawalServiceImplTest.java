@@ -71,6 +71,8 @@ class StudentWithdrawalServiceImplTest {
         userId = UUID.randomUUID();
         AppUser user = new AppUser();
         user.setId(userId);
+        user.setPhoneNumber("+84912345678");
+        user.setPhoneVerifiedAt(Instant.now());
         student = new StudentProfile();
         student.setId(UUID.randomUUID());
         student.setUser(user);
@@ -138,6 +140,40 @@ class StudentWithdrawalServiceImplTest {
                         userId, request(new BigDecimal("100000.00"))));
 
         assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, error.getMessageCode());
+        verify(otpService, never()).consumeOtp(any(), any());
+        verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createWithdrawal_requiresVerifiedPhoneBeforeWalletOrOtp() {
+        student.getUser().setPhoneVerifiedAt(null);
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.createWithdrawal(
+                        userId, request(new BigDecimal("100000.00"))));
+
+        assertEquals(MessageCodes.PHONE_VERIFICATION_REQUIRED, error.getMessageCode());
+        verify(studentWalletService, never()).getOrCreateStudentWallet(any());
+        verify(walletRepository, never()).findByOwnerTypeAndStudent_IdForUpdate(any(), any());
+        verify(otpService, never()).consumeOtp(any(), any());
+        verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createWithdrawal_requiresVerifiedIdentityBeforeWalletOrOtp() {
+        student.setIdentityVerifiedAt(null);
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.createWithdrawal(
+                        userId, request(new BigDecimal("100000.00"))));
+
+        assertEquals(MessageCodes.MSG_KYC_002, error.getMessageCode());
+        verify(studentWalletService, never()).getOrCreateStudentWallet(any());
+        verify(walletRepository, never()).findByOwnerTypeAndStudent_IdForUpdate(any(), any());
         verify(otpService, never()).consumeOtp(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
     }

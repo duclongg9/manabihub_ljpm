@@ -2,7 +2,10 @@ package com.manabihub.payout.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.payout.dto.request.BankAccountDto;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
@@ -30,6 +33,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -46,12 +50,17 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private final WalletRepository walletRepository;
     private final TeacherBankAccountRepository bankAccountRepository;
     private final TeacherProfileRepository teacherProfileRepository;
+    private final KycRequestRepository kycRequestRepository;
+    private final AppUserRepository appUserRepository;
     private final WalletService walletService;
     private final WithdrawalMapper withdrawalMapper;
     private final WithdrawalNotificationService notificationService;
     private final WithdrawalOtpService otpService;
     private final PayoutSecurityService securityService;
     private final CommercialPolicyService commercialPolicyService;
+
+    @Value("${manabihub.kyc.identity-verification-mode:direct-sdk-mock}")
+    private String identityVerificationMode;
 
     @Override
     @Transactional
@@ -62,7 +71,29 @@ public class WithdrawalServiceImpl implements WithdrawalService {
             throw new BusinessException(MessageCodes.PAYOUT_AMOUNT_BELOW_MINIMUM, "Amount below minimum threshold");
         }
 
-        UUID teacherProfileId = resolveTeacherProfileId(userId);
+        UUID userUuid = UUID.fromString(userId);
+        TeacherProfile teacherProfile = resolveTeacherProfile(userUuid);
+        if (appUserRepository.findById(userUuid)
+                .map(user -> user.getPhoneVerifiedAt() == null)
+                .orElse(true)) {
+            throw new BusinessException(
+                    MessageCodes.PHONE_VERIFICATION_REQUIRED,
+                    "Vui lòng xác minh số điện thoại trước khi rút tiền",
+                    HttpStatus.FORBIDDEN);
+        }
+        var latestKyc = kycRequestRepository
+                .findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
+                .orElse(null);
+        boolean identityVerified = latestKyc != null
+                && latestKyc.getIdentityStatus() == IdentityVerificationStatus.VERIFIED
+                && (isDirectSdkDemo() || latestKyc.getServerVerifiedAt() != null);
+        if (!identityVerified) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_002,
+                    "Vui lòng hoàn tất xác minh CCCD trước khi rút tiền",
+                    HttpStatus.FORBIDDEN);
+        }
+        UUID teacherProfileId = teacherProfile.getId();
 
         // Serialize withdrawal creation per teacher across all application instances.
         var wallet = walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(
@@ -274,13 +305,20 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     }
 
     private UUID resolveTeacherProfileId(String userId) {
-        UUID userUuid = UUID.fromString(userId);
-        TeacherProfile teacherProfile = teacherProfileRepository.findByUserId(userUuid)
+        return resolveTeacherProfile(UUID.fromString(userId)).getId();
+    }
+
+    private boolean isDirectSdkDemo() {
+        return !org.springframework.util.StringUtils.hasText(identityVerificationMode)
+                || "direct-sdk-mock".equalsIgnoreCase(identityVerificationMode);
+    }
+
+    private TeacherProfile resolveTeacherProfile(UUID userId) {
+        return teacherProfileRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.KYC_TEACHER_NOT_FOUND,
                         "Teacher profile not found"
                 ));
-        return teacherProfile.getId();
     }
 
     private String teacherEmail(UUID teacherProfileId) {

@@ -303,7 +303,7 @@ class TeacherKycServiceTest {
                 .thenReturn(Optional.of(registryRecord));
         when(teacherIdentityClaimService.normalizeCccd("012345678901"))
                 .thenReturn("012345678901");
-        when(kycRequestRepository.save(any())).thenAnswer(invocation -> {
+        when(kycRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             KycRequest request = invocation.getArgument(0);
             request.setId(UUID.randomUUID());
             return request;
@@ -349,7 +349,7 @@ class TeacherKycServiceTest {
                 .thenReturn(Optional.empty());
         when(teacherIdentityClaimService.normalizeCccd("012345678901"))
                 .thenReturn("012345678901");
-        when(kycRequestRepository.save(any())).thenAnswer(invocation -> {
+        when(kycRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             KycRequest request = invocation.getArgument(0);
             request.setId(UUID.randomUUID());
             return request;
@@ -380,12 +380,47 @@ class TeacherKycServiceTest {
     }
 
     @Test
+    void verifyIdentity_directSdkMockMode_rejectsDocumentOnlyLivenessWithoutFaceCheck() {
+        teacherKycService = newTeacherKycService("direct-sdk-mock");
+        when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
+        when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacher.getId()))
+                .thenReturn(Optional.empty());
+        when(kycRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            KycRequest request = invocation.getArgument(0);
+            request.setId(UUID.randomUUID());
+            return request;
+        });
+
+        Map<String, Object> sdkResult = Map.of(
+                "ocr", Map.of("object", Map.of(
+                        "id", "012345678901",
+                        "name", "Nguyen Van A",
+                        "birth_day", "02/01/1990"
+                )),
+                "liveness_card_front", Map.of("object", Map.of("liveness", "success")),
+                "liveness_card_back", Map.of("object", Map.of("liveness", "success"))
+        );
+
+        KycIdentityVerificationResponse response = teacherKycService.verifyIdentity(
+                user.getId(),
+                new KycIdentityVerificationRequest("session", "transaction", sdkResult),
+                "127.0.0.1",
+                "JUnit"
+        );
+
+        assertEquals("FAILED", response.request().identityStatus());
+        verify(teacherIdentityClaimService, never()).processIdentityClaim(
+                any(), anyString(), any(), anyString(), anyString()
+        );
+    }
+
+    @Test
     void verifyIdentity_directSdkMockMode_rejectsVnptNoMatchBeforeRegistryLookup() {
         teacherKycService = newTeacherKycService("direct-sdk-mock");
         when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacher.getId()))
                 .thenReturn(Optional.empty());
-        when(kycRequestRepository.save(any())).thenAnswer(invocation -> {
+        when(kycRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             KycRequest request = invocation.getArgument(0);
             request.setId(UUID.randomUUID());
             return request;
@@ -421,7 +456,7 @@ class TeacherKycServiceTest {
         when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacher.getId()))
                 .thenReturn(Optional.empty());
-        when(kycRequestRepository.save(any())).thenAnswer(invocation -> {
+        when(kycRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             KycRequest request = invocation.getArgument(0);
             request.setId(UUID.randomUUID());
             return request;
@@ -622,6 +657,7 @@ class TeacherKycServiceTest {
         when(insertQuery.setParameter(anyString(), any())).thenReturn(insertQuery);
         when(insertQuery.executeUpdate()).thenReturn(1);
     }
+
     private MockMultipartFile validPng() {
         byte[] bytes = new byte[] {
                 (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01

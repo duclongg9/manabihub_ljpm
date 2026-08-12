@@ -138,7 +138,8 @@ function TeacherKycPageContent() {
   const [identityLaunching, setIdentityLaunching] = useState(false);
   const [certificateSubmitting, setCertificateSubmitting] = useState(false);
   const [restartSubmitting, setRestartSubmitting] = useState(false);
-  const [pageError, setPageError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [identityLaunchKey, setIdentityLaunchKey] = useState(0);
   const [identityCooldownUntil, setIdentityCooldownUntil] = useState(readIdentityCooldownUntil);
   const [identityCooldownNow, setIdentityCooldownNow] = useState(() => Date.now());
@@ -146,6 +147,11 @@ function TeacherKycPageContent() {
 
   useEffect(() => {
     void refreshStatus({ showLoading: true });
+    return () => {
+      identityLaunchTokenRef.current += 1;
+      clearVnptSdkContainer();
+      resetVnptIdentitySdkRuntime();
+    };
   }, []);
 
   useEffect(() => {
@@ -160,7 +166,7 @@ function TeacherKycPageContent() {
     return () => window.clearInterval(intervalId);
   }, [identityCooldownUntil]);
 
-  const statusLoadFailed = !loadingStatus && Boolean(pageError) && !status;
+  const statusLoadFailed = !loadingStatus && Boolean(statusError) && !status;
   const identityStatus = status?.identityVerification ?? fallbackIdentityStatus(statusLoadFailed);
   const certificateStatus = status?.certificateVerification ?? fallbackCertificateStatus(statusLoadFailed);
   const latestRequest = restartEnvelope?.data.request ?? certificateEnvelope?.data.request ?? identityEnvelope?.data.request ?? status?.latestRequest ?? null;
@@ -171,7 +177,7 @@ function TeacherKycPageContent() {
   const showRestartVerification = Boolean(status && ['REJECTED', 'CORRECTION_REQUIRED'].includes(status.teacherKycStatus));
   const canRestartVerification = showRestartVerification && !restartSubmitting && !identityLaunching && !certificateSubmitting;
   
-  const hasNetworkError = Boolean(pageError);
+  const hasNetworkError = Boolean(statusError);
   const identityCooldownRemainingSeconds = Math.max(0, Math.ceil((identityCooldownUntil - identityCooldownNow) / 1000));
   const identityLaunchOnCooldown = identityCooldownRemainingSeconds > 0;
   const canStartIdentity =
@@ -196,11 +202,11 @@ function TeacherKycPageContent() {
     }
 
     try {
-      setPageError(null);
+      setStatusError(null);
       const response = await getTeacherKycStatus();
       setStatus(response);
     } catch (error) {
-      setPageError(readErrorMessage(error));
+      setStatusError(readErrorMessage(error));
     } finally {
       setLoadingStatus(false);
     }
@@ -221,12 +227,25 @@ function TeacherKycPageContent() {
     }
   }
 
-  function handleCloseIdentityDialog() {
+  function finishIdentityLaunch() {
     identityLaunchTokenRef.current += 1;
     setIdentityLaunching(false);
     clearVnptSdkContainer();
     resetVnptIdentitySdkRuntime();
-    void refreshStatus();
+  }
+
+  function clearIdentityLaunchCooldown() {
+    setIdentityCooldownUntil(0);
+    setIdentityCooldownNow(Date.now());
+    try {
+      localStorage.removeItem(IDENTITY_LAUNCH_COOLDOWN_STORAGE_KEY);
+    } catch {
+      // best effort
+    }
+  }
+
+  function handleCloseIdentityDialog() {
+    finishIdentityLaunch();
   }
 
   async function handleStartIdentity() {
@@ -237,8 +256,7 @@ function TeacherKycPageContent() {
     const launchToken = identityLaunchTokenRef.current + 1;
     identityLaunchTokenRef.current = launchToken;
 
-    startIdentityLaunchCooldown();
-    setPageError(null);
+    setActionError(null);
     setIdentityEnvelope(null);
     setIdentityLaunchKey((current) => current + 1);
     clearVnptSdkContainer();
@@ -253,34 +271,47 @@ function TeacherKycPageContent() {
         }
 
         clearVnptSdkContainer();
-        await launchVnptIdentitySdk(async (result) => {
-          if (identityLaunchTokenRef.current !== launchToken) {
-            return;
-          }
+        await launchVnptIdentitySdk(
+          async (result) => {
+            if (identityLaunchTokenRef.current !== launchToken) {
+              return;
+            }
 
-          try {
             const response = await verifyTeacherIdentity(result);
+            if (identityLaunchTokenRef.current !== launchToken) {
+              return;
+            }
             setIdentityEnvelope(response);
+            finishIdentityLaunch();
             await refreshStatus();
-            handleCloseIdentityDialog();
-          } catch (error) {
-            setPageError(readErrorMessage(error));
-            handleCloseIdentityDialog();
-          }
-        });
+          },
+          {
+            onError: (error) => {
+              if (identityLaunchTokenRef.current !== launchToken) {
+                return;
+              }
+              setActionError(readErrorMessage(error));
+              clearIdentityLaunchCooldown();
+              finishIdentityLaunch();
+            },
+          },
+        );
+        if (identityLaunchTokenRef.current === launchToken) {
+          startIdentityLaunchCooldown();
+        }
       } catch (error) {
         if (identityLaunchTokenRef.current !== launchToken) {
           return;
         }
 
-        setPageError(readErrorMessage(error));
-        setIdentityLaunching(false);
+        setActionError(readErrorMessage(error));
+        finishIdentityLaunch();
       }
     }, 150);
   }
 
   async function handleRestartVerification() {
-    setPageError(null);
+    setActionError(null);
     setIdentityEnvelope(null);
     setCertificateEnvelope(null);
     setRestartEnvelope(null);
@@ -300,7 +331,7 @@ function TeacherKycPageContent() {
       setErrors({});
       await refreshStatus();
     } catch (error) {
-      setPageError(readErrorMessage(error));
+      setActionError(readErrorMessage(error));
     } finally {
       setRestartSubmitting(false);
     }
@@ -359,7 +390,7 @@ function TeacherKycPageContent() {
 
   async function handleCertificateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPageError(null);
+    setActionError(null);
     setCertificateEnvelope(null);
 
     const nextErrors = validateCertificateForm(
@@ -393,7 +424,7 @@ function TeacherKycPageContent() {
       setCertificateEnvelope(response);
       await refreshStatus();
     } catch (error) {
-      setPageError(readErrorMessage(error));
+      setActionError(readErrorMessage(error));
     } finally {
       setCertificateSubmitting(false);
     }
@@ -471,13 +502,13 @@ function TeacherKycPageContent() {
       </Paper>
 
       {/* Loading and error states */}
-      {loadingStatus && !pageError && (
+      {loadingStatus && !statusError && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
           <CircularProgress color="primary" size={32} />
           <Typography sx={{ ml: 2, color: 'text.secondary' }}>Đang tải thông tin xác minh...</Typography>
         </Box>
       )}
-      {pageError && (
+      {statusError && (
         <Alert
           severity="error"
           action={
@@ -486,7 +517,12 @@ function TeacherKycPageContent() {
             </Button>
           }
         >
-          {pageError === 'Network Error' ? 'Lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.' : pageError}
+          {statusError === 'Network Error' ? 'Lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.' : statusError}
+        </Alert>
+      )}
+      {actionError && (
+        <Alert severity="error" onClose={() => setActionError(null)} aria-live="assertive">
+          {actionError === 'Network Error' ? 'Lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.' : actionError}
         </Alert>
       )}
 
@@ -1297,6 +1333,10 @@ function readErrorMessage(error: unknown) {
     const messageCode = response?.data?.messageCode;
     const message = response?.data?.message;
 
+    if (messageCode === 'MSG-KYC-008') {
+      return localizeKycConflict(message);
+    }
+
     if (messageCode && KYC_ERROR_MESSAGES[messageCode]) {
       return KYC_ERROR_MESSAGES[messageCode];
     }
@@ -1307,11 +1347,27 @@ function readErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
 }
 
+function localizeKycConflict(message?: string) {
+  const normalized = (message ?? '').toLowerCase();
+  if (normalized.includes('missing provider identifiers')) {
+    return 'VNPT chưa trả về đủ mã phiên và mã giao dịch. Vui lòng chụp lại CCCD và thử lại.';
+  }
+  if (normalized.includes('maximum verification attempts')) {
+    return 'Lượt xác minh hiện tại đã vượt số lần kiểm tra cho phép. Vui lòng bắt đầu lại lượt xác minh.';
+  }
+  if (normalized.includes('duplicate provider transaction')) {
+    return 'Kết quả VNPT này đã được tiếp nhận. Vui lòng tải lại trạng thái trước khi thử lại.';
+  }
+  if (normalized.includes('claimed') || normalized.includes('another teacher')) {
+    return 'Thông tin định danh này đã được sử dụng cho một tài khoản Giảng viên khác.';
+  }
+  return message || 'Kết quả xác minh đang xung đột với lượt hiện tại. Vui lòng tải lại trạng thái và thử lại.';
+}
+
 const KYC_ERROR_MESSAGES: Record<string, string> = {
   KYC_TEACHER_NOT_FOUND: 'Không thể khởi tạo hồ sơ xác minh. Vui lòng thử lại hoặc liên hệ bộ phận hỗ trợ.',
   KYC_ALREADY_PENDING: 'Hồ sơ của bạn đang được xét duyệt. Vui lòng chờ kết quả trước khi gửi lại.',
   KYC_ALREADY_APPROVED: 'Hồ sơ Giảng viên của bạn đã được phê duyệt.',
   'MSG-KYC-002': 'Thông tin xác minh chưa hợp lệ. Vui lòng kiểm tra và thực hiện lại.',
   'MSG-KYC-006': 'Thông tin chứng chỉ không khớp với thông tin định danh.',
-  'MSG-KYC-008': 'Thông tin định danh này đã được sử dụng cho một tài khoản Giảng viên khác.',
 };
