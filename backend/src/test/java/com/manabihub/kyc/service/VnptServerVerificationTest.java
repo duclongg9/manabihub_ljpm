@@ -1,5 +1,6 @@
 package com.manabihub.kyc.service;
 
+import com.manabihub.identity.service.AccountIdentityVerificationService;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.KycRequest;
@@ -68,6 +69,7 @@ class VnptServerVerificationTest {
     @Mock private MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
     @Mock private EntityManager entityManager;
     @Mock private VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
+    @Mock private AccountIdentityVerificationService accountIdentityVerificationService;
 
     private VnptVerificationCoordinator coordinator;
     private TeacherKycService service;
@@ -108,6 +110,7 @@ class VnptServerVerificationTest {
                 entityManager,
                 coordinator,
                 vnptIdentityTransactionClaimRepository,
+                accountIdentityVerificationService,
                 "storage/kyc",
                 "server"
         );

@@ -3,6 +3,7 @@ package com.manabihub.payout.service.impl;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.identity.service.AccountIdentityVerificationService;
 import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.KycRequestRepository;
@@ -58,6 +59,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private final WithdrawalOtpService otpService;
     private final PayoutSecurityService securityService;
     private final CommercialPolicyService commercialPolicyService;
+    private final AccountIdentityVerificationService accountIdentityVerificationService;
 
     @Value("${manabihub.kyc.identity-verification-mode:direct-sdk-mock}")
     private String identityVerificationMode;
@@ -84,9 +86,10 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         var latestKyc = kycRequestRepository
                 .findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
                 .orElse(null);
-        boolean identityVerified = latestKyc != null
+        boolean identityVerified = accountIdentityVerificationService.findVerified(userUuid).isPresent()
+                || (latestKyc != null
                 && latestKyc.getIdentityStatus() == IdentityVerificationStatus.VERIFIED
-                && (isDirectSdkPayoutMode() || latestKyc.getServerVerifiedAt() != null);
+                && (isDirectSdkPayoutMode() || latestKyc.getServerVerifiedAt() != null));
         if (!identityVerified) {
             throw new BusinessException(
                     MessageCodes.MSG_KYC_002,

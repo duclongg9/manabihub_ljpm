@@ -21,6 +21,7 @@ import com.manabihub.identity.repository.InternalAdminSessionRepository;
 import com.manabihub.identity.repository.PhoneVerificationChallengeRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.identity.repository.AccountIdentityVerificationRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.TeacherCertificateClaimRepository;
@@ -124,6 +125,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private StudentProfileRepository studentProfileRepository;
+
+    @MockBean
+    private AccountIdentityVerificationRepository accountIdentityVerificationRepository;
 
     @MockBean
     private IdentityTeacherProfileRepository identityTeacherProfileRepository;

@@ -48,6 +48,17 @@ declare global {
     __MANABIHUB_VNPT_ACTIVE_LAUNCH__?: {
       cleanup: () => void;
     };
+    __MANABIHUB_VNPT_DIAGNOSTICS__?: {
+      release: 'face-guide-v2';
+      launchedAt: number;
+      faceGuideDetectedAt?: number;
+      faceGuideClickAttempts: number;
+      faceGuideClosedAt?: number;
+      documentCallbacks: number;
+      intermediateCallbacks: number;
+      endFlowCallbacks: number;
+      lastEndFlowClassification?: EndFlowClassification;
+    };
   }
 }
 
@@ -123,6 +134,14 @@ export async function launchVnptIdentitySdk(
   options: VnptIdentitySdkOptions = {},
 ) {
   const launchGeneration = ++vnptLaunchGeneration;
+  window.__MANABIHUB_VNPT_DIAGNOSTICS__ = {
+    release: 'face-guide-v2',
+    launchedAt: Date.now(),
+    faceGuideClickAttempts: 0,
+    documentCallbacks: 0,
+    intermediateCallbacks: 0,
+    endFlowCallbacks: 0,
+  };
   cleanupLegacyVnptIdentityStorage();
   if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__) {
     window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__.cleanup();
@@ -238,6 +257,10 @@ export async function launchVnptIdentitySdk(
     // OCR callbacks can contain unrelated `compare` fields and must never make
     // an otherwise empty END_FLOW look complete.
     const terminalClassification = classifyEndFlow({ endFlowResult: terminalResult });
+    if (window.__MANABIHUB_VNPT_DIAGNOSTICS__) {
+      window.__MANABIHUB_VNPT_DIAGNOSTICS__.endFlowCallbacks += 1;
+      window.__MANABIHUB_VNPT_DIAGNOSTICS__.lastEndFlowClassification = terminalClassification;
+    }
     if (terminalClassification === 'incomplete') {
       // VNPT 3.2.1 can show its result screen (and emit END_FLOW) when the
       // face processor times out behind the tutorial modal. Empty face and
@@ -274,6 +297,9 @@ export async function launchVnptIdentitySdk(
 
   const handleDocumentResult: VnptSdkCallback = (sdkResult) => {
     if (isCleanedUp) return;
+    if (window.__MANABIHUB_VNPT_DIAGNOSTICS__) {
+      window.__MANABIHUB_VNPT_DIAGNOSTICS__.documentCallbacks += 1;
+    }
     documentResult = compactSdkResult(sdkResult);
   };
 
@@ -282,6 +308,9 @@ export async function launchVnptIdentitySdk(
   // terminal so partial evidence is never submitted.
   const handleCallbackResult: VnptSdkCallback = (sdkResult) => {
     if (isCleanedUp) return;
+    if (window.__MANABIHUB_VNPT_DIAGNOSTICS__) {
+      window.__MANABIHUB_VNPT_DIAGNOSTICS__.intermediateCallbacks += 1;
+    }
     callbackResult = compactSdkResult(sdkResult);
   };
 
@@ -484,32 +513,72 @@ function installVnptFaceGuideAutoDismiss() {
     return () => undefined;
   }
 
-  let dismissed = false;
-  const dismissKnownGuide = () => {
-    if (dismissed) return;
-    const tutorialSources = Array.from(document.querySelectorAll<HTMLSourceElement>('video source[type="video/mp4"]'));
-    const tutorialSource = tutorialSources.find((source) => {
-      try {
-        const path = new URL(source.src, document.baseURI).pathname;
-        return path.endsWith('/lib/vietnamese-tutorial.mp4')
-          || path.endsWith('/lib/english-tutorial.mp4');
-      } catch {
-        return false;
-      }
-    });
-    const dialog = tutorialSource?.closest<HTMLElement>('[role="dialog"], .ant-modal-content, .ant-modal');
-    const confirmAction = dialog?.querySelector<HTMLElement>('.vnpt-cursor-pointer.vnpt-bg-primary');
-    if (!confirmAction) return;
+  let retryTimer: number | undefined;
+  let stopped = false;
 
-    dismissed = true;
-    confirmAction.click();
+  const stopWatching = () => {
+    stopped = true;
     observer.disconnect();
+    if (retryTimer !== undefined) {
+      window.clearInterval(retryTimer);
+      retryTimer = undefined;
+    }
+  };
+
+  const findTutorialAction = () => {
+    const tutorialMedia = Array.from(document.querySelectorAll<HTMLElement>('video, video source'))
+      .find((element) => {
+        const rawSource = element instanceof HTMLVideoElement
+          ? element.currentSrc || element.getAttribute('src') || ''
+          : element.getAttribute('src') || '';
+        try {
+          const path = new URL(rawSource, document.baseURI).pathname;
+          return path.endsWith('/lib/vietnamese-tutorial.mp4')
+            || path.endsWith('/lib/english-tutorial.mp4');
+        } catch {
+          return false;
+        }
+      });
+
+    // The SDK uses Ant Design today, but the class names are not part of VNPT's
+    // public contract. Walk ancestors from the known tutorial video and anchor
+    // the action to that subtree instead of depending on `.ant-modal-*`.
+    let ancestor = tutorialMedia?.parentElement ?? null;
+    while (ancestor && ancestor !== document.body) {
+      const action = ancestor.querySelector<HTMLElement>('.vnpt-cursor-pointer.vnpt-bg-primary');
+      if (action) return { tutorialMedia, action };
+      ancestor = ancestor.parentElement;
+    }
+    return null;
+  };
+
+  const dismissKnownGuide = () => {
+    if (stopped) return;
+    const match = findTutorialAction();
+    if (!match) {
+      if (window.__MANABIHUB_VNPT_DIAGNOSTICS__?.faceGuideDetectedAt) {
+        window.__MANABIHUB_VNPT_DIAGNOSTICS__.faceGuideClosedAt = Date.now();
+        stopWatching();
+      }
+      return;
+    }
+
+    const diagnostics = window.__MANABIHUB_VNPT_DIAGNOSTICS__;
+    if (diagnostics) {
+      diagnostics.faceGuideDetectedAt ??= Date.now();
+      diagnostics.faceGuideClickAttempts += 1;
+    }
+    match.action.click();
   };
 
   const observer = new MutationObserver(dismissKnownGuide);
   observer.observe(document.body, { childList: true, subtree: true });
+  // MutationObserver can fire while React is still committing the vendor modal.
+  // Retry until the known tutorial subtree is actually gone; a one-shot click
+  // can be lost and leaves VNPT's face timer running behind the video.
+  retryTimer = window.setInterval(dismissKnownGuide, 100);
   queueMicrotask(dismissKnownGuide);
-  return () => observer.disconnect();
+  return stopWatching;
 }
 
 function getVnptEnv() {

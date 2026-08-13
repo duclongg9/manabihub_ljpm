@@ -2,6 +2,8 @@ package com.manabihub.kyc.service;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.identity.entity.AccountIdentityVerification;
+import com.manabihub.identity.service.AccountIdentityVerificationService;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.audit.entity.AuditLog;
 import com.manabihub.audit.service.SecurityAuditService;
@@ -104,6 +106,7 @@ public class TeacherKycService {
     private final Path storageRoot;
     private final VnptVerificationCoordinator verificationCoordinator;
     private final VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
+    private final AccountIdentityVerificationService accountIdentityVerificationService;
     private final String identityVerificationMode;
 
     public TeacherKycService(
@@ -122,6 +125,7 @@ public class TeacherKycService {
             EntityManager entityManager,
             VnptVerificationCoordinator verificationCoordinator,
             VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository,
+            AccountIdentityVerificationService accountIdentityVerificationService,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot,
             @Value("${manabihub.kyc.identity-verification-mode:direct-sdk-mock}") String identityVerificationMode
     ) {
@@ -141,6 +145,7 @@ public class TeacherKycService {
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
         this.verificationCoordinator = verificationCoordinator;
         this.vnptIdentityTransactionClaimRepository = vnptIdentityTransactionClaimRepository;
+        this.accountIdentityVerificationService = accountIdentityVerificationService;
         this.identityVerificationMode = identityVerificationMode;
     }
 
@@ -149,6 +154,11 @@ public class TeacherKycService {
         TeacherProfile teacherProfile = resolveTeacher(userId);
         KycRequest latestRequest = kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
                 .orElse(null);
+        AccountIdentityVerification sharedVerification =
+                accountIdentityVerificationService.findVerified(userId).orElse(null);
+        if (sharedVerification != null) {
+            latestRequest = ensureAccountIdentityRequest(teacherProfile, latestRequest, sharedVerification);
+        }
 
         return new KycStatusResponse(
                 teacherProfile.getId(),
@@ -174,6 +184,20 @@ public class TeacherKycService {
             throw new BusinessException(MessageCodes.MSG_KYC_002, "VNPT eKYC SDK result is required");
         }
         VnptSdkPayloadPolicy.validate(request.sdkResult());
+
+        AccountIdentityVerification sharedVerification =
+                accountIdentityVerificationService.findVerified(userId).orElse(null);
+        if (sharedVerification != null) {
+            TeacherProfile teacherProfile = resolveTeacher(userId);
+            KycRequest latestRequest = kycRequestRepository
+                    .findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())
+                    .orElse(null);
+            KycRequest sharedRequest = ensureAccountIdentityRequest(
+                    teacherProfile,
+                    latestRequest,
+                    sharedVerification);
+            return buildIdentityResponse(teacherProfile, sharedRequest, false);
+        }
 
         if (usesDirectSdkVerification()) {
             return verifyIdentityFromSdk(
@@ -201,6 +225,15 @@ public class TeacherKycService {
                 .orElseThrow();
         KycRequest kycRequest = kycRequestRepository.findById(outcome.requestId())
                 .orElseThrow();
+
+        if (resolvedIdentityStatus(kycRequest) == IdentityVerificationStatus.VERIFIED) {
+            recordAccountIdentity(
+                    userId,
+                    sdkDecision.identityOcr(),
+                    VNPT_PROVIDER,
+                    kycRequest.getIdentityVerifiedAt(),
+                    "TEACHER");
+        }
 
         return buildIdentityResponse(teacherProfile, kycRequest, outcome.auditLogged());
     }
@@ -266,8 +299,8 @@ public class TeacherKycService {
         List<String> failureReasons = new ArrayList<>(sdkDecision.failureReasons());
         Map<String, String> identityOcr = sdkDecision.identityOcr();
 
+        String normalizedCccd = null;
         if (verified) {
-            String normalizedCccd = null;
             try {
                 normalizedCccd = teacherIdentityClaimService.normalizeCccd(identityOcr.get("idNumber"));
                 parseSupportedDate(identityOcr.get("dateOfBirth"));
@@ -291,6 +324,14 @@ public class TeacherKycService {
                         ipAddress,
                         userAgent
                 );
+                accountIdentityVerificationService.recordVerified(
+                        user.getId(),
+                        teacherIdentityClaimService.generateFingerprint(normalizedCccd),
+                        VNPT_PROVIDER,
+                        blankToNull(identityOcr.get("fullName")),
+                        parseSupportedDate(identityOcr.get("dateOfBirth")),
+                        Instant.now(),
+                        "TEACHER");
             }
         }
 
@@ -359,6 +400,56 @@ public class TeacherKycService {
         }
         boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
         return buildIdentityResponse(teacherProfile, savedRequest, auditLogged);
+    }
+
+    private KycRequest ensureAccountIdentityRequest(
+            TeacherProfile teacherProfile,
+            KycRequest latestRequest,
+            AccountIdentityVerification verification
+    ) {
+        if (latestRequest != null
+                && resolvedIdentityStatus(latestRequest) == IdentityVerificationStatus.VERIFIED) {
+            return latestRequest;
+        }
+
+        KycRequest sharedRequest = new KycRequest();
+        sharedRequest.setTeacherProfile(teacherProfile);
+        sharedRequest.setStatus(KycRequestStatus.DRAFT);
+        sharedRequest.setEkycProvider(VNPT_PROVIDER);
+        sharedRequest.setEkycReferenceId("ACCOUNT-IDENTITY-" + UUID.randomUUID());
+        sharedRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
+        sharedRequest.setIdentityVerifiedAt(verification.getVerifiedAt());
+        sharedRequest.setCertificateStatus(CertificateVerificationStatus.NOT_SUBMITTED);
+        sharedRequest.setServerFullName(verification.getFullName());
+        sharedRequest.setServerDateOfBirth(
+                verification.getDateOfBirth() == null ? null : verification.getDateOfBirth().toString());
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("identityProvider", verification.getProvider());
+        payload.put("providerStatus", "ACCOUNT_VERIFIED");
+        payload.put("sourceSubject", verification.getSourceSubject());
+        payload.put("messageCode", "KYC_IDENTITY_VERIFIED");
+        payload.put("sharedAcrossAccountRoles", true);
+        sharedRequest.setVerificationPayload(payload);
+        return kycRequestRepository.saveAndFlush(sharedRequest);
+    }
+
+    private void recordAccountIdentity(
+            UUID userId,
+            Map<String, String> identityOcr,
+            String provider,
+            Instant verifiedAt,
+            String sourceSubject
+    ) {
+        String normalizedCccd = teacherIdentityClaimService.normalizeCccd(identityOcr.get("idNumber"));
+        accountIdentityVerificationService.recordVerified(
+                userId,
+                teacherIdentityClaimService.generateFingerprint(normalizedCccd),
+                provider,
+                blankToNull(identityOcr.get("fullName")),
+                parseSupportedDate(identityOcr.get("dateOfBirth")),
+                verifiedAt == null ? Instant.now() : verifiedAt,
+                sourceSubject);
     }
 
     private String directSdkReplayId(

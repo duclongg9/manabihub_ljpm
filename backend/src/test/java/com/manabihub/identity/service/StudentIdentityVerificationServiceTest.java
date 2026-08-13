@@ -3,6 +3,7 @@ package com.manabihub.identity.service;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.dto.request.StudentIdentityVerificationRequest;
 import com.manabihub.identity.entity.StudentProfile;
+import com.manabihub.identity.entity.AccountIdentityVerification;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import com.manabihub.kyc.domain.VnptIdentityTransactionClaim;
 import com.manabihub.kyc.repository.VnptIdentityTransactionClaimRepository;
@@ -59,6 +60,9 @@ class StudentIdentityVerificationServiceTest {
     @Mock
     private DatabaseAuthRateLimiter vnptKycRateLimiter;
 
+    @Mock
+    private AccountIdentityVerificationService accountIdentityVerificationService;
+
     @InjectMocks
     private StudentIdentityVerificationServiceImpl service;
 
@@ -73,9 +77,29 @@ class StudentIdentityVerificationServiceTest {
         student.setId(UUID.randomUUID());
         userId = UUID.randomUUID();
         when(currentUserService.getCurrentUserId()).thenReturn(userId);
-        when(studentProfileRepository.findByUser_Id(any())).thenReturn(Optional.of(student));
+        lenient().when(studentProfileRepository.findByUser_Id(any())).thenReturn(Optional.of(student));
         lenient().when(vnptKycRateLimiter.consume(any(), any(), any(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(true);
+    }
+
+    @Test
+    void getStatus_usesIdentityVerifiedThroughTeacherEntryPoint() {
+        AccountIdentityVerification shared = new AccountIdentityVerification();
+        shared.setUserId(userId);
+        shared.setIdentityFingerprint("fingerprint");
+        shared.setProvider("VNPT_EKYC_WEB_SDK");
+        shared.setFullName("NGUYEN VAN A");
+        shared.setDateOfBirth(LocalDate.of(1990, 1, 2));
+        shared.setVerifiedAt(Instant.parse("2026-08-14T00:00:00Z"));
+        shared.setSourceSubject("TEACHER");
+        when(accountIdentityVerificationService.findVerified(userId)).thenReturn(Optional.of(shared));
+
+        var response = service.getStatus();
+
+        assertTrue(response.verified());
+        assertEquals("NGUYEN VAN A", response.fullName());
+        assertEquals("VNPT_EKYC_WEB_SDK", response.provider());
+        verify(studentProfileRepository, never()).findByUser_Id(any());
     }
 
     @Test

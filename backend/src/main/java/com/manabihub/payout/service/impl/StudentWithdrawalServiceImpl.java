@@ -4,6 +4,7 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.identity.service.AccountIdentityVerificationService;
 import com.manabihub.payout.dto.request.BankAccountDto;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
 import com.manabihub.payout.dto.response.StudentBankAccountResponse;
@@ -58,6 +59,7 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
     private final CommercialPolicyService commercialPolicyService;
     private final WithdrawalNotificationService notificationService;
     private final StudentBankOwnershipVerificationService ownershipVerificationService;
+    private final AccountIdentityVerificationService accountIdentityVerificationService;
 
     @Value("${manabihub.kyc.identity-verification-mode:direct-sdk-mock}")
     private String identityVerificationMode;
@@ -82,8 +84,13 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
                     "Vui lòng xác minh số điện thoại trước khi rút tiền",
                     HttpStatus.FORBIDDEN);
         }
-        if (student.getIdentityVerifiedAt() == null
-                || (!isDirectSdkDemo() && "VNPT_EKYC_WEB_SDK_DEMO".equals(student.getIdentityProvider()))) {
+        boolean sharedIdentityVerified = accountIdentityVerificationService.findVerified(userId)
+                .filter(verification -> isDirectSdkDemo()
+                        || !"VNPT_EKYC_WEB_SDK_DEMO".equals(verification.getProvider()))
+                .isPresent();
+        boolean legacyIdentityVerified = student.getIdentityVerifiedAt() != null
+                && (isDirectSdkDemo() || !"VNPT_EKYC_WEB_SDK_DEMO".equals(student.getIdentityProvider()));
+        if (!sharedIdentityVerified && !legacyIdentityVerified) {
             throw new BusinessException(
                     MessageCodes.MSG_KYC_002,
                     "Vui lòng hoàn tất xác minh CCCD trước khi rút tiền",
