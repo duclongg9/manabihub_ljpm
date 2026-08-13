@@ -61,8 +61,9 @@ management:
 
 manabihub:
   kyc:
-# Demo/UAT can use the direct browser-SDK mock registry. Real server-to-server
-# verification must explicitly set KYC_IDENTITY_VERIFICATION_MODE=server.
+# Safe default: synthetic registry. Sandbox may explicitly select direct-sdk;
+# it trusts browser evidence and unlocks sandbox withdrawals. Real production
+# must select server.
     identity-verification-mode: ${KYC_IDENTITY_VERIFICATION_MODE:direct-sdk-mock}
   phone-verification:
     # Production must explicitly configure a real provider; OTPs are never

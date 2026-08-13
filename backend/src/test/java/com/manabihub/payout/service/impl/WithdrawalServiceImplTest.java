@@ -38,6 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -414,6 +415,23 @@ class WithdrawalServiceImplTest {
         verify(walletRepository, never()).findByOwnerTypeAndTeacher_IdForUpdate(any(), any());
         verifyNoInteractions(otpService, walletService);
         verify(withdrawalRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("UTCID12 (N) - direct-sdk sandbox identity unlocks withdrawal without server timestamp")
+    void createWithdrawalRequest_AcceptsDirectSdkSandboxIdentity() {
+        ReflectionTestUtils.setField(withdrawalService, "identityVerificationMode", "direct-sdk");
+        UUID withdrawalId = UUID.randomUUID();
+        stubAcceptedRequest(withdrawalId);
+
+        WithdrawalRequestResponse response = withdrawalService.createWithdrawalRequest(
+                userIdString,
+                newRequest()
+        );
+
+        assertNotNull(response);
+        verify(withdrawalRepository).saveAndFlush(any(WithdrawalRequest.class));
     }
     }
 

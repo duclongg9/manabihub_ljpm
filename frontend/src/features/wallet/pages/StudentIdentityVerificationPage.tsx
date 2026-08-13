@@ -14,6 +14,7 @@ export function StudentIdentityVerificationPage() {
   const [status, setStatus] = useState<IdentityStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [launching, setLaunching] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const launchToken = useRef(0);
@@ -43,6 +44,7 @@ export function StudentIdentityVerificationPage() {
     if (token !== launchToken.current) return;
     launchToken.current += 1;
     setLaunching(false);
+    setSubmitting(false);
     clearSdkContainer();
     resetVnptIdentitySdkRuntime();
   };
@@ -55,6 +57,7 @@ export function StudentIdentityVerificationPage() {
     clearSdkContainer();
     resetVnptIdentitySdkRuntime();
     setLaunching(true);
+    setSubmitting(false);
 
     try {
       await waitForSdkContainer();
@@ -63,6 +66,7 @@ export function StudentIdentityVerificationPage() {
       await launchVnptIdentitySdk(
         async (result) => {
           if (token !== launchToken.current) return;
+          setSubmitting(true);
           const verified = await verifyStudentIdentity(result);
           if (token !== launchToken.current) return;
           setStatus(verified);
@@ -85,6 +89,7 @@ export function StudentIdentityVerificationPage() {
   };
 
   const cancelVerification = () => {
+    if (submitting) return;
     finishLaunch(launchToken.current);
   };
 
@@ -124,10 +129,22 @@ export function StudentIdentityVerificationPage() {
                   onClick={() => void startVerification()}
                   disabled={launching || status?.verified || Boolean(statusError)}
                 >
-                  {launching ? 'Đang mở VNPT eKYC…' : status?.verified ? 'Đã hoàn tất xác minh' : 'Bắt đầu xác minh'}
+                  {submitting
+                    ? 'Đang ghi nhận kết quả…'
+                    : launching
+                      ? 'Đang mở VNPT eKYC…'
+                      : status?.verified
+                        ? 'Đã hoàn tất xác minh'
+                        : 'Bắt đầu xác minh'}
                 </Button>
-                {launching && <Button variant="outlined" color="inherit" onClick={cancelVerification}>Hủy</Button>}
-                <Button variant="outlined" onClick={() => navigate(returnTo)}>Quay lại Ví & Thanh toán</Button>
+                {launching && (
+                  <Button variant="outlined" color="inherit" onClick={cancelVerification} disabled={submitting}>
+                    {submitting ? 'Không thể hủy khi đang ghi nhận' : 'Hủy'}
+                  </Button>
+                )}
+                <Button variant="outlined" onClick={() => navigate(returnTo)} disabled={submitting}>
+                  Quay lại Ví & Thanh toán
+                </Button>
               </Stack>
               {launching && (
                 <Box
@@ -171,7 +188,14 @@ function readSafeReturnTo(value: string | null) {
 }
 
 function readErrorMessage(error: unknown, fallback: string) {
-  const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  const data = (error as { response?: { data?: { message?: string; messageCode?: string } } })?.response?.data;
+  if (data?.messageCode === 'MSG-KYC-002') {
+    return 'Kết quả xác minh CCCD chưa hợp lệ. Vui lòng thực hiện lại đầy đủ các bước VNPT eKYC.';
+  }
+  if (data?.messageCode === 'MSG-KYC-008') {
+    return 'CCCD này đã được liên kết hoặc lượt xác minh đang xung đột. Vui lòng tải lại trạng thái.';
+  }
+  const message = data?.message;
   return message || (error instanceof Error ? error.message : fallback);
 }
 

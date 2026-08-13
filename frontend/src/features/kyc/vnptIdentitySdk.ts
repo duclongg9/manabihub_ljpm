@@ -5,36 +5,37 @@ const DEFAULT_VNPT_SDK_SCRIPT_URLS = [
   '/lib/VNPTQRBrowserApp.js',
   '/lib/VNPTBrowserSDKAppV4.1.0.js',
 ];
+const APPROVED_VNPT_BACKEND_ORIGINS = new Set([
+  'https://api.idg.vnpt.vn',
+  'https://sandbox-idg.vnpt.vn',
+]);
 
 const PROVIDER_SESSION_ID_ALIASES = ['providersessionid', 'sessionid', 'clientsession'];
 const PROVIDER_TRANSACTION_ID_ALIASES = [
   'providertransactionid',
   'transactionid',
-  'requestid',
   'txid',
 ];
+const PROVIDER_TRANSACTION_ID_FALLBACK_ALIASES = ['requestid'];
 const MAX_SDK_RESULT_DEPTH = 8;
 const MAX_SDK_ARRAY_ITEMS = 50;
 const MAX_SDK_STRING_LENGTH = 4_096;
 const OMITTED = Symbol('omitted');
+const VNPT_PROVIDER_ERROR_MESSAGE =
+  'VNPT eKYC không thể xử lý phiên xác minh. Vui lòng kiểm tra kết nối, cấu hình VNPT và thử lại.';
+const VNPT_AUTH_ERROR_MESSAGE =
+  'Phiên xác thực VNPT đã hết hạn hoặc không được chấp nhận. Vui lòng cập nhật cấu hình xác thực và thử lại.';
+const VNPT_TRANSPORT_ERROR_MESSAGE =
+  'Không thể kết nối dịch vụ VNPT eKYC. Vui lòng kiểm tra mạng và thử lại.';
 
-/**
- * Heuristic error matching for VNPT's web-sdk-version-3.2.1.0.js crash when
- * authentication credentials are invalid or expired.
- * Different browsers produce different TypeErrors (e.g., "Cannot read properties of undefined (reading 'hash')"
- * vs "undefined is not an object (evaluating '...hash')" vs "xyz is undefined").
- */
-const isVnptVendorCrash = (message: string, stack?: string) => {
-  // ALL matches require evidence that the error originated from VNPT vendor code.
-  // Without a VNPT stack trace we must not swallow unrelated application errors.
-  const isFromVnpt = Boolean(stack && /vnpt|web-sdk-version/i.test(stack));
-  if (!isFromVnpt) return false;
-  // Different browsers produce different TypeErrors when the SDK config is invalid:
-  //   Chrome:  "Cannot read properties of undefined (reading 'hash')"
-  //   Safari:  "undefined is not an object (evaluating 'e.dataConfig.hash')"
-  //   Firefox: "xyz is undefined"
-  return /hash/i.test(message) || /undefined/i.test(message) || /null/i.test(message);
-};
+/** Match only the response.object.hash dereference seen in VNPT 3.2.1. */
+function isVnptHashDereference(message: string) {
+  const normalized = message.toLowerCase();
+  return /cannot read propert(?:y|ies) of (?:undefined|null).*['"]hash['"]/.test(normalized)
+    || /(?:undefined|null) is not an object.*\.object\.hash/.test(normalized)
+    || /\.object is (?:undefined|null)/.test(normalized)
+    || /can't access property ['"]hash['"].*\.object is (?:undefined|null)/.test(normalized);
+}
 
 declare global {
   interface Window {
@@ -47,6 +48,8 @@ declare global {
     };
   }
 }
+
+let vnptLaunchGeneration = 0;
 
 export interface VnptIdentityResult {
   providerSessionId?: string | null;
@@ -71,6 +74,7 @@ export function cleanupLegacyVnptIdentityStorage() {
 }
 
 export function resetVnptIdentitySdkRuntime() {
+  vnptLaunchGeneration += 1;
   if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__) {
     window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__.cleanup();
     delete window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__;
@@ -99,13 +103,14 @@ function isJwtExpired(token: string): boolean {
       .replace(/-/g, '+')
       .replace(/_/g, '/')
       .padEnd(base64Url.length + ((4 - (base64Url.length % 4)) % 4), '=');
-    const payload = JSON.parse(atob(base64));
-    // Allow up to 5 minutes of clock skew to avoid blocking users with slightly inaccurate system clocks.
-    const CLOCK_SKEW_MS = 5 * 60 * 1000;
-    if (payload.exp && payload.exp * 1000 < Date.now() - CLOCK_SKEW_MS) {
-      return true;
-    }
-    return false;
+    const decoded = atob(base64);
+    const bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes)) as { exp?: unknown };
+    // Avoid starting a camera flow with a token that expires during the next five minutes.
+    const MINIMUM_REMAINING_LIFETIME_MS = 5 * 60 * 1000;
+    return typeof payload.exp === 'number'
+      && Number.isFinite(payload.exp)
+      && payload.exp * 1000 <= Date.now() + MINIMUM_REMAINING_LIFETIME_MS;
   } catch {
     return false; // Cannot parse — treat as opaque / unverifiable
   }
@@ -115,7 +120,11 @@ export async function launchVnptIdentitySdk(
   onResult: (result: VnptIdentityResult) => Promise<void> | void,
   options: VnptIdentitySdkOptions = {},
 ) {
+  const launchGeneration = ++vnptLaunchGeneration;
   cleanupLegacyVnptIdentityStorage();
+  if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__) {
+    window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__.cleanup();
+  }
   const env = getVnptEnv();
 
   if (!env.enabled) {
@@ -146,6 +155,10 @@ export async function launchVnptIdentitySdk(
 
   await loadVnptScripts(env.scriptUrls);
 
+  if (launchGeneration !== vnptLaunchGeneration) {
+    return;
+  }
+
   if (!window.SDK?.launch) {
     throw new Error('Không tải được VNPT eKYC SDK. Kiểm tra frontend/public/web-sdk-version-3.2.1.0.js và frontend/public/lib/.');
   }
@@ -156,57 +169,64 @@ export async function launchVnptIdentitySdk(
   let finalResultHandled = false;
   let errorFired = false;
   let isCleanedUp = false;
+  let restoreFetchGuard: (() => void) | null = null;
+  const configuredScriptSources = resolveConfiguredScriptSources(env.scriptUrls);
 
-  // Clean up any previous active launch before starting a new one
-  if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__) {
-    window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__.cleanup();
-  }
-
-  const onWindowError = (event: ErrorEvent | PromiseRejectionEvent) => {
+  const onWindowError = (event: ErrorEvent) => {
     if (isCleanedUp) return;
-
-    let message = '';
-    let stack = '';
-    if (event instanceof ErrorEvent) {
-      message = event.error?.message || event.message;
-      stack = event.error?.stack || '';
-    } else {
-      message = event.reason?.message || String(event.reason);
-      stack = event.reason?.stack || '';
-    }
-
-    // Only handle the exact VNPT vendor crash — do not swallow unrelated errors
-    if (isVnptVendorCrash(message, stack)) {
+    const message = event.error?.message || event.message || '';
+    const stack = readStringProperty(event.error, 'stack');
+    const source = event.filename
+      || readStringProperty(event.error, 'sourceURL')
+      || readStringProperty(event.error, 'fileName');
+    if (isVnptHashDereference(message)
+        && isConfiguredVnptSource(source, stack, configuredScriptSources)) {
       event.preventDefault();
-      cleanupLaunch();
-      if (!errorFired) {
-        errorFired = true;
-        options.onError?.(new Error(
-          'Phiên xác thực VNPT đã hết hạn hoặc cấu hình chưa hợp lệ. Vui lòng cập nhật thông tin xác thực và thử lại.',
-        ));
-      }
+      failLaunch(new Error(VNPT_PROVIDER_ERROR_MESSAGE));
     }
-    // Intentionally NOT calling event.preventDefault() for unmatched errors — let them propagate
+  };
+
+  const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+    if (isCleanedUp) return;
+    const reason = event.reason;
+    const message = reason instanceof Error ? reason.message : readStringProperty(reason, 'message');
+    const stack = readStringProperty(reason, 'stack');
+    const source = readStringProperty(reason, 'sourceURL') || readStringProperty(reason, 'fileName');
+    if (isVnptHashDereference(message)
+        && isConfiguredVnptSource(source, stack, configuredScriptSources)) {
+      event.preventDefault();
+      failLaunch(new Error(VNPT_PROVIDER_ERROR_MESSAGE));
+    }
   };
 
   const cleanupLaunch = () => {
+    if (isCleanedUp) return;
     isCleanedUp = true;
+    documentResult = null;
+    callbackResult = null;
     window.removeEventListener('error', onWindowError);
-    window.removeEventListener('unhandledrejection', onWindowError as EventListener);
+    window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    restoreFetchGuard?.();
+    restoreFetchGuard = null;
     if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__?.cleanup === cleanupLaunch) {
       delete window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__;
     }
   };
 
+  const failLaunch = (error: Error) => {
+    if (errorFired) return;
+    errorFired = true;
+    cleanupLaunch();
+    options.onError?.(error);
+  };
+
   window.addEventListener('error', onWindowError);
-  window.addEventListener('unhandledrejection', onWindowError as EventListener);
+  window.addEventListener('unhandledrejection', onUnhandledRejection);
+  restoreFetchGuard = installVnptFetchGuard(env.backendUrl, failLaunch);
   window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__ = { cleanup: cleanupLaunch };
 
   const reportCallbackError = (error: unknown) => {
-    if (!errorFired) {
-      errorFired = true;
-      options.onError?.(toError(error));
-    }
+    failLaunch(toError(error));
   };
 
   const submitTerminalResult = async (terminalResult: Record<string, unknown>) => {
@@ -214,9 +234,18 @@ export async function launchVnptIdentitySdk(
       return;
     }
 
+    const providerSessionId = resolveProviderIdentifier(
+      [terminalResult, callbackResult, documentResult],
+      PROVIDER_SESSION_ID_ALIASES,
+      'mã phiên',
+    );
+    const providerTransactionId = resolveProviderIdentifier(
+      [terminalResult, callbackResult, documentResult],
+      PROVIDER_TRANSACTION_ID_ALIASES,
+      'mã giao dịch',
+      PROVIDER_TRANSACTION_ID_FALLBACK_ALIASES,
+    );
     const compactResult = mergeSdkResults(documentResult, callbackResult, terminalResult);
-    const providerSessionId = findExactValue(compactResult, PROVIDER_SESSION_ID_ALIASES);
-    const providerTransactionId = findExactValue(compactResult, PROVIDER_TRANSACTION_ID_ALIASES);
 
     finalResultHandled = true;
     cleanupLaunch();
@@ -228,6 +257,7 @@ export async function launchVnptIdentitySdk(
   };
 
   const handleDocumentResult: VnptSdkCallback = (sdkResult) => {
+    if (isCleanedUp) return;
     documentResult = compactSdkResult(sdkResult);
   };
 
@@ -235,6 +265,7 @@ export async function launchVnptIdentitySdk(
   // present there, but they do not prove that the flow is complete. Only END_FLOW is
   // terminal so partial evidence is never submitted.
   const handleCallbackResult: VnptSdkCallback = (sdkResult) => {
+    if (isCleanedUp) return;
     callbackResult = compactSdkResult(sdkResult);
   };
 
@@ -250,7 +281,8 @@ export async function launchVnptIdentitySdk(
     TOKEN_KEY: env.tokenKey,
     TOKEN_ID: env.tokenId,
     ACCESS_TOKEN: env.accessToken,
-    CHALLENGE_CODE: env.challengeCode,
+    // The bundled SDK appends this value directly to a query string.
+    CHALLENGE_CODE: encodeURIComponent(env.challengeCode),
     CALL_BACK: handleCallbackResult,
     CALL_BACK_END_FLOW: handleEndFlowResult,
     CALL_BACK_DOCUMENT_RESULT: handleDocumentResult,
@@ -282,7 +314,12 @@ export async function launchVnptIdentitySdk(
   // Deliberately expose only booleans for browser credentials. Raw SDK results,
   // CCCD images and access tokens must never be written to browser storage/debug state.
   window.__MANABIHUB_LAST_VNPT_CONFIG__ = safeDebugConfig(dataConfig);
-  window.SDK.launch(dataConfig);
+  try {
+    window.SDK.launch(dataConfig);
+  } catch {
+    cleanupLaunch();
+    throw new Error(VNPT_PROVIDER_ERROR_MESSAGE);
+  }
 }
 
 function getVnptEnv() {
@@ -400,42 +437,52 @@ function mergeSdkResults(
   return result;
 }
 
-function findExactValue(source: Record<string, unknown>, aliases: string[]) {
-  const entries = flattenEntries(source);
-
-  for (const alias of aliases) {
-    const match = entries.find((entry) => normalizeKey(entry.key) === alias && isScalarValue(entry.value));
-    if (match) {
-      return String(match.value).trim();
-    }
+function resolveProviderIdentifier(
+  sourcesInPriorityOrder: Array<Record<string, unknown> | null>,
+  aliases: string[],
+  label: string,
+  fallbackAliases: string[] = [],
+) {
+  const values = sourcesInPriorityOrder.flatMap((source) => source ? findExactValues(source, aliases) : []);
+  const distinctValues = Array.from(new Set(values));
+  if (distinctValues.length > 1) {
+    throw new Error(`VNPT trả về ${label} không nhất quán. Vui lòng thực hiện lại phiên xác minh.`);
   }
+  if (distinctValues[0]) return distinctValues[0];
 
-  return null;
+  const fallbackValues = Array.from(new Set(
+    sourcesInPriorityOrder.flatMap((source) => source ? findExactValues(source, fallbackAliases) : []),
+  ));
+  if (fallbackValues.length > 1) {
+    throw new Error(`VNPT trả về ${label} không nhất quán. Vui lòng thực hiện lại phiên xác minh.`);
+  }
+  return fallbackValues[0] ?? null;
 }
 
-function flattenEntries(source: unknown) {
-  const entries: Array<{ key: string; value: unknown }> = [];
-  const seen = new WeakSet<object>();
-
-  function walk(current: unknown, depth: number) {
-    if (current === null || typeof current !== 'object' || depth > MAX_SDK_RESULT_DEPTH || seen.has(current)) {
-      return;
-    }
-
-    seen.add(current);
-    if (Array.isArray(current)) {
-      current.forEach((item) => walk(item, depth + 1));
-      return;
-    }
-
-    Object.entries(current as Record<string, unknown>).forEach(([key, value]) => {
-      entries.push({ key, value });
-      walk(value, depth + 1);
-    });
+function findExactValues(source: Record<string, unknown>, aliases: string[]) {
+  const aliasSet = new Set(aliases);
+  const values: string[] = [];
+  const candidateEnvelopes: Record<string, unknown>[] = [source];
+  for (const envelopeKey of ['object', 'data', 'result']) {
+    const envelope = findObjectProperty(source, envelopeKey);
+    if (envelope) candidateEnvelopes.push(envelope);
   }
+  for (const envelope of candidateEnvelopes) {
+    for (const [key, value] of Object.entries(envelope)) {
+      if (aliasSet.has(normalizeKey(key)) && isScalarValue(value)) {
+        const normalized = String(value).trim();
+        if (normalized) values.push(normalized);
+      }
+    }
+  }
+  return values;
+}
 
-  walk(source, 0);
-  return entries;
+function findObjectProperty(source: Record<string, unknown>, expectedKey: string) {
+  const entry = Object.entries(source).find(([key]) => normalizeKey(key) === expectedKey);
+  return entry?.[1] && typeof entry[1] === 'object' && !Array.isArray(entry[1])
+    ? entry[1] as Record<string, unknown>
+    : null;
 }
 
 function isScalarValue(value: unknown) {
@@ -516,13 +563,112 @@ function splitCsv(value: string | undefined) {
 
 function resolveScriptUrls(value: string | undefined) {
   const configuredUrls = splitCsv(value);
-  return configuredUrls.length > 0 ? configuredUrls : DEFAULT_VNPT_SDK_SCRIPT_URLS;
+  const urls = configuredUrls.length > 0 ? configuredUrls : DEFAULT_VNPT_SDK_SCRIPT_URLS;
+  urls.forEach((url) => {
+    if (url.startsWith('/') && !url.startsWith('//') && !url.includes('\\')) return;
+    throw new Error(`URL VNPT SDK phải là đường dẫn same-origin bắt đầu bằng '/': ${url}`);
+  });
+  return urls;
 }
 
 function normalizeBackendUrl(value: string | undefined) {
-  return (value ?? '').trim().replace(/\/+$/, '');
+  const normalized = (value ?? '').trim().replace(/\/+$/, '');
+  if (!normalized) return '';
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error('VITE_VNPT_EKYC_BACKEND_URL không phải URL hợp lệ.');
+  }
+  if (!APPROVED_VNPT_BACKEND_ORIGINS.has(parsed.origin)
+      || parsed.username
+      || parsed.password
+      || parsed.pathname !== '/'
+      || parsed.search
+      || parsed.hash) {
+    throw new Error('VITE_VNPT_EKYC_BACKEND_URL phải dùng đúng VNPT production hoặc sandbox origin đã phê duyệt.');
+  }
+  return parsed.origin;
 }
 
 function sanitizeAccessToken(value: string | undefined) {
   return (value ?? '').trim().replace(/^bearer\s+/i, '');
+}
+
+interface ConfiguredScriptSource {
+  href: string;
+  originAndPath: string;
+}
+
+function resolveConfiguredScriptSources(scriptUrls: string[]): ConfiguredScriptSource[] {
+  return scriptUrls.map((url) => {
+    const resolved = new URL(url, document.baseURI);
+    return {
+      href: resolved.href,
+      originAndPath: `${resolved.origin}${resolved.pathname}`,
+    };
+  });
+}
+
+function isConfiguredVnptSource(
+  source: string,
+  stack: string,
+  configuredSources: ConfiguredScriptSource[],
+) {
+  if (source) {
+    try {
+      const resolved = new URL(source, document.baseURI);
+      const originAndPath = `${resolved.origin}${resolved.pathname}`;
+      if (configuredSources.some((configured) => configured.originAndPath === originAndPath)) return true;
+    } catch {
+      // A malformed source is not trustworthy enough to attribute to VNPT.
+    }
+  }
+  return Boolean(stack && configuredSources.some((configured) =>
+    stack.includes(configured.href) || stack.includes(configured.originAndPath)));
+}
+
+function readStringProperty(value: unknown, property: string) {
+  if (!value || typeof value !== 'object') return '';
+  const candidate = (value as Record<string, unknown>)[property];
+  return typeof candidate === 'string' ? candidate : '';
+}
+
+function installVnptFetchGuard(backendUrl: string, failLaunch: (error: Error) => void) {
+  if (typeof window.fetch !== 'function') return () => undefined;
+
+  const originalFetch = window.fetch;
+  let active = true;
+  const guardedFetch: typeof window.fetch = async (input, init) => {
+    const isProviderRequest = isVnptBackendRequest(input, backendUrl);
+    try {
+      const response = await originalFetch.call(window, input, init);
+      if (active && isProviderRequest && (response.status === 401 || response.status === 403)) {
+        failLaunch(new Error(VNPT_AUTH_ERROR_MESSAGE));
+      }
+      return response;
+    } catch (error) {
+      if (active && isProviderRequest) failLaunch(new Error(VNPT_TRANSPORT_ERROR_MESSAGE));
+      throw error;
+    }
+  };
+  window.fetch = guardedFetch;
+  return () => {
+    active = false;
+    if (window.fetch === guardedFetch) window.fetch = originalFetch;
+  };
+}
+
+function isVnptBackendRequest(input: RequestInfo | URL, backendUrl: string) {
+  try {
+    const requestUrl = new URL(input instanceof Request ? input.url : String(input), document.baseURI);
+    const providerBase = new URL(backendUrl, document.baseURI);
+    const basePath = providerBase.pathname.replace(/\/+$/, '');
+    return requestUrl.origin === providerBase.origin
+      && (!basePath || basePath === '/'
+        || requestUrl.pathname === basePath
+        || requestUrl.pathname.startsWith(`${basePath}/`));
+  } catch {
+    return false;
+  }
 }
