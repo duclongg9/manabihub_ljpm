@@ -264,11 +264,17 @@ describe('VNPT identity SDK bridge', () => {
     expect(launch).toHaveBeenCalledTimes(1);
   });
 
-  it('fails fast if challenge code is missing', async () => {
+  it('uses the bundled SDK default when VNPT has not issued a challenge code', async () => {
     vi.stubEnv('VITE_VNPT_EKYC_CHALLENGE_CODE', '');
 
-    await expect(launchVnptIdentitySdk(vi.fn())).rejects.toThrow(/Thiếu VITE_VNPT_EKYC_CHALLENGE_CODE/);
-    expect(launch).not.toHaveBeenCalled();
+    await launchVnptIdentitySdk(vi.fn());
+
+    const config = launch.mock.calls[0][0] as SdkConfig;
+    expect(launch).toHaveBeenCalledTimes(1);
+    expect(config).not.toHaveProperty('CHALLENGE_CODE');
+    expect(window.__MANABIHUB_LAST_VNPT_CONFIG__).toMatchObject({
+      CHALLENGE_CODE_EXISTS: false,
+    });
   });
 
   it('rejects a lookalike VNPT backend and remote SDK scripts', async () => {
