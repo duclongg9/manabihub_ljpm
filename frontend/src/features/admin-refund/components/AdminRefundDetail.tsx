@@ -179,12 +179,31 @@ export function AdminRefundDetail() {
         await loadDetail();
         return;
       }
-      const message =
-        apiError?.status === 409
-          ? 'Yêu cầu đã được người khác xử lý hoặc trạng thái đã thay đổi. Hãy tải lại dữ liệu trước khi quyết định.'
-          : apiError?.data?.message
-            ? apiError.data.message
-            : 'Không thể ghi nhận quyết định. Không có thay đổi nào được xác nhận.';
+
+      let message = 'Không thể ghi nhận quyết định. Không có thay đổi nào được xác nhận.';
+      if (apiError?.status === 409) {
+        message = 'Yêu cầu đã được người khác xử lý hoặc trạng thái đã thay đổi. Hãy tải lại dữ liệu trước khi quyết định.';
+      } else if (apiError?.data?.messageCode === 'COMMON_INTERNAL_ERROR' || (apiError && apiError.status >= 500)) {
+        let correlationId: string | undefined;
+        if (apiError?.headers) {
+          const getHeader = (key: string): string | undefined => {
+            const headers = apiError.headers as any;
+            if (typeof headers.get === 'function') {
+              const val = headers.get(key);
+              return typeof val === 'string' ? val : undefined;
+            }
+            return headers[key] as string | undefined;
+          };
+          correlationId = getHeader('x-correlation-id') || getHeader('x-amzn-trace-id');
+        }
+
+        message = correlationId
+          ? `Hệ thống gặp sự cố không mong muốn (Mã theo dõi: ${correlationId}). Vui lòng liên hệ quản trị viên với mã theo dõi này.`
+          : 'Hệ thống gặp sự cố không mong muốn. Vui lòng thử lại hoặc liên hệ quản trị viên.';
+      } else if (apiError?.data?.message) {
+        message = apiError.data.message;
+      }
+
       setDecisionNotice({ tone: 'error', message });
       if (apiError?.status === 409) {
         setDecisionAction(null);

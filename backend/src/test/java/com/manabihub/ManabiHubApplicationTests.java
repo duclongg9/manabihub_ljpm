@@ -25,6 +25,7 @@ import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.TeacherCertificateClaimRepository;
 import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
+import com.manabihub.kyc.repository.VnptIdentityTransactionClaimRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.service.TeacherKycService;
@@ -50,6 +51,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(properties = {
@@ -83,6 +85,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private TeacherCertificateClaimRepository teacherCertificateClaimRepository;
+
+    @MockBean
+    private VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
 
     @MockBean
     private AuditLogRepository auditLogRepository;
@@ -243,6 +248,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private TransactionTemplate transactionTemplate;
+
+    @MockBean
+    private PlatformTransactionManager platformTransactionManager;
 
 
     @MockBean

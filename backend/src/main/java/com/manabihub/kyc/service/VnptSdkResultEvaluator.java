@@ -113,9 +113,28 @@ public final class VnptSdkResultEvaluator {
                     || normalized.contains("mismatch")
                     || normalized.contains("failed")
                     || normalized.contains("failure")
+                    || isTerminalFailureStatus(normalized)
                     || normalized.equals("null");
         }
         return false;
+    }
+
+    /**
+     * A flow-level terminal failure must take precedence over successful OCR
+     * or face callbacks received earlier in the same SDK session.
+     */
+    private static boolean isTerminalFailureStatus(String value) {
+        String compact = normalizeKey(value);
+        if (Set.of("noerror", "withouterror").contains(compact)) {
+            return false;
+        }
+        return compact.contains("cancel")
+                || compact.contains("abort")
+                || compact.contains("timeout")
+                || compact.contains("timedout")
+                || compact.equals("error")
+                || compact.startsWith("error")
+                || compact.endsWith("error");
     }
 
     private static boolean isNegativeDecisionKey(String key) {

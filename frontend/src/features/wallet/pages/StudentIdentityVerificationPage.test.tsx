@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudentIdentityVerificationPage } from './StudentIdentityVerificationPage';
@@ -71,6 +71,26 @@ describe('StudentIdentityVerificationPage', () => {
     expect(await screen.findByText(/chưa trả về đủ mã phiên và mã giao dịch/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Bắt đầu xác minh' })).toBeEnabled();
     expect(serviceMocks.verify).not.toHaveBeenCalled();
+  });
+
+  it('does not present cancellation as effective after the verification POST starts', async () => {
+    let terminalCallback: ((result: Record<string, unknown>) => Promise<void>) | undefined;
+    sdkMocks.launch.mockImplementation(async (onResult) => {
+      terminalCallback = onResult;
+    });
+    serviceMocks.verify.mockReturnValue(new Promise(() => undefined));
+
+    renderPage('/student/identity-verification');
+    fireEvent.click(await screen.findByRole('button', { name: 'Bắt đầu xác minh' }));
+    await waitFor(() => expect(terminalCallback).toBeDefined());
+
+    await act(async () => {
+      void terminalCallback?.({ sdkResult: { status: 'SUCCESS' } });
+    });
+
+    expect(await screen.findByRole('button', { name: 'Không thể hủy khi đang ghi nhận' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Quay lại Ví & Thanh toán' })).toBeDisabled();
+    expect(serviceMocks.verify).toHaveBeenCalledTimes(1);
   });
 });
 

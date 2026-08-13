@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminRefundApi } from '../api/adminRefundApi';
 import type { RefundDetailResponse } from '../types';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { AdminRefundDetail } from './AdminRefundDetail';
 
 vi.mock('../api/adminRefundApi', () => ({
@@ -181,5 +182,78 @@ describe('AdminRefundDetail', () => {
           Boolean(element.textContent?.includes('PROVIDER_UNAVAILABLE')),
       ),
     ).toBeInTheDocument();
+  });
+
+  it('shows correlation ID from response header on HTTP 500 and keeps modal open', async () => {
+    const headers = new AxiosHeaders();
+    headers.set('x-correlation-id', 'abc-trace-123');
+
+    const error = new AxiosError(
+      'Internal Server Error',
+      '500',
+      undefined,
+      undefined,
+      {
+        status: 500,
+        statusText: 'Internal Server Error',
+        config: {} as any,
+        headers: headers,
+        data: { success: false, messageCode: 'COMMON_INTERNAL_ERROR', message: 'Internal Server Error' }
+      }
+    );
+    approveRefundMock.mockRejectedValueOnce(error);
+
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Chấp thuận' }));
+    fireEvent.change(screen.getByLabelText(/Mã lý do/), {
+      target: { value: 'STANDARD_ELIGIBLE' },
+    });
+    fireEvent.change(screen.getByLabelText(/Căn cứ quyết định/), {
+      target: { value: 'Test note for 500.' },
+    });
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Chấp thuận' }));
+
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert.textContent).toContain('abc-trace-123');
+  });
+
+  it('shows generic Vietnamese message on HTTP 500 without correlation header and keeps modal open', async () => {
+    getRefundDetailMock.mockResolvedValue(pendingRefund);
+
+    const headers = new AxiosHeaders();
+
+    const error = new AxiosError(
+      'Internal Server Error',
+      '500',
+      undefined,
+      undefined,
+      {
+        status: 500,
+        statusText: 'Internal Server Error',
+        config: {} as any,
+        headers: headers,
+        data: { success: false, messageCode: 'COMMON_INTERNAL_ERROR', message: 'Internal Server Error' }
+      }
+    );
+    approveRefundMock.mockRejectedValueOnce(error);
+
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Chấp thuận' }));
+    fireEvent.change(screen.getByLabelText(/Mã lý do/), {
+      target: { value: 'STANDARD_ELIGIBLE' },
+    });
+    fireEvent.change(screen.getByLabelText(/Căn cứ quyết định/), {
+      target: { value: 'Test note for 500.' },
+    });
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Chấp thuận' }));
+
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert.textContent).toContain('Hệ thống gặp sự cố không mong muốn');
+    expect(alert.textContent).not.toContain('N/A');
+    expect(alert.textContent).not.toContain('abc-trace');
   });
 });
