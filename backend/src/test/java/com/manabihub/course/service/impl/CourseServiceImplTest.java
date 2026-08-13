@@ -2,6 +2,7 @@ package com.manabihub.course.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.ai.service.AiCourseEligibilityService;
 import com.manabihub.course.dto.request.CreateCourseDraftRequest;
 import com.manabihub.course.dto.response.CourseDraftResponse;
 import com.manabihub.course.dto.response.ValidationResultResponse;
@@ -91,6 +92,9 @@ class CourseServiceImplTest {
     @Mock
     private CourseEditDraftService courseEditDraftService;
 
+    @Mock
+    private AiCourseEligibilityService aiCourseEligibilityService;
+
     @InjectMocks
     private CourseServiceImpl courseService;
     private UUID userId;
@@ -110,7 +114,8 @@ class CourseServiceImplTest {
                 settingValueService,
                 enrollmentRepository,
                 escrowLedgerRepository,
-                courseEditDraftService
+                courseEditDraftService,
+                aiCourseEligibilityService
         );
         org.mockito.Mockito.lenient()
                 .when(courseEditDraftService.resolveEditableCourse(any(Course.class)))
@@ -141,13 +146,15 @@ class CourseServiceImplTest {
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
         when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
         when(courseRepository.existsBySlug("jlpt-n5-foundation")).thenReturn(false);
+        CreateCourseDraftRequest request = validRequest();
+        when(aiCourseEligibilityService.isPriceEligible(request.price())).thenReturn(true);
         when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> {
             Course course = invocation.getArgument(0);
             course.setId(UUID.randomUUID());
             return course;
         });
 
-        CourseDraftResponse response = courseService.createDraft(validRequest());
+        CourseDraftResponse response = courseService.createDraft(request);
 
         assertNotNull(response.id());
         assertEquals(CourseStatus.DRAFT, response.status());
@@ -165,6 +172,7 @@ class CourseServiceImplTest {
         assertEquals(CourseStatus.DRAFT, savedCourse.getStatus());
         assertEquals(approvedTeacher.getId(), savedCourse.getTeacher().getId());
         assertEquals(4, savedCourse.getLearningGoals().size());
+        assertTrue(savedCourse.isAiSupported());
         assertTrue(savedCourse.getLearningGoals().stream().allMatch(goal -> goal.getGoalText().length() <= 160));
     }
 
@@ -296,12 +304,15 @@ class CourseServiceImplTest {
                 .thenReturn(Optional.of(draft));
         when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
         when(courseRepository.existsBySlugAndIdNot("jlpt-n5-foundation", draftId)).thenReturn(false);
+        CreateCourseDraftRequest request = validRequest();
+        when(aiCourseEligibilityService.isPriceEligible(request.price())).thenReturn(true);
 
-        CourseDraftResponse response = courseService.updateDraft(draftId, validRequest());
+        CourseDraftResponse response = courseService.updateDraft(draftId, request);
 
         assertEquals("JLPT N5 Foundation", response.title());
         assertEquals("jlpt-n5-foundation", response.slug());
         assertEquals(4, response.learningGoals().size());
+        assertTrue(draft.isAiSupported());
     }
 
     @Test

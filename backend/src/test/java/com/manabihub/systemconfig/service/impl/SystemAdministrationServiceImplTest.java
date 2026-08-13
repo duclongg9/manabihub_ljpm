@@ -1,5 +1,6 @@
 package com.manabihub.systemconfig.service.impl;
 
+import com.manabihub.ai.service.AiCourseEligibilityService;
 import com.manabihub.audit.service.AuditLogService;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -61,6 +63,7 @@ class SystemAdministrationServiceImplTest {
     @Mock private InternalAdminInvitationService invitationService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private NotificationService notificationService;
+    @Mock private AiCourseEligibilityService aiCourseEligibilityService;
 
     private SystemAdministrationServiceImpl service;
     private UUID actorId;
@@ -77,7 +80,8 @@ class SystemAdministrationServiceImplTest {
                 new CommercialPolicyService(settingRepository),
                 invitationService,
                 eventPublisher,
-                notificationService
+                notificationService,
+                aiCourseEligibilityService
         );
         actorId = UUID.randomUUID();
         actor = account(actorId, "system@manabihub.local", RoleCode.SYSTEM_ADMIN);
@@ -301,6 +305,26 @@ class SystemAdministrationServiceImplTest {
 
             assertEquals(MessageCodes.SYSTEM_ADMIN_REQUIRED, error.getMessageCode());
             verify(settingRepository, never()).save(any());
+        }
+
+        @Test
+        @Order(12)
+        @DisplayName("AI price floor update synchronizes persisted course AI flags")
+        void updatingAiPriceFloorSynchronizesCourseFlags() {
+            SystemSetting setting = SystemSetting.builder()
+                    .id(UUID.randomUUID())
+                    .settingKey("AI_SUPPORT_PRICE_FLOOR")
+                    .settingValue("100000")
+                    .valueType("NUMBER")
+                    .editable(true)
+                    .build();
+            when(settingRepository.findBySettingKeyForUpdate("AI_SUPPORT_PRICE_FLOOR"))
+                    .thenReturn(Optional.of(setting));
+            when(settingRepository.save(setting)).thenReturn(setting);
+
+            service.updateSetting(actorId, "AI_SUPPORT_PRICE_FLOOR", "0", "Enable AI for free courses");
+
+            verify(aiCourseEligibilityService).synchronizeAllCourses(BigDecimal.ZERO);
         }
     }
 

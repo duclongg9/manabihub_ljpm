@@ -73,7 +73,7 @@ public class FlywayMigrationIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
-    // ── Test 1: Clean build from V001 to V072 ──────────────────────────────
+    // ── Test 1: Clean build from V001 to V075 ──────────────────────────────
     @Test
     void cleanMigrationToLatestVersion() {
         assertThat(flyway).isNotNull();
@@ -90,7 +90,7 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("074");
+        assertThat(current).isEqualTo("075");
 
         MigrationInfo immutablePhoneMigration = Arrays.stream(flyway.info().all())
                 .filter(info -> info.getVersion() != null
@@ -105,7 +105,7 @@ public class FlywayMigrationIntegrationTest {
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V072 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V075 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");
