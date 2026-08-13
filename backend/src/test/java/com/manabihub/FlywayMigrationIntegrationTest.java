@@ -302,21 +302,20 @@ public class FlywayMigrationIntegrationTest {
     }
 
     @Test
-    void v069UpgradeRejectsMultipleVerifiedOwnersForManualReview() {
+    void v074UpgradeRejectsMultipleVerifiedOwnersForManualReview() {
         String schema = "phone_verified_conflict_test";
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
 
-        Flyway beforePhoneVerification = Flyway.configure()
+        Flyway beforePhoneHardening = Flyway.configure()
                 .dataSource(dataSource)
                 .schemas(schema)
-                .target("068")
+                .target("069")
                 .load();
-        beforePhoneVerification.migrate();
+        beforePhoneHardening.migrate();
 
         JdbcTemplate legacy = new JdbcTemplate(dataSource);
         legacy.execute("ALTER TABLE " + schema + ".app_users "
-                + "ALTER COLUMN phone_number TYPE VARCHAR(20), "
-                + "ADD COLUMN phone_verified_at TIMESTAMPTZ");
+                + "ALTER COLUMN phone_number TYPE VARCHAR(20)");
         legacy.update("INSERT INTO " + schema + ".app_users "
                         + "(id, email, full_name, phone_number, phone_verified_at, created_at) VALUES "
                         + "(?, 'verified-a@test.com', 'Verified A', '0971693378', now(), now()), "
@@ -329,7 +328,7 @@ public class FlywayMigrationIntegrationTest {
                 .load();
 
         assertThatThrownBy(latest::migrate)
-                .hasMessageContaining("manual account review is required");
+                .hasMessageContaining("manual review is required before retrying");
         assertThat(legacy.queryForObject(
                 "SELECT count(*) FROM " + schema + ".app_users "
                         + "WHERE BTRIM(phone_number) = '0971693378'",
