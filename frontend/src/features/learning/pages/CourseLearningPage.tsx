@@ -71,11 +71,17 @@ import {
   type FinalTestViolationType,
 } from '../utils/finalTestProctoring';
 import { downloadCertificatePdf, formatCertificateDate } from '../utils/certificatePdf';
-import { normalizeWatchedSecondsAtVideoEnd } from '../utils/videoProgress';
+import {
+  formatVideoTime,
+  normalizeWatchedSecondsAtVideoEnd,
+  resolveVideoResumePosition,
+  type VideoProgressCheckpoint,
+} from '../utils/videoProgress';
 import { CoursePomodoroPanel } from '../components/CoursePomodoroPanel';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
 const WATCHED_DELTA_MAX_SECONDS = 2;
+const VIDEO_PROGRESS_STORAGE_PREFIX = 'manabihub:video-progress:';
 const COURSE_SELECTION_STORAGE_PREFIX = 'manabihub:course-selection:';
 const WRITING_DRAFT_STORAGE_PREFIX = 'manabihub:writing-draft:';
 const QUIZ_ANSWERS_STORAGE_PREFIX = 'manabihub:quiz-answers:';
@@ -104,6 +110,10 @@ function quizAnswersStorageKey(blockId: string) {
 
 function finalTestStorageKey(courseId: string) {
   return `${FINAL_TEST_STORAGE_PREFIX}${publicStorageScope()}:${courseId}`;
+}
+
+function videoProgressStorageKey(blockId: string) {
+  return `${VIDEO_PROGRESS_STORAGE_PREFIX}${publicStorageScope()}:${blockId}`;
 }
 
 interface LocalFinalTestState {
@@ -752,10 +762,22 @@ function VideoBlock({
   onProgressSaveError: BlockContentProps['onVideoProgressError'];
   onLoadingChange: BlockContentProps['onContentLoadingChange'];
 }) {
+  const [checkpoint] = useState(
+    () => readLocalStorageValue<VideoProgressCheckpoint>(videoProgressStorageKey(block.id)),
+  );
+  const [initialPosition] = useState(
+    () => resolveVideoResumePosition(block.lastVideoPositionSeconds, checkpoint),
+  );
+  const initialWatchedSeconds = Math.max(block.watchedVideoSeconds ?? 0, checkpoint?.watchedSeconds ?? 0);
   const [playerLoading, setPlayerLoading] = useState(true);
+  const [currentPosition, setCurrentPosition] = useState(initialPosition);
+  const [mediaDuration, setMediaDuration] = useState(
+    checkpoint?.mediaDurationSeconds ?? (block.durationMinutes ? block.durationMinutes * 60 : 0),
+  );
   const playerRef = useRef<HTMLVideoElement>(null);
+  const currentPositionRef = useRef(initialPosition);
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
-  const watchedSecondsRef = useRef(block.watchedVideoSeconds ?? 0);
+  const watchedSecondsRef = useRef(initialWatchedSeconds);
   const lastSavedWatchedRef = useRef(block.watchedVideoSeconds ?? 0);
   const mediaDurationRef = useRef<number | null>(null);
   const lastObservedTimeRef = useRef<number | null>(null);
@@ -765,6 +787,19 @@ function VideoBlock({
   const pendingPositionRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
 
+  const storeCheckpoint = useCallback((positionSeconds: number) => {
+    const normalizedPosition = Math.max(0, Math.floor(positionSeconds));
+    const checkpointToStore: VideoProgressCheckpoint = {
+      positionSeconds: normalizedPosition,
+      watchedSeconds: Math.max(0, Math.floor(watchedSecondsRef.current)),
+      ...(mediaDurationRef.current && mediaDurationRef.current > 0
+        ? { mediaDurationSeconds: Math.floor(mediaDurationRef.current) }
+        : {}),
+      savedAt: Date.now(),
+    };
+    writeLocalStorageValue(videoProgressStorageKey(block.id), checkpointToStore);
+  }, [block.id]);
+
   useEffect(() => {
     setPlayerLoading(true);
     onLoadingChange(true);
@@ -773,6 +808,7 @@ function VideoBlock({
 
   const savePosition = useCallback(
     (positionSeconds: number) => {
+      storeCheckpoint(positionSeconds);
       pendingPositionRef.current = positionSeconds;
 
       const flush = () => {
@@ -802,6 +838,7 @@ function VideoBlock({
             lastSavedRef.current = positionToSave;
             lastSavedWatchedRef.current = progress.watchedVideoSeconds ?? watchedSecondsRef.current;
             watchedSecondsRef.current = Math.max(watchedSecondsRef.current, lastSavedWatchedRef.current);
+            storeCheckpoint(positionToSave);
             onProgressSaved(
               block.id,
               positionToSave,
@@ -834,17 +871,51 @@ function VideoBlock({
 
       flush();
     },
-    [block.id, onProgressSaveError, onProgressSaved],
+    [block.id, onProgressSaveError, onProgressSaved, storeCheckpoint],
   );
+
+  useEffect(() => {
+    const persistBeforeLeaving = () => {
+      const position = Math.max(0, Math.floor(currentPositionRef.current));
+      storeCheckpoint(position);
+      learningService.saveVideoProgressKeepalive(
+        block.id,
+        position,
+        watchedSecondsRef.current,
+        mediaDurationRef.current ?? undefined,
+      );
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') persistBeforeLeaving();
+    };
+
+    window.addEventListener('pagehide', persistBeforeLeaving);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', persistBeforeLeaving);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      persistBeforeLeaving();
+    };
+  }, [block.id, storeCheckpoint]);
 
   const handleReady = () => {
     const video = playerRef.current;
     if (video && Number.isFinite(video.duration) && video.duration > 0) {
       mediaDurationRef.current = video.duration;
+      setMediaDuration(video.duration);
     }
-    if (video && !isReadyRef.current && block.lastVideoPositionSeconds && block.lastVideoPositionSeconds > 0) {
+    if (video && !isReadyRef.current) {
       isReadyRef.current = true;
-      video.currentTime = Math.min(block.lastVideoPositionSeconds, video.duration || block.lastVideoPositionSeconds);
+      const resumePosition = resolveVideoResumePosition(
+        block.lastVideoPositionSeconds,
+        checkpoint,
+        video.duration,
+      );
+      if (resumePosition > 0) {
+        video.currentTime = resumePosition;
+        currentPositionRef.current = resumePosition;
+        setCurrentPosition(resumePosition);
+      }
     }
     if (video) lastObservedTimeRef.current = video.currentTime;
     setPlayerLoading(false);
@@ -889,6 +960,8 @@ function VideoBlock({
       return;
     }
     const position = Math.floor(video.currentTime);
+    currentPositionRef.current = video.currentTime;
+    setCurrentPosition(video.currentTime);
     const previousPosition = lastObservedTimeRef.current;
     if (!isSeekingRef.current && previousPosition != null) {
       const delta = video.currentTime - previousPosition;
@@ -909,6 +982,8 @@ function VideoBlock({
     const player = playerRef.current;
     if (!player || player.ended) return;
     const position = Math.floor(player.currentTime);
+    currentPositionRef.current = player.currentTime;
+    setCurrentPosition(player.currentTime);
     if (
       position !== lastSavedRef.current
       || watchedSecondsRef.current !== lastSavedWatchedRef.current
@@ -922,6 +997,7 @@ function VideoBlock({
     if (!video) return;
     if (Number.isFinite(video.duration) && video.duration > 0) {
       mediaDurationRef.current = video.duration;
+      setMediaDuration(video.duration);
     }
     watchedSecondsRef.current = normalizeWatchedSecondsAtVideoEnd(
       watchedSecondsRef.current,
@@ -929,6 +1005,10 @@ function VideoBlock({
     );
     savePosition(Math.floor(video.currentTime));
   };
+
+  const progressPercent = mediaDuration > 0
+    ? Math.min(100, Math.max(0, (currentPosition / mediaDuration) * 100))
+    : 0;
 
   return (
     <Box>
@@ -975,6 +1055,24 @@ function VideoBlock({
           onEnded={handleEnded}
         />
       </Box>
+      <Stack spacing={0.75} sx={{ mt: 1.5 }}>
+        <LinearProgress
+          variant="determinate"
+          value={progressPercent}
+          aria-label="Tiến trình xem video"
+          sx={{ height: 7, borderRadius: 999 }}
+        />
+        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            Đã xem {formatVideoTime(currentPosition)} / {mediaDuration > 0 ? formatVideoTime(mediaDuration) : '--:--'}
+          </Typography>
+          {initialPosition > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              Tiếp tục từ {formatVideoTime(initialPosition)}
+            </Typography>
+          )}
+        </Stack>
+      </Stack>
       {block.content && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
           {block.content}

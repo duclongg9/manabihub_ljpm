@@ -1,6 +1,7 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 import { isAxiosError } from 'axios';
+import { getAuthSession } from '../../../shared/auth/authSession';
 import type {
   CourseLearning,
   CourseProgressSummary,
@@ -55,6 +56,37 @@ export const learningService = {
         : {}),
     });
     return response.data.data;
+  },
+
+  saveVideoProgressKeepalive: (
+    blockId: string,
+    positionSeconds: number,
+    watchedSeconds: number,
+    mediaDurationSeconds?: number,
+  ): void => {
+    if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
+
+    const session = getAuthSession('public');
+    const endpoint = axiosClient.getUri({ url: ENDPOINTS.LEARNING.VIDEO_PROGRESS(blockId) });
+    const url = new URL(endpoint, window.location.origin).toString();
+    const body = JSON.stringify({
+      positionSeconds: Math.max(0, Math.floor(positionSeconds)),
+      watchedSeconds: Math.max(0, Math.floor(watchedSeconds)),
+      ...(mediaDurationSeconds && mediaDurationSeconds > 0
+        ? { mediaDurationSeconds: Math.floor(mediaDurationSeconds) }
+        : {}),
+    });
+
+    void window.fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
+      },
+      body,
+      credentials: 'include',
+      keepalive: true,
+    }).catch(() => undefined);
   },
 
   reviewFlashcard: async (blockId: string, cardIndex: number, status: 'REMEMBERED' | 'NEEDS_REVIEW'): Promise<LessonProgress> => {
