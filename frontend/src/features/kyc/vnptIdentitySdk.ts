@@ -23,10 +23,6 @@ const MAX_SDK_STRING_LENGTH = 4_096;
 const OMITTED = Symbol('omitted');
 const VNPT_PROVIDER_ERROR_MESSAGE =
   'VNPT eKYC không thể xử lý phiên xác minh. Vui lòng kiểm tra kết nối, cấu hình VNPT và thử lại.';
-const VNPT_AUTH_ERROR_MESSAGE =
-  'Phiên xác thực VNPT đã hết hạn hoặc không được chấp nhận. Vui lòng cập nhật cấu hình xác thực và thử lại.';
-const VNPT_TRANSPORT_ERROR_MESSAGE =
-  'Không thể kết nối dịch vụ VNPT eKYC. Vui lòng kiểm tra mạng và thử lại.';
 const VNPT_TERMINAL_FAILURE_MESSAGE =
   'Phiên xác minh VNPT đã bị hủy, hết thời gian hoặc gặp lỗi. Vui lòng thực hiện lại từ đầu.';
 
@@ -63,6 +59,7 @@ declare global {
 }
 
 let vnptLaunchGeneration = 0;
+let vnptScriptSequence: { fingerprint: string; promise: Promise<void> } | null = null;
 
 export interface VnptIdentityResult {
   providerSessionId?: string | null;
@@ -92,9 +89,11 @@ export function resetVnptIdentitySdkRuntime() {
     window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__.cleanup();
     delete window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__;
   }
-  delete window.SDK;
   delete window.__MANABIHUB_LAST_VNPT_CONFIG__;
-  document.querySelectorAll<HTMLScriptElement>('script[data-vnpt-sdk]').forEach((script) => script.remove());
+  // Keep the vendor runtime loaded for the lifetime of this browser document.
+  // Removing its script tags and deleting window.SDK does not undo TensorFlow's
+  // global WebGL registrations; reinjecting the face bundle only registers the
+  // same kernels again. A full page reload remains the hard-reset boundary.
   cleanupLegacyVnptIdentityStorage();
 }
 
@@ -184,7 +183,6 @@ export async function launchVnptIdentitySdk(
   let finalResultHandled = false;
   let errorFired = false;
   let isCleanedUp = false;
-  let restoreFetchGuard: (() => void) | null = null;
   let restorePopupBypass: (() => void) | null = null;
   const configuredScriptSources = resolveConfiguredScriptSources(env.scriptUrls);
 
@@ -222,8 +220,6 @@ export async function launchVnptIdentitySdk(
     callbackResult = null;
     window.removeEventListener('error', onWindowError);
     window.removeEventListener('unhandledrejection', onUnhandledRejection);
-    restoreFetchGuard?.();
-    restoreFetchGuard = null;
     restorePopupBypass?.();
     restorePopupBypass = null;
     if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__?.cleanup === cleanupLaunch) {
@@ -240,7 +236,11 @@ export async function launchVnptIdentitySdk(
 
   window.addEventListener('error', onWindowError);
   window.addEventListener('unhandledrejection', onUnhandledRejection);
-  restoreFetchGuard = installVnptFetchGuard(env.backendUrl, failLaunch);
+  // Let VNPT's own SDK consume individual HTTP responses. Treating any
+  // intermediate 401/403 or transport failure as a terminal host error tears
+  // down the camera while VNPT is still advancing from document capture to
+  // face liveness. Startup validation and explicit terminal callbacks remain
+  // the fail-closed boundaries for the host application.
   restorePopupBypass = installVnptFaceGuideAutoDismiss();
   window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__ = { cleanup: cleanupLaunch };
 
@@ -598,8 +598,30 @@ async function loadVnptScripts(scriptUrls: string[]) {
     return;
   }
 
-  for (const url of scriptUrls) {
-    await loadScript(url);
+  const fingerprint = scriptUrls.join('\u0000');
+  if (vnptScriptSequence && vnptScriptSequence.fingerprint !== fingerprint) {
+    throw new Error('Danh sách VNPT SDK đã thay đổi trong cùng một phiên trang. Vui lòng tải lại trang và thử lại.');
+  }
+
+  if (!vnptScriptSequence) {
+    vnptScriptSequence = {
+      fingerprint,
+      promise: (async () => {
+        for (const url of scriptUrls) {
+          await loadScript(url);
+        }
+      })(),
+    };
+  }
+
+  const sequence = vnptScriptSequence;
+  try {
+    await sequence.promise;
+  } catch (error) {
+    if (vnptScriptSequence === sequence) {
+      vnptScriptSequence = null;
+    }
+    throw error;
   }
 }
 
@@ -613,16 +635,23 @@ function loadScript(src: string) {
     }
 
     const script = existingScript ?? document.createElement('script');
-    script.dataset.vnptSdk = src;
-    script.async = true;
-    script.src = src;
-    script.onload = () => {
+    const handleLoad = () => {
+      script.removeEventListener('error', handleError);
       script.dataset.loaded = 'true';
       resolve();
     };
-    script.onerror = () => reject(new Error(`Không tải được VNPT SDK script: ${src}`));
+    const handleError = () => {
+      script.removeEventListener('load', handleLoad);
+      script.remove();
+      reject(new Error(`Không tải được VNPT SDK script: ${src}`));
+    };
+    script.addEventListener('load', handleLoad, { once: true });
+    script.addEventListener('error', handleError, { once: true });
 
     if (!existingScript) {
+      script.dataset.vnptSdk = src;
+      script.async = true;
+      script.src = src;
       document.head.appendChild(script);
     }
   });
@@ -891,43 +920,4 @@ function readStringProperty(value: unknown, property: string) {
   if (!value || typeof value !== 'object') return '';
   const candidate = (value as Record<string, unknown>)[property];
   return typeof candidate === 'string' ? candidate : '';
-}
-
-function installVnptFetchGuard(backendUrl: string, failLaunch: (error: Error) => void) {
-  if (typeof window.fetch !== 'function') return () => undefined;
-
-  const originalFetch = window.fetch;
-  let active = true;
-  const guardedFetch: typeof window.fetch = async (input, init) => {
-    const isProviderRequest = isVnptBackendRequest(input, backendUrl);
-    try {
-      const response = await originalFetch.call(window, input, init);
-      if (active && isProviderRequest && (response.status === 401 || response.status === 403)) {
-        failLaunch(new Error(VNPT_AUTH_ERROR_MESSAGE));
-      }
-      return response;
-    } catch (error) {
-      if (active && isProviderRequest) failLaunch(new Error(VNPT_TRANSPORT_ERROR_MESSAGE));
-      throw error;
-    }
-  };
-  window.fetch = guardedFetch;
-  return () => {
-    active = false;
-    if (window.fetch === guardedFetch) window.fetch = originalFetch;
-  };
-}
-
-function isVnptBackendRequest(input: RequestInfo | URL, backendUrl: string) {
-  try {
-    const requestUrl = new URL(input instanceof Request ? input.url : String(input), document.baseURI);
-    const providerBase = new URL(backendUrl, document.baseURI);
-    const basePath = providerBase.pathname.replace(/\/+$/, '');
-    return requestUrl.origin === providerBase.origin
-      && (!basePath || basePath === '/'
-        || requestUrl.pathname === basePath
-        || requestUrl.pathname.startsWith(`${basePath}/`));
-  } catch {
-    return false;
-  }
 }
