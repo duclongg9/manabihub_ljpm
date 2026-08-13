@@ -287,9 +287,13 @@ export async function launchVnptIdentitySdk(
     HAS_BACKGROUND_IMAGE: true,
     HAS_RESULT_SCREEN: true,
     SHOW_STEP: true,
-    MAX_SIZE_IMAGE: 1,
+    // VNPT SDK 3.2.1 accepts this value in MB. Five MB matches the known-good
+    // CCCD camera/upload integration and avoids rejecting otherwise readable
+    // high-resolution mobile captures before OCR can evaluate them.
+    MAX_SIZE_IMAGE: 5,
     DEFAULT_LANGUAGE: 'vi',
     LIST_TYPE_DOCUMENT: [9],
+    DOCUMENT_TYPE_START: 9,
     HAS_QR_SCAN: false,
     SDK_FLOW: 'DOCUMENT_TO_FACE',
     FLOW_TAKEN: 'DOCUMENT_TO_FACE',

@@ -499,11 +499,13 @@ class TeacherKycServiceTest {
     }
 
     @Test
-    void verifyIdentity_directSdkMockMode_rejectsNonEmptyVnptWarning() {
-        teacherKycService = newTeacherKycService("direct-sdk-mock");
+    void verifyIdentity_directSdkMode_acceptsDocumentQualityWarningWithoutMockRegistry() {
+        teacherKycService = newTeacherKycService("direct-sdk");
         when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacher.getId()))
                 .thenReturn(Optional.empty());
+        when(teacherIdentityClaimService.normalizeCccd("012345678901"))
+                .thenReturn("012345678901");
         when(kycRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             KycRequest request = invocation.getArgument(0);
             request.setId(UUID.randomUUID());
@@ -528,10 +530,10 @@ class TeacherKycServiceTest {
                 "JUnit"
         );
 
-        assertEquals("FAILED", response.request().identityStatus());
+        assertEquals("VERIFIED", response.request().identityStatus());
         verifyNoInteractions(mockNationalIdRegistryRepository);
-        verify(teacherIdentityClaimService, never()).processIdentityClaim(
-                any(), anyString(), any(), anyString(), anyString()
+        verify(teacherIdentityClaimService).processIdentityClaim(
+                eq(teacher.getId()), eq("012345678901"), eq(user), eq("127.0.0.1"), eq("JUnit")
         );
     }
 

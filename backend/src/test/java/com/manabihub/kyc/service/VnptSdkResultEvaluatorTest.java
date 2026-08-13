@@ -2,6 +2,7 @@ package com.manabihub.kyc.service;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,6 +32,44 @@ class VnptSdkResultEvaluatorTest {
         assertTrue(decision.verified());
     }
 
+    @Test
+    void acceptsDocumentQualityWarningsWhenTheDocumentAndFaceSignalsPass() {
+        VnptSdkDecision decision = VnptSdkResultEvaluator.evaluate(Map.of(
+                "documentResult", Map.of(
+                        "ocr", Map.of(
+                                "id", "012345678901",
+                                "name", "NGUYEN VAN A",
+                                "birth_day", "01/01/2000",
+                                "msg", "OK",
+                                "msg_back", "OK",
+                                "warning", List.of("anh_dau_vao_mo_nhoe"),
+                                "warning_msg", "Anh dau vao hoi mo",
+                                "id_fake_warning", "no",
+                                "id_fake_prob", 0.98,
+                                "tampering", Map.of("is_legal", "yes", "warning", List.of())),
+                        "liveness_card_front", Map.of("liveness", "success", "fake_liveness", false),
+                        "liveness_card_back", Map.of("liveness", "success", "face_swapping", false)),
+                "callbackResult", Map.of(
+                        "liveness_face", Map.of("liveness", "success"),
+                        "masked", "no",
+                        "compare", Map.of("msg", "MATCH", "prob", 98)),
+                "endFlowResult", Map.of("status", "SUCCESS")));
+
+        assertTrue(decision.verified(), () -> String.join("; ", decision.failureReasons()));
+    }
+
+    @Test
+    void rejectsOnlyDocumentedHardFailureSignals() {
+        assertFalse(VnptSdkResultEvaluator.evaluate(withOcr(Map.of(
+                "compare", Map.of("msg", "NOMATCH")))).verified());
+        assertFalse(VnptSdkResultEvaluator.evaluate(withOcr(Map.of(
+                "ocr", Map.of("tampering", Map.of("is_legal", "no"))))).verified());
+        assertFalse(VnptSdkResultEvaluator.evaluate(withOcr(Map.of(
+                "liveness_face", Map.of("liveness", "failure")))).verified());
+        assertFalse(VnptSdkResultEvaluator.evaluate(withOcr(Map.of(
+                "ocr", Map.of("id_fake_warning", "yes")))).verified());
+    }
+
     private Map<String, Object> payloadWithTerminalStatus(String status) {
         return Map.of(
                 "documentResult", Map.of(
@@ -41,5 +80,21 @@ class VnptSdkResultEvaluatorTest {
                         "faceLiveness", Map.of("status", "SUCCESS"),
                         "faceCompare", Map.of("result", "MATCH")),
                 "endFlowResult", Map.of("status", status));
+    }
+
+    private Map<String, Object> withOcr(Map<String, Object> additionalCallbackResult) {
+        return Map.of(
+                "documentResult", Map.of(
+                        "ocr", Map.of(
+                                "id", "012345678901",
+                                "name", "NGUYEN VAN A",
+                                "birth_day", "01/01/2000",
+                                "msg", "OK",
+                                "msg_back", "OK")),
+                "callbackResult", Map.of(
+                        "liveness_face", Map.of("liveness", "success"),
+                        "compare", Map.of("msg", "MATCH"),
+                        "additional", additionalCallbackResult),
+                "endFlowResult", Map.of("status", "SUCCESS"));
     }
 }
