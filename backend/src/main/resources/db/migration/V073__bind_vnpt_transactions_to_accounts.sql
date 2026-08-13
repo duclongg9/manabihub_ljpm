@@ -36,7 +36,7 @@ SELECT gen_random_uuid(),
        request.provider_session_id,
        COALESCE(request.created_at, NOW())
 FROM kyc_requests request
-JOIN teacher_profiles teacher ON teacher.id = request.teacher_profile_id
+JOIN teacher_profiles teacher ON teacher.id = request.teacher_id
 WHERE request.ekyc_provider IS NOT NULL
   AND request.provider_transaction_id IS NOT NULL
   AND BTRIM(request.provider_transaction_id) <> ''
