@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { applySequentialLocks } from './CourseLearningPage';
-import { normalizeWatchedSecondsAtVideoEnd } from '../utils/videoProgress';
+import {
+  formatVideoTime,
+  normalizeWatchedSecondsAtVideoEnd,
+  normalizeVideoProgressPayload,
+  resolveVideoResumePosition,
+} from '../utils/videoProgress';
 import type { LearningLessonBlock, LearningModule } from '../types';
 
 function lesson(id: string, status: LearningLessonBlock['progressStatus']): LearningLessonBlock {
@@ -62,5 +67,32 @@ describe('CourseLearningPage video completion guards', () => {
 
   it('keeps the watched value when media duration is unavailable', () => {
     expect(normalizeWatchedSecondsAtVideoEnd(120, Number.NaN)).toBe(120);
+  });
+});
+
+describe('CourseLearningPage video resume helpers', () => {
+  it('formats video time for short and long lessons', () => {
+    expect(formatVideoTime(65)).toBe('1:05');
+    expect(formatVideoTime(3661)).toBe('1:01:01');
+  });
+
+  it('prefers the newest local checkpoint when the server save is older', () => {
+    expect(resolveVideoResumePosition(30, {
+      positionSeconds: 42,
+      watchedSeconds: 42,
+      savedAt: Date.now(),
+    })).toBe(42);
+  });
+
+  it('keeps the resume point inside the media duration', () => {
+    expect(resolveVideoResumePosition(120, null, 100)).toBe(99);
+  });
+
+  it('caps replayed watch time and end-position rounding to the media duration', () => {
+    expect(normalizeVideoProgressPayload(136, 142, 135.8)).toEqual({
+      positionSeconds: 135,
+      watchedSeconds: 135,
+      mediaDurationSeconds: 135,
+    });
   });
 });
