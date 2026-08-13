@@ -132,8 +132,6 @@ export const CourseDetailPage = () => {
             <div className="mb-12">
               <CurriculumAccordion
                 modules={course.modules}
-                courseId={course.id}
-                showAiChatAction={course.isEnrolled && course.aiSupported}
               />
             </div>
 

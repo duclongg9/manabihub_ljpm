@@ -35,11 +35,13 @@ import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import AssignmentTurnedInOutlinedIcon from '@mui/icons-material/AssignmentTurnedInOutlined';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { isAxiosError } from 'axios';
 import ReactPlayer from 'react-player';
 import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
+import { aiChatService } from '../../ai-chat/services/aiChatService';
 import { learningService } from '../services/learningService';
 import type {
   CourseLearning,
@@ -131,9 +133,32 @@ export function CourseLearningPage() {
   const [completing, setCompleting] = useState(false);
   const [selectedContentLoading, setSelectedContentLoading] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [aiChatAvailable, setAiChatAvailable] = useState<boolean | null>(null);
 
   const session = getAuthSession('public');
   const canReport = session ? hasAnyRole(session, [ROLES.STUDENT, ROLES.TEACHER]) : false;
+
+  useEffect(() => {
+    if (!courseId || !selectedBlockId) {
+      setAiChatAvailable(false);
+      return;
+    }
+
+    let active = true;
+    setAiChatAvailable(null);
+    void aiChatService
+      .getEligibility(courseId, selectedBlockId)
+      .then((eligibility) => {
+        if (active) setAiChatAvailable(eligibility.eligible);
+      })
+      .catch(() => {
+        if (active) setAiChatAvailable(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [courseId, selectedBlockId]);
 
   useEffect(() => {
     if (!courseId) return;
@@ -512,6 +537,19 @@ export function CourseLearningPage() {
                       >
                         <ReportProblemOutlinedIcon fontSize="small" />
                       </IconButton>
+                    </Tooltip>
+                  )}
+                  {aiChatAvailable && (
+                    <Tooltip title="Hỏi AI về bài học đang chọn">
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<SmartToyOutlinedIcon fontSize="small" />}
+                        aria-label="Hỏi AI về bài học đang chọn"
+                        onClick={() => navigate(ROUTES.STUDENT.AI_CHAT(learning.courseId, selectedBlock.id))}
+                      >
+                        Hỏi AI
+                      </Button>
                     </Tooltip>
                   )}
                   {selectedBlock.progressStatus === 'COMPLETED' && (
