@@ -553,19 +553,25 @@ describe('VNPT identity SDK bridge', () => {
     expect(onResult).not.toHaveBeenCalled();
   });
 
-  it('surfaces VNPT 401 at the fetch boundary without consuming the response', async () => {
+  it('leaves an intermediate VNPT 401 for the vendor SDK without ending the host launch', async () => {
     const response = new Response('provider unauthorized', { status: 401 });
     const originalFetch = vi.fn().mockResolvedValue(response);
     window.fetch = originalFetch as typeof window.fetch;
+    const onResult = vi.fn();
     const onError = vi.fn();
-    await launchVnptIdentitySdk(vi.fn(), { onError });
+    await launchVnptIdentitySdk(onResult, { onError });
+    const config = launch.mock.calls[0][0] as SdkConfig;
 
-    const guardedResponse = await window.fetch('https://api.idg.vnpt.vn/file-service/v1/addFile');
+    const vendorResponse = await window.fetch('https://api.idg.vnpt.vn/file-service/v1/addFile');
 
-    expect(await guardedResponse.text()).toBe('provider unauthorized');
-    expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError.mock.calls[0][0].message).toMatch(/hết hạn hoặc không được chấp nhận/);
+    expect(await vendorResponse.text()).toBe('provider unauthorized');
+    expect(onError).not.toHaveBeenCalled();
+    expect(window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__).toBeDefined();
     expect(window.fetch).toBe(originalFetch);
+
+    await callback(config, 'CALL_BACK_END_FLOW', successfulVendorFaceResult());
+    await vi.waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it('does not intercept authentication failures from another backend', async () => {
@@ -581,37 +587,54 @@ describe('VNPT identity SDK bridge', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it('surfaces a VNPT network failure as transport rather than token expiry', async () => {
+  it('leaves an intermediate VNPT network failure for the vendor SDK to handle', async () => {
     const networkError = new TypeError('Failed to fetch');
     window.fetch = vi.fn().mockRejectedValue(networkError) as typeof window.fetch;
     const onError = vi.fn();
     await launchVnptIdentitySdk(vi.fn(), { onError });
 
     await expect(window.fetch('https://api.idg.vnpt.vn/file-service/v1/addFile')).rejects.toBe(networkError);
-    expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError.mock.calls[0][0].message).toMatch(/Không thể kết nối dịch vụ VNPT/);
-    expect(onError.mock.calls[0][0].message).not.toMatch(/hết hạn/);
+    expect(onError).not.toHaveBeenCalled();
+    expect(window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__).toBeDefined();
   });
 
-  it('ignores an old provider fetch that settles after the launch is cleaned up', async () => {
-    let resolveFetch: ((response: Response) => void) | undefined;
-    const originalFetch = vi.fn(() => new Promise<Response>((resolve) => { resolveFetch = resolve; }));
-    window.fetch = originalFetch as typeof window.fetch;
-    const firstError = vi.fn();
-    const firstResult = vi.fn();
-    await launchVnptIdentitySdk(firstResult, { onError: firstError });
-    const firstConfig = launch.mock.calls[0][0] as SdkConfig;
+  it('deduplicates concurrent script loads and removes a failed script so it can be retried', async () => {
+    delete window.SDK;
+    vi.stubEnv('VITE_VNPT_EKYC_SDK_SCRIPT_URLS', '/retryable-vnpt-sdk.js');
 
-    const pending = window.fetch('https://api.idg.vnpt.vn/file-service/v1/addFile');
-    await callback(firstConfig, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({ status: 'SUCCESS' }));
-    await vi.waitFor(() => expect(firstResult).toHaveBeenCalledTimes(1));
+    const firstLaunch = launchVnptIdentitySdk(vi.fn());
+    const secondLaunch = launchVnptIdentitySdk(vi.fn());
+    const firstFailure = expect(firstLaunch).rejects.toThrow(/retryable-vnpt-sdk\.js/);
+    const secondFailure = expect(secondLaunch).rejects.toThrow(/retryable-vnpt-sdk\.js/);
+    const firstScript = await vi.waitFor(() => {
+      const scripts = document.querySelectorAll<HTMLScriptElement>(
+        'script[data-vnpt-sdk="/retryable-vnpt-sdk.js"]',
+      );
+      expect(scripts).toHaveLength(1);
+      return scripts[0];
+    });
 
-    resolveFetch?.(new Response('', { status: 401 }));
-    await pending;
-    expect(firstError).not.toHaveBeenCalled();
+    firstScript.dispatchEvent(new Event('error'));
+    await Promise.all([firstFailure, secondFailure]);
+    expect(firstScript.isConnected).toBe(false);
+
+    const retryLaunch = launchVnptIdentitySdk(vi.fn());
+    const retryFailure = expect(retryLaunch).rejects.toThrow(/retryable-vnpt-sdk\.js/);
+    const retryScript = await vi.waitFor(() => {
+      const candidate = document.querySelector<HTMLScriptElement>(
+        'script[data-vnpt-sdk="/retryable-vnpt-sdk.js"]',
+      );
+      expect(candidate).not.toBeNull();
+      return candidate as HTMLScriptElement;
+    });
+
+    expect(retryScript).not.toBe(firstScript);
+    retryScript.dispatchEvent(new Event('error'));
+    await retryFailure;
+    expect(retryScript.isConnected).toBe(false);
   });
 
-  it('does not launch after cancellation while a vendor script is still loading', async () => {
+  it('cancels a pending launch while preserving the successfully loaded runtime for relaunch', async () => {
     delete window.SDK;
     vi.stubEnv('VITE_VNPT_EKYC_SDK_SCRIPT_URLS', '/slow-vnpt-sdk.js');
 
@@ -624,10 +647,22 @@ describe('VNPT identity SDK bridge', () => {
 
     resetVnptIdentitySdkRuntime();
     window.SDK = { launch };
-    script.onload?.(new Event('load'));
+    script.dispatchEvent(new Event('load'));
     await launchPromise;
 
     expect(launch).not.toHaveBeenCalled();
+    expect(script.dataset.loaded).toBe('true');
+    expect(script.isConnected).toBe(true);
+
+    resetVnptIdentitySdkRuntime();
+    expect(window.SDK?.launch).toBe(launch);
+    expect(script.isConnected).toBe(true);
+
+    await launchVnptIdentitySdk(vi.fn());
+    expect(launch).toHaveBeenCalledTimes(1);
+    expect(document.querySelectorAll('script[data-vnpt-sdk="/slow-vnpt-sdk.js"]')).toHaveLength(1);
+
+    script.remove();
   });
 
   it('keeps the launch active when END_FLOW arrives before face liveness and compare complete', async () => {
