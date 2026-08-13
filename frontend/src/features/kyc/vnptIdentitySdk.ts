@@ -147,12 +147,6 @@ export async function launchVnptIdentitySdk(
     throw new Error('Phiên xác thực VNPT đã hết hạn hoặc cấu hình chưa hợp lệ. Vui lòng cập nhật thông tin xác thực và thử lại.');
   }
 
-  if (!env.challengeCode) {
-    throw new Error(
-      'Thiếu VITE_VNPT_EKYC_CHALLENGE_CODE. Challenge code là bắt buộc khi VNPT eKYC được bật.',
-    );
-  }
-
   await loadVnptScripts(env.scriptUrls);
 
   if (launchGeneration !== vnptLaunchGeneration) {
@@ -281,8 +275,12 @@ export async function launchVnptIdentitySdk(
     TOKEN_KEY: env.tokenKey,
     TOKEN_ID: env.tokenId,
     ACCESS_TOKEN: env.accessToken,
-    // The bundled SDK appends this value directly to a query string.
-    CHALLENGE_CODE: encodeURIComponent(env.challengeCode),
+    // SDK 3.2.1 defaults CHALLENGE_CODE to "00000". Omit the property when
+    // VNPT has not issued an application-specific code so that default survives
+    // the SDK's Object.assign(defaults, suppliedConfig) merge.
+    ...(env.challengeCode
+      ? { CHALLENGE_CODE: encodeURIComponent(env.challengeCode) }
+      : {}),
     CALL_BACK: handleCallbackResult,
     CALL_BACK_END_FLOW: handleEndFlowResult,
     CALL_BACK_DOCUMENT_RESULT: handleDocumentResult,

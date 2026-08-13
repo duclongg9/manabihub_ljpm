@@ -7,6 +7,9 @@ const REQUIRED_WHEN_ENABLED = [
   'VITE_VNPT_EKYC_TOKEN_ID',
   'VITE_VNPT_EKYC_TOKEN_KEY',
   'VITE_VNPT_EKYC_ACCESS_TOKEN',
+];
+
+const OPTIONAL_WHEN_ENABLED = [
   'VITE_VNPT_EKYC_CHALLENGE_CODE',
 ];
 
@@ -80,6 +83,13 @@ function validateVnptEnv(env, requireEnabled) {
     if (!value) {
       errors.push(`${name} is required when VITE_VNPT_EKYC_ENABLED=true.`);
     } else if (PLACEHOLDER_VALUE.test(value) || /[\r\n]/.test(value)) {
+      errors.push(`${name} still contains a placeholder or invalid control characters.`);
+    }
+  }
+
+  for (const name of OPTIONAL_WHEN_ENABLED) {
+    const value = valueOf(env, name);
+    if (value && (PLACEHOLDER_VALUE.test(value) || /[\r\n]/.test(value))) {
       errors.push(`${name} still contains a placeholder or invalid control characters.`);
     }
   }

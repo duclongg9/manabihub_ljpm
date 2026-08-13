@@ -2,10 +2,10 @@
 
 ## Summary
 
-When `VITE_VNPT_EKYC_ENABLED=true`, the frontend build requires the complete
-VNPT Web SDK configuration below. `npm run build` now fails before TypeScript or
-Vite runs if a required value is missing, still contains a placeholder, or uses
-an unsafe provider/script URL.
+When `VITE_VNPT_EKYC_ENABLED=true`, the frontend build validates the VNPT Web
+SDK configuration below. `npm run build` fails before TypeScript or Vite runs
+if a required value is missing, a supplied value still contains a placeholder,
+or an unsafe provider/script URL is used.
 
 ## Security boundary: every `VITE_*` value is public
 
@@ -17,10 +17,10 @@ secret in the deployed application**.
 Only use credentials that VNPT explicitly issues for Web SDK/browser use and
 permits to be exposed to end users. Never put a server API key, client secret,
 or unrestricted provider credential under a `VITE_*` name. Before release,
-VNPT must confirm that the token ID, token key, access token, and challenge code
-are browser-scoped and restricted to the exact deployed origin. If any value is
-confidential, the integration must obtain a short-lived session/token from a
-server-side adapter instead of embedding it in the frontend.
+VNPT must confirm that the token ID, token key, access token, and any supplied
+challenge code are browser-scoped and restricted to the exact deployed origin.
+If any value is confidential, the integration must obtain a short-lived
+session/token from a server-side adapter instead of embedding it in the frontend.
 
 ## Required Amplify branch variables
 
@@ -32,22 +32,24 @@ server-side adapter instead of embedding it in the frontend.
 | `VITE_VNPT_EKYC_TOKEN_ID` | Required VNPT-approved public browser token identifier. |
 | `VITE_VNPT_EKYC_TOKEN_KEY` | Required by the current browser integration. Do not enable it until VNPT confirms this value is safe for public exposure. |
 | `VITE_VNPT_EKYC_ACCESS_TOKEN` | Required by the current browser integration and must be browser-scoped. A build-time token needs an expiry and rotation plan. |
-| `VITE_VNPT_EKYC_CHALLENGE_CODE` | Required browser-visible liveness challenge issued for the same VNPT application/environment. |
+| `VITE_VNPT_EKYC_CHALLENGE_CODE` | Optional browser-visible challenge. Leave blank when VNPT has not issued one; bundled Web SDK 3.2.1 then retains its `00000` default. |
 
 Do not mix production and sandbox endpoints or credentials. Changes to any
 `VITE_*` value require a new Amplify build because the values are compiled into
 the artifact.
 
-Enter the provider-issued challenge code as its raw value. The bridge URL-encodes
+If VNPT later issues a challenge code, enter its raw value. The bridge URL-encodes
 it exactly once before handing it to the bundled SDK, which concatenates the
-value into VNPT API query strings; do not pre-encode it in Amplify.
+value into VNPT API query strings; do not pre-encode it in Amplify. When the
+variable is blank or absent, the bridge omits `CHALLENGE_CODE` so the SDK's
+`00000` default is not overwritten.
 
 ## Provisioning
 
 ### AWS Amplify
 
 1. Open Amplify Console → App → the exact deployment branch → Environment variables.
-2. Configure the complete matrix above, not only the challenge code.
+2. Configure all required values above; add the optional challenge only if VNPT issued one.
 3. Confirm the VNPT portal allowlists the final HTTPS origin/custom domain.
 4. Trigger a clean rebuild and retain the build log as release evidence.
 5. Use `npm run build:vnpt-release`; unlike the generic CI build, it fails if
@@ -139,4 +141,4 @@ substitute.
 | `deploy/.env.production.example` | Separates backend runtime from Amplify build configuration and labels demo/UAT mode. |
 | `frontend/scripts/validate-vnpt-env.mjs` | Build-time required-value, exact-origin, same-origin-script, and release-enabled validation. |
 | `frontend/package.json` | Runs validation before normal builds and exposes a fail-closed VNPT release build. |
-| `frontend/src/features/kyc/vnptIdentitySdk.ts` | Runtime challenge-code and credential validation. |
+| `frontend/src/features/kyc/vnptIdentitySdk.ts` | Runtime credential validation and optional challenge-code override. |
