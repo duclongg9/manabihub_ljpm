@@ -2,9 +2,11 @@ package com.manabihub.payout.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.identity.entity.AccountIdentityVerification;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.identity.service.AccountIdentityVerificationService;
 import com.manabihub.payout.dto.request.BankAccountDto;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
 import com.manabihub.payout.dto.response.WithdrawalRequestResponse;
@@ -60,6 +62,7 @@ class StudentWithdrawalServiceImplTest {
     @Mock private CommercialPolicyService commercialPolicyService;
     @Mock private WithdrawalNotificationService notificationService;
     @Mock private StudentBankOwnershipVerificationService ownershipVerificationService;
+    @Mock private AccountIdentityVerificationService accountIdentityVerificationService;
 
     @InjectMocks private StudentWithdrawalServiceImpl service;
 
@@ -179,6 +182,45 @@ class StudentWithdrawalServiceImplTest {
         verify(walletRepository, never()).findByOwnerTypeAndStudent_IdForUpdate(any(), any());
         verify(otpService, never()).consumeOtp(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createWithdrawal_acceptsIdentityVerifiedThroughTeacherEntryPoint() {
+        student.setIdentityVerifiedAt(null);
+        ReflectionTestUtils.setField(service, "identityVerificationMode", "direct-sdk");
+        AccountIdentityVerification sharedVerification = new AccountIdentityVerification();
+        sharedVerification.setUserId(userId);
+        sharedVerification.setProvider("VNPT_EKYC_WEB_SDK");
+        when(accountIdentityVerificationService.findVerified(userId))
+                .thenReturn(Optional.of(sharedVerification));
+
+        CreateWithdrawalRequest request = request(new BigDecimal("200000.00"));
+        UUID withdrawalId = UUID.randomUUID();
+        stubOwnerAndWallet();
+        when(withdrawalRequestRepository.countByStudentIdAndStatus(
+                student.getId(), WithdrawalStatus.PENDING)).thenReturn(0L);
+        when(withdrawalRequestRepository.countByStudentIdAndCreatedAtAfter(
+                eq(student.getId()), any(LocalDateTime.class))).thenReturn(0L);
+        when(securityService.encryptAccountNumber("0123456789"))
+                .thenReturn("enc:student-account");
+        when(withdrawalRequestRepository.saveAndFlush(any()))
+                .thenAnswer(invocation -> {
+                    WithdrawalRequest saved = invocation.getArgument(0);
+                    saved.setId(withdrawalId);
+                    return saved;
+                });
+        when(withdrawalMapper.toResponse(any())).thenReturn(
+                WithdrawalRequestResponse.builder()
+                        .id(withdrawalId.toString())
+                        .status(WithdrawalStatus.PENDING)
+                        .build());
+
+        WithdrawalRequestResponse response = service.createWithdrawal(userId, request);
+
+        assertEquals(WithdrawalStatus.PENDING, response.getStatus());
+        verify(otpService).consumeOtp(userId.toString(), "123456");
+        verify(studentWalletService).reserveForWithdrawal(
+                student.getId(), withdrawalId, request.getAmount());
     }
 
     @Test

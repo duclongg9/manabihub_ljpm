@@ -2,6 +2,8 @@ package com.manabihub.kyc.service;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.identity.service.AccountIdentityVerificationService;
+import com.manabihub.identity.entity.AccountIdentityVerification;
 import com.manabihub.kyc.domain.AppUser;
 import com.manabihub.kyc.domain.CertificateVerificationStatus;
 import com.manabihub.kyc.domain.IdentityVerificationStatus;
@@ -87,6 +89,7 @@ class TeacherKycServiceTest {
     @Mock private MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
     @Mock private VnptVerificationCoordinator verificationCoordinator;
     @Mock private VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
+    @Mock private AccountIdentityVerificationService accountIdentityVerificationService;
     @TempDir
     private Path storageRoot;
     private TeacherKycService teacherKycService;
@@ -147,9 +150,38 @@ class TeacherKycServiceTest {
                 entityManager,
                 verificationCoordinator,
                 vnptIdentityTransactionClaimRepository,
+                accountIdentityVerificationService,
                 storageRoot.toString(),
                 verificationMode
         );
+    }
+
+    @Test
+    void getStatus_materializesIdentityVerifiedThroughStudentEntryPoint() {
+        AccountIdentityVerification shared = new AccountIdentityVerification();
+        shared.setUserId(user.getId());
+        shared.setIdentityFingerprint("fingerprint");
+        shared.setProvider("VNPT_EKYC_WEB_SDK_UAT");
+        shared.setFullName("Nguyen Van A");
+        shared.setDateOfBirth(java.time.LocalDate.of(1990, 1, 2));
+        shared.setVerifiedAt(Instant.parse("2026-08-14T00:00:00Z"));
+        shared.setSourceSubject("STUDENT");
+        when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
+        when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacher.getId()))
+                .thenReturn(Optional.empty());
+        when(accountIdentityVerificationService.findVerified(user.getId()))
+                .thenReturn(Optional.of(shared));
+        when(kycRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            KycRequest request = invocation.getArgument(0);
+            request.setId(UUID.randomUUID());
+            return request;
+        });
+
+        KycStatusResponse response = teacherKycService.getStatus(user.getId());
+
+        assertEquals("VERIFIED", response.identityVerification().status());
+        assertEquals("NOT_SUBMITTED", response.certificateVerification().status());
+        assertEquals("ACCOUNT_VERIFIED", response.latestRequest().verificationPayload().get("providerStatus"));
     }
     @Test
     void restartVerification_failsIfUserInactive() {
@@ -216,12 +248,20 @@ class TeacherKycServiceTest {
         mockRequest.setId(UUID.randomUUID());
         mockRequest.setIdentityStatus(IdentityVerificationStatus.VERIFIED);
         mockRequest.setEkycProvider("VNPT_EKYC_WEB_SDK");
+        mockRequest.setIdentityVerifiedAt(Instant.parse("2026-08-14T00:00:00Z"));
         when(kycRequestRepository.findById(mockRequest.getId())).thenReturn(Optional.of(mockRequest));
         when(verificationCoordinator.orchestrate(any(), any(), any(), anyString(), anyString()))
                 .thenReturn(new VnptVerificationCoordinator.VerificationOutcome(
                         mockRequest.getId(), teacher.getId(), user.getId(), IdentityVerificationStatus.VERIFIED, true
                 ));
-        Map<String, Object> sdkResult = Map.of("object", Map.of("idNumber", "123"));
+        when(teacherIdentityClaimService.normalizeCccd("012345678901"))
+                .thenReturn("012345678901");
+        when(teacherIdentityClaimService.generateFingerprint("012345678901"))
+                .thenReturn("fingerprint");
+        Map<String, Object> sdkResult = Map.of("object", Map.of(
+                "idNumber", "012345678901",
+                "fullName", "Nguyen Van A",
+                "dateOfBirth", "1990-01-02"));
         var response = teacherKycService.verifyIdentity(
                 user.getId(),
                 new KycIdentityVerificationRequest("session", "transaction", sdkResult),

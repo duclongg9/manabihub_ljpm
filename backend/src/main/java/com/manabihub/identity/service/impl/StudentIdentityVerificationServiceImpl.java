@@ -4,8 +4,10 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.dto.request.StudentIdentityVerificationRequest;
 import com.manabihub.identity.dto.response.StudentIdentityVerificationResponse;
+import com.manabihub.identity.entity.AccountIdentityVerification;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.identity.service.AccountIdentityVerificationService;
 import com.manabihub.kyc.domain.VnptIdentityTransactionClaim;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.identity.service.DatabaseAuthRateLimiter;
@@ -74,6 +76,7 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
     private final VnptVerificationPort vnptVerificationPort;
     private final VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
     private final DatabaseAuthRateLimiter vnptKycRateLimiter;
+    private final AccountIdentityVerificationService accountIdentityVerificationService;
 
     @Value("${manabihub.kyc.identity-secret:}")
     private String identitySecret;
@@ -84,7 +87,10 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
     @Override
     @Transactional(readOnly = true)
     public StudentIdentityVerificationResponse getStatus() {
-        return toResponse(requireStudent(currentUserService.getCurrentUserId()));
+        UUID userId = currentUserService.getCurrentUserId();
+        return accountIdentityVerificationService.findVerified(userId)
+                .map(this::toResponse)
+                .orElseGet(() -> toResponse(requireStudent(userId)));
     }
 
     @Override
@@ -92,6 +98,11 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
     public StudentIdentityVerificationResponse verify(StudentIdentityVerificationRequest request) {
         UUID userId = currentUserService.getCurrentUserId();
         StudentProfile student = requireStudent(userId);
+        Optional<AccountIdentityVerification> sharedVerification =
+                accountIdentityVerificationService.findVerified(userId);
+        if (sharedVerification.isPresent()) {
+            return toResponse(sharedVerification.get());
+        }
         if (student.getIdentityVerifiedAt() != null) {
             return toResponse(student);
         }
@@ -181,15 +192,25 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
                     HttpStatus.CONFLICT);
         }
 
+        Instant verifiedAt = Instant.now();
         if (!directSdkDemo) {
             bindProviderTransaction(userId, providerBinding, Instant.now());
         }
+
+        accountIdentityVerificationService.recordVerified(
+                userId,
+                identityFingerprint,
+                verifiedIdentity.provider(),
+                verifiedFullName,
+                verifiedDateOfBirth,
+                verifiedAt,
+                "STUDENT");
 
         student.setIdentityFingerprint(identityFingerprint);
         student.setIdentityProvider(verifiedIdentity.provider());
         student.setIdentityFullName(verifiedFullName);
         student.setIdentityDateOfBirth(verifiedDateOfBirth);
-        student.setIdentityVerifiedAt(Instant.now());
+        student.setIdentityVerifiedAt(verifiedAt);
         try {
             return toResponse(studentProfileRepository.save(student));
         } catch (DataIntegrityViolationException ex) {
@@ -330,6 +351,17 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
                 verified || uatEvaluated ? student.getIdentityFullName() : null,
                 verified || uatEvaluated ? student.getIdentityDateOfBirth() : null,
                 student.getIdentityVerifiedAt());
+    }
+
+    private StudentIdentityVerificationResponse toResponse(AccountIdentityVerification verification) {
+        return new StudentIdentityVerificationResponse(
+                true,
+                "VERIFIED",
+                verification.getProvider(),
+                "••••••••",
+                verification.getFullName(),
+                verification.getDateOfBirth(),
+                verification.getVerifiedAt());
     }
 
     private String normalizeId(String raw) {

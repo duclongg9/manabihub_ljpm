@@ -2,8 +2,10 @@ package com.manabihub.payout.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.identity.entity.AccountIdentityVerification;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.identity.service.AccountIdentityVerificationService;
 import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.KycRequest;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -71,6 +73,7 @@ class WithdrawalServiceImplTest {
     @Mock private WithdrawalOtpService otpService;
     @Mock private PayoutSecurityService securityService;
     @Mock private CommercialPolicyService commercialPolicyService;
+    @Mock private AccountIdentityVerificationService accountIdentityVerificationService;
 
     @InjectMocks
     private WithdrawalServiceImpl withdrawalService;
@@ -431,6 +434,32 @@ class WithdrawalServiceImplTest {
         );
 
         assertNotNull(response);
+        verify(withdrawalRepository).saveAndFlush(any(WithdrawalRequest.class));
+    }
+
+    @Test
+    @Order(13)
+    @DisplayName("UTCID13 (N) - student entry-point identity unlocks teacher withdrawal")
+    void createWithdrawalRequest_AcceptsIdentityVerifiedThroughStudentEntryPoint() {
+        KycRequest pendingKyc = new KycRequest();
+        pendingKyc.setIdentityStatus(IdentityVerificationStatus.PROCESSING);
+        when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(
+                teacherProfileId)).thenReturn(Optional.of(pendingKyc));
+        AccountIdentityVerification sharedVerification = new AccountIdentityVerification();
+        sharedVerification.setUserId(userId);
+        sharedVerification.setProvider("VNPT_EKYC_WEB_SDK");
+        when(accountIdentityVerificationService.findVerified(userId))
+                .thenReturn(Optional.of(sharedVerification));
+
+        UUID withdrawalId = UUID.randomUUID();
+        stubAcceptedRequest(withdrawalId);
+
+        WithdrawalRequestResponse response = withdrawalService.createWithdrawalRequest(
+                userIdString,
+                newRequest());
+
+        assertNotNull(response);
+        verify(otpService).consumeOtp(userIdString, "123456");
         verify(withdrawalRepository).saveAndFlush(any(WithdrawalRequest.class));
     }
     }

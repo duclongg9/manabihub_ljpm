@@ -90,7 +90,7 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("075");
+        assertThat(current).isEqualTo("076");
 
         MigrationInfo immutablePhoneMigration = Arrays.stream(flyway.info().all())
                 .filter(info -> info.getVersion() != null
@@ -504,6 +504,12 @@ public class FlywayMigrationIntegrationTest {
                         + "WHERE table_name = 'course_edit_drafts' AND table_schema = 'public'",
                 Integer.class);
         assertThat(courseEditDraftTable).as("course_edit_drafts exists").isEqualTo(1);
+
+        Integer accountIdentityTable = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.tables "
+                        + "WHERE table_name = 'account_identity_verifications' AND table_schema = 'public'",
+                Integer.class);
+        assertThat(accountIdentityTable).as("account identity verification ledger exists").isEqualTo(1);
 
         // uq_wallet_transactions_idempotency_key constraint
         Integer uqWti = jdbcTemplate.queryForObject(

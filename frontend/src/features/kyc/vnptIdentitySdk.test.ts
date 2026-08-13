@@ -675,7 +675,7 @@ describe('VNPT identity SDK bridge', () => {
     expect(window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__).toBeUndefined();
   });
 
-  it('dismisses only the known VNPT face tutorial action and not unrelated videos or buttons', async () => {
+  it('dismisses the known VNPT face tutorial without relying on Ant modal classes', async () => {
     const unrelatedClick = vi.fn();
     const guideClick = vi.fn();
     await launchVnptIdentitySdk(vi.fn());
@@ -686,7 +686,6 @@ describe('VNPT identity SDK bridge', () => {
     document.body.append(unrelatedVideo, unrelatedButton);
 
     const vendorDialog = document.createElement('div');
-    vendorDialog.setAttribute('role', 'dialog');
     const tutorialVideo = document.createElement('video');
     const tutorialSource = document.createElement('source');
     tutorialSource.type = 'video/mp4';
@@ -694,15 +693,45 @@ describe('VNPT identity SDK bridge', () => {
     tutorialVideo.append(tutorialSource);
     const guideAction = document.createElement('div');
     guideAction.className = 'vnpt-cursor-pointer vnpt-bg-primary';
-    guideAction.addEventListener('click', guideClick);
+    guideAction.addEventListener('click', () => {
+      guideClick();
+      vendorDialog.remove();
+    });
     vendorDialog.append(tutorialVideo, guideAction);
     document.body.append(vendorDialog);
 
     await vi.waitFor(() => expect(guideClick).toHaveBeenCalledTimes(1));
     expect(unrelatedClick).not.toHaveBeenCalled();
-    vendorDialog.remove();
+    expect(window.__MANABIHUB_VNPT_DIAGNOSTICS__).toMatchObject({
+      release: 'face-guide-v2',
+      faceGuideClickAttempts: 1,
+    });
     unrelatedVideo.remove();
     unrelatedButton.remove();
+  });
+
+  it('retries the known tutorial action until the vendor modal actually closes', async () => {
+    const guideClick = vi.fn();
+    await launchVnptIdentitySdk(vi.fn());
+
+    const vendorWrapper = document.createElement('section');
+    const tutorialVideo = document.createElement('video');
+    const tutorialSource = document.createElement('source');
+    tutorialSource.src = '/lib/vietnamese-tutorial.mp4';
+    tutorialVideo.append(tutorialSource);
+    const guideAction = document.createElement('div');
+    guideAction.className = 'vnpt-cursor-pointer vnpt-bg-primary';
+    guideAction.addEventListener('click', () => {
+      guideClick();
+      if (guideClick.mock.calls.length === 2) vendorWrapper.remove();
+    });
+    vendorWrapper.append(tutorialVideo, guideAction);
+    document.body.append(vendorWrapper);
+
+    await vi.waitFor(() => expect(guideClick).toHaveBeenCalledTimes(2));
+    expect(window.__MANABIHUB_VNPT_DIAGNOSTICS__).toMatchObject({
+      faceGuideClickAttempts: 2,
+    });
   });
 });
 
