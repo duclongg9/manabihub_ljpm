@@ -43,6 +43,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import com.manabihub.audit.service.AuditLogService;
+import com.manabihub.ai.service.AiCourseEligibilityService;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.notification.NotificationTypes;
 import com.manabihub.review.dto.response.CourseReviewAggregateResponse;
@@ -87,6 +88,7 @@ public class CourseServiceImpl implements CourseService {
     private final EnrollmentRepository enrollmentRepository;
     private final EscrowLedgerRepository escrowLedgerRepository;
     private final CourseEditDraftService courseEditDraftService;
+    private final AiCourseEligibilityService aiCourseEligibilityService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -107,13 +109,13 @@ public class CourseServiceImpl implements CourseService {
                 .thumbnailUrl(blankToNull(request.thumbnailUrl()))
                 .outcomes(trim(request.outcomes()))
                 .price(request.price())
+                .aiSupported(aiCourseEligibilityService.isPriceEligible(request.price()))
                 .currency("VND")
                 .prerequisites(trim(request.prerequisites()))
                 .targetStudents(trim(request.targetStudents()))
                 .accessDurationDays(normalizeAccessDuration(request.accessDurationDays()))
                 .accessExpiresAt(request.accessExpiresAt())
                 .status(CourseStatus.DRAFT)
-                .aiSupported(false)
                 .build();
 
         for (int index = 0; index < learningGoals.size(); index++) {
@@ -264,6 +266,7 @@ public class CourseServiceImpl implements CourseService {
         course.setThumbnailUrl(blankToNull(request.thumbnailUrl()));
         course.setOutcomes(trim(request.outcomes()));
         course.setPrice(request.price());
+        course.setAiSupported(aiCourseEligibilityService.isPriceEligible(request.price()));
         course.setCurrency("VND");
         course.setPrerequisites(trim(request.prerequisites()));
         course.setTargetStudents(trim(request.targetStudents()));
