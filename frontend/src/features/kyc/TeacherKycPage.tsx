@@ -136,6 +136,7 @@ function TeacherKycPageContent() {
   const [restartEnvelope, setRestartEnvelope] = useState<ApiEnvelope<KycRestartVerificationResponse> | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [identityLaunching, setIdentityLaunching] = useState(false);
+  const [identitySubmitting, setIdentitySubmitting] = useState(false);
   const [certificateSubmitting, setCertificateSubmitting] = useState(false);
   const [restartSubmitting, setRestartSubmitting] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -230,6 +231,7 @@ function TeacherKycPageContent() {
   function finishIdentityLaunch() {
     identityLaunchTokenRef.current += 1;
     setIdentityLaunching(false);
+    setIdentitySubmitting(false);
     clearVnptSdkContainer();
     resetVnptIdentitySdkRuntime();
   }
@@ -245,6 +247,9 @@ function TeacherKycPageContent() {
   }
 
   function handleCloseIdentityDialog() {
+    if (identitySubmitting) {
+      return;
+    }
     finishIdentityLaunch();
   }
 
@@ -262,6 +267,7 @@ function TeacherKycPageContent() {
     clearVnptSdkContainer();
     resetVnptIdentitySdkRuntime();
     setIdentityLaunching(true);
+    setIdentitySubmitting(false);
 
     window.setTimeout(async () => {
       try {
@@ -277,6 +283,7 @@ function TeacherKycPageContent() {
               return;
             }
 
+            setIdentitySubmitting(true);
             const response = await verifyTeacherIdentity(result);
             if (identityLaunchTokenRef.current !== launchToken) {
               return;
@@ -842,7 +849,7 @@ function TeacherKycPageContent() {
         maxWidth="md" 
         fullWidth 
         onClose={(_, reason) => {
-          if (reason !== 'backdropClick') {
+          if (!identitySubmitting && reason !== 'backdropClick') {
             handleCloseIdentityDialog();
           }
         }}
@@ -862,6 +869,7 @@ function TeacherKycPageContent() {
         <IconButton
           aria-label="Đóng xác minh VNPT"
           onClick={handleCloseIdentityDialog}
+          disabled={identitySubmitting}
           sx={{
             position: 'absolute',
             top: { xs: 10, sm: -18 },
@@ -878,7 +886,27 @@ function TeacherKycPageContent() {
         >
           <X size={20} />
         </IconButton>
-        <DialogContent sx={{ borderRadius: 'inherit', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 0 }}>
+        <DialogContent sx={{ borderRadius: 'inherit', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 0, position: 'relative' }}>
+          {identitySubmitting && (
+            <Stack
+              role="status"
+              spacing={1.5}
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 9998,
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'rgba(15, 23, 42, 0.92)',
+                color: 'white',
+              }}
+            >
+              <CircularProgress color="inherit" />
+              <Typography sx={{ fontWeight: 700 }}>
+                Đang ghi nhận kết quả xác minh. Không đóng cửa sổ này.
+              </Typography>
+            </Stack>
+          )}
           <Box
             key={`vnpt-sdk-${identityLaunchKey}`}
             id="ekyc_sdk_intergrated"

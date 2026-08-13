@@ -86,7 +86,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 .orElse(null);
         boolean identityVerified = latestKyc != null
                 && latestKyc.getIdentityStatus() == IdentityVerificationStatus.VERIFIED
-                && (isDirectSdkDemo() || latestKyc.getServerVerifiedAt() != null);
+                && (isDirectSdkPayoutMode() || latestKyc.getServerVerifiedAt() != null);
         if (!identityVerified) {
             throw new BusinessException(
                     MessageCodes.MSG_KYC_002,
@@ -308,9 +308,10 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         return resolveTeacherProfile(UUID.fromString(userId)).getId();
     }
 
-    private boolean isDirectSdkDemo() {
+    private boolean isDirectSdkPayoutMode() {
         return !org.springframework.util.StringUtils.hasText(identityVerificationMode)
-                || "direct-sdk-mock".equalsIgnoreCase(identityVerificationMode);
+                || "direct-sdk-mock".equalsIgnoreCase(identityVerificationMode)
+                || "direct-sdk".equalsIgnoreCase(identityVerificationMode);
     }
 
     private TeacherProfile resolveTeacherProfile(UUID userId) {

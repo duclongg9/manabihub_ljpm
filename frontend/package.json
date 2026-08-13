@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run validate:vnpt-env && tsc -b && vite build",
+    "build:vnpt-release": "npm run validate:vnpt-release && tsc -b && vite build",
+    "validate:vnpt-env": "node scripts/validate-vnpt-env.mjs --mode production",
+    "validate:vnpt-release": "node scripts/validate-vnpt-env.mjs --mode production --require-enabled",
     "lint": "oxlint",
     "test": "vitest run",
     "audit:ci": "node scripts/check-audit.mjs",

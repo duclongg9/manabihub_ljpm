@@ -14,6 +14,7 @@ import com.manabihub.kyc.port.VnptVerificationPort;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.kyc.repository.VnptIdentityTransactionClaimRepository;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.notification.repository.NotificationRepository;
@@ -66,6 +67,7 @@ class VnptServerVerificationTest {
     @Mock private com.manabihub.audit.service.SecurityAuditService securityAuditService;
     @Mock private MockNationalIdRegistryRepository mockNationalIdRegistryRepository;
     @Mock private EntityManager entityManager;
+    @Mock private VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
 
     private VnptVerificationCoordinator coordinator;
     private TeacherKycService service;
@@ -84,6 +86,7 @@ class VnptServerVerificationTest {
                 vnptVerificationPort,
                 teacherIdentityClaimService,
                 securityAuditService,
+                vnptIdentityTransactionClaimRepository,
                 java.time.Clock.systemUTC(),
                 coordProvider
         );
@@ -104,6 +107,7 @@ class VnptServerVerificationTest {
                 mockNationalIdRegistryRepository,
                 entityManager,
                 coordinator,
+                vnptIdentityTransactionClaimRepository,
                 "storage/kyc",
                 "server"
         );

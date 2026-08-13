@@ -14,6 +14,7 @@ import com.manabihub.kyc.domain.KycRequestStatus;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.domain.UserStatus;
+import com.manabihub.kyc.domain.VnptIdentityTransactionClaim;
 import com.manabihub.kyc.dto.KycCertificateSubmissionResponse;
 import com.manabihub.kyc.dto.KycDocumentResponse;
 import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
@@ -28,6 +29,7 @@ import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.kyc.repository.VnptIdentityTransactionClaimRepository;
 import com.manabihub.mock.domain.MockNationalIdRegistryRecord;
 import com.manabihub.mock.repository.MockNationalIdRegistryRepository;
 import com.manabihub.notification.entity.Notification;
@@ -78,6 +80,8 @@ public class TeacherKycService {
     private static final int MAX_OCR_TEXT_LENGTH = 20_000;
     private static final Set<String> CERTIFICATE_MIME_TYPES = Set.of("image/jpeg", "image/png");
     private static final String VNPT_PROVIDER = "VNPT_EKYC_WEB_SDK";
+    private static final String VNPT_SESSION_REPLAY_PREFIX = "SESSION:";
+    private static final int MAX_VNPT_PROVIDER_ID_LENGTH = 128;
     private static final UUID TEACHER_ROLE_ID = UUID.fromString("a0000000-0000-0000-0000-000000000002");
     private static final String REVIEW_ETA =
             "1-2 business days, excluding Saturdays, Sundays, and public holidays";
@@ -99,6 +103,7 @@ public class TeacherKycService {
     private final EntityManager entityManager;
     private final Path storageRoot;
     private final VnptVerificationCoordinator verificationCoordinator;
+    private final VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
     private final String identityVerificationMode;
 
     public TeacherKycService(
@@ -116,6 +121,7 @@ public class TeacherKycService {
             MockNationalIdRegistryRepository mockNationalIdRegistryRepository,
             EntityManager entityManager,
             VnptVerificationCoordinator verificationCoordinator,
+            VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository,
             @Value("${manabihub.kyc.storage-root:storage/kyc}") String storageRoot,
             @Value("${manabihub.kyc.identity-verification-mode:direct-sdk-mock}") String identityVerificationMode
     ) {
@@ -134,6 +140,7 @@ public class TeacherKycService {
         this.entityManager = entityManager;
         this.storageRoot = Path.of(storageRoot).toAbsolutePath().normalize();
         this.verificationCoordinator = verificationCoordinator;
+        this.vnptIdentityTransactionClaimRepository = vnptIdentityTransactionClaimRepository;
         this.identityVerificationMode = identityVerificationMode;
     }
 
@@ -163,9 +170,10 @@ public class TeacherKycService {
             String ipAddress,
             String userAgent
     ) {
-        if (request == null || request.sdkResult() == null || request.sdkResult().isEmpty()) {
+        if (request == null) {
             throw new BusinessException(MessageCodes.MSG_KYC_002, "VNPT eKYC SDK result is required");
         }
+        VnptSdkPayloadPolicy.validate(request.sdkResult());
 
         if (usesDirectSdkVerification()) {
             return verifyIdentityFromSdk(
@@ -213,6 +221,11 @@ public class TeacherKycService {
         AppUser user = teacherProfile.getUser();
         String providerTransactionId = blankToNull(request.providerTransactionId());
         String providerSessionId = blankToNull(request.providerSessionId());
+        String providerReplayId = directSdkReplayId(
+                providerTransactionId,
+                providerSessionId,
+                crossCheckMockNationalId
+        );
 
         if (providerTransactionId != null) {
             KycRequest boundRequest = kycRequestRepository
@@ -299,9 +312,12 @@ public class TeacherKycService {
         Map<String, Object> verificationPayload = new LinkedHashMap<>();
         verificationPayload.put("identityProvider", VNPT_PROVIDER);
         verificationPayload.put("verificationMode", normalizedIdentityVerificationMode());
-        verificationPayload.put("providerResult", request.sdkResult());
+        // Do not persist the untrusted raw browser callback. The normalized OCR,
+        // terminal decision and failure reasons below are the durable evidence.
         verificationPayload.put("providerStatus", verified ? "SDK_VERIFIED" : "SDK_FAILED");
-        verificationPayload.put("identityOcr", identityOcr);
+        if (verified) {
+            verificationPayload.put("identityOcr", storedIdentityEvidence(identityOcr));
+        }
         verificationPayload.put("failureReasons", failureReasons);
         verificationPayload.put("messageCode", verified ? "KYC_IDENTITY_VERIFIED" : MessageCodes.MSG_KYC_002);
         verificationPayload.put("certificateManualAuthenticityReviewRequired", true);
@@ -311,9 +327,19 @@ public class TeacherKycService {
 
         KycRequest savedRequest;
         try {
+            if (providerReplayId != null) {
+                VnptIdentityTransactionClaim providerClaim = new VnptIdentityTransactionClaim();
+                providerClaim.setUserId(user.getId());
+                providerClaim.setSubjectType("TEACHER");
+                providerClaim.setProvider(VNPT_PROVIDER);
+                providerClaim.setProviderTransactionId(providerReplayId);
+                providerClaim.setProviderSessionId(providerSessionId);
+                providerClaim.setClaimedAt(now);
+                vnptIdentityTransactionClaimRepository.saveAndFlush(providerClaim);
+            }
             savedRequest = kycRequestRepository.saveAndFlush(kycRequest);
         } catch (DataIntegrityViolationException exception) {
-            if (providerTransactionId != null && isProviderTransactionConstraint(exception)) {
+            if (providerReplayId != null && isProviderTransactionConstraint(exception)) {
                 securityAuditService.logVerificationEvent(
                         "DUPLICATE_TRANSACTION",
                         teacherProfile.getId(),
@@ -333,6 +359,70 @@ public class TeacherKycService {
         }
         boolean auditLogged = createIdentityAudit(savedRequest, user, ipAddress, userAgent);
         return buildIdentityResponse(teacherProfile, savedRequest, auditLogged);
+    }
+
+    private String directSdkReplayId(
+            String providerTransactionId,
+            String providerSessionId,
+            boolean mockRegistryMode
+    ) {
+        validateProviderIdentifier(providerTransactionId, "providerTransactionId");
+        validateProviderIdentifier(providerSessionId, "providerSessionId");
+        if (!mockRegistryMode && providerSessionId == null) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_002,
+                    "VNPT providerSessionId is required in direct-sdk mode",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (providerTransactionId != null) {
+            return providerTransactionId;
+        }
+        if (providerSessionId == null) {
+            return null;
+        }
+        if (providerSessionId.length() > MAX_VNPT_PROVIDER_ID_LENGTH - VNPT_SESSION_REPLAY_PREFIX.length()) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_002,
+                    "VNPT providerSessionId exceeds the accepted replay-binding length",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        return VNPT_SESSION_REPLAY_PREFIX + providerSessionId;
+    }
+
+    private void validateProviderIdentifier(String value, String fieldName) {
+        if (value == null) {
+            return;
+        }
+        if (value.length() > MAX_VNPT_PROVIDER_ID_LENGTH
+                || value.codePoints().anyMatch(Character::isISOControl)) {
+            throw new BusinessException(
+                    MessageCodes.MSG_KYC_002,
+                    "Invalid VNPT " + fieldName,
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+    }
+
+    private Map<String, String> storedIdentityEvidence(Map<String, String> identityOcr) {
+        Map<String, String> evidence = new LinkedHashMap<>();
+        String idNumber = blankToNull(identityOcr.get("idNumber"));
+        if (idNumber != null) {
+            String digits = idNumber.replaceAll("[^0-9]", "");
+            evidence.put("idNumber", digits.length() > 4
+                    ? "*".repeat(digits.length() - 4) + digits.substring(digits.length() - 4)
+                    : "****");
+        }
+        String fullName = blankToNull(identityOcr.get("fullName"));
+        if (fullName != null) {
+            evidence.put("fullName", fullName);
+        }
+        String dateOfBirth = blankToNull(identityOcr.get("dateOfBirth"));
+        if (dateOfBirth != null) {
+            evidence.put("dateOfBirth", dateOfBirth);
+        }
+        return Map.copyOf(evidence);
     }
 
     private boolean crossCheckMockNationalId(
@@ -632,7 +722,9 @@ public class TeacherKycService {
         while (current != null) {
             String message = current.getMessage();
             if (message != null && message.toLowerCase(Locale.ROOT)
-                    .contains("uq_kyc_requests_provider_tx")) {
+                    .contains("uq_kyc_requests_provider_tx")
+                    || message != null && message.toLowerCase(Locale.ROOT)
+                    .contains("uq_vnpt_identity_claim_provider_transaction")) {
                 return true;
             }
             current = current.getCause();

@@ -39,9 +39,9 @@ manabihub:
     sms-api-key: ${PHONE_VERIFICATION_SMS_API_KEY:}
   kyc:
     identity-secret: ${KYC_IDENTITY_SECRET:}
-    # This deployment is a demo/UAT system: validate the real VNPT browser SDK
-    # callback and cross-check it with the synthetic national-ID registry.
-    # A production tenant with VNPT server credentials must explicitly select SERVER.
+    # direct-sdk-mock cross-checks synthetic fixtures. A sandbox may explicitly
+    # select direct-sdk to trust browser results and unlock sandbox withdrawals.
+    # A production tenant must select SERVER.
     identity-verification-mode: ${KYC_IDENTITY_VERIFICATION_MODE:direct-sdk-mock}
   payout:
     security-secret: ${PAYOUT_SECURITY_SECRET:}

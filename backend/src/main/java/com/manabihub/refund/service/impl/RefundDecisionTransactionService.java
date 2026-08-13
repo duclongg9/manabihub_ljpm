@@ -42,6 +42,7 @@ import com.manabihub.wallet.service.EscrowService;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.service.StudentWalletService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -54,6 +55,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RefundDecisionTransactionService {
@@ -753,15 +755,29 @@ public class RefundDecisionTransactionService {
         if (item == null) {
             return;
         }
-        AppUser student = refund.getStudent().getUser();
-        var teacher = item.getCourse().getTeacher().getUser();
+
+        RefundAfterCommitNotifier.Recipient studentRecipient = null;
+        if (refund.getStudent() != null && refund.getStudent().getUser() != null) {
+            var u = refund.getStudent().getUser();
+            studentRecipient = new RefundAfterCommitNotifier.Recipient(u.getId(), u.getEmail());
+        }
+
+        RefundAfterCommitNotifier.Recipient teacherRecipient = null;
+        if (item.getCourse() != null && item.getCourse().getTeacher() != null && item.getCourse().getTeacher().getUser() != null) {
+            var u = item.getCourse().getTeacher().getUser();
+            teacherRecipient = new RefundAfterCommitNotifier.Recipient(u.getId(), u.getEmail());
+        }
+
+        String orderCode = refund.getOrder() != null ? refund.getOrder().getOrderCode() : "N/A";
+        String courseTitle = item.getCourse() != null ? item.getCourse().getTitle() : "N/A";
+
         afterCommitNotifier.schedule(
                 refund.getId(),
                 outcome,
-                new RefundAfterCommitNotifier.Recipient(student.getId(), student.getEmail()),
-                new RefundAfterCommitNotifier.Recipient(teacher.getId(), teacher.getEmail()),
-                refund.getOrder().getOrderCode(),
-                item.getCourse().getTitle()
+                studentRecipient,
+                teacherRecipient,
+                orderCode,
+                courseTitle
         );
     }
 
