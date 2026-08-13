@@ -32,6 +32,29 @@ import java.util.stream.Collectors;
 public final class VnptSdkResultEvaluator {
 
     private static final int MAX_DEPTH = 8;
+    private static final Set<String> TERMINAL_OUTCOME_PATHS = Set.of(
+            "endflowresultstatus",
+            "endflowresultresult",
+            "endflowresultterminalstatus",
+            "endflowresultterminalresult",
+            "endflowresultflowstatus",
+            "endflowresultobjectstatus",
+            "endflowresultobjectresult",
+            "endflowresultobjectterminalstatus",
+            "endflowresultobjectterminalresult",
+            "endflowresultobjectflowstatus",
+            "endflowresultdatastatus",
+            "endflowresultdataresult",
+            "endflowresultdataterminalstatus",
+            "endflowresultdataterminalresult",
+            "endflowresultdataflowstatus",
+            "endflowresultresultstatus",
+            "endflowresultresultterminalstatus",
+            "endflowresultresultterminalresult",
+            "endflowresultresultflowstatus",
+            "terminalstatus",
+            "terminalresult"
+    );
 
     private VnptSdkResultEvaluator() {
     }
@@ -119,10 +142,12 @@ public final class VnptSdkResultEvaluator {
 
     private static boolean isTerminalOutcomePath(String path) {
         String normalizedPath = normalizeKey(path);
-        String leaf = normalizeKey(lastSegment(path));
-        return normalizedPath.contains("endflow")
-                || normalizedPath.contains("terminal")
-                || (leaf.equals("status") && !normalizedPath.contains("ocr"));
+        // CALL_BACK_END_FLOW contains the complete VNPT result object, not just
+        // a terminal status. In particular, ordinary successful results include
+        // values such as masked=no and fake_liveness=false below this envelope.
+        // Treating every descendant of endFlowResult as a terminal outcome turns
+        // those explicit safe values into a false terminal failure.
+        return TERMINAL_OUTCOME_PATHS.contains(normalizedPath);
     }
 
     private static boolean hasFailedOcrOutcome(List<ResultEntry> entries) {
