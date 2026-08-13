@@ -139,6 +139,7 @@ describe('VNPT identity SDK bridge', () => {
       },
     });
     await callback(config, 'CALL_BACK_END_FLOW', {
+      ...successfulVendorFaceResult(),
       session_id: 'session-1',
       transactionId: 'transaction-1',
       tokenKey: 'must-not-leak-either',
@@ -169,7 +170,7 @@ describe('VNPT identity SDK bridge', () => {
 
     const config = launch.mock.calls[0][0] as SdkConfig;
     await callback(config, 'CALL_BACK_DOCUMENT_RESULT', { id: '012345678901', fullName: 'Nguyen Van A' });
-    await callback(config, 'CALL_BACK_END_FLOW', { status: 'SUCCESS' });
+    await callback(config, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({ status: 'SUCCESS' }));
 
     await vi.waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
     expect(onResult.mock.calls[0][0].providerSessionId).toBeNull();
@@ -185,7 +186,10 @@ describe('VNPT identity SDK bridge', () => {
     await callback(config, 'CALL_BACK', { sessionId: 'session-1', requestId: 'transaction-1' });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(onResult).not.toHaveBeenCalled();
-    await callback(config, 'CALL_BACK_END_FLOW', { sessionId: 'session-1', requestId: 'transaction-1' });
+    await callback(config, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({
+      sessionId: 'session-1',
+      requestId: 'transaction-1',
+    }));
     await vi.waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
 
     expect(window.__MANABIHUB_LAST_VNPT_CONFIG__).toMatchObject({
@@ -380,12 +384,18 @@ describe('VNPT identity SDK bridge', () => {
     const config = launch.mock.calls[0][0] as SdkConfig;
 
     // Terminal event
-    await callback(config, 'CALL_BACK_END_FLOW', { status: 'SUCCESS', transactionId: 'tx-1' });
+    await callback(config, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({
+      status: 'SUCCESS',
+      transactionId: 'tx-1',
+    }));
 
     await vi.waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
 
     // A second END_FLOW should be ignored
-    await callback(config, 'CALL_BACK_END_FLOW', { status: 'SUCCESS', transactionId: 'tx-1' });
+    await callback(config, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({
+      status: 'SUCCESS',
+      transactionId: 'tx-1',
+    }));
     expect(onResult).toHaveBeenCalledTimes(1);
 
     // Listener should have been cleaned up — vendor crash should not trigger onError
@@ -490,6 +500,7 @@ describe('VNPT identity SDK bridge', () => {
     expect(firstResult).not.toHaveBeenCalled();
 
     await callback(secondConfig, 'CALL_BACK_END_FLOW', {
+      ...successfulVendorFaceResult(),
       sessionId: 'new-session',
       transactionId: 'new-transaction',
     });
@@ -504,7 +515,9 @@ describe('VNPT identity SDK bridge', () => {
     const config = launch.mock.calls[0][0] as SdkConfig;
 
     await callback(config, 'CALL_BACK', { sessionId: 'session-old' });
-    await callback(config, 'CALL_BACK_END_FLOW', { sessionId: 'session-terminal' });
+    await callback(config, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({
+      sessionId: 'session-terminal',
+    }));
 
     await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
     expect(onResult).not.toHaveBeenCalled();
@@ -517,7 +530,9 @@ describe('VNPT identity SDK bridge', () => {
     const config = launch.mock.calls[0][0] as SdkConfig;
 
     await callback(config, 'CALL_BACK_DOCUMENT_RESULT', { requestId: 'ocr-upload-request' });
-    await callback(config, 'CALL_BACK_END_FLOW', { transactionId: 'terminal-transaction' });
+    await callback(config, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({
+      transactionId: 'terminal-transaction',
+    }));
 
     await vi.waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
     expect(onResult.mock.calls[0][0].providerTransactionId).toBe('terminal-transaction');
@@ -530,7 +545,9 @@ describe('VNPT identity SDK bridge', () => {
     const config = launch.mock.calls[0][0] as SdkConfig;
 
     await callback(config, 'CALL_BACK_DOCUMENT_RESULT', { requestId: 'ocr-request' });
-    await callback(config, 'CALL_BACK_END_FLOW', { requestId: 'terminal-request' });
+    await callback(config, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({
+      requestId: 'terminal-request',
+    }));
 
     await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
     expect(onResult).not.toHaveBeenCalled();
@@ -586,7 +603,7 @@ describe('VNPT identity SDK bridge', () => {
     const firstConfig = launch.mock.calls[0][0] as SdkConfig;
 
     const pending = window.fetch('https://api.idg.vnpt.vn/file-service/v1/addFile');
-    await callback(firstConfig, 'CALL_BACK_END_FLOW', { status: 'SUCCESS' });
+    await callback(firstConfig, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({ status: 'SUCCESS' }));
     await vi.waitFor(() => expect(firstResult).toHaveBeenCalledTimes(1));
 
     resolveFetch?.(new Response('', { status: 401 }));
@@ -612,6 +629,81 @@ describe('VNPT identity SDK bridge', () => {
 
     expect(launch).not.toHaveBeenCalled();
   });
+
+  it('keeps the launch active when END_FLOW arrives before face liveness and compare complete', async () => {
+    const onResult = vi.fn();
+    const onError = vi.fn();
+    await launchVnptIdentitySdk(onResult, { onError });
+    const config = launch.mock.calls[0][0] as SdkConfig;
+
+    await callback(config, 'CALL_BACK_DOCUMENT_RESULT', {
+      ocr: { object: { id: '012345678901', name: 'NGUYEN VAN A', birth_day: '01/01/2000' } },
+    });
+    const prematureVendorEndFlow = {
+      client_session: 'WEB-SDK_mobile_session',
+      liveness_face: { object: { liveness: '' } },
+      compare: { object: { msg: '', prob: null } },
+      masked: { object: { masked: '' } },
+    };
+
+    await callback(config, 'CALL_BACK_END_FLOW', prematureVendorEndFlow);
+    await callback(config, 'CALL_BACK_END_FLOW', prematureVendorEndFlow);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(onResult).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__).toBeDefined();
+
+    await callback(config, 'CALL_BACK_END_FLOW', successfulVendorFaceResult({
+      client_session: 'WEB-SDK_mobile_session',
+    }));
+    await vi.waitFor(() => expect(onResult).toHaveBeenCalledTimes(1));
+    expect(window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__).toBeUndefined();
+  });
+
+  it('reports an explicit terminal cancellation once without submitting it to the backend callback', async () => {
+    const onResult = vi.fn();
+    const onError = vi.fn();
+    await launchVnptIdentitySdk(onResult, { onError });
+    const config = launch.mock.calls[0][0] as SdkConfig;
+
+    await callback(config, 'CALL_BACK_END_FLOW', { status: 'USER_CANCELLED' });
+    await callback(config, 'CALL_BACK_END_FLOW', { status: 'USER_CANCELLED' });
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    expect(onResult).not.toHaveBeenCalled();
+    expect(window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__).toBeUndefined();
+  });
+
+  it('dismisses only the known VNPT face tutorial action and not unrelated videos or buttons', async () => {
+    const unrelatedClick = vi.fn();
+    const guideClick = vi.fn();
+    await launchVnptIdentitySdk(vi.fn());
+
+    const unrelatedVideo = document.createElement('video');
+    const unrelatedButton = document.createElement('button');
+    unrelatedButton.addEventListener('click', unrelatedClick);
+    document.body.append(unrelatedVideo, unrelatedButton);
+
+    const vendorDialog = document.createElement('div');
+    vendorDialog.setAttribute('role', 'dialog');
+    const tutorialVideo = document.createElement('video');
+    const tutorialSource = document.createElement('source');
+    tutorialSource.type = 'video/mp4';
+    tutorialSource.src = '/lib/vietnamese-tutorial.mp4';
+    tutorialVideo.append(tutorialSource);
+    const guideAction = document.createElement('div');
+    guideAction.className = 'vnpt-cursor-pointer vnpt-bg-primary';
+    guideAction.addEventListener('click', guideClick);
+    vendorDialog.append(tutorialVideo, guideAction);
+    document.body.append(vendorDialog);
+
+    await vi.waitFor(() => expect(guideClick).toHaveBeenCalledTimes(1));
+    expect(unrelatedClick).not.toHaveBeenCalled();
+    vendorDialog.remove();
+    unrelatedVideo.remove();
+    unrelatedButton.remove();
+  });
 });
 
 function toBase64Url(value: unknown) {
@@ -627,4 +719,13 @@ function toBase64Url(value: unknown) {
 async function callback(config: SdkConfig, name: string, result: unknown) {
   const handler = config[name] as ((value: unknown) => Promise<void> | void);
   await handler(result);
+}
+
+function successfulVendorFaceResult(extra: Record<string, unknown> = {}) {
+  return {
+    liveness_face: { object: { liveness: 'success' } },
+    compare: { object: { msg: 'MATCH', prob: 98 } },
+    masked: { object: { masked: 'no' } },
+    ...extra,
+  };
 }

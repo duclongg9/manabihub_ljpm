@@ -27,6 +27,8 @@ const VNPT_AUTH_ERROR_MESSAGE =
   'Phiên xác thực VNPT đã hết hạn hoặc không được chấp nhận. Vui lòng cập nhật cấu hình xác thực và thử lại.';
 const VNPT_TRANSPORT_ERROR_MESSAGE =
   'Không thể kết nối dịch vụ VNPT eKYC. Vui lòng kiểm tra mạng và thử lại.';
+const VNPT_TERMINAL_FAILURE_MESSAGE =
+  'Phiên xác minh VNPT đã bị hủy, hết thời gian hoặc gặp lỗi. Vui lòng thực hiện lại từ đầu.';
 
 /** Match only the response.object.hash dereference seen in VNPT 3.2.1. */
 function isVnptHashDereference(message: string) {
@@ -164,6 +166,7 @@ export async function launchVnptIdentitySdk(
   let errorFired = false;
   let isCleanedUp = false;
   let restoreFetchGuard: (() => void) | null = null;
+  let restorePopupBypass: (() => void) | null = null;
   const configuredScriptSources = resolveConfiguredScriptSources(env.scriptUrls);
 
   const onWindowError = (event: ErrorEvent) => {
@@ -202,6 +205,8 @@ export async function launchVnptIdentitySdk(
     window.removeEventListener('unhandledrejection', onUnhandledRejection);
     restoreFetchGuard?.();
     restoreFetchGuard = null;
+    restorePopupBypass?.();
+    restorePopupBypass = null;
     if (window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__?.cleanup === cleanupLaunch) {
       delete window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__;
     }
@@ -217,6 +222,7 @@ export async function launchVnptIdentitySdk(
   window.addEventListener('error', onWindowError);
   window.addEventListener('unhandledrejection', onUnhandledRejection);
   restoreFetchGuard = installVnptFetchGuard(env.backendUrl, failLaunch);
+  restorePopupBypass = installVnptFaceGuideAutoDismiss();
   window.__MANABIHUB_VNPT_ACTIVE_LAUNCH__ = { cleanup: cleanupLaunch };
 
   const reportCallbackError = (error: unknown) => {
@@ -227,6 +233,23 @@ export async function launchVnptIdentitySdk(
     if (finalResultHandled) {
       return;
     }
+
+    // Completion must be proven by the terminal callback itself. Intermediate
+    // OCR callbacks can contain unrelated `compare` fields and must never make
+    // an otherwise empty END_FLOW look complete.
+    const terminalClassification = classifyEndFlow({ endFlowResult: terminalResult });
+    if (terminalClassification === 'incomplete') {
+      // VNPT 3.2.1 can show its result screen (and emit END_FLOW) when the
+      // face processor times out behind the tutorial modal. Empty face and
+      // compare envelopes are not a completed verification attempt.
+      return;
+    }
+    if (terminalClassification === 'terminal-failure') {
+      failLaunch(new Error(VNPT_TERMINAL_FAILURE_MESSAGE));
+      return;
+    }
+
+    const compactResult = mergeSdkResults(documentResult, callbackResult, terminalResult);
 
     const providerSessionId = resolveProviderIdentifier(
       [terminalResult, callbackResult, documentResult],
@@ -239,7 +262,6 @@ export async function launchVnptIdentitySdk(
       'mã giao dịch',
       PROVIDER_TRANSACTION_ID_FALLBACK_ALIASES,
     );
-    const compactResult = mergeSdkResults(documentResult, callbackResult, terminalResult);
 
     finalResultHandled = true;
     cleanupLaunch();
@@ -322,6 +344,172 @@ export async function launchVnptIdentitySdk(
     cleanupLaunch();
     throw new Error(VNPT_PROVIDER_ERROR_MESSAGE);
   }
+}
+
+type EndFlowClassification = 'incomplete' | 'terminal-failure' | 'complete';
+
+interface ScalarResultEntry {
+  path: string;
+  value: string | number | boolean;
+}
+
+const TERMINAL_OUTCOME_PATHS = new Set([
+  'endflowresultstatus',
+  'endflowresultresult',
+  'endflowresultterminalstatus',
+  'endflowresultterminalresult',
+  'endflowresultflowstatus',
+  'endflowresultobjectstatus',
+  'endflowresultobjectresult',
+  'endflowresultobjectterminalstatus',
+  'endflowresultobjectterminalresult',
+  'endflowresultobjectflowstatus',
+  'endflowresultdatastatus',
+  'endflowresultdataresult',
+  'endflowresultdataterminalstatus',
+  'endflowresultdataterminalresult',
+  'endflowresultdataflowstatus',
+  'endflowresultresultstatus',
+  'endflowresultresultterminalstatus',
+  'endflowresultresultterminalresult',
+  'endflowresultresultflowstatus',
+  'terminalstatus',
+  'terminalresult',
+]);
+
+function classifyEndFlow(compactResult: Record<string, unknown>): EndFlowClassification {
+  const entries = flattenScalarResultEntries(compactResult);
+  const terminalFailure = entries.some((entry) => (
+    TERMINAL_OUTCOME_PATHS.has(normalizeKey(entry.path))
+      && typeof entry.value === 'string'
+      && isExplicitTerminalFailure(entry.value)
+  ));
+  if (terminalFailure) return 'terminal-failure';
+
+  const hasFaceLivenessOutcome = entries.some((entry) => (
+    isFaceLivenessOutcomePath(entry.path) && isKnownLivenessOutcome(entry.value)
+  ));
+  const hasFaceCompareOutcome = entries.some((entry) => (
+    isFaceCompareOutcomePath(entry.path) && isKnownCompareOutcome(entry.value)
+  ));
+
+  return hasFaceLivenessOutcome && hasFaceCompareOutcome ? 'complete' : 'incomplete';
+}
+
+function flattenScalarResultEntries(root: Record<string, unknown>) {
+  const entries: ScalarResultEntry[] = [];
+  const seen = new WeakSet<object>();
+
+  const visit = (value: unknown, path: string, depth: number) => {
+    if (depth > MAX_SDK_RESULT_DEPTH || value == null) return;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      entries.push({ path, value });
+      return;
+    }
+    if (typeof value !== 'object' || seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      value.slice(0, MAX_SDK_ARRAY_ITEMS).forEach((item, index) => visit(item, `${path}.${index}`, depth + 1));
+      return;
+    }
+    Object.entries(value as Record<string, unknown>).forEach(([key, nestedValue]) => {
+      visit(nestedValue, path ? `${path}.${key}` : key, depth + 1);
+    });
+  };
+
+  visit(root, '', 0);
+  return entries;
+}
+
+function isExplicitTerminalFailure(value: string) {
+  const compact = normalizeKey(value);
+  if (compact === 'noerror' || compact === 'withouterror') return false;
+  return compact.includes('cancel')
+    || compact.includes('abort')
+    || compact.includes('timeout')
+    || compact.includes('timedout')
+    || compact === 'failed'
+    || compact === 'failure'
+    || compact === 'error'
+    || compact.startsWith('error')
+    || compact.endsWith('error');
+}
+
+function isFaceLivenessOutcomePath(path: string) {
+  const normalizedPath = normalizeKey(path);
+  const leaf = normalizeKey(path.split('.').at(-1) ?? '');
+  return normalizedPath.startsWith('endflowresult')
+    && (normalizedPath.includes('livenessface') || normalizedPath.includes('faceliveness'))
+    && (normalizedPath.endsWith('livenessface')
+      || normalizedPath.endsWith('faceliveness')
+      || ['liveness', 'status', 'result', 'msg'].includes(leaf));
+}
+
+function isFaceCompareOutcomePath(path: string) {
+  const normalizedPath = normalizeKey(path);
+  const leaf = normalizeKey(path.split('.').at(-1) ?? '');
+  return normalizedPath.startsWith('endflowresult')
+    && normalizedPath.includes('compare')
+    && (normalizedPath.endsWith('compare')
+      || normalizedPath.endsWith('facecompare')
+      || ['msg', 'status', 'result'].includes(leaf));
+}
+
+function isKnownLivenessOutcome(value: string | number | boolean) {
+  if (typeof value === 'boolean') return true;
+  if (typeof value !== 'string') return false;
+  return [
+    'success', 'successful', 'ok', 'valid', 'verified', 'pass', 'passed', 'live',
+    'failure', 'failed', 'error', 'invalid', 'notlive', 'noliveness', 'spoof',
+  ].includes(normalizeKey(value));
+}
+
+function isKnownCompareOutcome(value: string | number | boolean) {
+  if (typeof value === 'boolean') return true;
+  if (typeof value !== 'string') return false;
+  return [
+    'match', 'matched', 'same', 'identical', 'success', 'successful', 'pass', 'passed',
+    'nomatch', 'mismatch', 'different', 'failure', 'failed', 'error', 'invalid',
+  ].includes(normalizeKey(value));
+}
+
+/**
+ * VNPT 3.2.1 starts its face-processing timeout while the tutorial modal is
+ * still covering the camera on mobile WebKit. The tutorial action is a div,
+ * not a button. Dismiss only the known VNPT tutorial modal, once; never match
+ * arbitrary application videos or buttons.
+ */
+function installVnptFaceGuideAutoDismiss() {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') {
+    return () => undefined;
+  }
+
+  let dismissed = false;
+  const dismissKnownGuide = () => {
+    if (dismissed) return;
+    const tutorialSources = Array.from(document.querySelectorAll<HTMLSourceElement>('video source[type="video/mp4"]'));
+    const tutorialSource = tutorialSources.find((source) => {
+      try {
+        const path = new URL(source.src, document.baseURI).pathname;
+        return path.endsWith('/lib/vietnamese-tutorial.mp4')
+          || path.endsWith('/lib/english-tutorial.mp4');
+      } catch {
+        return false;
+      }
+    });
+    const dialog = tutorialSource?.closest<HTMLElement>('[role="dialog"], .ant-modal-content, .ant-modal');
+    const confirmAction = dialog?.querySelector<HTMLElement>('.vnpt-cursor-pointer.vnpt-bg-primary');
+    if (!confirmAction) return;
+
+    dismissed = true;
+    confirmAction.click();
+    observer.disconnect();
+  };
+
+  const observer = new MutationObserver(dismissKnownGuide);
+  observer.observe(document.body, { childList: true, subtree: true });
+  queueMicrotask(dismissKnownGuide);
+  return () => observer.disconnect();
 }
 
 function getVnptEnv() {
