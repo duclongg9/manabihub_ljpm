@@ -7,6 +7,32 @@ export interface VideoProgressCheckpoint {
   savedAt: number;
 }
 
+export interface NormalizedVideoProgress {
+  positionSeconds: number;
+  watchedSeconds: number;
+  mediaDurationSeconds?: number;
+}
+
+export function normalizeVideoProgressPayload(
+  positionSeconds: number,
+  watchedSeconds: number,
+  mediaDurationSeconds?: number,
+): NormalizedVideoProgress {
+  const duration = normalizeSeconds(mediaDurationSeconds);
+  const position = normalizeSeconds(positionSeconds);
+  const watched = normalizeSeconds(watchedSeconds);
+
+  if (duration <= 0) {
+    return { positionSeconds: position, watchedSeconds: watched };
+  }
+
+  return {
+    positionSeconds: Math.min(position, duration),
+    watchedSeconds: Math.min(watched, duration),
+    mediaDurationSeconds: duration,
+  };
+}
+
 export function formatVideoTime(seconds: number): string {
   const normalized = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
   const hours = Math.floor(normalized / 3600);

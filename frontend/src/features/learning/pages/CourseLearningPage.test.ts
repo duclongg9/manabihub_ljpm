@@ -3,6 +3,7 @@ import { applySequentialLocks } from './CourseLearningPage';
 import {
   formatVideoTime,
   normalizeWatchedSecondsAtVideoEnd,
+  normalizeVideoProgressPayload,
   resolveVideoResumePosition,
 } from '../utils/videoProgress';
 import type { LearningLessonBlock, LearningModule } from '../types';
@@ -85,5 +86,13 @@ describe('CourseLearningPage video resume helpers', () => {
 
   it('keeps the resume point inside the media duration', () => {
     expect(resolveVideoResumePosition(120, null, 100)).toBe(99);
+  });
+
+  it('caps replayed watch time and end-position rounding to the media duration', () => {
+    expect(normalizeVideoProgressPayload(136, 142, 135.8)).toEqual({
+      positionSeconds: 135,
+      watchedSeconds: 135,
+      mediaDurationSeconds: 135,
+    });
   });
 });

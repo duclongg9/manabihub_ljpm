@@ -2,6 +2,7 @@ import { axiosClient } from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 import { isAxiosError } from 'axios';
 import { getAuthSession } from '../../../shared/auth/authSession';
+import { normalizeVideoProgressPayload } from '../utils/videoProgress';
 import type {
   CourseLearning,
   CourseProgressSummary,
@@ -48,12 +49,13 @@ export const learningService = {
     watchedSeconds = 0,
     mediaDurationSeconds?: number,
   ): Promise<LessonProgress> => {
-    const response = await axiosClient.put(ENDPOINTS.LEARNING.VIDEO_PROGRESS(blockId), {
+    const progress = normalizeVideoProgressPayload(
       positionSeconds,
       watchedSeconds,
-      ...(mediaDurationSeconds && mediaDurationSeconds > 0
-        ? { mediaDurationSeconds: Math.floor(mediaDurationSeconds) }
-        : {}),
+      mediaDurationSeconds,
+    );
+    const response = await axiosClient.put(ENDPOINTS.LEARNING.VIDEO_PROGRESS(blockId), {
+      ...progress,
     });
     return response.data.data;
   },
@@ -69,13 +71,11 @@ export const learningService = {
     const session = getAuthSession('public');
     const endpoint = axiosClient.getUri({ url: ENDPOINTS.LEARNING.VIDEO_PROGRESS(blockId) });
     const url = new URL(endpoint, window.location.origin).toString();
-    const body = JSON.stringify({
-      positionSeconds: Math.max(0, Math.floor(positionSeconds)),
-      watchedSeconds: Math.max(0, Math.floor(watchedSeconds)),
-      ...(mediaDurationSeconds && mediaDurationSeconds > 0
-        ? { mediaDurationSeconds: Math.floor(mediaDurationSeconds) }
-        : {}),
-    });
+    const body = JSON.stringify(normalizeVideoProgressPayload(
+      positionSeconds,
+      watchedSeconds,
+      mediaDurationSeconds,
+    ));
 
     void window.fetch(url, {
       method: 'PUT',
