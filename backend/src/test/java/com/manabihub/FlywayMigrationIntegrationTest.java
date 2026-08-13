@@ -90,7 +90,16 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("073");
+        assertThat(current).isEqualTo("074");
+
+        MigrationInfo immutablePhoneMigration = Arrays.stream(flyway.info().all())
+                .filter(info -> info.getVersion() != null
+                        && "069".equals(info.getVersion().toString()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(immutablePhoneMigration.getChecksum())
+                .as("released V069 checksum remains immutable")
+                .isEqualTo(1213575808);
 
         // Hibernate ddl-auto=validate already succeeded if context loaded
         verifyConstraintsAndIndexes();
@@ -217,21 +226,20 @@ public class FlywayMigrationIntegrationTest {
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     @Test
-    void v069UpgradeNormalizesLegacyPhonesAndKeepsVerifiedOwner() {
+    void v074NormalizesLegacyPhonesAndKeepsVerifiedOwner() {
         String schema = "phone_upgrade_test";
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
 
-        Flyway beforePhoneVerification = Flyway.configure()
+        Flyway beforePhoneHardening = Flyway.configure()
                 .dataSource(dataSource)
                 .schemas(schema)
-                .target("068")
+                .target("069")
                 .load();
-        beforePhoneVerification.migrate();
+        beforePhoneHardening.migrate();
 
         JdbcTemplate legacy = new JdbcTemplate(dataSource);
         legacy.execute("ALTER TABLE " + schema + ".app_users "
-                + "ALTER COLUMN phone_number TYPE VARCHAR(20), "
-                + "ADD COLUMN phone_verified_at TIMESTAMPTZ");
+                + "ALTER COLUMN phone_number TYPE VARCHAR(20)");
 
         UUID oldestUnverified = UUID.randomUUID();
         UUID verifiedOwner = UUID.randomUUID();
@@ -307,11 +315,12 @@ public class FlywayMigrationIntegrationTest {
 
         JdbcTemplate legacy = new JdbcTemplate(dataSource);
         legacy.execute("ALTER TABLE " + schema + ".app_users "
+                + "ALTER COLUMN phone_number TYPE VARCHAR(20), "
                 + "ADD COLUMN phone_verified_at TIMESTAMPTZ");
         legacy.update("INSERT INTO " + schema + ".app_users "
                         + "(id, email, full_name, phone_number, phone_verified_at, created_at) VALUES "
                         + "(?, 'verified-a@test.com', 'Verified A', '0971693378', now(), now()), "
-                        + "(?, 'verified-b@test.com', 'Verified B', '0971693378', now(), now())",
+                        + "(?, 'verified-b@test.com', 'Verified B', ' 0971693378 ', now(), now())",
                 UUID.randomUUID(), UUID.randomUUID());
 
         Flyway latest = Flyway.configure()
@@ -320,9 +329,10 @@ public class FlywayMigrationIntegrationTest {
                 .load();
 
         assertThatThrownBy(latest::migrate)
-                .hasMessageContaining("manual review is required before retrying");
+                .hasMessageContaining("manual account review is required");
         assertThat(legacy.queryForObject(
-                "SELECT count(*) FROM " + schema + ".app_users WHERE phone_number = '0971693378'",
+                "SELECT count(*) FROM " + schema + ".app_users "
+                        + "WHERE BTRIM(phone_number) = '0971693378'",
                 Integer.class)).isEqualTo(2);
     }
 
