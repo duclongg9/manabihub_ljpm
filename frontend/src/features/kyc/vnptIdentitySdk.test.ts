@@ -198,6 +198,18 @@ describe('VNPT identity SDK bridge', () => {
     expect(JSON.stringify(window.__MANABIHUB_LAST_VNPT_CONFIG__)).not.toContain('browser-access-token');
   });
 
+  it('uses the documented CCCD chip configuration with a five-megabyte image ceiling', async () => {
+    await launchVnptIdentitySdk(vi.fn());
+
+    const config = launch.mock.calls[0][0] as SdkConfig;
+    expect(config).toMatchObject({
+      MAX_SIZE_IMAGE: 5,
+      LIST_TYPE_DOCUMENT: [9],
+      DOCUMENT_TYPE_START: 9,
+      SDK_FLOW: 'DOCUMENT_TO_FACE',
+    });
+  });
+
   it('removes legacy persisted KYC payloads when runtime is reset', () => {
     localStorage.setItem('vnpt_ekyc_last_document_result', 'legacy-document');
     localStorage.setItem('vnpt_ekyc_last_result', 'legacy-result');

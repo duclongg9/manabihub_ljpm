@@ -18,10 +18,14 @@ import java.util.stream.Collectors;
  * <p>The browser payload is treated as evidence, not as a trusted identity by
  * itself. A successful decision requires all of the following:</p>
  * <ul>
- *     <li>no explicit document, spoof, mask, mismatch or warning signal;</li>
+ *     <li>no explicit document, spoof, mask, mismatch or terminal-failure signal;</li>
  *     <li>CCCD number, full name and date of birth from OCR;</li>
  *     <li>an explicit successful liveness/face comparison signal.</li>
  * </ul>
+ * OCR image-quality warnings are deliberately not failure signals. VNPT Web SDK
+ * 3.2.1 documents them as capture guidance (for example, a blurred image or a
+ * cropped corner), while the provider's anti-spoof, tampering, liveness and
+ * comparison fields are the authoritative pass/fail signals.
  * The caller must still cross-check the extracted identity with the configured
  * national identity registry before granting a verified state.
  */
@@ -39,11 +43,7 @@ public final class VnptSdkResultEvaluator {
         }
 
         List<ResultEntry> entries = flatten(sdkResult);
-        boolean invalidProviderSignal = entries.stream().anyMatch(VnptSdkResultEvaluator::isExplicitInvalidValue)
-                || hasNonEmptyCollection(entries, "generalwarning", "warning")
-                || hasNonBlankWarning(entries)
-                || hasAffirmativeSignal(entries, "masked")
-                || hasNumericRiskSignal(entries);
+        List<String> providerFailureReasons = providerFailureReasons(entries);
         Map<String, String> identityOcr = extractIdentityOcr(entries);
         boolean requiredOcr = StringUtils.hasText(identityOcr.get("idNumber"))
                 && StringUtils.hasText(identityOcr.get("fullName"))
@@ -51,9 +51,7 @@ public final class VnptSdkResultEvaluator {
         boolean faceVerified = hasAcceptedFaceVerification(entries);
 
         List<String> reasons = new ArrayList<>();
-        if (invalidProviderSignal) {
-            reasons.add("VNPT validation returned an invalid, mismatched or spoofed result");
-        }
+        reasons.addAll(providerFailureReasons);
         if (!requiredOcr) {
             reasons.add("VNPT OCR did not return CCCD number, full name and date of birth");
         }
@@ -87,34 +85,158 @@ public final class VnptSdkResultEvaluator {
         }
     }
 
-    private static boolean isExplicitInvalidValue(ResultEntry entry) {
-        Object value = entry.value();
-        String normalizedKey = normalizeKey(entry.key());
-        if (isDecisionKey(entry.key()) && value instanceof Boolean flag) {
-            return isNegativeDecisionKey(normalizedKey) ? flag : !flag;
+    private static List<String> providerFailureReasons(List<ResultEntry> entries) {
+        Set<String> reasons = new java.util.LinkedHashSet<>();
+        if (hasTerminalFailure(entries)) {
+            reasons.add("VNPT terminal flow did not complete successfully");
         }
-        if (isNegativeDecisionKey(normalizedKey) && affirmativeFlag(value)) {
-            return true;
+        if (hasFailedOcrOutcome(entries)) {
+            reasons.add("VNPT OCR reported an invalid document result");
         }
-        if (isDecisionKey(entry.key()) && value instanceof String text) {
-            String normalized = normalizeText(text).trim();
-            return normalized.contains("khong hop le")
-                    || normalized.contains("khong cung loai")
-                    || normalized.contains("khong trung khop")
-                    || normalized.contains("khong khop")
-                    || normalized.contains("khong thanh cong")
-                    || normalized.contains("that bai")
-                    || normalized.contains("invalid")
-                    || normalized.contains("not valid")
-                    || normalized.contains("not same")
-                    || normalized.contains("not match")
-                    || normalized.contains("nomatch")
-                    || normalized.equals("nothing")
-                    || normalized.contains("mismatch")
-                    || normalized.contains("failed")
-                    || normalized.contains("failure")
-                    || isTerminalFailureStatus(normalized)
-                    || normalized.equals("null");
+        if (hasFailedDocumentLiveness(entries)) {
+            reasons.add("VNPT reported a document liveness failure");
+        }
+        if (hasAffirmativeProviderFlag(entries, "fakeliveness", "faceswapping", "fakeprintphoto", "idfakewarning")) {
+            reasons.add("VNPT reported a document anti-spoofing failure");
+        }
+        if (hasIllegalTamperingSignal(entries)) {
+            reasons.add("VNPT reported an illegal document tampering signal");
+        }
+        if (hasAffirmativeProviderFlag(entries, "masked", "maskedface") || hasFailedFaceLiveness(entries)) {
+            reasons.add("VNPT reported a mask or face-liveness failure");
+        }
+        if (hasFailedFaceComparison(entries)) {
+            reasons.add("VNPT reported that face comparison did not match");
+        }
+        return List.copyOf(reasons);
+    }
+
+    private static boolean hasTerminalFailure(List<ResultEntry> entries) {
+        return entries.stream()
+                .filter(entry -> isTerminalOutcomePath(entry.key()))
+                .anyMatch(entry -> isFailureOutcome(entry.value()));
+    }
+
+    private static boolean isTerminalOutcomePath(String path) {
+        String normalizedPath = normalizeKey(path);
+        String leaf = normalizeKey(lastSegment(path));
+        return normalizedPath.contains("endflow")
+                || normalizedPath.contains("terminal")
+                || (leaf.equals("status") && !normalizedPath.contains("ocr"));
+    }
+
+    private static boolean hasFailedOcrOutcome(List<ResultEntry> entries) {
+        return entries.stream()
+                .filter(entry -> isOcrOutcomePath(entry.key()))
+                .anyMatch(entry -> isFailureOutcome(entry.value()));
+    }
+
+    private static boolean isOcrOutcomePath(String path) {
+        String normalizedPath = normalizeKey(path);
+        String leaf = normalizeKey(lastSegment(path));
+        return normalizedPath.contains("ocr")
+                && Set.of("msg", "msgback", "status", "result").contains(leaf);
+    }
+
+    private static boolean hasFailedDocumentLiveness(List<ResultEntry> entries) {
+        return entries.stream()
+                .filter(entry -> isDocumentLivenessPath(entry.key()))
+                .anyMatch(entry -> isFailureOutcome(entry.value()));
+    }
+
+    private static boolean isDocumentLivenessPath(String path) {
+        String normalizedPath = normalizeKey(path);
+        String leaf = normalizeKey(lastSegment(path));
+        return (normalizedPath.contains("livenesscard")
+                || normalizedPath.contains("cardliveness")
+                || (normalizedPath.contains("document") && normalizedPath.contains("liveness")))
+                && Set.of("liveness", "status", "result").contains(leaf);
+    }
+
+    private static boolean hasFailedFaceLiveness(List<ResultEntry> entries) {
+        return entries.stream()
+                .filter(entry -> isFaceLivenessPath(entry.key()))
+                .anyMatch(entry -> isFailureOutcome(entry.value()));
+    }
+
+    private static boolean isFaceLivenessPath(String path) {
+        String normalizedPath = normalizeKey(path);
+        String leaf = normalizeKey(lastSegment(path));
+        return (normalizedPath.contains("livenessface") || normalizedPath.contains("faceliveness"))
+                && Set.of("liveness", "status", "result").contains(leaf);
+    }
+
+    private static boolean hasFailedFaceComparison(List<ResultEntry> entries) {
+        return entries.stream()
+                .filter(entry -> normalizeKey(entry.key()).contains("compare"))
+                .filter(entry -> Set.of("msg", "status", "result").contains(normalizeKey(lastSegment(entry.key()))))
+                .anyMatch(entry -> isFailureOutcome(entry.value()));
+    }
+
+    private static boolean hasIllegalTamperingSignal(List<ResultEntry> entries) {
+        return entries.stream().anyMatch(entry -> {
+            String normalizedPath = normalizeKey(entry.key());
+            String leaf = normalizeKey(lastSegment(entry.key()));
+            if (!normalizedPath.contains("tampering") && !normalizedPath.contains("tamper")) {
+                return false;
+            }
+            if (leaf.equals("islegal")) {
+                return !isPositiveOutcome(entry.value());
+            }
+            return leaf.equals("warning") && hasNonEmptyValue(entry.value());
+        });
+    }
+
+    private static boolean hasAffirmativeProviderFlag(List<ResultEntry> entries, String... aliases) {
+        Set<String> keys = Arrays.stream(aliases)
+                .map(VnptSdkResultEvaluator::normalizeKey)
+                .collect(Collectors.toSet());
+        return entries.stream()
+                .filter(entry -> keys.contains(normalizeKey(lastSegment(entry.key()))))
+                .anyMatch(entry -> affirmativeValue(entry.value()));
+    }
+
+    private static boolean hasNonEmptyValue(Object value) {
+        if (value instanceof Iterable<?> iterable) {
+            return iterable.iterator().hasNext();
+        }
+        return value != null && value.getClass().isArray() && Array.getLength(value) > 0;
+    }
+
+    private static boolean isFailureOutcome(Object value) {
+        if (value instanceof Boolean flag) {
+            return !flag;
+        }
+        if (!(value instanceof String text)) {
+            return false;
+        }
+        String normalized = normalizeText(text).trim();
+        if (Set.of("noerror", "withouterror", "ok", "success", "valid", "verified", "match", "matched", "pass", "passed").contains(normalized)) {
+            return false;
+        }
+        return Set.of("false", "no", "null", "nothing", "failure", "failed", "error", "invalid", "nomatch", "mismatch")
+                .contains(normalized)
+                || normalized.contains("khong hop le")
+                || normalized.contains("khong trung khop")
+                || normalized.contains("khong khop")
+                || normalized.contains("khong thanh cong")
+                || normalized.contains("that bai")
+                || normalized.contains("not valid")
+                || normalized.contains("not same")
+                || normalized.contains("not match")
+                || normalized.contains("nomatch")
+                || normalized.contains("mismatch")
+                || normalized.contains("failed")
+                || normalized.contains("failure")
+                || isTerminalFailureStatus(normalized);
+    }
+
+    private static boolean isPositiveOutcome(Object value) {
+        if (value instanceof Boolean flag) return flag;
+        if (value instanceof Number number) return number.doubleValue() > 0;
+        if (value instanceof String text) {
+            return Set.of("true", "yes", "1", "co", "ok", "success", "valid", "verified", "match", "matched", "pass")
+                    .contains(normalizeText(text).trim());
         }
         return false;
     }
@@ -137,75 +259,12 @@ public final class VnptSdkResultEvaluator {
                 || compact.endsWith("error");
     }
 
-    private static boolean isNegativeDecisionKey(String key) {
-        return key.contains("fake") || key.contains("spoof") || key.contains("tamper")
-                || key.contains("multiple") || key.contains("warning") || key.contains("swapping");
-    }
-
-    private static boolean hasNonEmptyCollection(List<ResultEntry> entries, String... aliases) {
-        Set<String> keys = Arrays.stream(aliases).map(VnptSdkResultEvaluator::normalizeKey).collect(Collectors.toSet());
-        return entries.stream()
-                .filter(entry -> keys.contains(normalizeKey(lastSegment(entry.key()))))
-                .map(ResultEntry::value)
-                .anyMatch(value -> {
-                    if (value instanceof Iterable<?> iterable) {
-                        return iterable.iterator().hasNext();
-                    }
-                    return value != null && value.getClass().isArray() && Array.getLength(value) > 0;
-                });
-    }
-
-    private static boolean hasNonBlankWarning(List<ResultEntry> entries) {
-        return entries.stream()
-                .filter(entry -> {
-                    String key = normalizeKey(lastSegment(entry.key()));
-                    return key.equals("warning") || key.equals("generalwarning") || key.equals("warningstatus");
-                })
-                .map(ResultEntry::value)
-                .filter(value -> value instanceof String)
-                .map(value -> normalizeText((String) value).trim())
-                .anyMatch(value -> !value.isBlank()
-                        && !Set.of("none", "no", "false", "0", "ok", "normal", "pass", "passed").contains(value));
-    }
-
-    /**
-     * VNPT returns anti-spoof probabilities as scalar numbers. They are not
-     * binary blobs and must survive the browser compaction, but a positive
-     * spoof/fake/tamper probability is still a failed verification signal.
-     * Values in [0,1] are probabilities; larger values are percentages.
-     */
-    private static boolean hasNumericRiskSignal(List<ResultEntry> entries) {
-        return entries.stream()
-                .filter(entry -> entry.value() instanceof Number)
-                .filter(entry -> {
-                    String key = normalizeKey(entry.key());
-                    return key.contains("fake") || key.contains("spoof") || key.contains("tamper")
-                            || key.contains("swapping") || key.contains("masked");
-                })
-                .map(entry -> ((Number) entry.value()).doubleValue())
-                .anyMatch(value -> value > 0.2d && value < 100d || value >= 20d);
-    }
-
-    private static boolean hasAffirmativeSignal(List<ResultEntry> entries, String... aliases) {
-        Set<String> keys = Arrays.stream(aliases).map(VnptSdkResultEvaluator::normalizeKey).collect(Collectors.toSet());
-        return entries.stream()
-                .filter(entry -> keys.contains(normalizeKey(lastSegment(entry.key()))))
-                .anyMatch(entry -> affirmativeValue(entry.value()));
-    }
-
     private static boolean affirmativeValue(Object value) {
         if (value instanceof Boolean flag) return flag;
-        if (value instanceof Number number) return number.doubleValue() > 0;
         if (value instanceof String text) {
             return Set.of("true", "yes", "1", "co").contains(normalizeText(text).trim());
         }
         return false;
-    }
-
-    private static boolean affirmativeFlag(Object value) {
-        if (value instanceof Boolean flag) return flag;
-        return value instanceof String text
-                && Set.of("true", "yes", "1", "co").contains(normalizeText(text).trim());
     }
 
     private static boolean hasAcceptedFaceVerification(List<ResultEntry> entries) {
@@ -312,7 +371,9 @@ public final class VnptSdkResultEvaluator {
         // Card/document liveness proves that the document is present, not that
         // the person holding it is live. It must never satisfy the face gate.
         if (normalized.contains("card") || normalized.contains("document")
-                || normalized.contains("ocr")) {
+                || normalized.contains("ocr") || normalized.contains("fake")
+                || normalized.contains("spoof") || normalized.contains("tamper")
+                || normalized.contains("swap") || normalized.contains("mask")) {
             return false;
         }
         return normalized.contains("face") || normalized.contains("selfie")

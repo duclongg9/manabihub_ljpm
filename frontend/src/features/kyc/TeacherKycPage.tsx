@@ -1233,6 +1233,34 @@ function extractStringList(value: unknown) {
 function localizeIdentityFailureReason(reason: string) {
   const normalized = normalizePayloadKey(reason);
 
+  if (normalized.includes('terminalflowdidnotcomplete')) {
+    return 'Phiên xác minh VNPT chưa hoàn tất. Vui lòng thực hiện lại từ đầu.';
+  }
+
+  if (normalized.includes('ocrreportedaninvaliddocument')) {
+    return 'VNPT không xác nhận được ảnh CCCD. Hãy chụp rõ cả hai mặt giấy tờ gốc.';
+  }
+
+  if (normalized.includes('documentlivenessfailure')) {
+    return 'VNPT không xác nhận được giấy tờ gốc. Hãy đặt CCCD trên nền sáng và thực hiện lại.';
+  }
+
+  if (normalized.includes('antispoofingfailure')) {
+    return 'VNPT phát hiện tín hiệu an toàn không đạt trên giấy tờ. Hãy dùng CCCD gốc và thực hiện lại.';
+  }
+
+  if (normalized.includes('illegaldocumenttampering')) {
+    return 'VNPT phát hiện dấu hiệu chỉnh sửa trên giấy tờ. Hãy kiểm tra lại CCCD gốc.';
+  }
+
+  if (normalized.includes('maskorfacelivenessfailure')) {
+    return 'VNPT chưa xác nhận được khuôn mặt sống. Hãy bỏ khẩu trang, đủ ánh sáng và thực hiện lại.';
+  }
+
+  if (normalized.includes('facecomparisondidnotmatch')) {
+    return 'Khuôn mặt chưa khớp với ảnh trên CCCD theo kết quả VNPT.';
+  }
+
   if (normalized.includes('invaliddocument') || normalized.includes('mismatch') || normalized.includes('nullresult')) {
     return 'Giấy tờ không hợp lệ hoặc mặt trước/sau không cùng loại.';
   }
