@@ -21,7 +21,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeKanjiWatermark/DecorativeKanjiWatermark';
-import { getAuthSession } from '../../../shared/auth/authSession';
+import { getAuthSession, subscribeToAuthSessionChanges } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { ROUTES } from '../../../shared/constants/routes';
 import type { OrderItemResponse, OrderResponse } from '../../checkout/types';
@@ -93,6 +93,9 @@ function formatMoney(amount: number, currency: string = 'VND') {
 
 export function StudentPaymentsPage() {
   const navigate = useNavigate();
+  const [session, setSession] = useState(() => getAuthSession('public'));
+  const isTeacher = session?.roles.includes(ROLES.TEACHER) ?? false;
+
   const [mainTab, setMainTab] = useState(0); // 0 = Lịch sử đơn hàng, 1 = Lịch sử rút hoa hồng
 
   const [filterIndex, setFilterIndex] = useState(0);
@@ -113,8 +116,6 @@ export function StudentPaymentsPage() {
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(true);
   const [errorWithdrawals, setErrorWithdrawals] = useState(false);
 
-  const isTeacher = getAuthSession('public')?.roles.includes(ROLES.TEACHER) ?? false;
-
   const policyQuery = useCommercialPolicy();
   const minimumAmount = policyQuery.data?.payoutThreshold ?? 100000;
 
@@ -127,18 +128,41 @@ export function StudentPaymentsPage() {
   const courseOrders = rawOrders.filter((order) => order.type !== 'WALLET_TOPUP');
   const refunds = refundsQuery.data?.content ?? [];
 
+  // Listen to auth session changes
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthSessionChanges(() => {
+      setSession(getAuthSession('public'));
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Force tab to order history if user is no longer a teacher
+  useEffect(() => {
+    if (!isTeacher && mainTab !== 0) {
+      setMainTab(0);
+    }
+  }, [isTeacher, mainTab]);
+
   const loadWalletData = useCallback(async () => {
     setLoadingWallet(true);
     setLoadingTeacherWallet(isTeacher);
     try {
+      const studentWalletPromise = getStudentWallet();
+      const identityPromise = isTeacher
+        ? getStudentIdentityVerificationStatus()
+        : Promise.resolve(null);
       const [studentWallet, identity] = await Promise.all([
-        getStudentWallet(),
-        getStudentIdentityVerificationStatus(),
+        studentWalletPromise,
+        identityPromise,
       ]);
       setWallet(studentWallet);
-      setIdentityVerified(identity.verified);
+      if (identity) {
+        setIdentityVerified(identity.verified);
+      }
     } catch {
-      // A transient wallet/identity failure must not break the payment history.
+      // A transient wallet failure must not break the payment history.
     } finally {
       setLoadingWallet(false);
     }
@@ -161,13 +185,13 @@ export function StudentPaymentsPage() {
   }, [isTeacher]);
 
   const loadWithdrawalData = useCallback(async () => {
-    setLoadingWithdrawals(true);
-    setErrorWithdrawals(false);
     if (!isTeacher) {
       setWithdrawals([]);
       setLoadingWithdrawals(false);
       return;
     }
+    setLoadingWithdrawals(true);
+    setErrorWithdrawals(false);
     try {
       const response = await walletService.getTeacherWithdrawals({ page: 0, size: 20, sort: 'requestedAt,desc' });
       setWithdrawals(response.data?.content ?? []);
@@ -227,9 +251,11 @@ export function StudentPaymentsPage() {
         {/* Keep the student purchase wallet separate from the teacher revenue wallet. */}
         <Box
           sx={{
-            display: 'grid',
-            gap: 2,
-            gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(0, 1.25fr)' },
+            display: isTeacher ? 'grid' : 'block',
+            ...(isTeacher && {
+              gap: 2,
+              gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(0, 1.25fr)' },
+            }),
             mb: 2.5,
           }}
         >
@@ -278,33 +304,33 @@ export function StudentPaymentsPage() {
                 </Typography>
               </Box>
               <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.72)' }}>
-                Số dư này không bao gồm hoa hồng giảng viên. Thưởng trò chơi và điểm danh hằng ngày được cộng vào ví học viên sau khi hệ thống quyết toán.
+                Tiền nạp, hoàn tiền và thưởng học tập được cộng vào ví học viên sau khi hệ thống quyết toán.
               </Typography>
             </Stack>
           </Box>
 
-          <Box
-            sx={{
-              bgcolor: '#fff',
-              border: '1px solid #E1E5EA',
-              borderRadius: 3,
-              boxShadow: '0 4px 16px rgba(15, 23, 42, 0.05)',
-              p: { xs: 2.5, sm: 3 },
-            }}
-          >
-            <Stack spacing={2} sx={{ height: '100%', justifyContent: 'center' }}>
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                <Box sx={{ bgcolor: '#FFF1F2', borderRadius: 2, color: '#C41E3A', display: 'grid', p: 1.1, placeItems: 'center' }}>
-                  <AccountBalanceIcon />
-                </Box>
-                <Box>
-                  <Typography sx={{ fontWeight: 900 }}>Ví doanh thu giảng viên</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Hoa hồng khóa học được đối soát và quản lý tách biệt với tiền mua khóa học.
-                  </Typography>
-                </Box>
-              </Stack>
-              {isTeacher && (
+          {isTeacher && (
+            <Box
+              sx={{
+                bgcolor: '#fff',
+                border: '1px solid #E1E5EA',
+                borderRadius: 3,
+                boxShadow: '0 4px 16px rgba(15, 23, 42, 0.05)',
+                p: { xs: 2.5, sm: 3 },
+              }}
+            >
+              <Stack spacing={2} sx={{ height: '100%', justifyContent: 'center' }}>
+                <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                  <Box sx={{ bgcolor: '#FFF1F2', borderRadius: 2, color: '#C41E3A', display: 'grid', p: 1.1, placeItems: 'center' }}>
+                    <AccountBalanceIcon />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontWeight: 900 }}>Ví doanh thu giảng viên</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Hoa hồng khóa học được đối soát và quản lý tách biệt với tiền mua khóa học.
+                    </Typography>
+                  </Box>
+                </Stack>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                   <Box sx={{ flex: 1, bgcolor: '#F8FAFC', borderRadius: 2, p: 1.5 }}>
                     <Typography variant="caption" color="text.secondary">Hoa hồng có thể rút</Typography>
@@ -319,79 +345,79 @@ export function StudentPaymentsPage() {
                     </Typography>
                   </Box>
                 </Stack>
-              )}
-              <Alert severity="info" sx={{ borderRadius: 2 }}>
-                Số dư hoàn tiền chỉ dùng để mua khóa học. Chỉ hoa hồng đã đối soát trong Ví doanh thu mới được rút; tài khoản cần xác thực số điện thoại và CCCD.
-              </Alert>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Tối thiểu {formatMoney(minimumAmount, currency)}
-                </Typography>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
-                  <Button
-                    variant="outlined"
-                    disabled={withdrawalLoading || identityVerified}
-                    onClick={() => navigate(ROUTES.STUDENT.IDENTITY_VERIFICATION)}
-                    sx={{ borderColor: '#C41E3A', color: '#C41E3A', borderRadius: 10, fontWeight: 800, px: 2, textTransform: 'none' }}
-                  >
-                    {identityVerified ? 'Đã xác thực CCCD thành công' : 'Xác thực CCCD'}
-                  </Button>
-                  <Button
-                    variant="contained"
-                    disabled={withdrawalLoading}
-                    onClick={() => {
-                      if (!identityVerified) {
-                        navigate(ROUTES.STUDENT.IDENTITY_VERIFICATION);
-                        return;
-                      }
-                      navigate(isTeacher ? ROUTES.TEACHER.WALLET : ROUTES.TEACHER.KYC);
-                    }}
-                    sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 800, px: 3, textTransform: 'none' }}
-                  >
-                    {!identityVerified
-                      ? 'Xác minh SĐT & CCCD để rút hoa hồng'
-                      : isTeacher
-                        ? 'Mở Ví doanh thu để rút hoa hồng'
-                        : 'Trở thành giảng viên để rút hoa hồng'}
-                  </Button>
+                <Alert severity="info" sx={{ borderRadius: 2 }}>
+                  Số dư hoàn tiền chỉ dùng để mua khóa học. Chỉ hoa hồng đã đối soát trong Ví doanh thu mới được rút; tài khoản cần xác thực số điện thoại và CCCD.
+                </Alert>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Tối thiểu {formatMoney(minimumAmount, currency)}
+                  </Typography>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+                    <Button
+                      variant="outlined"
+                      disabled={withdrawalLoading || identityVerified}
+                      onClick={() => navigate(ROUTES.STUDENT.IDENTITY_VERIFICATION)}
+                      sx={{ borderColor: '#C41E3A', color: '#C41E3A', borderRadius: 10, fontWeight: 800, px: 2, textTransform: 'none' }}
+                    >
+                      {identityVerified ? 'Đã xác thực CCCD thành công' : 'Xác thực CCCD'}
+                    </Button>
+                    <Button
+                      variant="contained"
+                      disabled={withdrawalLoading}
+                      onClick={() => {
+                        if (!identityVerified) {
+                          navigate(ROUTES.STUDENT.IDENTITY_VERIFICATION);
+                          return;
+                        }
+                        navigate(ROUTES.TEACHER.WALLET);
+                      }}
+                      sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 800, px: 3, textTransform: 'none' }}
+                    >
+                      {!identityVerified
+                        ? 'Xác minh SĐT & CCCD để rút hoa hồng'
+                        : 'Mở Ví doanh thu để rút hoa hồng'}
+                    </Button>
+                  </Stack>
                 </Stack>
               </Stack>
-            </Stack>
+            </Box>
+          )}
+        </Box>
+
+        {/* Sub-tabs Navigation - only shown if user has TEACHER role */}
+        {isTeacher && (
+          <Box sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs
+              value={mainTab}
+              onChange={(_, newValue) => setMainTab(newValue)}
+              sx={{
+                '& .MuiTab-root': {
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  textTransform: 'none',
+                  minHeight: 48,
+                  px: 3,
+                  minWidth: 160,
+                },
+                '& .Mui-selected': {
+                  color: '#C41E3A !important',
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: '#C41E3A',
+                  height: 3,
+                  borderRadius: '3px 3px 0 0',
+                },
+              }}
+            >
+              <Tab value={0} icon={<ShoppingBagOutlinedIcon fontSize="small" />} iconPosition="start" label="Lịch sử đơn hàng" />
+              <Tab value={1} icon={<AccountBalanceIcon fontSize="small" />} iconPosition="start" label="Lịch sử rút hoa hồng" />
+            </Tabs>
           </Box>
-        </Box>
+        )}
 
-        {/* Sub-tabs Navigation */}
-        <Box sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs
-            value={mainTab}
-            onChange={(_, newValue) => setMainTab(newValue)}
-            sx={{
-              '& .MuiTab-root': {
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                textTransform: 'none',
-                minHeight: 48,
-                px: 3,
-                minWidth: 160,
-              },
-              '& .Mui-selected': {
-                color: '#C41E3A !important',
-              },
-              '& .MuiTabs-indicator': {
-                backgroundColor: '#C41E3A',
-                height: 3,
-                borderRadius: '3px 3px 0 0',
-              },
-            }}
-          >
-            <Tab icon={<ShoppingBagOutlinedIcon fontSize="small" />} iconPosition="start" label="Lịch sử đơn hàng" />
-            <Tab icon={<AccountBalanceIcon fontSize="small" />} iconPosition="start" label="Lịch sử rút hoa hồng" />
-          </Tabs>
-        </Box>
-
-        {/* SUBTAB 1: Lịch sử đơn hàng */}
-        {mainTab === 0 && (
-          <Box>
+        {/* SUBTAB 1: Lịch sử đơn hàng & Hoàn tiền (always visible for non-teacher, or when mainTab === 0 for teacher) */}
+        {(!isTeacher || mainTab === 0) && (
+          <>
             {/* Filter Pills Header (Directly on page background) */}
             <Box sx={{ mb: 2.5 }}>
               <Stack
@@ -521,32 +547,31 @@ export function StudentPaymentsPage() {
                 />
               </Box>
             )}
-          </Box>
+
+            {/* Lịch sử hoàn tiền */}
+            <Box sx={{ mt: 4 }}>
+              <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+                <Typography variant="h6" sx={{ fontWeight: 900 }}>Lịch sử hoàn tiền</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Các yêu cầu hoàn tiền được tách khỏi lịch sử đơn hàng để dễ theo dõi trạng thái xử lý.
+                </Typography>
+              </Stack>
+              <StudentRefundHistory
+                refunds={refunds}
+                loading={refundsQuery.isLoading}
+                error={refundsQuery.isError}
+                onRetry={() => void refundsQuery.refetch()}
+                onOpen={openRefundDetail}
+                page={refundPage}
+                totalPages={refundsQuery.data?.totalPages ?? 1}
+                onPageChange={setRefundPage}
+              />
+            </Box>
+          </>
         )}
 
-        {mainTab === 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-              <Typography variant="h6" sx={{ fontWeight: 900 }}>Lịch sử hoàn tiền</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Các yêu cầu hoàn tiền được tách khỏi lịch sử đơn hàng để dễ theo dõi trạng thái xử lý.
-              </Typography>
-            </Stack>
-            <StudentRefundHistory
-              refunds={refunds}
-              loading={refundsQuery.isLoading}
-              error={refundsQuery.isError}
-              onRetry={() => void refundsQuery.refetch()}
-              onOpen={openRefundDetail}
-              page={refundPage}
-              totalPages={refundsQuery.data?.totalPages ?? 1}
-              onPageChange={setRefundPage}
-            />
-          </Box>
-        )}
-
-        {/* SUBTAB 2: Lịch sử rút hoa hồng */}
-        {mainTab === 1 && (
+        {/* SUBTAB 2: Lịch sử rút hoa hồng (only rendered if user has TEACHER role and selected tab 1) */}
+        {isTeacher && mainTab === 1 && (
           <Box
             sx={{
               p: { xs: 2, md: 2.5 },
@@ -556,22 +581,7 @@ export function StudentPaymentsPage() {
               boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
             }}
           >
-            {!isTeacher ? (
-              <Stack spacing={1.5} sx={{ py: 6, alignItems: 'center', textAlign: 'center' }}>
-                <AccountBalanceIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
-                <Typography sx={{ fontWeight: 700 }}>Bạn chưa có Ví doanh thu</Typography>
-                <Typography color="text.secondary">
-                  Hoàn tất xác minh giáo viên để nhận hoa hồng và tạo yêu cầu rút tiền.
-                </Typography>
-                <Button
-                  variant="contained"
-                  onClick={() => navigate(ROUTES.TEACHER.KYC)}
-                  sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 700, textTransform: 'none' }}
-                >
-                  Trở thành giảng viên
-                </Button>
-              </Stack>
-            ) : loadingWithdrawals ? (
+            {loadingWithdrawals ? (
               <Stack spacing={1.5} sx={{ py: 6, alignItems: 'center' }}>
                 <CircularProgress aria-label="Đang tải lịch sử rút hoa hồng" sx={{ color: '#C41E3A' }} />
                 <Typography color="text.secondary">Đang tải lịch sử rút hoa hồng…</Typography>
