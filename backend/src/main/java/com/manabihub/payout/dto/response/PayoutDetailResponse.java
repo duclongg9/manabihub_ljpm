@@ -50,6 +50,7 @@ public class PayoutDetailResponse {
     String gatewayReference;
     PayoutTransferMethod transferMethod;
     boolean manualProofAvailable;
+    boolean bankQrAvailable;
     String manualProofOriginalName;
     Long manualProofSize;
     Instant manualTransferredAt;

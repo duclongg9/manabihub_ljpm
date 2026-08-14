@@ -40,6 +40,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.util.Base64;
+import java.util.Locale;
 import java.util.UUID;
 
 @Slf4j
@@ -96,6 +98,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                     "Vui lòng hoàn tất xác minh CCCD trước khi rút tiền",
                     HttpStatus.FORBIDDEN);
         }
+        BankQrPayload bankQr = decodeBankQr(request.getBankQrDataUrl());
         UUID teacherProfileId = teacherProfile.getId();
 
         // Serialize withdrawal creation per teacher across all application instances.
@@ -132,6 +135,8 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 .requestedAmount(request.getAmount())
                 .status(WithdrawalStatus.PENDING)
                 .bankAccountSnapshot(snapshot)
+                .bankQrCode(bankQr.bytes())
+                .bankQrContentType(bankQr.contentType())
                 .build();
         
         try {
@@ -323,6 +328,68 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                         MessageCodes.KYC_TEACHER_NOT_FOUND,
                         "Teacher profile not found"
                 ));
+    }
+
+    private BankQrPayload decodeBankQr(String dataUrl) {
+        if (dataUrl == null || dataUrl.isBlank()) {
+            throw new BusinessException(
+                    MessageCodes.PAYOUT_BANK_QR_REQUIRED,
+                    "A bank QR image is required for Finance."
+            );
+        }
+        int comma = dataUrl.indexOf(',');
+        if (comma <= 0 || comma == dataUrl.length() - 1) {
+            throw invalidBankQr();
+        }
+        String metadata = dataUrl.substring(0, comma).toLowerCase(Locale.ROOT);
+        String encoded = dataUrl.substring(comma + 1);
+        String contentType = metadata.startsWith("data:image/png;base64")
+                ? "image/png"
+                : metadata.startsWith("data:image/jpeg;base64") || metadata.startsWith("data:image/jpg;base64")
+                    ? "image/jpeg"
+                    : metadata.startsWith("data:image/webp;base64")
+                        ? "image/webp"
+                        : null;
+        if (contentType == null) {
+            throw invalidBankQr();
+        }
+        final byte[] bytes;
+        try {
+            bytes = Base64.getDecoder().decode(encoded);
+        } catch (IllegalArgumentException exception) {
+            throw invalidBankQr();
+        }
+        if (bytes.length == 0 || bytes.length > 2L * 1024L * 1024L || !matchesSignature(bytes, contentType)) {
+            throw invalidBankQr();
+        }
+        return new BankQrPayload(bytes, contentType);
+    }
+
+    private boolean matchesSignature(byte[] bytes, String contentType) {
+        if ("image/png".equals(contentType)) {
+            byte[] signature = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+            return bytes.length >= signature.length
+                    && java.util.Arrays.equals(signature, java.util.Arrays.copyOf(bytes, signature.length));
+        }
+        if ("image/jpeg".equals(contentType)) {
+            return bytes.length >= 3
+                    && (bytes[0] & 0xFF) == 0xFF
+                    && (bytes[1] & 0xFF) == 0xD8
+                    && (bytes[2] & 0xFF) == 0xFF;
+        }
+        return bytes.length >= 12
+                && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P';
+    }
+
+    private BusinessException invalidBankQr() {
+        return new BusinessException(
+                MessageCodes.PAYOUT_BANK_QR_INVALID,
+                "The bank QR image is invalid. Upload a PNG, JPEG, or WEBP image under 2 MB."
+        );
+    }
+
+    private record BankQrPayload(byte[] bytes, String contentType) {
     }
 
     private String teacherEmail(UUID teacherProfileId) {

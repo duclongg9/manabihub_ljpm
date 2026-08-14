@@ -295,6 +295,9 @@ public final class MessageCodes {
     public static final String PAYOUT_PENDING_REQUEST_EXISTS = "PAYOUT_PENDING_REQUEST_EXISTS";
     public static final String PAYOUT_MONTHLY_LIMIT_EXCEEDED = "PAYOUT_MONTHLY_LIMIT_EXCEEDED";
     public static final String PAYOUT_BANK_ACCOUNT_REQUIRED = "PAYOUT_BANK_ACCOUNT_REQUIRED";
+    public static final String PAYOUT_PHONE_VERIFICATION_REQUIRED = "PAYOUT_PHONE_VERIFICATION_REQUIRED";
+    public static final String PAYOUT_BANK_QR_REQUIRED = "PAYOUT_BANK_QR_REQUIRED";
+    public static final String PAYOUT_BANK_QR_INVALID = "PAYOUT_BANK_QR_INVALID";
     public static final String PAYOUT_EMAIL_REQUIRED = "PAYOUT_EMAIL_REQUIRED";
     public static final String PAYOUT_INVALID_OTP = "PAYOUT_INVALID_OTP";
     public static final String PAYOUT_OTP_RATE_LIMITED = "PAYOUT_OTP_RATE_LIMITED";

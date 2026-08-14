@@ -91,6 +91,7 @@ export interface PayoutDetail {
   gatewayReference: string | null;
   transferMethod: PayoutTransferMethod | null;
   manualProofAvailable: boolean;
+  bankQrAvailable: boolean;
   manualProofOriginalName: string | null;
   manualProofSize: number | null;
   manualTransferredAt: string | null;
