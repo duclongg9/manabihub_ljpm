@@ -34,6 +34,7 @@ public final class NotificationTypes {
     public static final String COURSE_COMPLETED = "COURSE_COMPLETED";
     public static final String ADMIN_ROLE_CHANGED = "ADMIN_ROLE_CHANGED";
     public static final String SYSTEM_SETTING_CHANGED = "SYSTEM_SETTING_CHANGED";
+    public static final String OPERATIONAL_DECISION_WARNING = "OPERATIONAL_DECISION_WARNING";
 
     /**
      * User-facing label used in notification emails. Technical identifiers are

@@ -71,14 +71,11 @@ public class AdminCourseApprovalServiceImpl implements AdminCourseApprovalServic
     private final CourseValidationService courseValidationService;
 
     private String requireReviewerRole(UUID adminId) {
-        if (courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN"))) {
-            return "SYSTEM_ADMIN";
-        }
         if (courseRepository.hasAdminRole(adminId, List.of("COURSE_MANAGER"))) {
             return "COURSE_MANAGER";
         }
         throw new BusinessException(MessageCodes.ADMIN_PERMISSION_DENIED,
-                "Access denied: Course Manager or System Admin privileges required");
+                "Access denied: Course Manager privileges required");
     }
 
     @Override

@@ -48,7 +48,7 @@ describe('AdminLayout Navigation & RBAC', () => {
     renderAdminLayout('/admin/courses/approvals');
     expect(DashboardLayout).toHaveBeenCalledWith(
       expect.objectContaining({
-        allowedRoles: [ROLES.COURSE_MANAGER, ROLES.SYSTEM_ADMIN],
+        allowedRoles: [ROLES.COURSE_MANAGER],
         sessionKind: 'admin',
         menuItems: ADMIN_MENU
       }),

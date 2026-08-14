@@ -139,18 +139,20 @@ class AdminCourseApprovalServiceImplTest {
 
     @Test
     @Order(1)
-    @DisplayName("UTCID01 (N) - System Admin approves -> audit records SYSTEM_ADMIN")
-    void reviewCourse_RecordsSystemAdminRoleWhenSystemAdminMakesDecision() {
-        when(courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN"))).thenReturn(true);
+    @DisplayName("UTCID01 (N) - System Admin cannot make an operational course decision")
+    void reviewCourse_RejectsSystemAdminOperationalDecision() {
+        when(courseRepository.hasAdminRole(adminId, List.of("COURSE_MANAGER"))).thenReturn(false);
         CourseReviewRequest request = CourseReviewRequest.builder()
                 .action("APPROVE")
                 .build();
 
-        courseApprovalService.reviewCourse(adminId, courseId, request);
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> courseApprovalService.reviewCourse(adminId, courseId, request)
+        );
 
-        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(auditLogRepository).save(auditCaptor.capture());
-        assertEquals("SYSTEM_ADMIN", auditCaptor.getValue().getActorRoleCode());
+        assertEquals(MessageCodes.ADMIN_PERMISSION_DENIED, error.getMessageCode());
+        verify(auditLogRepository, never()).save(any());
     }
 
     @ParameterizedTest
@@ -302,9 +304,8 @@ class AdminCourseApprovalServiceImplTest {
 
     @Test
     @Order(10)
-    @DisplayName("UTCID10 (A) - actor is neither Course Manager nor System Admin -> ADMIN_PERMISSION_DENIED")
+    @DisplayName("UTCID10 (A) - actor is not Course Manager -> ADMIN_PERMISSION_DENIED")
     void reviewCourse_WithoutReviewerRole_IsRejected() {
-        when(courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN"))).thenReturn(false);
         when(courseRepository.hasAdminRole(adminId, List.of("COURSE_MANAGER"))).thenReturn(false);
 
         BusinessException error = assertThrows(
@@ -437,7 +438,6 @@ class AdminCourseApprovalServiceImplTest {
     }
 
     private void mockCourseManagerAccess() {
-        when(courseRepository.hasAdminRole(adminId, List.of("SYSTEM_ADMIN"))).thenReturn(false);
         when(courseRepository.hasAdminRole(adminId, List.of("COURSE_MANAGER"))).thenReturn(true);
     }
 }

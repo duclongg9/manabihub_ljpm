@@ -125,7 +125,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 .findByWithdrawalRequestId(withdrawalRequestId)
                 .orElse(null);
         PayoutReconciliationService.ReconciliationResult reconciliation =
-                reconcile(request, owner);
+                reconcileForCurrentPhase(request, owner, settlement);
 
         return toDetail(request, owner, settlement, reconciliation);
     }
@@ -142,7 +142,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 .findByWithdrawalRequestId(withdrawalRequestId)
                 .orElse(null);
         PayoutReconciliationService.ReconciliationResult reconciliation =
-                reconcile(request, owner);
+                reconcileForCurrentPhase(request, owner, settlement);
         saveReconciliationLog(
                 request,
                 settlement,
@@ -1065,7 +1065,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 .findByWithdrawalRequestId(request.getId())
                 .orElse(null);
         PayoutReconciliationService.ReconciliationResult reconciliation =
-                reconcile(request, owner);
+                reconcileForCurrentPhase(request, owner, settlement);
 
         return PayoutQueueItemResponse.builder()
                 .withdrawalRequestId(request.getId())
@@ -1490,6 +1490,23 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                         request, owner.wallet(), owner.student())
                 : reconciliationService.reconcile(
                         request, owner.wallet(), owner.teacher());
+    }
+
+    private PayoutReconciliationService.ReconciliationResult reconcileForCurrentPhase(
+            WithdrawalRequest request,
+            OwnerContext owner,
+            PayoutSettlement settlement
+    ) {
+        boolean completionPhase = request.getStatus() == WithdrawalStatus.EXECUTED
+                || settlement != null && settlement.getStatus() == PayoutStatus.SUCCEEDED;
+        if (completionPhase) {
+            return reconciliationService.reconcileCompleted(
+                    request,
+                    owner.wallet(),
+                    settlement
+            );
+        }
+        return reconcile(request, owner);
     }
 
     private UUID ownerProfileId(WithdrawalRequest request) {

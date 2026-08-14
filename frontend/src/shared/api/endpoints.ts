@@ -34,6 +34,17 @@ export const ENDPOINTS = {
     DETAIL: (reportId: string) => `/v1/admin/violations/${reportId}`,
     RESOLVE: (reportId: string) => `/v1/admin/violations/${reportId}/resolve`,
   },
+  ADMIN_FINANCE: {
+    REVENUE_DASHBOARD: '/v1/admin/finance/revenue/dashboard',
+    EXPENSES: '/v1/admin/finance/expenses',
+    EXPENSE: (id: string) => `/v1/admin/finance/expenses/${id}`,
+  },
+  ADMIN_DECISION_REVIEWS: {
+    LIST: '/v1/admin/decision-reviews',
+    DETAIL: (auditLogId: string) => `/v1/admin/decision-reviews/${auditLogId}`,
+    REVIEWED: (auditLogId: string) => `/v1/admin/decision-reviews/${auditLogId}/reviewed`,
+    WARNINGS: (auditLogId: string) => `/v1/admin/decision-reviews/${auditLogId}/warnings`,
+  },
   SYSTEM_ADMIN: {
     SETTINGS: '/v1/admin/system-settings',
     SETTING: (key: string) => `/v1/admin/system-settings/${encodeURIComponent(key)}`,

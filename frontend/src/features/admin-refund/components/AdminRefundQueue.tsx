@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
 import { adminRefundApi } from '../api/adminRefundApi';
-import type { RefundMoneyValue, RefundQueueResponse, RefundStatus } from '../types';
+import type { RefundMoneyValue, RefundQueueFilters, RefundQueueResponse, RefundStatus } from '../types';
 
 const STATUS_LABELS: Record<RefundStatus, string> = {
   PENDING: 'Chờ quyết định',
@@ -36,14 +36,16 @@ export function AdminRefundQueue() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const size = 10;
+  const [size, setSize] = useState(10);
+  const [filters, setFilters] = useState<RefundQueueFilters>({ status: 'PENDING' });
+  const [draftFilters, setDraftFilters] = useState<RefundQueueFilters>({ status: 'PENDING' });
 
   const loadQueue = useCallback(async (currentPage: number) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await adminRefundApi.getPendingRefunds(currentPage, size);
+      const response = await adminRefundApi.getPendingRefunds(currentPage, size, filters);
       setQueue(response.content);
       setTotalPages(response.totalPages);
       setTotalElements(response.totalElements);
@@ -56,7 +58,7 @@ export function AdminRefundQueue() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters, size]);
 
   useEffect(() => {
     void loadQueue(page);
@@ -97,6 +99,31 @@ export function AdminRefundQueue() {
         <span className="self-start rounded-full border border-amber-200 bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 sm:self-auto">
           {totalElements} yêu cầu cần theo dõi
         </span>
+      </div>
+
+      <div className="grid gap-3 border-b border-gray-200 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <select
+          aria-label="Trạng thái hoàn tiền"
+          value={draftFilters.status ?? ''}
+          onChange={(event) => setDraftFilters({ ...draftFilters, status: event.target.value as RefundStatus | '' })}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">Tất cả trạng thái</option>
+          {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>Trạng thái: {label}</option>)}
+        </select>
+        <input aria-label="Mã đơn hàng" placeholder="Mã đơn hàng" value={draftFilters.orderCode ?? ''} onChange={(event) => setDraftFilters({ ...draftFilters, orderCode: event.target.value })} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <input aria-label="Học viên" placeholder="Tên hoặc email học viên" value={draftFilters.student ?? ''} onChange={(event) => setDraftFilters({ ...draftFilters, student: event.target.value })} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <input aria-label="Khóa học" placeholder="Tên khóa học" value={draftFilters.course ?? ''} onChange={(event) => setDraftFilters({ ...draftFilters, course: event.target.value })} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <input aria-label="Nhà cung cấp thanh toán" placeholder="Provider (VD: VNPAY)" value={draftFilters.paymentProvider ?? ''} onChange={(event) => setDraftFilters({ ...draftFilters, paymentProvider: event.target.value })} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <select aria-label="Trạng thái đối soát" value={String(draftFilters.reconciliationRequired ?? '')} onChange={(event) => setDraftFilters({ ...draftFilters, reconciliationRequired: event.target.value === '' ? '' : event.target.value === 'true' })} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+          <option value="">Tất cả đối soát</option><option value="true">Chỉ yêu cầu cần đối soát</option><option value="false">Chỉ yêu cầu không cần đối soát</option>
+        </select>
+        <div className="flex gap-2"><input aria-label="Số tiền tối thiểu" type="number" min="0" placeholder="Từ số tiền" value={draftFilters.minAmount ?? ''} onChange={(event) => setDraftFilters({ ...draftFilters, minAmount: event.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" /><input aria-label="Số tiền tối đa" type="number" min="0" placeholder="Đến số tiền" value={draftFilters.maxAmount ?? ''} onChange={(event) => setDraftFilters({ ...draftFilters, maxAmount: event.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" /></div>
+        <div className="flex gap-2"><input aria-label="Từ ngày" type="date" value={draftFilters.createdFrom ?? ''} onChange={(event) => setDraftFilters({ ...draftFilters, createdFrom: event.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-2 text-sm" /><input aria-label="Đến ngày" type="date" value={draftFilters.createdTo ?? ''} onChange={(event) => setDraftFilters({ ...draftFilters, createdTo: event.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-2 text-sm" /></div>
+        <div className="flex gap-2 lg:col-span-4">
+          <button onClick={() => { setPage(0); setFilters(draftFilters); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Áp dụng bộ lọc</button>
+          <button onClick={() => { const reset = { status: 'PENDING' as const }; setDraftFilters(reset); setFilters(reset); setPage(0); }} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">Xóa lọc</button>
+        </div>
       </div>
 
       {queue.length === 0 ? (
@@ -181,11 +208,11 @@ export function AdminRefundQueue() {
           </table>
 
           <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50/50 p-4">
-            <span className="text-sm text-gray-700">
+            <div className="flex items-center gap-3"><span className="text-sm text-gray-700">
               Trang <span className="font-semibold text-gray-900">{page + 1}</span>
               {' / '}
               <span className="font-semibold text-gray-900">{Math.max(totalPages, 1)}</span>
-            </span>
+            </span><select aria-label="Số dòng mỗi trang" value={size} onChange={(event) => { setSize(Number(event.target.value)); setPage(0); }} className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"><option value="10">10 dòng</option><option value="20">20 dòng</option><option value="50">50 dòng</option></select></div>
             <div className="inline-flex space-x-2">
               <button
                 onClick={() => setPage((previousPage) => Math.max(previousPage - 1, 0))}

@@ -58,5 +58,8 @@ export const ROUTES = {
     NOTIFICATIONS: '/admin/notifications',
     REFUND_REVIEW: '/admin/refunds',
     AUDIT_LOGS: '/admin/audit-logs',
+    FINANCE_REVENUE: '/admin/finance/revenue',
+    FINANCE_EXPENSES: '/admin/finance/expenses',
+    DECISION_REVIEWS: '/admin/decision-reviews',
   },
 };

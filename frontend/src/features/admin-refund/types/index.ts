@@ -77,3 +77,16 @@ export interface RefundDecisionRequest {
   reasonCode: RefundDecisionReasonCode;
   note: string;
 }
+
+export interface RefundQueueFilters {
+  status?: RefundStatus | '';
+  orderCode?: string;
+  student?: string;
+  course?: string;
+  paymentProvider?: string;
+  reconciliationRequired?: boolean | '';
+  minAmount?: string;
+  maxAmount?: string;
+  createdFrom?: string;
+  createdTo?: string;
+}
