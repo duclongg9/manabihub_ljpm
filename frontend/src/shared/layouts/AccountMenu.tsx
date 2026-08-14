@@ -16,6 +16,7 @@ import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
 import PasswordOutlinedIcon from '@mui/icons-material/PasswordOutlined';
+import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { AuthSession } from '../auth/authSession';
@@ -151,6 +152,12 @@ export function AccountMenu({ session, anchorEl, onClose, onLogout }: AccountMen
             Hồ sơ cá nhân
           </MenuItem>
         )}
+        {isStudent && (
+          <MenuItem onClick={() => navigateTo(ROUTES.TEACHER.KYC)} sx={{ borderRadius: 1.25, py: 1 }}>
+            <ListItemIcon><SchoolOutlinedIcon fontSize="small" /></ListItemIcon>
+            Trở thành giảng viên
+          </MenuItem>
+        )}
         <MenuItem onClick={() => navigateTo(notificationPath)} sx={{ borderRadius: 1.25, py: 1 }}>
           <ListItemIcon><NotificationsNoneOutlinedIcon fontSize="small" /></ListItemIcon>
           Thông báo
@@ -205,7 +212,7 @@ function AccountWalletSummary({ kind, loading, error, wallet, onOpen }: AccountW
           <AccountBalanceWalletOutlinedIcon fontSize="small" sx={{ color: '#C41E3A' }} />
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: '#475467' }}>
-              {isStudent ? 'Ví Manabi' : 'Ví doanh thu'}
+              {isStudent ? 'Ví' : 'Ví doanh thu'}
             </Typography>
             <Typography variant="body2" noWrap sx={{ fontWeight: 800 }}>
               {loading ? 'Đang cập nhật…' : error ? 'Chưa tải được số dư' : `Số dư: ${currency}`}

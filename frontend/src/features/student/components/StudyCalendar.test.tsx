@@ -41,8 +41,10 @@ describe('StudyCalendar', () => {
     expect(screen.getByRole('button', { name: 'Tháng' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tuần' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Hôm nay' }).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByTestId('calendar-course-filter'));
     expect(screen.getByRole('checkbox', { name: 'Kanji N5 nền tảng' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Giao tiếp tiếng Nhật' })).toBeChecked();
+    expect(screen.getByPlaceholderText('Tìm khóa học...')).toBeInTheDocument();
     expect(screen.getByTestId(`calendar-event-slot-kanji-${todayKey(today)}`)).toHaveTextContent('20:00');
 
     fireEvent.click(screen.getByTestId(`calendar-day-${todayKey(today)}`));
@@ -70,6 +72,7 @@ describe('StudyCalendar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Đóng' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('calendar-course-filter'));
     fireEvent.click(screen.getAllByRole('checkbox')[0]);
     fireEvent.click(screen.getByTestId(`calendar-day-${todayKey(today)}`));
     expect(within(screen.getByRole('dialog')).getByText('Giao tiếp tiếng Nhật')).toBeInTheDocument();

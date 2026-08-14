@@ -61,8 +61,8 @@ export function StudentIdentityVerificationPage() {
                   : 'Chưa xác minh. Hãy chuẩn bị CCCD gốc và thực hiện VNPT eKYC.'}
               </Alert>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                <Button variant="contained" onClick={() => void startVerification()} disabled={launching}>
-                  {launching ? 'Đang mở VNPT eKYC…' : status?.verified ? 'Xác minh lại' : 'Bắt đầu xác minh'}
+                <Button variant="contained" onClick={() => void startVerification()} disabled={launching || status?.verified === true}>
+                  {launching ? 'Đang mở VNPT eKYC…' : status?.verified ? 'Đã xác thực CCCD thành công' : 'Bắt đầu xác minh'}
                 </Button>
                 <Button variant="outlined" onClick={() => navigate(ROUTES.STUDENT.PAYMENTS)}>Quay lại lịch sử thanh toán</Button>
               </Stack>

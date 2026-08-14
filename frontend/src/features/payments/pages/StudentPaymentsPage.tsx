@@ -243,9 +243,9 @@ export function StudentPaymentsPage() {
                   <AccountBalanceWalletIcon />
                 </Box>
                 <Box>
-                  <Typography sx={{ fontWeight: 900 }}>Ví học viên</Typography>
+                  <Typography sx={{ fontWeight: 900 }}>Ví</Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)' }}>
-                    Tiền hoàn hợp lệ dùng để mua khóa học
+                    Tiền hoàn hợp lệ từ các giao dịch khóa học
                   </Typography>
                 </Box>
               </Stack>
@@ -262,6 +262,9 @@ export function StudentPaymentsPage() {
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Số dư có thể rút</Typography>
                   <Typography sx={{ fontWeight: 800 }}>
                     {loadingWallet ? '…' : formatMoney(wallet?.availableWithdrawableBalance ?? 0, wallet?.currency ?? 'VND')}
+                  </Typography>
+                  <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.62)', mt: 0.35 }}>
+                    Tiền hoàn; hoa hồng giảng viên ở Ví doanh thu.
                   </Typography>
                 </Box>
                 <Box sx={{ flex: 1, pl: 1 }}>
@@ -302,20 +305,30 @@ export function StudentPaymentsPage() {
                 <Typography variant="body2" color="text.secondary">
                   Tối thiểu {formatMoney(minimumAmount, wallet?.currency ?? 'VND')}
                 </Typography>
-                <Button
-                  variant="contained"
-                  disabled={loadingWallet || (identityVerified && (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount)}
-                  onClick={() => {
-                    if (!identityVerified) {
-                      navigate('/student/identity-verification');
-                      return;
-                    }
-                    setWithdrawalModalOpen(true);
-                  }}
-                  sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 800, px: 3, textTransform: 'none' }}
-                >
-                  {identityVerified ? 'Yêu cầu rút tiền' : 'Xác minh SĐT & CCCD để rút tiền'}
-                </Button>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+                  <Button
+                    variant="outlined"
+                    disabled={loadingWallet || identityVerified}
+                    onClick={() => navigate(ROUTES.STUDENT.IDENTITY_VERIFICATION)}
+                    sx={{ borderColor: '#C41E3A', color: '#C41E3A', borderRadius: 10, fontWeight: 800, px: 2, textTransform: 'none' }}
+                  >
+                    {identityVerified ? 'Đã xác thực CCCD thành công' : 'Xác thực CCCD'}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    disabled={loadingWallet || (identityVerified && (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount)}
+                    onClick={() => {
+                      if (!identityVerified) {
+                        navigate(ROUTES.STUDENT.IDENTITY_VERIFICATION);
+                        return;
+                      }
+                      setWithdrawalModalOpen(true);
+                    }}
+                    sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 800, px: 3, textTransform: 'none' }}
+                  >
+                    {identityVerified ? 'Yêu cầu rút tiền' : 'Xác minh SĐT & CCCD để rút tiền'}
+                  </Button>
+                </Stack>
               </Stack>
             </Stack>
           </Box>
