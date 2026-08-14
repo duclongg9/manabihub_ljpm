@@ -130,13 +130,25 @@ export function AccountMenu({ session, anchorEl, onClose, onLogout }: AccountMen
       {(isStudent || isTeacher) && (
         <>
           <Divider />
-          <AccountWalletSummary
-            kind={isStudent ? 'student' : 'teacher'}
-            loading={isStudent ? studentWalletQuery.isLoading : teacherWalletQuery.isLoading}
-            error={isStudent ? studentWalletQuery.isError : teacherWalletQuery.isError}
-            wallet={isStudent ? studentWalletQuery.data : teacherWalletQuery.data}
-            onOpen={() => navigateTo(isStudent ? ROUTES.STUDENT.PAYMENTS : ROUTES.TEACHER.WALLET)}
-          />
+          {isStudent && (
+            <AccountWalletSummary
+              kind="student"
+              loading={studentWalletQuery.isLoading}
+              error={studentWalletQuery.isError}
+              wallet={studentWalletQuery.data}
+              onOpen={() => navigateTo(ROUTES.STUDENT.PAYMENTS)}
+            />
+          )}
+          {isStudent && isTeacher && <Divider />}
+          {isTeacher && (
+            <AccountWalletSummary
+              kind="teacher"
+              loading={teacherWalletQuery.isLoading}
+              error={teacherWalletQuery.isError}
+              wallet={teacherWalletQuery.data}
+              onOpen={() => navigateTo(ROUTES.TEACHER.WALLET)}
+            />
+          )}
         </>
       )}
 
@@ -212,10 +224,10 @@ function AccountWalletSummary({ kind, loading, error, wallet, onOpen }: AccountW
           <AccountBalanceWalletOutlinedIcon fontSize="small" sx={{ color: '#C41E3A' }} />
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="caption" sx={{ display: 'block', fontWeight: 800, color: '#475467' }}>
-              {isStudent ? 'Ví' : 'Ví doanh thu'}
+              {isStudent ? 'Ví học viên' : 'Ví doanh thu'}
             </Typography>
             <Typography variant="body2" noWrap sx={{ fontWeight: 800 }}>
-              {loading ? 'Đang cập nhật…' : error ? 'Chưa tải được số dư' : `Số dư: ${currency}`}
+              {loading ? 'Đang cập nhật…' : error ? 'Chưa tải được số dư' : `${isStudent ? 'Số dư mua khóa học' : 'Số dư'}: ${currency}`}
             </Typography>
           </Box>
         </Stack>

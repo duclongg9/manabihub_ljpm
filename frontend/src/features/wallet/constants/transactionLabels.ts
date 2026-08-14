@@ -5,6 +5,8 @@ export const TRANSACTION_TYPE_LABELS: Record<WalletTransactionType, string> = {
   TOP_UP: 'Nạp tiền vào ví',
   PURCHASE: 'Thanh toán khóa học',
   REFUND: 'Hoàn tiền',
+  GAME_REWARD: 'Thưởng trò chơi',
+  ATTENDANCE_REWARD: 'Thưởng điểm danh hằng ngày',
   REVENUE_SHARE: 'Chia sẻ doanh thu',
   PAYOUT: 'Chi trả',
   ADJUSTMENT: 'Điều chỉnh',
@@ -24,6 +26,8 @@ export const STUDENT_TRANSACTION_TYPES: WalletTransactionType[] = [
   'TOP_UP',
   'PURCHASE',
   'REFUND',
+  'GAME_REWARD',
+  'ATTENDANCE_REWARD',
   'ADJUSTMENT',
   'ADMIN_ADJUSTMENT',
 ];
