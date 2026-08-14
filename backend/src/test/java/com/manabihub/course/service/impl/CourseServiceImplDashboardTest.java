@@ -4,6 +4,7 @@ import com.manabihub.course.dto.response.TeacherDashboardResponse;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -33,6 +34,9 @@ public class CourseServiceImplDashboardTest {
     @Mock
     private CurrentUserService currentUserService;
 
+    @Mock
+    private CourseEditDraftService courseEditDraftService;
+
     @InjectMocks
     private CourseServiceImpl courseService;
 
@@ -42,6 +46,8 @@ public class CourseServiceImplDashboardTest {
         UUID teacherProfileId = UUID.randomUUID();
 
         when(currentUserService.getCurrentUserId()).thenReturn(teacherUserId);
+        when(courseEditDraftService.resolveEditableCourse(org.mockito.ArgumentMatchers.any(Course.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         TeacherProfile profile = new TeacherProfile();
         profile.setId(teacherProfileId);
         profile.setKycStatus(TeacherKycStatus.APPROVED);

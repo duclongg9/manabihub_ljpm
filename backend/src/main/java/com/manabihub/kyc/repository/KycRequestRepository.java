@@ -15,6 +15,7 @@ import java.util.UUID;
 public interface KycRequestRepository extends JpaRepository<KycRequest, UUID> {
     List<KycRequest> findByStatusOrderByCreatedAtDesc(KycRequestStatus status);
     Optional<KycRequest> findTopByTeacherProfileIdOrderBySubmittedAtDesc(UUID teacherId);
+    Optional<KycRequest> findByEkycProviderAndProviderTransactionId(String ekycProvider, String providerTransactionId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -30,5 +31,5 @@ public interface KycRequestRepository extends JpaRepository<KycRequest, UUID> {
     @Query("SELECT r FROM KycRequest r WHERE r.id = :id")
     Optional<KycRequest> findByIdForUpdate(@Param("id") UUID id);
 
-    boolean existsByProviderTransactionId(String txId);
+    boolean existsByEkycProviderAndProviderTransactionId(String ekycProvider, String txId);
 }

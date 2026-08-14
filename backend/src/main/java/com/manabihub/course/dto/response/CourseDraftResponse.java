@@ -28,6 +28,7 @@ public record CourseDraftResponse(
         Integer accessDurationDays,
         Instant accessExpiresAt,
         Instant createdAt,
+        Instant updatedAt,
         Map<String, Object> srsTrace
 ) {
 }

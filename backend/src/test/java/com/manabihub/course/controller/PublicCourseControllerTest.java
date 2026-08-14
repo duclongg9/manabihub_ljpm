@@ -249,6 +249,40 @@ class PublicCourseControllerTest {
     }
 
     @Test
+    void searchCourses_withEnrollmentRanking_passesWhitelistedDescendingSort() throws Exception {
+        when(courseService.searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+        )).thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        mockMvc.perform(get("/api/v1/public/courses")
+                        .param("page", "2")
+                        .param("size", "4")
+                        .param("sort", "enrollmentCount,desc"))
+                .andExpect(status().isOk());
+
+        verify(courseService).searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(),
+                eq(PageRequest.of(2, 4, Sort.by(Sort.Direction.DESC, "enrollmentCount")))
+        );
+    }
+
+    @Test
+    void searchCourses_withRatingRanking_forcesDescendingLeaderboard() throws Exception {
+        when(courseService.searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+        )).thenReturn(new PageImpl<>(Collections.emptyList()));
+
+        mockMvc.perform(get("/api/v1/public/courses")
+                        .param("sort", "averageRating,asc"))
+                .andExpect(status().isOk());
+
+        verify(courseService).searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(),
+                eq(PageRequest.of(0, 12, Sort.by(Sort.Direction.DESC, "averageRating")))
+        );
+    }
+
+    @Test
     void getCourseReviews_returnsOnlyPublicSafeReviewFields() throws Exception {
         UUID reviewId = UUID.randomUUID();
         CourseReviewResponse review = new CourseReviewResponse(

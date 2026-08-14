@@ -138,7 +138,9 @@ describe('CourseReviewsSection', () => {
     await screen.findAllByText('Học viên An');
     const initialCalls = getPublicReviewsMock.mock.calls.length;
     const refreshButtons = screen.getAllByRole('button', { name: 'Tải lại đánh giá' });
-    fireEvent.click(refreshButtons[refreshButtons.length - 1]);
+    const refreshButton = refreshButtons[refreshButtons.length - 1];
+    await waitFor(() => expect(refreshButton).toBeEnabled());
+    fireEvent.click(refreshButton);
 
     await waitFor(() => expect(getPublicReviewsMock.mock.calls.length).toBe(initialCalls + 1));
     expect(getPublicReviewsMock).toHaveBeenLastCalledWith('course-slug', 0, 10);

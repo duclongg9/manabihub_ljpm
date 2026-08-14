@@ -5,7 +5,9 @@ import com.manabihub.ai.repository.AiUsageLogRepository;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseModuleRepository;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.repository.CourseThumbnailAssetRepository;
 import com.manabihub.course.repository.LessonBlockRepository;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.finaltest.repository.FinalTestRepository;
 import com.manabihub.identity.mapper.StudentProfileMapper;
 import com.manabihub.identity.mapper.TeacherProfileMapper;
@@ -19,10 +21,12 @@ import com.manabihub.identity.repository.InternalAdminSessionRepository;
 import com.manabihub.identity.repository.PhoneVerificationChallengeRepository;
 import com.manabihub.identity.repository.RoleRepository;
 import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.identity.repository.AccountIdentityVerificationRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.repository.KycDocumentRepository;
 import com.manabihub.kyc.repository.TeacherCertificateClaimRepository;
 import com.manabihub.kyc.repository.TeacherIdentityClaimRepository;
+import com.manabihub.kyc.repository.VnptIdentityTransactionClaimRepository;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.kyc.service.TeacherKycService;
@@ -48,6 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(properties = {
@@ -81,6 +86,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private TeacherCertificateClaimRepository teacherCertificateClaimRepository;
+
+    @MockBean
+    private VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
 
     @MockBean
     private AuditLogRepository auditLogRepository;
@@ -119,6 +127,9 @@ class ManabiHubApplicationTests {
     private StudentProfileRepository studentProfileRepository;
 
     @MockBean
+    private AccountIdentityVerificationRepository accountIdentityVerificationRepository;
+
+    @MockBean
     private IdentityTeacherProfileRepository identityTeacherProfileRepository;
 
     @MockBean
@@ -141,6 +152,12 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private CourseRepository courseRepository;
+
+    @MockBean
+    private CourseEditDraftService courseEditDraftService;
+
+    @MockBean
+    private CourseThumbnailAssetRepository courseThumbnailAssetRepository;
 
     @MockBean
     private CourseCategoryRepository courseCategoryRepository;
@@ -235,6 +252,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private TransactionTemplate transactionTemplate;
+
+    @MockBean
+    private PlatformTransactionManager platformTransactionManager;
 
 
     @MockBean

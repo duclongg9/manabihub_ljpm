@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
@@ -120,6 +121,25 @@ class ChallengeRewardSettlementServiceTest {
         assertEquals(ChallengeStatus.PUBLISHED, challenge.getStatus());
     }
 
+    @Test
+    void dailyAttendance_onlyCountsLearningAfterTheChallengeWasPublished() {
+        LocalDate rewardDate = LocalDate.now(BUSINESS_ZONE).minusDays(1);
+        LocalDate weekStart = rewardDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        UUID challengeId = UUID.randomUUID();
+        WeeklyLearningChallenge challenge = challenge(challengeId, weekStart, ChallengeStatus.PUBLISHED);
+        Instant publishedAt = rewardDate.atTime(13, 30).atZone(BUSINESS_ZONE).toInstant();
+        Instant dayEnd = rewardDate.plusDays(1).atStartOfDay(BUSINESS_ZONE).toInstant();
+        challenge.setPublishedAt(publishedAt);
+        when(challengeRepository.findByWeekStartForUpdate(weekStart)).thenReturn(Optional.of(challenge));
+        when(progressRepository.findStudentsWithCompletedLearningActivity(publishedAt, dayEnd))
+                .thenReturn(List.of());
+
+        service.settleDailyAttendance(rewardDate);
+
+        verify(progressRepository).findStudentsWithCompletedLearningActivity(publishedAt, dayEnd);
+        verifyNoInteractions(walletService);
+    }
+
     private WeeklyLearningChallenge challenge(UUID id, LocalDate weekStart, ChallengeStatus status) {
         return WeeklyLearningChallenge.builder()
                 .id(id).weekStart(weekStart).title("Challenge").description("Description")
@@ -128,6 +148,7 @@ class ChallengeRewardSettlementServiceTest {
                 .firstPrize(new BigDecimal("30000"))
                 .secondPrize(new BigDecimal("20000"))
                 .thirdPrize(new BigDecimal("10000"))
+                .publishedAt(weekStart.atStartOfDay(BUSINESS_ZONE).toInstant())
                 .build();
     }
 

@@ -60,12 +60,23 @@ management:
       enabled: false
 
 manabihub:
+  kyc:
+# Safe default: synthetic registry. Sandbox may explicitly select direct-sdk;
+# it trusts browser evidence and unlocks sandbox withdrawals. Real production
+# must select server.
+    identity-verification-mode: ${KYC_IDENTITY_VERIFICATION_MODE:direct-sdk-mock}
   phone-verification:
     # Production must explicitly configure a real provider; OTPs are never
     # logged in the production profile.
     sms-mode: ${PHONE_VERIFICATION_SMS_MODE:disabled}
     sms-webhook-url: ${PHONE_VERIFICATION_SMS_WEBHOOK_URL:}
     sms-api-key: ${PHONE_VERIFICATION_SMS_API_KEY:}
+    sms-timeout-seconds: ${PHONE_VERIFICATION_SMS_TIMEOUT_SECONDS:5}
+    esms:
+      api-key: ${PHONE_VERIFICATION_ESMS_API_KEY:}
+      secret-key: ${PHONE_VERIFICATION_ESMS_SECRET_KEY:}
+      brandname: ${PHONE_VERIFICATION_ESMS_BRANDNAME:}
+      sandbox: ${PHONE_VERIFICATION_ESMS_SANDBOX:true}
   payment:
     vnpay:
       # Required in production. Startup also verifies HTTPS, the frontend

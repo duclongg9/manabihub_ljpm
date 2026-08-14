@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -35,11 +35,13 @@ import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import AssignmentTurnedInOutlinedIcon from '@mui/icons-material/AssignmentTurnedInOutlined';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { isAxiosError } from 'axios';
 import ReactPlayer from 'react-player';
 import { sanitizeRichText } from '../../../shared/security/sanitizeRichText';
+import { aiChatService } from '../../ai-chat/services/aiChatService';
 import { learningService } from '../services/learningService';
 import type {
   CourseLearning,
@@ -57,6 +59,7 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
+import { AiChatPanel } from '../../ai-chat/components/AiChatPanel';
 import {
   isSingleCharacterMutation,
   readLocalStorageValue,
@@ -71,10 +74,17 @@ import {
   type FinalTestViolationType,
 } from '../utils/finalTestProctoring';
 import { downloadCertificatePdf, formatCertificateDate } from '../utils/certificatePdf';
+import {
+  formatVideoTime,
+  normalizeWatchedSecondsAtVideoEnd,
+  resolveVideoResumePosition,
+  type VideoProgressCheckpoint,
+} from '../utils/videoProgress';
 import { CoursePomodoroPanel } from '../components/CoursePomodoroPanel';
 
 const VIDEO_SAVE_INTERVAL_SECONDS = 10;
 const WATCHED_DELTA_MAX_SECONDS = 2;
+const VIDEO_PROGRESS_STORAGE_PREFIX = 'manabihub:video-progress:';
 const COURSE_SELECTION_STORAGE_PREFIX = 'manabihub:course-selection:';
 const WRITING_DRAFT_STORAGE_PREFIX = 'manabihub:writing-draft:';
 const QUIZ_ANSWERS_STORAGE_PREFIX = 'manabihub:quiz-answers:';
@@ -105,6 +115,10 @@ function finalTestStorageKey(courseId: string) {
   return `${FINAL_TEST_STORAGE_PREFIX}${publicStorageScope()}:${courseId}`;
 }
 
+function videoProgressStorageKey(blockId: string) {
+  return `${VIDEO_PROGRESS_STORAGE_PREFIX}${publicStorageScope()}:${blockId}`;
+}
+
 interface LocalFinalTestState {
   attempt: FinalTestAttempt;
   answers: Record<string, string[]>;
@@ -113,16 +127,42 @@ interface LocalFinalTestState {
 export function CourseLearningPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedAiBlockId = searchParams.get('aiLessonBlockId');
   const [learning, setLearning] = useState<CourseLearning | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
   const [selectedContentLoading, setSelectedContentLoading] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [aiChatAvailable, setAiChatAvailable] = useState<boolean | null>(null);
 
   const session = getAuthSession('public');
   const canReport = session ? hasAnyRole(session, [ROLES.STUDENT, ROLES.TEACHER]) : false;
+
+  useEffect(() => {
+    if (!courseId || !selectedBlockId) {
+      setAiChatAvailable(false);
+      return;
+    }
+
+    let active = true;
+    setAiChatAvailable(null);
+    void aiChatService
+      .getEligibility(courseId, selectedBlockId)
+      .then((eligibility) => {
+        if (active) setAiChatAvailable(eligibility.eligible);
+      })
+      .catch(() => {
+        if (active) setAiChatAvailable(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [courseId, selectedBlockId]);
 
   useEffect(() => {
     if (!courseId) return;
@@ -137,13 +177,20 @@ export function CourseLearningPage() {
         const modules = applySequentialLocks(data.modules);
         const availableBlockIds = new Set(modules.flatMap((module) => module.blocks.map((block) => block.id)));
         const savedBlockId = readLocalStorageValue<string>(courseSelectionStorageKey(data.courseId));
+        const requestedBlock = requestedAiBlockId
+          ? modules.flatMap((module) => module.blocks).find((block) => block.id === requestedAiBlockId)
+          : undefined;
+        const requestedBlockIsAvailable = Boolean(requestedBlock && !requestedBlock.locked);
         const initialBlockId =
-          savedBlockId && availableBlockIds.has(savedBlockId)
-            ? savedBlockId
-            : data.currentLessonBlockId ?? modules[0]?.blocks[0]?.id ?? null;
+          requestedBlockIsAvailable
+            ? requestedAiBlockId
+            : savedBlockId && availableBlockIds.has(savedBlockId)
+              ? savedBlockId
+              : data.currentLessonBlockId ?? modules[0]?.blocks[0]?.id ?? null;
         const initialBlock = modules.flatMap((module) => module.blocks).find((block) => block.id === initialBlockId);
         setLearning({ ...data, modules });
         setSelectedBlockId(initialBlockId);
+        setAiChatOpen(requestedBlockIsAvailable);
         setSelectedContentLoading(initialBlock?.type === 'VIDEO');
       })
       .catch((err) => {
@@ -167,7 +214,7 @@ export function CourseLearningPage() {
     return () => {
       active = false;
     };
-  }, [courseId, navigate]);
+  }, [courseId, navigate, requestedAiBlockId]);
 
   useEffect(() => {
     if (!courseId || !selectedBlockId) return;
@@ -207,8 +254,44 @@ export function CourseLearningPage() {
     });
   }, []);
 
+  const syncedCompletedBlocksRef = useRef(new Set<string>());
+
+  const refreshLearningAfterCompletion = useCallback(async (
+    completedBlockId: string,
+    preferredBlockId: string = completedBlockId,
+  ) => {
+    if (!courseId || syncedCompletedBlocksRef.current.has(completedBlockId)) return;
+
+    syncedCompletedBlocksRef.current.add(completedBlockId);
+    setSelectedContentLoading(true);
+    try {
+      const data = await learningService.openCourse(courseId);
+      const modules = applySequentialLocks(data.modules);
+      const blocks = modules.flatMap((module) => module.blocks);
+      const availableBlockIds = new Set(blocks.map((block) => block.id));
+      const nextSelectedBlockId = availableBlockIds.has(preferredBlockId)
+        ? preferredBlockId
+        : data.currentLessonBlockId && availableBlockIds.has(data.currentLessonBlockId)
+          ? data.currentLessonBlockId
+          : blocks[0]?.id ?? null;
+
+      setLearning({ ...data, modules });
+      setSelectedBlockId(nextSelectedBlockId);
+      setError(null);
+    } catch {
+      syncedCompletedBlocksRef.current.delete(completedBlockId);
+      setError('Đã lưu kết quả bài học nhưng chưa thể tải nội dung bài tiếp theo. Vui lòng thử lại.');
+    } finally {
+      setSelectedContentLoading(false);
+    }
+  }, [courseId]);
+
   const handleMarkComplete = async () => {
     if (!selectedBlock || completing || selectedContentLoading || selectedBlock.locked) return;
+    if (!selectedBlock.contentAvailable) {
+      setError('Nội dung bài học chưa được tải đầy đủ. Vui lòng tải lại trước khi hoàn thành bài.');
+      return;
+    }
     setCompleting(true);
     try {
       const progress = await learningService.markLessonComplete(selectedBlock.id);
@@ -217,9 +300,7 @@ export function CourseLearningPage() {
         completedAt: progress.completedAt,
       });
       const next = allBlocks[selectedIndex + 1];
-      if (next) {
-        setSelectedBlockId(next.id);
-      }
+      await refreshLearningAfterCompletion(selectedBlock.id, next?.id ?? selectedBlock.id);
     } catch {
       setError('Không thể lưu trạng thái hoàn thành. Vui lòng thử lại.');
     } finally {
@@ -245,9 +326,16 @@ export function CourseLearningPage() {
         watchedVideoSeconds,
         progressStatus: status,
       });
+      if (status === 'COMPLETED') {
+        void refreshLearningAfterCompletion(blockId);
+      }
     },
-    [updateBlock],
+    [refreshLearningAfterCompletion, updateBlock],
   );
+
+  const handleVideoProgressError = useCallback(() => {
+    setError('Không thể lưu tiến độ video. Vui lòng kiểm tra kết nối và thử lại.');
+  }, []);
 
   const handleFlashcardProgressSaved = useCallback(
     (blockId: string, cardIndex: number, status: 'REMEMBERED' | 'NEEDS_REVIEW', progressStatus: LearningLessonBlock['progressStatus']) => {
@@ -275,8 +363,11 @@ export function CourseLearningPage() {
           courseCompleted: totalLessons > 0 && completedLessons === totalLessons,
         };
       });
+      if (progressStatus === 'COMPLETED') {
+        void refreshLearningAfterCompletion(blockId);
+      }
     },
-    [],
+    [refreshLearningAfterCompletion],
   );
 
   const handleWritingProgressSaved = useCallback((blockId: string) => {
@@ -305,13 +396,17 @@ export function CourseLearningPage() {
         courseCompleted: newTotal > 0 && newCompleted === newTotal,
       };
     });
-  }, []);
+    void refreshLearningAfterCompletion(blockId);
+  }, [refreshLearningAfterCompletion]);
 
   const handleQuizProgressSaved = useCallback(
     (blockId: string, status: LearningLessonBlock['progressStatus']) => {
       updateBlock(blockId, { progressStatus: status });
+      if (status === 'COMPLETED') {
+        void refreshLearningAfterCompletion(blockId);
+      }
     },
-    [updateBlock],
+    [refreshLearningAfterCompletion, updateBlock],
   );
 
   if (loading) {
@@ -436,6 +531,15 @@ export function CourseLearningPage() {
         </Paper>
 
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 2,
+              alignItems: 'flex-start',
+              flexDirection: { xs: 'column', lg: 'row' },
+            }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
           {selectedBlock ? (
             <Card variant="outlined">
               <CardContent>
@@ -455,6 +559,19 @@ export function CourseLearningPage() {
                       </IconButton>
                     </Tooltip>
                   )}
+                  {aiChatAvailable && (
+                    <Tooltip title="Hỏi AI về bài học đang chọn">
+                      <Button
+                        size="small"
+                        variant={aiChatOpen ? 'contained' : 'outlined'}
+                        startIcon={<SmartToyOutlinedIcon fontSize="small" />}
+                        aria-label="Hỏi AI về bài học đang chọn"
+                        onClick={() => setAiChatOpen((open) => !open)}
+                      >
+                        {aiChatOpen ? 'Ẩn AI' : 'Hỏi AI'}
+                      </Button>
+                    </Tooltip>
+                  )}
                   {selectedBlock.progressStatus === 'COMPLETED' && (
                     <Chip size="small" icon={<CheckCircleIcon />} label="Đã hoàn thành" color="success" />
                   )}
@@ -469,6 +586,7 @@ export function CourseLearningPage() {
                     block={selectedBlock}
                     onContentLoadingChange={setSelectedContentLoading}
                     onVideoProgressSaved={handleVideoProgressSaved}
+                    onVideoProgressError={handleVideoProgressError}
                     onQuizProgressSaved={handleQuizProgressSaved}
                     onFlashcardProgressSaved={handleFlashcardProgressSaved}
                     onWritingProgressSaved={handleWritingProgressSaved}
@@ -489,6 +607,7 @@ export function CourseLearningPage() {
                       block={selectedBlock}
                       onContentLoadingChange={setSelectedContentLoading}
                       onVideoProgressSaved={handleVideoProgressSaved}
+                      onVideoProgressError={handleVideoProgressError}
                       onQuizProgressSaved={handleQuizProgressSaved}
                       onFlashcardProgressSaved={handleFlashcardProgressSaved}
                       onWritingProgressSaved={handleWritingProgressSaved}
@@ -527,6 +646,7 @@ export function CourseLearningPage() {
                         completing ||
                         selectedContentLoading ||
                         selectedBlock.progressStatus === 'COMPLETED' ||
+                        !selectedBlock.contentAvailable ||
                         ['VIDEO', 'QUIZ', 'FLASHCARD', 'WRITING'].includes(selectedBlock.type)
                       }
                       onClick={handleMarkComplete}
@@ -557,6 +677,29 @@ export function CourseLearningPage() {
           ) : learning.modules.length === 0 ? (
             <Alert severity="info">Khoá học chưa có nội dung bài học.</Alert>
           ) : null}
+            </Box>
+
+            {selectedBlock && (
+              <Box
+                component="aside"
+                aria-label="Trợ lý AI cho bài học"
+                sx={{
+                  width: { xs: '100%', lg: 360 },
+                  flexShrink: 0,
+                  display: aiChatOpen ? 'block' : 'none',
+                  position: { lg: 'sticky' },
+                  top: { lg: 16 },
+                }}
+              >
+                <AiChatPanel
+                  courseId={learning.courseId}
+                  lessonBlockId={selectedBlock.id}
+                  lessonTitle={selectedBlock.title}
+                  onClose={() => setAiChatOpen(false)}
+                />
+              </Box>
+            )}
+          </Box>
           <Box sx={{ mt: 2 }}>
             <CoursePomodoroPanel courseTitle={learning.courseTitle} />
           </Box>
@@ -630,6 +773,7 @@ interface BlockContentProps {
     status: LearningLessonBlock['progressStatus'],
     watchedVideoSeconds: number,
   ) => void;
+  onVideoProgressError: () => void;
   onFlashcardProgressSaved: (
     blockId: string,
     cardIndex: number,
@@ -647,6 +791,7 @@ function BlockContent({
   block,
   onContentLoadingChange,
   onVideoProgressSaved,
+  onVideoProgressError,
   onQuizProgressSaved,
   onFlashcardProgressSaved,
   onWritingProgressSaved,
@@ -658,6 +803,7 @@ function BlockContent({
           key={block.id}
           block={block}
           onProgressSaved={onVideoProgressSaved}
+          onProgressSaveError={onVideoProgressError}
           onLoadingChange={onContentLoadingChange}
         />
       );
@@ -689,16 +835,30 @@ function BlockContent({
 function VideoBlock({
   block,
   onProgressSaved,
+  onProgressSaveError,
   onLoadingChange,
 }: {
   block: LearningLessonBlock;
   onProgressSaved: BlockContentProps['onVideoProgressSaved'];
+  onProgressSaveError: BlockContentProps['onVideoProgressError'];
   onLoadingChange: BlockContentProps['onContentLoadingChange'];
 }) {
+  const [checkpoint] = useState(
+    () => readLocalStorageValue<VideoProgressCheckpoint>(videoProgressStorageKey(block.id)),
+  );
+  const [initialPosition] = useState(
+    () => resolveVideoResumePosition(block.lastVideoPositionSeconds, checkpoint),
+  );
+  const initialWatchedSeconds = Math.max(block.watchedVideoSeconds ?? 0, checkpoint?.watchedSeconds ?? 0);
   const [playerLoading, setPlayerLoading] = useState(true);
+  const [currentPosition, setCurrentPosition] = useState(initialPosition);
+  const [mediaDuration, setMediaDuration] = useState(
+    checkpoint?.mediaDurationSeconds ?? (block.durationMinutes ? block.durationMinutes * 60 : 0),
+  );
   const playerRef = useRef<HTMLVideoElement>(null);
+  const currentPositionRef = useRef(initialPosition);
   const lastSavedRef = useRef(block.lastVideoPositionSeconds ?? 0);
-  const watchedSecondsRef = useRef(block.watchedVideoSeconds ?? 0);
+  const watchedSecondsRef = useRef(initialWatchedSeconds);
   const lastSavedWatchedRef = useRef(block.watchedVideoSeconds ?? 0);
   const mediaDurationRef = useRef<number | null>(null);
   const lastObservedTimeRef = useRef<number | null>(null);
@@ -708,6 +868,19 @@ function VideoBlock({
   const pendingPositionRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
 
+  const storeCheckpoint = useCallback((positionSeconds: number) => {
+    const normalizedPosition = Math.max(0, Math.floor(positionSeconds));
+    const checkpointToStore: VideoProgressCheckpoint = {
+      positionSeconds: normalizedPosition,
+      watchedSeconds: Math.max(0, Math.floor(watchedSecondsRef.current)),
+      ...(mediaDurationRef.current && mediaDurationRef.current > 0
+        ? { mediaDurationSeconds: Math.floor(mediaDurationRef.current) }
+        : {}),
+      savedAt: Date.now(),
+    };
+    writeLocalStorageValue(videoProgressStorageKey(block.id), checkpointToStore);
+  }, [block.id]);
+
   useEffect(() => {
     setPlayerLoading(true);
     onLoadingChange(true);
@@ -716,6 +889,7 @@ function VideoBlock({
 
   const savePosition = useCallback(
     (positionSeconds: number) => {
+      storeCheckpoint(positionSeconds);
       pendingPositionRef.current = positionSeconds;
 
       const flush = () => {
@@ -745,6 +919,7 @@ function VideoBlock({
             lastSavedRef.current = positionToSave;
             lastSavedWatchedRef.current = progress.watchedVideoSeconds ?? watchedSecondsRef.current;
             watchedSecondsRef.current = Math.max(watchedSecondsRef.current, lastSavedWatchedRef.current);
+            storeCheckpoint(positionToSave);
             onProgressSaved(
               block.id,
               positionToSave,
@@ -758,10 +933,18 @@ function VideoBlock({
             if (pendingPositionRef.current === null) {
               pendingPositionRef.current = positionToSave;
             }
+            onProgressSaveError();
           })
           .finally(() => {
             isSavingRef.current = false;
-            if (success && pendingPositionRef.current !== null && pendingPositionRef.current !== lastSavedRef.current) {
+            if (
+              success
+              && pendingPositionRef.current !== null
+              && (
+                pendingPositionRef.current !== lastSavedRef.current
+                || Math.floor(watchedSecondsRef.current) !== lastSavedWatchedRef.current
+              )
+            ) {
               flush();
             }
           });
@@ -769,17 +952,51 @@ function VideoBlock({
 
       flush();
     },
-    [block.id, onProgressSaved],
+    [block.id, onProgressSaveError, onProgressSaved, storeCheckpoint],
   );
+
+  useEffect(() => {
+    const persistBeforeLeaving = () => {
+      const position = Math.max(0, Math.floor(currentPositionRef.current));
+      storeCheckpoint(position);
+      learningService.saveVideoProgressKeepalive(
+        block.id,
+        position,
+        watchedSecondsRef.current,
+        mediaDurationRef.current ?? undefined,
+      );
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') persistBeforeLeaving();
+    };
+
+    window.addEventListener('pagehide', persistBeforeLeaving);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', persistBeforeLeaving);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      persistBeforeLeaving();
+    };
+  }, [block.id, storeCheckpoint]);
 
   const handleReady = () => {
     const video = playerRef.current;
     if (video && Number.isFinite(video.duration) && video.duration > 0) {
       mediaDurationRef.current = video.duration;
+      setMediaDuration(video.duration);
     }
-    if (video && !isReadyRef.current && block.lastVideoPositionSeconds && block.lastVideoPositionSeconds > 0) {
+    if (video && !isReadyRef.current) {
       isReadyRef.current = true;
-      video.currentTime = Math.min(block.lastVideoPositionSeconds, video.duration || block.lastVideoPositionSeconds);
+      const resumePosition = resolveVideoResumePosition(
+        block.lastVideoPositionSeconds,
+        checkpoint,
+        video.duration,
+      );
+      if (resumePosition > 0) {
+        video.currentTime = resumePosition;
+        currentPositionRef.current = resumePosition;
+        setCurrentPosition(resumePosition);
+      }
     }
     if (video) lastObservedTimeRef.current = video.currentTime;
     setPlayerLoading(false);
@@ -824,6 +1041,8 @@ function VideoBlock({
       return;
     }
     const position = Math.floor(video.currentTime);
+    currentPositionRef.current = video.currentTime;
+    setCurrentPosition(video.currentTime);
     const previousPosition = lastObservedTimeRef.current;
     if (!isSeekingRef.current && previousPosition != null) {
       const delta = video.currentTime - previousPosition;
@@ -844,6 +1063,8 @@ function VideoBlock({
     const player = playerRef.current;
     if (!player || player.ended) return;
     const position = Math.floor(player.currentTime);
+    currentPositionRef.current = player.currentTime;
+    setCurrentPosition(player.currentTime);
     if (
       position !== lastSavedRef.current
       || watchedSecondsRef.current !== lastSavedWatchedRef.current
@@ -857,12 +1078,18 @@ function VideoBlock({
     if (!video) return;
     if (Number.isFinite(video.duration) && video.duration > 0) {
       mediaDurationRef.current = video.duration;
+      setMediaDuration(video.duration);
     }
-    if (video.duration && watchedSecondsRef.current >= video.duration - WATCHED_DELTA_MAX_SECONDS) {
-      watchedSecondsRef.current = Math.max(watchedSecondsRef.current, Math.floor(video.duration));
-    }
+    watchedSecondsRef.current = normalizeWatchedSecondsAtVideoEnd(
+      watchedSecondsRef.current,
+      video.duration,
+    );
     savePosition(Math.floor(video.currentTime));
   };
+
+  const progressPercent = mediaDuration > 0
+    ? Math.min(100, Math.max(0, (currentPosition / mediaDuration) * 100))
+    : 0;
 
   return (
     <Box>
@@ -909,6 +1136,24 @@ function VideoBlock({
           onEnded={handleEnded}
         />
       </Box>
+      <Stack spacing={0.75} sx={{ mt: 1.5 }}>
+        <LinearProgress
+          variant="determinate"
+          value={progressPercent}
+          aria-label="Tiến trình xem video"
+          sx={{ height: 7, borderRadius: 999 }}
+        />
+        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            Đã xem {formatVideoTime(currentPosition)} / {mediaDuration > 0 ? formatVideoTime(mediaDuration) : '--:--'}
+          </Typography>
+          {initialPosition > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              Tiếp tục từ {formatVideoTime(initialPosition)}
+            </Typography>
+          )}
+        </Stack>
+      </Stack>
       {block.content && (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
           {block.content}

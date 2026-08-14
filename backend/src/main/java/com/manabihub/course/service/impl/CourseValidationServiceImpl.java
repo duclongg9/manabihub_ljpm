@@ -11,6 +11,7 @@ import com.manabihub.course.entity.CourseModule;
 import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.LessonBlockType;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.course.service.CourseValidationService;
 import com.manabihub.finaltest.entity.FinalTest;
 import com.manabihub.finaltest.entity.FinalTestChoice;
@@ -41,12 +42,12 @@ public class CourseValidationServiceImpl implements CourseValidationService {
     private final ObjectMapper objectMapper;
     private final CurrentUserService currentUserService;
     private final FinalTestRepository finalTestRepository;
+    private final CourseEditDraftService courseEditDraftService;
 
     @Override
     @Transactional(readOnly = true)
     public ValidationResultResponse validateCourse(UUID courseId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new IllegalArgumentException("Course not found"));
+        Course course = resolveCourseForValidation(courseId);
 
         if (course.getTeacher() == null
                 || course.getTeacher().getUser() == null
@@ -54,6 +55,22 @@ public class CourseValidationServiceImpl implements CourseValidationService {
             throw new SecurityException("You do not have permission to validate this course");
         }
 
+        return validateResolvedCourse(course);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ValidationResultResponse validateCourseForReview(UUID courseId) {
+        return validateResolvedCourse(resolveCourseForValidation(courseId));
+    }
+
+    private Course resolveCourseForValidation(UUID courseId) {
+        Course persistedCourse = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("Course not found"));
+        return courseEditDraftService.resolveEditableCourse(persistedCourse);
+    }
+
+    private ValidationResultResponse validateResolvedCourse(Course course) {
         List<ValidationError> errors = new ArrayList<>();
 
         validateMetadata(course, errors);
@@ -346,7 +363,9 @@ public class CourseValidationServiceImpl implements CourseValidationService {
     }
 
     private void validateFinalTest(Course course, List<ValidationError> errors) {
-        FinalTest finalTest = finalTestRepository.findByCourseId(course.getId()).orElse(null);
+        FinalTest finalTest = courseEditDraftService.hasEditDraft(course.getId())
+                ? course.getFinalTest()
+                : finalTestRepository.findByCourseId(course.getId()).orElse(null);
         if (finalTest == null) {
             errors.add(new ValidationError("MSG-FINAL-001",
                     "Vui lòng cấu hình bài kiểm tra cuối khóa trước khi gửi duyệt.", "error"));

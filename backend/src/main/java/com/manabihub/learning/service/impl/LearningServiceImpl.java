@@ -198,31 +198,18 @@ public class LearningServiceImpl implements LearningService {
 
         LessonBlockProgress progress = resolveOrCreateProgress(enrollment, block);
         int durationSeconds = resolveVideoDurationSeconds(block, progress, request.mediaDurationSeconds());
-        if (request.positionSeconds() > durationSeconds) {
-            throw new BusinessException(
-                    MessageCodes.LEARNING_INVALID_VIDEO_POSITION,
-                    "Video position exceeds the lesson duration",
-                    HttpStatus.BAD_REQUEST
-            );
-        }
-
         if (progress.getVideoDurationSeconds() == null
                 && isAcceptableObservedDuration(block, request.mediaDurationSeconds())) {
             progress.setVideoDurationSeconds(request.mediaDurationSeconds());
         }
-        progress.setLastVideoPositionSeconds(request.positionSeconds());
+        int normalizedPositionSeconds = Math.min(request.positionSeconds(), durationSeconds);
+        progress.setLastVideoPositionSeconds(normalizedPositionSeconds);
         int reportedWatchedSeconds = request.watchedSeconds() == null ? 0 : request.watchedSeconds();
-        if (reportedWatchedSeconds > durationSeconds) {
-            throw new BusinessException(
-                    MessageCodes.LEARNING_INVALID_VIDEO_POSITION,
-                    "Watched video time exceeds the lesson duration",
-                    HttpStatus.BAD_REQUEST
-            );
-        }
-        int watchedSeconds = Math.max(
+        int normalizedWatchedSeconds = Math.min(reportedWatchedSeconds, durationSeconds);
+        int watchedSeconds = Math.min(durationSeconds, Math.max(
                 progress.getWatchedVideoSeconds() == null ? 0 : progress.getWatchedVideoSeconds(),
-                reportedWatchedSeconds
-        );
+                normalizedWatchedSeconds
+        ));
         progress.setWatchedVideoSeconds(watchedSeconds);
         if (progress.getStatus() == LessonProgressStatus.NOT_STARTED) {
             progress.setStatus(LessonProgressStatus.IN_PROGRESS);

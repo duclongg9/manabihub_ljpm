@@ -16,8 +16,12 @@ import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.repository.PublicCourseSpecification;
+import com.manabihub.course.repository.projection.PublicCourseCardProjection;
+import com.manabihub.course.repository.projection.PublicCourseLessonCountProjection;
+import com.manabihub.course.repository.projection.PublicCourseRankProjection;
 import com.manabihub.course.service.CourseService;
 import com.manabihub.course.service.CourseValidationService;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.course.dto.response.ValidationResultResponse;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
@@ -29,17 +33,17 @@ import com.manabihub.learning.repository.EnrollmentRepository;
 import com.manabihub.wallet.enums.EscrowStatus;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
 import com.manabihub.course.dto.response.TeacherCourseAnalyticsResponse;
-import com.manabihub.kyc.repository.TeacherProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import com.manabihub.audit.service.AuditLogService;
+import com.manabihub.ai.service.AiCourseEligibilityService;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.notification.NotificationTypes;
 import com.manabihub.review.dto.response.CourseReviewAggregateResponse;
@@ -57,6 +61,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
@@ -81,6 +87,8 @@ public class CourseServiceImpl implements CourseService {
     private final SystemSettingValueService settingValueService;
     private final EnrollmentRepository enrollmentRepository;
     private final EscrowLedgerRepository escrowLedgerRepository;
+    private final CourseEditDraftService courseEditDraftService;
+    private final AiCourseEligibilityService aiCourseEligibilityService;
 
     @Override
     public CourseDraftResponse createDraft(CreateCourseDraftRequest request) {
@@ -101,13 +109,13 @@ public class CourseServiceImpl implements CourseService {
                 .thumbnailUrl(blankToNull(request.thumbnailUrl()))
                 .outcomes(trim(request.outcomes()))
                 .price(request.price())
+                .aiSupported(aiCourseEligibilityService.isPriceEligible(request.price()))
                 .currency("VND")
                 .prerequisites(trim(request.prerequisites()))
                 .targetStudents(trim(request.targetStudents()))
                 .accessDurationDays(normalizeAccessDuration(request.accessDurationDays()))
                 .accessExpiresAt(request.accessExpiresAt())
                 .status(CourseStatus.DRAFT)
-                .aiSupported(false)
                 .build();
 
         for (int index = 0; index < learningGoals.size(); index++) {
@@ -243,7 +251,8 @@ public class CourseServiceImpl implements CourseService {
     public CourseDraftResponse updateDraft(UUID draftId, CreateCourseDraftRequest request) {
         UUID currentUserId = currentUserService.getCurrentUserId();
         TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
-        Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
+        Course persistedCourse = resolveDraftForTeacher(draftId, teacherProfile.getId());
+        Course course = courseEditDraftService.resolveEditableCourse(persistedCourse);
         List<String> learningGoals = normalizeLearningGoals(request.learningGoals());
         validateDraftRequest(request, learningGoals);
         String title = normalizeDraftTitle(request.title());
@@ -257,12 +266,22 @@ public class CourseServiceImpl implements CourseService {
         course.setThumbnailUrl(blankToNull(request.thumbnailUrl()));
         course.setOutcomes(trim(request.outcomes()));
         course.setPrice(request.price());
+        course.setAiSupported(aiCourseEligibilityService.isPriceEligible(request.price()));
         course.setCurrency("VND");
         course.setPrerequisites(trim(request.prerequisites()));
         course.setTargetStudents(trim(request.targetStudents()));
         course.setAccessDurationDays(normalizeAccessDuration(request.accessDurationDays()));
         course.setAccessExpiresAt(request.accessExpiresAt());
         course.getLearningGoals().clear();
+
+        if (courseEditDraftService.hasEditDraft(course.getId())) {
+            for (int index = 0; index < learningGoals.size(); index++) {
+                course.addLearningGoal(learningGoals.get(index), index + 1);
+            }
+            courseEditDraftService.saveIfVersioned(course);
+            return toResponse(persistedCourse);
+        }
+
         courseRepository.saveAndFlush(course);
 
         for (int index = 0; index < learningGoals.size(); index++) {
@@ -278,6 +297,13 @@ public class CourseServiceImpl implements CourseService {
         TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
 
+        if (courseEditDraftService.hasEditDraft(course.getId())) {
+            throw new BusinessException(
+                    MessageCodes.COMMON_CONFLICT,
+                    "Không thể xóa khóa học đã từng xuất bản. Hãy tiếp tục chỉnh sửa và gửi duyệt lại.",
+                    HttpStatus.CONFLICT
+            );
+        }
         courseRepository.delete(course);
     }
 
@@ -286,6 +312,7 @@ public class CourseServiceImpl implements CourseService {
         UUID currentUserId = currentUserService.getCurrentUserId();
         TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         Course course = resolveDraftForTeacher(draftId, teacherProfile.getId());
+        Course editableCourse = courseEditDraftService.resolveEditableCourse(course);
         CourseStatus previousStatus = course.getStatus();
 
         ValidationResultResponse validationResult = courseValidationService.validateCourse(draftId);
@@ -303,7 +330,7 @@ public class CourseServiceImpl implements CourseService {
         notificationService.createNotificationForAdminRole(
                 "COURSE_MANAGER",
                 "Khóa học mới đang chờ xét duyệt",
-                "Giảng viên đã gửi khóa học \"" + course.getTitle() + "\" để xét duyệt.",
+                "Giảng viên đã gửi khóa học \"" + editableCourse.getTitle() + "\" để xét duyệt.",
                 NotificationTypes.COURSE_REVIEW,
                 "/admin/courses/approvals/" + course.getId()
         );
@@ -316,7 +343,7 @@ public class CourseServiceImpl implements CourseService {
                 course.getId(),
                 Map.of("status", previousStatus.name()),
                 Map.of("status", CourseStatus.PENDING.name()),
-                Map.of("courseTitle", course.getTitle())
+                Map.of("courseTitle", editableCourse.getTitle())
         );
     }
 
@@ -371,9 +398,6 @@ public class CourseServiceImpl implements CourseService {
     @Override
     public CourseDraftResponse unpublishCourse(UUID courseId) {
         UUID currentUserId = currentUserService.getCurrentUserId();
-        // Unpublishing is a workspace operation. It must remain available when
-        // a teacher needs to correct a cover/content item; it is not a publish
-        // operation and therefore must not require a second KYC gate here.
         TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
         Course course = courseRepository.findByIdAndTeacher_Id(courseId, teacherProfile.getId())
                 .orElseThrow(() -> new BusinessException(
@@ -392,8 +416,8 @@ public class CourseServiceImpl implements CourseService {
 
         CourseStatus previousStatus = course.getStatus();
         Instant previousPublishedAt = course.getPublishedAt();
+        courseEditDraftService.beginEditingPublishedCourse(course);
         course.setStatus(CourseStatus.DRAFT);
-        course.setPublishedAt(null);
         courseRepository.saveAndFlush(course);
 
         auditLogService.logUserAction(
@@ -446,10 +470,6 @@ public class CourseServiceImpl implements CourseService {
 
         boolean isAdmin = currentUserService.hasRole("ADMIN") || currentUserService.hasRole("SUPER_ADMIN");
 
-        // An unpublished course must disappear from the public catalogue, but
-        // existing students must still be able to open it while the teacher
-        // edits and resubmits the course. The learning endpoints enforce the
-        // same enrollment check, so keep the public detail response aligned.
         boolean isEnrolled = currentUserIdOpt.isPresent()
                 && courseRepository.checkEnrollmentExists(course.getId(), currentUserIdOpt.get());
 
@@ -459,6 +479,12 @@ public class CourseServiceImpl implements CourseService {
                     "Course was not found or is not published yet",
                     HttpStatus.NOT_FOUND
             );
+        }
+
+        // Authors and reviewers preview the proposed revision. Enrolled
+        // students deliberately keep reading the last approved live aggregate.
+        if (isAuthor || isAdmin) {
+            course = courseEditDraftService.resolveEditableCourse(course);
         }
 
         CourseReviewAggregateResponse reviewAggregate =
@@ -713,29 +739,31 @@ public class CourseServiceImpl implements CourseService {
     }
 
     private CourseDraftResponse toResponse(Course course) {
-        List<String> learningGoals = course.getLearningGoals().stream()
+        Course responseCourse = courseEditDraftService.resolveEditableCourse(course);
+        List<String> learningGoals = responseCourse.getLearningGoals().stream()
                 .map(CourseLearningGoal::getGoalText)
                 .toList();
 
         return new CourseDraftResponse(
-                course.getId(),
-                course.getTeacher().getId(),
-                course.getTitle(),
-                course.getSlug(),
-                course.getIntroduction(),
-                course.getJlptLevel(),
-                course.getCategory(),
-                course.getThumbnailUrl(),
-                course.getOutcomes(),
-                course.getPrice(),
-                course.getCurrency(),
-                course.getPrerequisites(),
-                course.getTargetStudents(),
-                course.getStatus(),
+                responseCourse.getId(),
+                responseCourse.getTeacher().getId(),
+                responseCourse.getTitle(),
+                responseCourse.getSlug(),
+                responseCourse.getIntroduction(),
+                responseCourse.getJlptLevel(),
+                responseCourse.getCategory(),
+                responseCourse.getThumbnailUrl(),
+                responseCourse.getOutcomes(),
+                responseCourse.getPrice(),
+                responseCourse.getCurrency(),
+                responseCourse.getPrerequisites(),
+                responseCourse.getTargetStudents(),
+                responseCourse.getStatus(),
                 learningGoals,
-                course.getAccessDurationDays(),
-                course.getAccessExpiresAt(),
-                course.getCreatedAt(),
+                responseCourse.getAccessDurationDays(),
+                responseCourse.getAccessExpiresAt(),
+                responseCourse.getCreatedAt(),
+                courseEditDraftService.resolveLastModifiedAt(course),
                 srsTrace()
         );
     }
@@ -787,23 +815,19 @@ public class CourseServiceImpl implements CourseService {
             BigDecimal maxPrice,
             Pageable pageable
     ) {
-        Sort.Order requestedOrder = pageable.getSort().stream().findFirst().orElse(null);
-        String aggregateSort = requestedOrder != null && isAggregateSort(requestedOrder.getProperty())
-                ? requestedOrder.getProperty()
-                : null;
-        var spec = PublicCourseSpecification.buildSearch(
-                keyword,
-                category,
-                jlptLevel,
-                minPrice,
-                maxPrice,
-                aggregateSort,
-                requestedOrder == null ? Sort.Direction.DESC : requestedOrder.getDirection()
-        );
-        Pageable queryPageable = aggregateSort == null
-                ? pageable
-                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
-        Page<Course> coursePage = courseRepository.findAll(spec, queryPageable);
+        if (pageable.getSort().getOrderFor("enrollmentCount") != null) {
+            return searchRankedPublicCourses(
+                    keyword, category, jlptLevel, minPrice, maxPrice, pageable, true
+            );
+        }
+        if (pageable.getSort().getOrderFor("averageRating") != null) {
+            return searchRankedPublicCourses(
+                    keyword, category, jlptLevel, minPrice, maxPrice, pageable, false
+            );
+        }
+
+        var spec = PublicCourseSpecification.buildSearch(keyword, category, jlptLevel, minPrice, maxPrice);
+        Page<Course> coursePage = courseRepository.findAll(spec, pageable);
         Map<UUID, Long> enrollmentCounts = new HashMap<>();
         List<UUID> courseIds = coursePage.getContent().stream().map(Course::getId).toList();
         if (!courseIds.isEmpty()) {
@@ -831,6 +855,115 @@ public class CourseServiceImpl implements CourseService {
                 ),
                 enrollmentCounts.getOrDefault(course.getId(), 0L)
         ));
+    }
+
+    /**
+     * Applies aggregate ranking to the complete filtered catalogue in SQL,
+     * then loads the selected page's card data in two bounded batch queries.
+     * This avoids both page-local Java sorting and module/block N+1 loading.
+     */
+    private Page<PublicCourseSummaryResponse> searchRankedPublicCourses(
+            String keyword,
+            String category,
+            com.manabihub.course.enums.JlptLevel jlptLevel,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Pageable responsePageable,
+            boolean rankByEnrollments
+    ) {
+        Pageable databasePageable = PageRequest.of(
+                responsePageable.getPageNumber(),
+                responsePageable.getPageSize()
+        );
+        String keywordPattern = toKeywordPattern(keyword);
+        String normalizedCategory = blankToNull(category);
+        String normalizedLevel = jlptLevel == null ? null : jlptLevel.name();
+
+        Page<PublicCourseRankProjection> rankedPage = rankByEnrollments
+                ? courseRepository.findPublicCoursesRankedByEnrollments(
+                        keywordPattern,
+                        normalizedCategory,
+                        normalizedLevel,
+                        minPrice,
+                        maxPrice,
+                        databasePageable
+                )
+                : courseRepository.findPublicCoursesRankedByRating(
+                        keywordPattern,
+                        normalizedCategory,
+                        normalizedLevel,
+                        minPrice,
+                        maxPrice,
+                        databasePageable
+                );
+
+        List<UUID> courseIds = rankedPage.getContent().stream()
+                .map(PublicCourseRankProjection::getCourseId)
+                .toList();
+        if (courseIds.isEmpty()) {
+            return new PageImpl<>(List.of(), responsePageable, rankedPage.getTotalElements());
+        }
+
+        Map<UUID, PublicCourseCardProjection> cardsById =
+                courseRepository.findPublicCourseCardsByIds(courseIds).stream()
+                        .collect(Collectors.toMap(
+                                PublicCourseCardProjection::getCourseId,
+                                Function.identity()
+                        ));
+        Map<UUID, Long> lessonCountsById =
+                courseRepository.countVisibleLessonsForPublicCourses(courseIds).stream()
+                        .collect(Collectors.toMap(
+                                PublicCourseLessonCountProjection::getCourseId,
+                                PublicCourseLessonCountProjection::getTotalLessons
+                        ));
+
+        List<PublicCourseSummaryResponse> content = rankedPage.getContent().stream()
+                .map(rank -> toRankedSummaryResponse(
+                        cardsById.get(rank.getCourseId()),
+                        rank,
+                        lessonCountsById.getOrDefault(rank.getCourseId(), 0L)
+                ))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        return new PageImpl<>(content, responsePageable, rankedPage.getTotalElements());
+    }
+
+    private PublicCourseSummaryResponse toRankedSummaryResponse(
+            PublicCourseCardProjection card,
+            PublicCourseRankProjection rank,
+            long totalLessons
+    ) {
+        if (card == null) {
+            return null;
+        }
+
+        com.manabihub.course.enums.JlptLevel level = card.getJlptLevel() == null
+                ? null
+                : com.manabihub.course.enums.JlptLevel.valueOf(card.getJlptLevel());
+        return PublicCourseSummaryResponse.builder()
+                .id(card.getCourseId())
+                .title(card.getTitle())
+                .slug(card.getSlug())
+                .thumbnailUrl(card.getThumbnailUrl())
+                .jlptLevel(level)
+                .category(card.getCategory())
+                .price(card.getPrice())
+                .currency(card.getCurrency())
+                .teacherId(card.getTeacherId())
+                .teacherName(card.getTeacherName())
+                .teacherAvatarUrl(card.getTeacherAvatarUrl())
+                .totalLessons(Math.toIntExact(totalLessons))
+                .publishedAt(card.getPublishedAt())
+                .averageRating(rank.getAverageRating() == null ? BigDecimal.ZERO : rank.getAverageRating())
+                .reviewCount(rank.getReviewCount())
+                .enrollmentCount(rank.getEnrollmentCount())
+                .build();
+    }
+
+    private String toKeywordPattern(String keyword) {
+        String normalized = blankToNull(keyword);
+        return normalized == null ? null : "%" + normalized.toLowerCase(Locale.ROOT) + "%";
     }
 
     private PublicCourseSummaryResponse toSummaryResponse(
@@ -872,10 +1005,6 @@ public class CourseServiceImpl implements CourseService {
                 .reviewCount(reviewAggregate.reviewCount())
                 .enrollmentCount(enrollmentCount)
                 .build();
-    }
-
-    private boolean isAggregateSort(String property) {
-        return "enrollmentCount".equals(property) || "averageRating".equals(property);
     }
 
 }

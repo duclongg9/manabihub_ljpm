@@ -11,6 +11,8 @@ import com.manabihub.notification.NotificationTypes;
 import com.manabihub.writing.dto.request.TeacherWritingFeedbackRequest;
 import com.manabihub.writing.dto.response.AiWritingSuggestionResponse;
 import com.manabihub.writing.dto.response.TeacherWritingFeedbackResponse;
+import com.manabihub.writing.dto.response.WritingReviewFacetResponse;
+import com.manabihub.writing.dto.response.WritingReviewOverviewResponse;
 import com.manabihub.writing.dto.response.WritingSubmissionDetailResponse;
 import com.manabihub.writing.dto.response.WritingSubmissionSummaryResponse;
 import com.manabihub.writing.entity.AiWritingSuggestion;
@@ -20,6 +22,7 @@ import com.manabihub.writing.enums.WritingSubmissionStatus;
 import com.manabihub.writing.repository.AiWritingSuggestionRepository;
 import com.manabihub.writing.repository.TeacherWritingFeedbackRepository;
 import com.manabihub.writing.repository.WritingSubmissionRepository;
+import com.manabihub.writing.repository.projection.WritingReviewFacetProjection;
 import com.manabihub.writing.repository.projection.WritingSubmissionQueueProjection;
 import com.manabihub.writing.service.TeacherWritingReviewService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -47,16 +57,81 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
     public PageResponse<WritingSubmissionSummaryResponse> listSubmissions(
             String searchQuery,
             Boolean reviewed,
+            UUID courseId,
+            UUID lessonId,
+            WritingSubmissionStatus status,
             Pageable pageable
     ) {
         TeacherProfile teacher = getCurrentTeacher();
         String normalizedQuery = searchQuery == null ? "" : searchQuery.trim();
 
         Page<WritingSubmissionSummaryResponse> responsePage = writingSubmissionRepository
-                .findOwnedQueue(teacher.getId(), normalizedQuery, reviewed, pageable)
+                .findOwnedQueue(
+                        teacher.getId(), normalizedQuery, reviewed, courseId, lessonId,
+                        status == null ? null : status.name(), pageable
+                )
                 .map(this::toSummaryResponse);
 
         return PageResponse.from(responsePage);
+    }
+
+    @Override
+    public WritingReviewFacetResponse getFacets() {
+        TeacherProfile teacher = getCurrentTeacher();
+        List<WritingReviewFacetProjection> rows = writingSubmissionRepository
+                .findOwnedFacets(teacher.getId());
+
+        Map<UUID, MutableCourseFacet> courses = new LinkedHashMap<>();
+        for (WritingReviewFacetProjection row : rows) {
+            MutableCourseFacet course = courses.computeIfAbsent(
+                    row.getCourseId(),
+                    ignored -> new MutableCourseFacet(row.getCourseId(), row.getCourseTitle())
+            );
+            if (row.getLessonId() != null) {
+                course.lessons.putIfAbsent(
+                        row.getLessonId(),
+                        new WritingReviewFacetResponse.LessonOption(
+                                row.getLessonId(), row.getLessonTitle()
+                        )
+                );
+            }
+        }
+
+        List<WritingReviewFacetResponse.CourseOption> options = courses.values().stream()
+                .map(course -> new WritingReviewFacetResponse.CourseOption(
+                        course.id,
+                        course.title,
+                        new ArrayList<>(course.lessons.values())
+                ))
+                .toList();
+        return new WritingReviewFacetResponse(options);
+    }
+
+    @Override
+    public WritingReviewOverviewResponse getOverview(
+            String searchQuery,
+            UUID courseId,
+            UUID lessonId,
+            WritingSubmissionStatus status
+    ) {
+        TeacherProfile teacher = getCurrentTeacher();
+        String normalizedQuery = searchQuery == null ? "" : searchQuery.trim();
+        String statusValue = status == null ? null : status.name();
+        long pending = writingSubmissionRepository.countOwnedQueue(
+                teacher.getId(), normalizedQuery, false, courseId, lessonId, statusValue
+        );
+        long reviewed = writingSubmissionRepository.countOwnedQueue(
+                teacher.getId(), normalizedQuery, true, courseId, lessonId, statusValue
+        );
+        BigDecimal average = writingSubmissionRepository.averageOwnedScore(
+                teacher.getId(), normalizedQuery, true, courseId, lessonId, statusValue
+        );
+        return new WritingReviewOverviewResponse(
+                pending + reviewed,
+                pending,
+                reviewed,
+                average == null ? null : average.setScale(2, RoundingMode.HALF_UP)
+        );
     }
 
     @Override
@@ -83,24 +158,33 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
                         .official(true)
                         .build());
 
-        feedback.setScore(request.score());
-        feedback.setComment(request.comment().trim());
-        feedback.setTeacher(teacher);
-        teacherWritingFeedbackRepository.save(feedback);
+        String normalizedComment = request.comment().trim();
+        boolean unchanged = feedback.getId() != null
+                && sameScore(feedback.getScore(), request.score())
+                && Objects.equals(feedback.getComment(), normalizedComment)
+                && submission.getStatus() == WritingSubmissionStatus.TEACHER_FEEDBACK_READY;
 
-        submission.setStatus(WritingSubmissionStatus.TEACHER_FEEDBACK_READY);
-        writingSubmissionRepository.save(submission);
+        if (!unchanged) {
+            feedback.setScore(request.score());
+            feedback.setComment(normalizedComment);
+            feedback.setTeacher(teacher);
+            feedback.setOfficial(true);
+            teacherWritingFeedbackRepository.save(feedback);
 
-        notificationService.createNotification(
-                submission.getStudent().getUser().getId(),
-                submission.getStudent().getUser().getEmail(),
-                "Giảng viên đã phản hồi bài viết",
-                "Bài viết của bạn trong khóa học "
-                        + submission.getEnrollment().getCourse().getTitle()
-                        + " đã được giảng viên nhận xét.",
-                NotificationTypes.TEACHER_WRITING_FEEDBACK,
-                "/student/courses/" + submission.getEnrollment().getCourse().getId() + "/learn"
-        );
+            submission.setStatus(WritingSubmissionStatus.TEACHER_FEEDBACK_READY);
+            writingSubmissionRepository.save(submission);
+
+            notificationService.createNotification(
+                    submission.getStudent().getUser().getId(),
+                    submission.getStudent().getUser().getEmail(),
+                    "Giảng viên đã phản hồi bài viết",
+                    "Bài viết của bạn trong khóa học "
+                            + submission.getEnrollment().getCourse().getTitle()
+                            + " đã được giảng viên nhận xét.",
+                    NotificationTypes.TEACHER_WRITING_FEEDBACK,
+                    "/student/courses/" + submission.getEnrollment().getCourse().getId() + "/learn"
+            );
+        }
 
         return toDetailResponse(submission);
     }
@@ -137,13 +221,15 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
                 projection.getId(),
                 projection.getCourseId(),
                 projection.getCourseTitle(),
+                projection.getLessonId(),
                 projection.getLessonTitle(),
                 projection.getStudentName(),
                 projection.getStudentEmail(),
                 WritingSubmissionStatus.valueOf(projection.getStatus()),
                 projection.getSubmittedAt(),
                 projection.getHasAiSuggestion(),
-                projection.getHasTeacherFeedback()
+                projection.getHasTeacherFeedback(),
+                projection.getScore()
         );
     }
 
@@ -162,6 +248,9 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
                 submission.getId(),
                 submission.getEnrollment().getCourse().getId(),
                 submission.getEnrollment().getCourse().getTitle(),
+                submission.getLegacyLessonId() != null
+                        ? submission.getLegacyLessonId()
+                        : submission.getLessonBlockId(),
                 writingSubmissionRepository.findLessonTitle(submission.getId())
                         .orElse("Writing activity"),
                 resolveStudentName(submission),
@@ -207,5 +296,24 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
                 feedback.getCreatedAt(),
                 feedback.getUpdatedAt()
         );
+    }
+
+    private boolean sameScore(BigDecimal current, BigDecimal requested) {
+        if (current == null || requested == null) {
+            return current == requested;
+        }
+        return current.compareTo(requested) == 0;
+    }
+
+    private static final class MutableCourseFacet {
+        private final UUID id;
+        private final String title;
+        private final Map<UUID, WritingReviewFacetResponse.LessonOption> lessons =
+                new LinkedHashMap<>();
+
+        private MutableCourseFacet(UUID id, String title) {
+            this.id = id;
+            this.title = title;
+        }
     }
 }

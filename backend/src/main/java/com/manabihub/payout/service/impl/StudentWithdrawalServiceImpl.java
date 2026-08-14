@@ -4,6 +4,7 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.identity.service.AccountIdentityVerificationService;
 import com.manabihub.payout.dto.request.BankAccountDto;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
 import com.manabihub.payout.dto.response.StudentBankAccountResponse;
@@ -32,6 +33,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -57,6 +59,10 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
     private final CommercialPolicyService commercialPolicyService;
     private final WithdrawalNotificationService notificationService;
     private final StudentBankOwnershipVerificationService ownershipVerificationService;
+    private final AccountIdentityVerificationService accountIdentityVerificationService;
+
+    @Value("${manabihub.kyc.identity-verification-mode:direct-sdk-mock}")
+    private String identityVerificationMode;
 
     @Override
     @Transactional
@@ -72,7 +78,19 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
         }
 
         StudentProfile student = requireStudent(userId);
-        if (student.getIdentityVerifiedAt() == null) {
+        if (student.getUser() == null || student.getUser().getPhoneVerifiedAt() == null) {
+            throw new BusinessException(
+                    MessageCodes.PHONE_VERIFICATION_REQUIRED,
+                    "Vui lòng xác minh số điện thoại trước khi rút tiền",
+                    HttpStatus.FORBIDDEN);
+        }
+        boolean sharedIdentityVerified = accountIdentityVerificationService.findVerified(userId)
+                .filter(verification -> isDirectSdkDemo()
+                        || !"VNPT_EKYC_WEB_SDK_DEMO".equals(verification.getProvider()))
+                .isPresent();
+        boolean legacyIdentityVerified = student.getIdentityVerifiedAt() != null
+                && (isDirectSdkDemo() || !"VNPT_EKYC_WEB_SDK_DEMO".equals(student.getIdentityProvider()));
+        if (!sharedIdentityVerified && !legacyIdentityVerified) {
             throw new BusinessException(
                     MessageCodes.MSG_KYC_002,
                     "Vui lòng hoàn tất xác minh CCCD trước khi rút tiền",
@@ -146,6 +164,11 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
         notifyAfterCommit(() -> notificationService.notifyFinanceManager(
                 withdrawalId, amount, "STUDENT"));
         return withdrawalMapper.toResponse(withdrawal);
+    }
+
+    private boolean isDirectSdkDemo() {
+        return !org.springframework.util.StringUtils.hasText(identityVerificationMode)
+                || "direct-sdk-mock".equalsIgnoreCase(identityVerificationMode);
     }
 
     @Override

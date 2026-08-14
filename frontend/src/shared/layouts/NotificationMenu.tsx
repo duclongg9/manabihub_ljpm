@@ -167,15 +167,21 @@ export function NotificationMenu({ anchorEl, onClose, onViewAll, scopeKey }: Not
         <Button
           fullWidth
           size="small"
+          variant="text"
           onClick={onViewAll}
           endIcon={<ArrowForwardIosOutlinedIcon sx={{ fontSize: '0.7rem !important' }} />}
           sx={{
             justifyContent: 'space-between',
-            px: 1,
+            px: 1.25,
             textTransform: 'none',
             color: '#C41E3A',
+            bgcolor: '#FFF1F2',
             fontWeight: 800,
-            '&:hover': { bgcolor: 'rgba(196, 30, 58, 0.06)' },
+            '& .MuiButton-endIcon': { color: 'inherit' },
+            '&:hover': {
+              color: '#9D182E',
+              bgcolor: '#FDE2E6',
+            },
           }}
         >
           Xem tất cả thông báo

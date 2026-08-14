@@ -6,4 +6,5 @@ import java.util.UUID;
 
 public interface WeeklyLearningChallengeRewardRepository extends JpaRepository<WeeklyLearningChallengeReward, UUID> {
     boolean existsByChallengeIdAndStudentId(UUID challengeId, UUID studentId);
+    boolean existsByChallengeId(UUID challengeId);
 }

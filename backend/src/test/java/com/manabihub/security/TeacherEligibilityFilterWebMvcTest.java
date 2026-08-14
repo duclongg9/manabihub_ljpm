@@ -145,7 +145,9 @@ class TeacherEligibilityFilterWebMvcTest {
                         .first(true)
                         .last(true)
                         .build();
-        when(teacherWritingReviewService.listSubmissions(any(), any(), any())).thenReturn(page);
+        when(teacherWritingReviewService.listSubmissions(
+                any(), any(), any(), any(), any(), any()
+        )).thenReturn(page);
 
         mockMvc.perform(get("/api/v1/teacher/writing-submissions")
                         .with(jwt().jwt(j -> j.subject(userId.toString()).claim("role", "TEACHER"))

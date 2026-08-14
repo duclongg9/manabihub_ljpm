@@ -75,6 +75,16 @@ public class TeacherCourseController {
         ));
     }
 
+    @PostMapping("/{courseId}/unpublish")
+    public ResponseEntity<ApiResponse<CourseDraftResponse>> unpublishCourse(@PathVariable UUID courseId) {
+        CourseDraftResponse response = courseService.unpublishCourse(courseId);
+        return ResponseEntity.ok(ApiResponse.success(
+                MessageCodes.COURSE_UPDATED,
+                "Khóa học đã được ẩn khỏi danh mục. Học viên hiện tại tiếp tục học phiên bản đã duyệt trong khi bạn chỉnh sửa bản mới.",
+                response
+        ));
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<List<CourseDraftResponse>>> listCourses() {
         List<CourseDraftResponse> response = courseService.listMyCourses();

@@ -9,6 +9,7 @@ public record WritingSubmissionDetailResponse(
         UUID id,
         UUID courseId,
         String courseTitle,
+        UUID lessonId,
         String lessonTitle,
         String studentName,
         String studentEmail,

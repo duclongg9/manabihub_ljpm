@@ -62,7 +62,10 @@ export const InstructorCourseReviewPage = () => (
     <h2>Khi khóa học bị gỡ xuất bản</h2>
     <p>
       Khóa học không còn nhận học viên mới. Học viên đã ghi danh vẫn giữ quyền truy
-      cập, trừ khi có quyết định riêng của Trust & Safety kèm phương án khắc phục.
+      cập và tiếp tục học phiên bản đã được duyệt gần nhất. Nội dung giảng viên đang
+      chỉnh sửa được lưu thành một phiên bản riêng, không ảnh hưởng tới học viên cho
+      đến khi Course Manager phê duyệt. Sau khi duyệt, phiên bản mới được cập nhật cho
+      học viên; giảng viên có thể xuất bản lại để nhận học viên mới.
     </p>
 
     <h2>Thông báo và khiếu nại</h2>

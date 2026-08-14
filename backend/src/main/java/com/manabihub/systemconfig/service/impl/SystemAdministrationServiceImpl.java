@@ -1,6 +1,7 @@
 package com.manabihub.systemconfig.service.impl;
 
 import com.manabihub.audit.service.AuditLogService;
+import com.manabihub.ai.service.AiCourseEligibilityService;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.entity.InternalAdminAccount;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.time.Instant;
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +52,7 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
     private final InternalAdminInvitationService invitationService;
     private final ApplicationEventPublisher eventPublisher;
     private final NotificationService notificationService;
+    private final AiCourseEligibilityService aiCourseEligibilityService;
 
     @Override
     @Transactional(readOnly = true)
@@ -101,12 +104,14 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
                 normalizedValue);
         String previousValue = setting.getSettingValue();
         if (previousValue.equals(normalizedValue)) {
+            synchronizeAiCourseFlags(key, normalizedValue);
             return toSettingResponse(setting);
         }
 
         setting.setSettingValue(normalizedValue);
         setting.setUpdatedBy(actorId);
         SystemSetting saved = settingRepository.save(setting);
+        synchronizeAiCourseFlags(key, normalizedValue);
 
         auditLogService.logAdminAction(
                 actorId,
@@ -126,6 +131,12 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
                 "/admin/settings"
         );
         return toSettingResponse(saved);
+    }
+
+    private void synchronizeAiCourseFlags(String key, String normalizedValue) {
+        if ("AI_SUPPORT_PRICE_FLOOR".equals(key)) {
+            aiCourseEligibilityService.synchronizeAllCourses(new BigDecimal(normalizedValue));
+        }
     }
 
     private BusinessException settingNotFound() {
