@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   Dialog,
   DialogActions,
@@ -10,6 +11,7 @@ import {
   DialogTitle,
   Divider,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   LinearProgress,
@@ -35,6 +37,7 @@ import { ROUTES } from '../../../shared/constants/routes';
 export const STORAGE_KEY = 'manabihub.student.study-plan.v1';
 export const STUDY_PLAN_UPDATED_EVENT = 'manabihub:study-plan-updated';
 export const STUDY_PLAN_OPEN_SCHEDULE_EVENT = 'manabihub:study-plan-open-schedule';
+export const STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT = 'manabihub:study-plan-open-bulk-schedule';
 const WEEKLY_TARGET_MINUTES = 150;
 
 const DAYS = [
@@ -60,6 +63,8 @@ const PRESETS = [
 
 type PresetId = (typeof PRESETS)[number]['id'] | 'custom';
 type DurationChoice = 25 | 50 | 60 | 'custom';
+type BulkTimeAction = 'keep' | 'set' | 'shift';
+type BulkDurationChoice = 25 | 50 | 60 | 'custom' | 'keep';
 
 export interface StudyCourseOption {
   id: string;
@@ -183,7 +188,30 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   const [scheduleDateKey, setScheduleDateKey] = useState<string | null>(null);
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Record<string, boolean>>({});
+  const [bulkCourseSearch, setBulkCourseSearch] = useState('');
+  const [bulkDayFilter, setBulkDayFilter] = useState<number | 'all'>('all');
+  const [bulkTimeAction, setBulkTimeAction] = useState<BulkTimeAction>('keep');
+  const [bulkStartTime, setBulkStartTime] = useState('19:00');
+  const [bulkShiftMinutes, setBulkShiftMinutes] = useState(15);
+  const [bulkDuration, setBulkDuration] = useState<BulkDurationChoice>('keep');
+  const [bulkCustomDuration, setBulkCustomDuration] = useState(25);
+  const [bulkError, setBulkError] = useState('');
   const notifiedRef = useRef(new Set<string>());
+
+  const openBulkSchedule = () => {
+    setBulkSelectedIds(Object.fromEntries(plan.slots.filter((slot) => slot.enabled).map((slot) => [slot.id, true])));
+    setBulkCourseSearch('');
+    setBulkDayFilter('all');
+    setBulkTimeAction('keep');
+    setBulkStartTime('19:00');
+    setBulkShiftMinutes(15);
+    setBulkDuration('keep');
+    setBulkCustomDuration(25);
+    setBulkError('');
+    setBulkOpen(true);
+  };
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
@@ -211,6 +239,11 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     window.addEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, openSchedule);
     return () => window.removeEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, openSchedule);
   }, []);
+
+  useEffect(() => {
+    window.addEventListener(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT, openBulkSchedule);
+    return () => window.removeEventListener(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT, openBulkSchedule);
+  }, [plan.slots]);
 
   useEffect(() => {
     if (!newSlot.courseId && courses.length > 0) {
@@ -289,6 +322,62 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     : plan.slots
       .filter((slot) => slot.enabled && slot.dayOfWeek === scheduleDayOfWeek)
       .sort((first, second) => timeToMinutes(first.startTime) - timeToMinutes(second.startTime));
+
+  const bulkVisibleSlots = plan.slots
+    .filter((slot) => slot.enabled)
+    .filter((slot) => bulkDayFilter === 'all' || slot.dayOfWeek === bulkDayFilter)
+    .filter((slot) => {
+      const query = bulkCourseSearch.trim().toLocaleLowerCase('vi-VN');
+      return !query || (slot.courseTitle || slot.skill).toLocaleLowerCase('vi-VN').includes(query);
+    })
+    .sort((first, second) => first.dayOfWeek - second.dayOfWeek || timeToMinutes(first.startTime) - timeToMinutes(second.startTime));
+  const bulkSelectedCount = Object.values(bulkSelectedIds).filter(Boolean).length;
+  const bulkHasChanges = bulkTimeAction !== 'keep' || bulkDuration !== 'keep';
+
+  const applyBulkSchedule = () => {
+    const selectedIds = new Set(Object.entries(bulkSelectedIds).filter(([, selected]) => selected).map(([id]) => id));
+    if (selectedIds.size === 0) {
+      setBulkError('Hãy chọn ít nhất một ca học để thay đổi.');
+      return;
+    }
+    if (!bulkHasChanges) {
+      setBulkError('Hãy chọn thao tác đổi giờ hoặc thời lượng trước khi áp dụng.');
+      return;
+    }
+    const nextDuration = bulkDuration === 'custom'
+      ? Math.min(180, Math.max(5, Number(bulkCustomDuration) || 25))
+      : bulkDuration === 'keep' ? null : bulkDuration;
+    const updatedSlots = plan.slots.map((slot) => {
+      if (!selectedIds.has(slot.id)) return slot;
+      let startMinutes = timeToMinutes(slot.startTime);
+      if (bulkTimeAction === 'set') startMinutes = timeToMinutes(bulkStartTime);
+      if (bulkTimeAction === 'shift') startMinutes = Math.min(1439, Math.max(0, startMinutes + bulkShiftMinutes));
+      const hour = Math.floor(startMinutes / 60);
+      const minute = startMinutes % 60;
+      return {
+        ...slot,
+        startTime: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+        durationMinutes: nextDuration ?? slot.durationMinutes,
+      };
+    });
+    const overlaps = (first: StudySlot, second: StudySlot) => first.enabled
+      && second.enabled
+      && first.dayOfWeek === second.dayOfWeek
+      && timeToMinutes(first.startTime) < timeToMinutes(second.startTime) + second.durationMinutes
+      && timeToMinutes(second.startTime) < timeToMinutes(first.startTime) + first.durationMinutes;
+    const hasNewConflict = updatedSlots.some((slot, index) => updatedSlots.some((other, otherIndex) => {
+      if (index >= otherIndex || !overlaps(slot, other)) return false;
+      const previousSlot = plan.slots.find((candidate) => candidate.id === slot.id);
+      const previousOther = plan.slots.find((candidate) => candidate.id === other.id);
+      return !previousSlot || !previousOther || !overlaps(previousSlot, previousOther);
+    }));
+    if (hasNewConflict) {
+      setBulkError('Thay đổi này tạo ra ca trùng giờ. Hãy lọc/chọn ít ca hơn hoặc chọn giờ khác.');
+      return;
+    }
+    setPlan((previous) => ({ ...previous, slots: updatedSlots }));
+    setBulkOpen(false);
+  };
 
   const resetSlotEditor = () => {
     setEditingSlotId(null);
@@ -475,6 +564,36 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
           {scheduleDayOfWeek === null && <Alert severity="info" sx={{ mt: 2 }} icon={<TimerOutlinedIcon />}><Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 800 }}>Gợi ý từ hệ thống</Typography><Typography variant="caption">Để hoàn thành khóa Kanji N5 đúng tiến độ, bạn chỉ cần học 3 buổi/tuần (tổng 75 phút).</Typography></Box><Button size="small" onClick={applySuggestion}>Áp dụng gợi ý này</Button></Stack></Alert>}
         </DialogContent>
         <DialogActions><Button onClick={() => { setScheduleOpen(false); resetSlotEditor(); }}>Hủy</Button><Button variant="contained" onClick={addSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>{editingSlotId ? 'Lưu thay đổi' : 'Lưu lịch'}</Button></DialogActions>
+      </Dialog>
+
+      <Dialog open={bulkOpen} onClose={() => setBulkOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Chỉnh lịch tổng</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#667085', mb: 1.5 }}>Chọn nhiều ca rồi đổi giờ hoặc thời lượng một lần. Các ngày và khóa học không bị thay đổi.</Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
+            <TextField fullWidth size="small" label="Tìm theo khóa học" value={bulkCourseSearch} onChange={(event) => setBulkCourseSearch(event.target.value)} />
+            <FormControl fullWidth size="small"><InputLabel id="bulk-day-label">Ngày</InputLabel><Select labelId="bulk-day-label" label="Ngày" value={bulkDayFilter} onChange={(event) => setBulkDayFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))}><MenuItem value="all">Tất cả các ngày</MenuItem>{DAYS.map((day) => <MenuItem key={day.value} value={day.value}>{day.label}</MenuItem>)}</Select></FormControl>
+          </Stack>
+          <Stack direction="row" spacing={0.75} sx={{ mt: 1, mb: 0.75, flexWrap: 'wrap' }}>
+            <Button size="small" onClick={() => setBulkSelectedIds((previous) => ({ ...previous, ...Object.fromEntries(bulkVisibleSlots.map((slot) => [slot.id, true])) }))} sx={{ textTransform: 'none' }}>Chọn tất cả đang lọc</Button>
+            <Button size="small" onClick={() => setBulkSelectedIds((previous) => ({ ...previous, ...Object.fromEntries(bulkVisibleSlots.map((slot) => [slot.id, false])) }))} sx={{ textTransform: 'none' }}>Bỏ chọn đang lọc</Button>
+            <Typography variant="caption" sx={{ alignSelf: 'center', color: '#475467', fontWeight: 800 }}>{bulkSelectedCount}/{plan.slots.filter((slot) => slot.enabled).length} ca được chọn</Typography>
+          </Stack>
+          <Paper variant="outlined" sx={{ maxHeight: 260, overflowY: 'auto', p: 1 }}>
+            {bulkVisibleSlots.length === 0 ? <Typography variant="body2" color="text.secondary" sx={{ p: 1, textAlign: 'center' }}>Không có ca phù hợp.</Typography> : <Stack spacing={0.25}>{bulkVisibleSlots.map((slot) => <FormControlLabel key={slot.id} control={<Checkbox size="small" checked={bulkSelectedIds[slot.id] === true} onChange={(event) => setBulkSelectedIds((previous) => ({ ...previous, [slot.id]: event.target.checked }))} />} label={<Typography variant="body2" noWrap>{DAYS.find((day) => day.value === slot.dayOfWeek)?.label} · {slot.startTime} · {slot.courseTitle || slot.skill}</Typography>} sx={{ mr: 0 }} />)}</Stack>}
+          </Paper>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>Thay đổi áp dụng cho các ca đã chọn</Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
+            <FormControl fullWidth size="small"><InputLabel id="bulk-time-action-label">Thao tác giờ</InputLabel><Select labelId="bulk-time-action-label" label="Thao tác giờ" value={bulkTimeAction} onChange={(event) => setBulkTimeAction(event.target.value as BulkTimeAction)}><MenuItem value="keep">Giữ nguyên giờ</MenuItem><MenuItem value="set">Đặt cùng một giờ</MenuItem><MenuItem value="shift">Dịch giờ hiện tại</MenuItem></Select></FormControl>
+            {bulkTimeAction === 'set' && <TextField fullWidth size="small" label="Giờ mới" type="time" value={bulkStartTime} onChange={(event) => setBulkStartTime(event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />}
+            {bulkTimeAction === 'shift' && <FormControl fullWidth size="small"><InputLabel id="bulk-shift-label">Dịch bao nhiêu</InputLabel><Select labelId="bulk-shift-label" label="Dịch bao nhiêu" value={bulkShiftMinutes} onChange={(event) => setBulkShiftMinutes(Number(event.target.value))}><MenuItem value={-60}>Lùi 60 phút</MenuItem><MenuItem value={-30}>Lùi 30 phút</MenuItem><MenuItem value={-15}>Lùi 15 phút</MenuItem><MenuItem value={15}>Tiến 15 phút</MenuItem><MenuItem value={30}>Tiến 30 phút</MenuItem><MenuItem value={60}>Tiến 60 phút</MenuItem></Select></FormControl>}
+            <FormControl fullWidth size="small"><InputLabel id="bulk-duration-label">Thời lượng</InputLabel><Select labelId="bulk-duration-label" label="Thời lượng" value={bulkDuration} onChange={(event) => setBulkDuration(event.target.value as BulkDurationChoice)}><MenuItem value="keep">Giữ nguyên thời lượng</MenuItem><MenuItem value={25}>25 phút</MenuItem><MenuItem value={50}>50 phút</MenuItem><MenuItem value={60}>60 phút</MenuItem><MenuItem value="custom">Tùy chỉnh</MenuItem></Select></FormControl>
+          </Stack>
+          {bulkDuration === 'custom' && <TextField size="small" type="number" label="Thời lượng mới (phút)" value={bulkCustomDuration} onChange={(event) => setBulkCustomDuration(Number(event.target.value))} slotProps={{ htmlInput: { min: 5, max: 180, step: 5 } }} sx={{ mt: 1.25, width: 220 }} />}
+          {bulkError && <Alert severity="warning" sx={{ mt: 1.5 }}>{bulkError}</Alert>}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setBulkOpen(false)}>Hủy</Button><Button variant="contained" disabled={bulkSelectedCount === 0 || !bulkHasChanges} onClick={applyBulkSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>Áp dụng cho {bulkSelectedCount} ca</Button></DialogActions>
       </Dialog>
     </Paper>
   );

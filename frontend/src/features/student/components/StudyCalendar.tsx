@@ -24,6 +24,7 @@ import ArrowBackIosNewOutlinedIcon from '@mui/icons-material/ArrowBackIosNewOutl
 import ArrowForwardIosOutlinedIcon from '@mui/icons-material/ArrowForwardIosOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
@@ -33,6 +34,7 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
   readPlan,
+  STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT,
   STUDY_PLAN_OPEN_SCHEDULE_EVENT,
   STUDY_PLAN_UPDATED_EVENT,
   type StudyCourseOption,
@@ -301,7 +303,10 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
           <IconButton size="small" aria-label="Lịch sau" onClick={() => moveCursor(1)}><ArrowForwardIosOutlinedIcon sx={{ fontSize: 15 }} /></IconButton>
           <Button size="small" onClick={() => { setCursor(startOfDay(new Date())); setView('day'); }} sx={{ textTransform: 'none', ml: 0.5 }}>Hôm nay</Button>
         </Stack>
-        <Button size="small" variant="outlined" startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Thêm suất học</Button>
+        <Stack direction="row" spacing={0.75}>
+          <Button size="small" variant="outlined" startIcon={<EditCalendarOutlinedIcon />} onClick={() => window.dispatchEvent(new Event(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT))} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Chỉnh lịch tổng</Button>
+          <Button size="small" variant="outlined" startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Thêm suất học</Button>
+        </Stack>
       </Stack>
 
       {courseOptions.length > 0 && (

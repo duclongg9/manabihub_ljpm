@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { STUDY_PLAN_OPEN_SCHEDULE_EVENT, STORAGE_KEY, StudyGoalsWidget, todayKey } from './StudyGoalsWidget';
+import { STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT, STUDY_PLAN_OPEN_SCHEDULE_EVENT, STORAGE_KEY, StudyGoalsWidget, todayKey } from './StudyGoalsWidget';
 
 describe('StudyGoalsWidget', () => {
   afterEach(cleanup);
@@ -96,5 +96,32 @@ describe('StudyGoalsWidget', () => {
 
     expect(screen.getByText('Khung giờ này bị trùng với một ca khác. Hãy chọn giờ khác hoặc bấm Sửa ở ca đang có.')).toBeInTheDocument();
     expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').slots).toHaveLength(1);
+  });
+
+  it('applies a time change to many selected slots at once', async () => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      weekKey: todayKey(today),
+      weeklyTargetMinutes: 150,
+      slots: [
+        { id: 'slot-1', dayOfWeek: today.getDay(), startTime: '19:00', durationMinutes: 25, skill: 'Kanji & Từ vựng', enabled: true },
+        { id: 'slot-2', dayOfWeek: tomorrow.getDay(), startTime: '20:00', durationMinutes: 25, skill: 'Ngữ pháp', enabled: true },
+      ],
+      focusTotals: {}, attendance: {},
+    }));
+
+    render(<StudyGoalsWidget courses={[]} />);
+    window.dispatchEvent(new Event(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT));
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Thao tác giờ' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Đặt cùng một giờ' }));
+    fireEvent.change(screen.getByLabelText('Giờ mới'), { target: { value: '21:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng cho 2 ca' }));
+
+    const slots = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').slots;
+    expect(slots.map((slot: { startTime: string }) => slot.startTime)).toEqual(['21:00', '21:00']);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });
