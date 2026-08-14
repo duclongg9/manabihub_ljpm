@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within, act } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within, act, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -369,10 +369,15 @@ describe('StudentPaymentsPage', () => {
         { initialEntries: ['/student/payments'] },
       );
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Xác minh SĐT & CCCD để rút hoa hồng' }));
-      expect(screen.getByTestId('current-location')).toHaveTextContent(
-        '/student/identity-verification',
-      );
+      const btn = await screen.findByRole('button', { name: 'Xác minh SĐT & CCCD để rút hoa hồng' });
+      await waitFor(() => expect(btn).not.toBeDisabled());
+      fireEvent.click(btn);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('current-location')).toHaveTextContent(
+          '/student/identity-verification',
+        );
+      });
     });
 
     it('navigates to teacher wallet when verified teacher clicks withdraw button', async () => {
@@ -390,10 +395,14 @@ describe('StudentPaymentsPage', () => {
       );
 
       const withdrawBtn = await screen.findByRole('button', { name: 'Mở Ví doanh thu để rút hoa hồng' });
+      await waitFor(() => expect(withdrawBtn).not.toBeDisabled());
       fireEvent.click(withdrawBtn);
-      expect(screen.getByTestId('current-location')).toHaveTextContent(
-        '/teacher/wallet',
-      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('current-location')).toHaveTextContent(
+          '/teacher/wallet',
+        );
+      });
     });
   });
 
