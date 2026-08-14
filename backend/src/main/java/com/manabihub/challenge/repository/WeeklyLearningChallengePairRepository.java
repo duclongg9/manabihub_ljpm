@@ -11,4 +11,3 @@ public interface WeeklyLearningChallengePairRepository extends JpaRepository<Wee
     @Modifying
     void deleteByChallengeId(UUID challengeId);
 }
-

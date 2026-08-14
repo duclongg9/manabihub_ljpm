@@ -60,6 +60,8 @@ export type WalletTransactionType =
   | 'TOP_UP'
   | 'PURCHASE'
   | 'REFUND'
+  | 'GAME_REWARD'
+  | 'ATTENDANCE_REWARD'
   | 'REVENUE_SHARE'
   | 'PAYOUT'
   | 'ADJUSTMENT'

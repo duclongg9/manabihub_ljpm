@@ -89,10 +89,10 @@ describe('getHeaderBrand', () => {
 
     expect(screen.getByText('Khóa học của tôi')).toBeInTheDocument();
     expect(screen.getByText('Hồ sơ cá nhân')).toBeInTheDocument();
-    expect(screen.getByText('Ví')).toBeInTheDocument();
+    expect(screen.getByText('Ví học viên')).toBeInTheDocument();
     expect(screen.getByText('Trở thành giảng viên')).toBeInTheDocument();
     expect(screen.getByText('Thông báo')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/Số dư:/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Số dư mua khóa học:/)).toBeInTheDocument());
     expect(screen.getByText(/250\.000/)).toBeInTheDocument();
     expect(screen.getByText('Mở ví')).toBeInTheDocument();
   });

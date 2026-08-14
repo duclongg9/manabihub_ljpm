@@ -3,13 +3,15 @@ import {
   Box,
   Button,
   Grid,
-  IconButton,
   Pagination,
   Stack,
   Typography,
   Chip,
   InputAdornment,
   TextField,
+  Tabs,
+  Tab,
+  MenuItem,
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -25,14 +27,15 @@ import { useCourseCategories } from '../hooks/useCourseCategories';
 import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
 import { ErrorState } from '../../../shared/components/ErrorState/ErrorState';
 import type { CourseCatalogFilters } from '../types/catalogTypes';
-import { CourseDiscoverySections } from '../components/CourseDiscoverySections';
 
-const PAGE_SIZE = 12;
+const DEFAULT_PAGE_SIZE = 12;
+const PAGE_SIZE_OPTIONS = [12, 24, 36, 50];
 const DEFAULT_SORT = 'enrollmentCount,desc';
+const ALL_COURSES_SORT = 'publishedAt,desc';
 const ALLOWED_SORTS = new Set([
   DEFAULT_SORT,
   'averageRating,desc',
-  'publishedAt,desc',
+  ALL_COURSES_SORT,
   'price,asc',
   'price,desc',
   'title,asc',
@@ -42,8 +45,15 @@ const ALLOWED_JLPT_LEVELS = new Set(['N1', 'N2', 'N3', 'N4', 'N5']);
 interface CatalogQuery {
   filters: CourseCatalogFilters;
   page: number;
+  pageSize: number;
   sort: string;
 }
+
+const CATALOG_TABS = [
+  { value: DEFAULT_SORT, label: 'Bán chạy nhất' },
+  { value: 'averageRating,desc', label: 'Được đánh giá cao' },
+  { value: ALL_COURSES_SORT, label: 'Tất cả khóa học' },
+] as const;
 
 function cleanText(value: string | null): string | undefined {
   const cleaned = value?.trim();
@@ -73,6 +83,10 @@ function readCatalogQuery(params: URLSearchParams): CatalogQuery {
   const requestedPage = Number(params.get('page'));
   const page =
     Number.isInteger(requestedPage) && requestedPage >= 1 ? requestedPage - 1 : 0;
+  const requestedPageSize = Number(params.get('size'));
+  const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize)
+    ? requestedPageSize
+    : DEFAULT_PAGE_SIZE;
   const requestedSort = params.get('sort');
   const sort = requestedSort && ALLOWED_SORTS.has(requestedSort) ? requestedSort : DEFAULT_SORT;
 
@@ -85,6 +99,7 @@ function readCatalogQuery(params: URLSearchParams): CatalogQuery {
       maxPrice,
     },
     page,
+    pageSize,
     sort,
   };
 }
@@ -99,6 +114,7 @@ function buildCatalogParams(query: CatalogQuery): URLSearchParams {
   if (filters.minPrice !== undefined) params.set('minPrice', String(filters.minPrice));
   if (filters.maxPrice !== undefined) params.set('maxPrice', String(filters.maxPrice));
   if (page > 0) params.set('page', String(page + 1));
+  if (query.pageSize !== DEFAULT_PAGE_SIZE) params.set('size', String(query.pageSize));
   if (sort !== DEFAULT_SORT) params.set('sort', sort);
 
   return params;
@@ -141,28 +157,9 @@ export const CourseCatalogPage: React.FC = () => {
   } = useCourseCatalog({
     ...query.filters,
     page: query.page,
-    size: PAGE_SIZE,
+    size: query.pageSize,
     sort: query.sort,
   });
-
-  const isDiscoveryView = !query.filters.keyword && !query.filters.category
-    && query.filters.minPrice === undefined && query.filters.maxPrice === undefined
-    && query.page === 0;
-  const discoveryFilters = query.filters.jlptLevel
-    ? { jlptLevel: query.filters.jlptLevel }
-    : {};
-  const { data: latestDiscoveryData } = useCourseCatalog(
-    { ...discoveryFilters, page: 0, size: 4, sort: 'publishedAt,desc' },
-    isDiscoveryView,
-  );
-  const { data: bestSellingData } = useCourseCatalog(
-    { ...discoveryFilters, page: 0, size: 4, sort: 'enrollmentCount,desc' },
-    isDiscoveryView,
-  );
-  const { data: topRatedData } = useCourseCatalog(
-    { ...discoveryFilters, page: 0, size: 4, sort: 'averageRating,desc' },
-    isDiscoveryView,
-  );
 
   useEffect(() => {
     if (data && data.totalPages > 0 && query.page >= data.totalPages) {
@@ -187,16 +184,16 @@ export const CourseCatalogPage: React.FC = () => {
 
   const handleFiltersChange = useCallback(
     (filters: CourseCatalogFilters) => {
-      replaceQuery({ filters, page: 0, sort: query.sort });
+      replaceQuery({ filters, page: 0, pageSize: query.pageSize, sort: query.sort });
     },
-    [query.sort, replaceQuery],
+    [query.pageSize, query.sort, replaceQuery],
   );
 
   const handleSortChange = useCallback(
     (sort: string) => {
-      replaceQuery({ filters: query.filters, page: 0, sort });
+      replaceQuery({ filters: query.filters, page: 0, pageSize: query.pageSize, sort });
     },
-    [query.filters, replaceQuery],
+    [query.filters, query.pageSize, replaceQuery],
   );
 
   const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
@@ -204,14 +201,18 @@ export const CourseCatalogPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const updateKeyword = (keyword: string) => {
-    handleFiltersChange({ ...query.filters, keyword: keyword.trim() || undefined });
+  const handlePageSizeChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const nextPageSize = Number(event.target.value);
+    if (!PAGE_SIZE_OPTIONS.includes(nextPageSize)) return;
+    replaceQuery({ ...query, page: 0, pageSize: nextPageSize });
   };
 
-  const showAllCourses = () => {
-    requestAnimationFrame(() => {
-      document.getElementById('all-courses')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+  const selectedCatalogTab = CATALOG_TABS.some((tab) => tab.value === query.sort)
+    ? query.sort
+    : ALL_COURSES_SORT;
+
+  const updateKeyword = (keyword: string) => {
+    handleFiltersChange({ ...query.filters, keyword: keyword.trim() || undefined });
   };
 
   const [heroKeyword, setHeroKeyword] = React.useState(query.filters.keyword ?? '');
@@ -229,6 +230,39 @@ export const CourseCatalogPage: React.FC = () => {
         />
 
         <Box sx={{ position: 'relative', zIndex: 1, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ position: 'sticky', top: { xs: 72, sm: 64 }, zIndex: 20, bgcolor: 'rgba(250, 249, 246, 0.92)', backdropFilter: 'blur(12px)', py: 2, mx: { xs: -2, sm: -3 }, px: { xs: 2, sm: 3 }, borderRadius: 2, transition: 'all 0.3s' }}>
+            <CourseCatalogFiltersBar
+              filters={query.filters}
+              onFiltersChange={handleFiltersChange}
+              categories={categories}
+              categoriesLoading={categoriesLoading}
+            />
+            <Tabs
+              value={selectedCatalogTab}
+              onChange={(_event, value: string) => handleSortChange(value)}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              aria-label="Cách sắp xếp khóa học"
+              sx={{
+                mt: 1.5,
+                minHeight: 42,
+                '& .MuiTabs-indicator': { bgcolor: '#C41E3A', height: 3, borderRadius: 3 },
+                '& .MuiTab-root': {
+                  minHeight: 42,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  color: '#64748B',
+                  '&.Mui-selected': { color: '#C41E3A' },
+                },
+              }}
+            >
+              {CATALOG_TABS.map((tab) => (
+                <Tab key={tab.value} value={tab.value} label={tab.label} />
+              ))}
+            </Tabs>
+          </Box>
+
           <Box
             component="section"
             aria-labelledby="course-discovery-search"
@@ -246,7 +280,7 @@ export const CourseCatalogPage: React.FC = () => {
                 Chọn khóa học phù hợp với mục tiêu của bạn
               </Typography>
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mb: 2, maxWidth: 720 }}>
-                Tìm theo tên khóa học, chủ đề hoặc từ khóa; sau đó lọc theo cấp độ JLPT, kỹ năng và mức học phí.
+                Lọc theo cấp độ JLPT, kỹ năng và mức học phí. Số sao và lượt học viên đều lấy từ dữ liệu thực tế.
               </Typography>
               <TextField
                 fullWidth
@@ -255,22 +289,7 @@ export const CourseCatalogPage: React.FC = () => {
                 onKeyDown={(event) => { if (event.key === 'Enter') updateKeyword(heroKeyword); }}
                 placeholder="Tìm Kanji, N3, giao tiếp..."
                 aria-label="Tìm khóa học"
-                slotProps={{
-                  input: {
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={() => updateKeyword(heroKeyword)}
-                          sx={{ color: '#C41E3A', bgcolor: '#FFF1F2', '&:hover': { bgcolor: '#FFE4E6' } }}
-                          aria-label="Tìm kiếm khóa học"
-                        >
-                          <SearchRoundedIcon />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  },
-                  htmlInput: { maxLength: 100 },
-                }}
+                slotProps={{ input: { endAdornment: <InputAdornment position="end"><Button onClick={() => updateKeyword(heroKeyword)} sx={{ minWidth: 40, color: '#C41E3A' }} aria-label="Tìm kiếm"><SearchRoundedIcon /></Button></InputAdornment> } }}
                 sx={{ maxWidth: 760, bgcolor: '#fff', borderRadius: 1.5, '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
               />
               <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 1.5, flexWrap: 'wrap' }}>
@@ -281,44 +300,13 @@ export const CourseCatalogPage: React.FC = () => {
             </Box>
           </Box>
 
-          {isDiscoveryView && latestDiscoveryData?.content && latestDiscoveryData.content.length > 0 && (
-            <CourseDiscoverySections
-              latestCourses={latestDiscoveryData.content}
-              bestSellingCourses={bestSellingData?.content ?? []}
-              topRatedCourses={topRatedData?.content ?? []}
-              selectedLevel={query.filters.jlptLevel}
-              onLevelChange={(level) => handleFiltersChange({ ...query.filters, jlptLevel: level })}
-              onViewAll={showAllCourses}
-            />
-          )}
-
-          <Box id="all-courses" sx={{ scrollMarginTop: { xs: 88, sm: 80 } }}>
-            <Typography component="h2" variant="h5" sx={{ color: '#14284B', fontWeight: 800, mb: 1 }}>
-              Tất cả khóa học
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748B', mb: 1 }}>
-              Dùng bộ lọc để thu hẹp danh sách; đánh giá và lượt học viên chỉ là thông tin tham khảo trên từng khóa học.
-            </Typography>
-          </Box>
-
-          <Box sx={{ position: 'sticky', top: { xs: 72, sm: 64 }, zIndex: 20, bgcolor: 'rgba(250, 249, 246, 0.92)', backdropFilter: 'blur(12px)', py: 2, mx: { xs: -2, sm: -3 }, px: { xs: 2, sm: 3 }, borderRadius: 2, transition: 'all 0.3s' }}>
-            <CourseCatalogFiltersBar
-            filters={query.filters}
-            onFiltersChange={handleFiltersChange}
-            categories={categories}
-            categoriesLoading={categoriesLoading}
-            sort={query.sort}
-            onSortChange={handleSortChange}
-          />
-        </Box>
-
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           sx={{ my: 3, minHeight: 28, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              {data ? `${data.totalElements} khóa học phù hợp` : 'Danh sách khóa học'}
+              {data ? `${data.totalElements} khóa học` : 'Danh sách khóa học'}
             </Typography>
             {/* Active Filter Badges */}
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
@@ -355,7 +343,7 @@ export const CourseCatalogPage: React.FC = () => {
 
         {isLoading && (
           <Grid container spacing={3} sx={{ mt: 1 }}>
-            {Array.from(new Array(12)).map((_, index) => (
+                {Array.from(new Array(Math.min(query.pageSize, 12))).map((_, index) => (
               <Grid key={index} size={{ xs: 12, md: 6, lg: 4 }}>
                 <Box sx={{ bgcolor: 'white', borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'grey.100', height: 340 }}>
                   <Box sx={{ width: '100%', aspectRatio: '16/9', bgcolor: 'grey.200', animation: 'pulse 1.5s infinite ease-in-out' }} />
@@ -390,7 +378,7 @@ export const CourseCatalogPage: React.FC = () => {
               icon={<SearchOffIcon sx={{ fontSize: 56, color: 'text.secondary' }} />}
               actionLabel="Xóa bộ lọc"
               onAction={() => {
-                replaceQuery({ filters: {}, page: 0, sort: DEFAULT_SORT });
+                replaceQuery({ filters: {}, page: 0, pageSize: query.pageSize, sort: DEFAULT_SORT });
               }}
             />
           </Box>
@@ -412,16 +400,35 @@ export const CourseCatalogPage: React.FC = () => {
           </Box>
         )}
 
-        {!isLoading && !isError && data && data.totalPages > 1 && (
-          <Box sx={{ mt: 5, display: 'flex', justifyContent: 'center' }}>
-            <Pagination
-              count={data.totalPages}
-              page={query.page + 1}
-              onChange={handlePageChange}
-              color="primary"
-              shape="rounded"
-            />
-          </Box>
+        {!isLoading && !isError && data && data.totalElements > 0 && (
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{ mt: 5, alignItems: 'center', justifyContent: 'center' }}
+          >
+            {data.totalPages > 1 && (
+              <Pagination
+                count={data.totalPages}
+                page={query.page + 1}
+                onChange={handlePageChange}
+                color="primary"
+                shape="rounded"
+              />
+            )}
+            <TextField
+              select
+              size="small"
+              label="Khóa học/trang"
+              value={query.pageSize}
+              onChange={handlePageSizeChange}
+              sx={{ minWidth: 150 }}
+              slotProps={{ select: { MenuProps: { disableScrollLock: true } } }}
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <MenuItem key={option} value={option}>{option}</MenuItem>
+              ))}
+            </TextField>
+          </Stack>
         )}
         </Box>
       </Box>

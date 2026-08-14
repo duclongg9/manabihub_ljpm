@@ -3,7 +3,16 @@ package com.manabihub.course.repository;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.enums.CourseStatus;
 import com.manabihub.course.enums.JlptLevel;
+import com.manabihub.learning.entity.Enrollment;
+import com.manabihub.learning.enums.EnrollmentStatus;
+import com.manabihub.review.entity.CourseReview;
+import com.manabihub.review.enums.CourseReviewStatus;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -29,6 +38,25 @@ public final class PublicCourseSpecification {
             JlptLevel jlptLevel,
             BigDecimal minPrice,
             BigDecimal maxPrice
+    ) {
+        return buildSearch(keyword, category, jlptLevel, minPrice, maxPrice, null, Sort.Direction.DESC);
+    }
+
+    /**
+     * Builds the public search predicate and, when requested, orders by values
+     * that are calculated from related tables rather than stored on courses.
+     * Keeping this in the specification makes aggregate sorting work together
+     * with the database page/size window instead of sorting only the current
+     * page in the browser.
+     */
+    public static Specification<Course> buildSearch(
+            String keyword,
+            String category,
+            JlptLevel jlptLevel,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String aggregateSort,
+            Sort.Direction direction
     ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -62,7 +90,59 @@ public final class PublicCourseSpecification {
                 predicates.add(cb.lessThanOrEqualTo(root.get("price"), maxPrice));
             }
 
+            if (!isCountQuery(query) && ("enrollmentCount".equals(aggregateSort)
+                    || "averageRating".equals(aggregateSort))) {
+                Expression<? extends Number> score = "enrollmentCount".equals(aggregateSort)
+                        ? enrollmentCount(root, query, cb)
+                        : averageRating(root, query, cb);
+                query.orderBy(
+                        direction == Sort.Direction.ASC ? cb.asc(score) : cb.desc(score),
+                        cb.desc(root.get("publishedAt")),
+                        cb.asc(root.get("id"))
+                );
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    private static boolean isCountQuery(jakarta.persistence.criteria.CriteriaQuery<?> query) {
+        Class<?> resultType = query.getResultType();
+        return resultType == Long.class || resultType == long.class;
+    }
+
+    private static Expression<Long> enrollmentCount(
+            Root<Course> course,
+            jakarta.persistence.criteria.CriteriaQuery<?> query,
+            jakarta.persistence.criteria.CriteriaBuilder cb
+    ) {
+        Subquery<Long> count = query.subquery(Long.class);
+        Root<Enrollment> enrollment = count.from(Enrollment.class);
+        count.select(cb.count(enrollment));
+        count.where(
+                cb.equal(enrollment.get("course").get("id"), course.get("id")),
+                enrollment.get("status").in(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED)
+        );
+        return count;
+    }
+
+    private static Expression<Double> averageRating(
+            Root<Course> course,
+            jakarta.persistence.criteria.CriteriaQuery<?> query,
+            jakarta.persistence.criteria.CriteriaBuilder cb
+    ) {
+        Subquery<Double> average = query.subquery(Double.class);
+        Root<CourseReview> review = average.from(CourseReview.class);
+        Join<CourseReview, Enrollment> enrollment = review.join("enrollment");
+        average.select(cb.avg(review.<Number>get("rating")));
+        average.where(
+                cb.equal(enrollment.get("course").get("id"), course.get("id")),
+                cb.equal(review.get("status"), CourseReviewStatus.APPROVED),
+                enrollment.get("status").in(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED)
+        );
+        jakarta.persistence.criteria.CriteriaBuilder.Coalesce<Double> coalesce = cb.coalesce();
+        coalesce.value(average);
+        coalesce.value(0d);
+        return coalesce;
     }
 }

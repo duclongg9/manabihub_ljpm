@@ -21,6 +21,8 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { DecorativeKanjiWatermark } from '../../../shared/components/DecorativeKanjiWatermark/DecorativeKanjiWatermark';
+import { getAuthSession } from '../../../shared/auth/authSession';
+import { ROLES } from '../../../shared/constants/roles';
 import { ROUTES } from '../../../shared/constants/routes';
 import type { OrderItemResponse, OrderResponse } from '../../checkout/types';
 import { RefundRequestDialog } from '../../refunds/components/RefundRequestDialog';
@@ -29,13 +31,13 @@ import { useStudentRefunds } from '../../refunds/hooks/useStudentRefunds';
 import type { StudentRefundResponse } from '../../refunds/types';
 import { useOrderHistory } from '../hooks/useOrderHistory';
 import type { OrderStatus } from '../services/orderHistoryService';
-import { getStudentWallet, getStudentWithdrawals } from '../../wallet/services/studentWalletService';
-import type { StudentWalletResponse, StudentWithdrawal } from '../../wallet/types';
+import { getStudentWallet } from '../../wallet/services/studentWalletService';
+import type { StudentWalletResponse } from '../../wallet/types';
 import { useCommercialPolicy } from '../../help-center/hooks/useCommercialPolicy';
-import { StudentWithdrawalModal } from '../../wallet/components/StudentWithdrawalModal';
-import { StudentWithdrawalHistory } from '../../wallet/components/StudentWithdrawalHistory';
 import { getStudentIdentityVerificationStatus } from '../../wallet/services/studentIdentityVerificationService';
-import { getMyStudentProfile } from '../../profile/profileApi';
+import { walletService } from '../../my-wallet/services/walletService';
+import { WithdrawalHistoryTable } from '../../my-wallet/components/WithdrawalHistoryTable';
+import type { TeacherWallet, WithdrawalRequest } from '../../my-wallet/types/wallet.types';
 
 interface FilterOption {
   label: string;
@@ -91,7 +93,7 @@ function formatMoney(amount: number, currency: string = 'VND') {
 
 export function StudentPaymentsPage() {
   const navigate = useNavigate();
-  const [mainTab, setMainTab] = useState(0); // 0 = Lịch sử đơn hàng, 1 = Lịch sử rút tiền
+  const [mainTab, setMainTab] = useState(0); // 0 = Lịch sử đơn hàng, 1 = Lịch sử rút hoa hồng
 
   const [filterIndex, setFilterIndex] = useState(0);
   const [page, setPage] = useState(0);
@@ -101,21 +103,20 @@ export function StudentPaymentsPage() {
 
   // Wallet state
   const [wallet, setWallet] = useState<StudentWalletResponse | null>(null);
+  const [teacherWallet, setTeacherWallet] = useState<TeacherWallet | null>(null);
   const [loadingWallet, setLoadingWallet] = useState(true);
+  const [loadingTeacherWallet, setLoadingTeacherWallet] = useState(false);
   const [identityVerified, setIdentityVerified] = useState(false);
-  const [phoneVerified, setPhoneVerified] = useState(false);
-  const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
 
   // Withdrawals history state
-  const [withdrawals, setWithdrawals] = useState<StudentWithdrawal[]>([]);
-  const [withdrawalPage, setWithdrawalPage] = useState(0);
-  const [withdrawalTotalPages, setWithdrawalTotalPages] = useState(1);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(true);
   const [errorWithdrawals, setErrorWithdrawals] = useState(false);
 
+  const isTeacher = getAuthSession('public')?.roles.includes(ROLES.TEACHER) ?? false;
+
   const policyQuery = useCommercialPolicy();
   const minimumAmount = policyQuery.data?.payoutThreshold ?? 100000;
-  const canWithdraw = phoneVerified && identityVerified;
 
   const selectedFilter = FILTERS[filterIndex];
   const ordersQuery = useOrderHistory({ page, size: 10, status: selectedFilter.status });
@@ -127,49 +128,60 @@ export function StudentPaymentsPage() {
   const refunds = refundsQuery.data?.content ?? [];
 
   const loadWalletData = useCallback(async () => {
+    setLoadingWallet(true);
+    setLoadingTeacherWallet(isTeacher);
     try {
-      const data = await getStudentWallet();
-      setWallet(data);
+      const [studentWallet, identity] = await Promise.all([
+        getStudentWallet(),
+        getStudentIdentityVerificationStatus(),
+      ]);
+      setWallet(studentWallet);
+      setIdentityVerified(identity.verified);
     } catch {
-      // transient balance fetch error
+      // A transient wallet/identity failure must not break the payment history.
     } finally {
       setLoadingWallet(false);
     }
-    try {
-      const identity = await getStudentIdentityVerificationStatus();
-      setIdentityVerified(identity.verified);
-    } catch {
-      // A stale backend must not prevent the wallet/history from rendering.
-      setIdentityVerified(false);
-    }
-    try {
-      const profile = await getMyStudentProfile();
-      setPhoneVerified(profile.phoneVerified === true);
-      setIdentityVerified((current) => current && profile.phoneVerified === true);
-    } catch {
-      setPhoneVerified(false);
-      setIdentityVerified(false);
-    }
-  }, []);
 
-  const loadWithdrawalData = useCallback(async (targetPage: number = withdrawalPage) => {
+    if (!isTeacher) {
+      setTeacherWallet(null);
+      setLoadingTeacherWallet(false);
+      return;
+    }
+
+    try {
+      const response = await walletService.getTeacherWallet();
+      setTeacherWallet(response.data);
+    } catch {
+      // The teacher wallet page owns the detailed activation/error state.
+      setTeacherWallet(null);
+    } finally {
+      setLoadingTeacherWallet(false);
+    }
+  }, [isTeacher]);
+
+  const loadWithdrawalData = useCallback(async () => {
     setLoadingWithdrawals(true);
     setErrorWithdrawals(false);
+    if (!isTeacher) {
+      setWithdrawals([]);
+      setLoadingWithdrawals(false);
+      return;
+    }
     try {
-      const res = await getStudentWithdrawals(targetPage, 10);
-      setWithdrawals(res.content ?? []);
-      setWithdrawalTotalPages(res.totalPages ?? 1);
+      const response = await walletService.getTeacherWithdrawals({ page: 0, size: 20, sort: 'requestedAt,desc' });
+      setWithdrawals(response.data?.content ?? []);
     } catch {
       setErrorWithdrawals(true);
     } finally {
       setLoadingWithdrawals(false);
     }
-  }, [withdrawalPage]);
+  }, [isTeacher]);
 
   useEffect(() => {
     void loadWalletData();
-    void loadWithdrawalData(withdrawalPage);
-  }, [loadWalletData, loadWithdrawalData, withdrawalPage]);
+    void loadWithdrawalData();
+  }, [loadWalletData, loadWithdrawalData]);
 
   const latestRefundByItem = new Map<string, StudentRefundResponse>();
   refunds.forEach((refund) => {
@@ -195,14 +207,11 @@ export function StudentPaymentsPage() {
     setDialogRefund(refund);
   };
 
-  const refreshAll = async () => {
-    await Promise.all([
-      loadWalletData(),
-      loadWithdrawalData(withdrawalPage),
-      ordersQuery.refetch(),
-      refundsQuery.refetch(),
-    ]);
-  };
+  const currency = wallet?.currency ?? 'VND';
+  const studentPurchaseBalance = wallet?.availableBalance ?? 0;
+  const commissionAvailableBalance = teacherWallet?.availableBalance ?? 0;
+  const commissionPendingBalance = teacherWallet?.pendingBalance ?? 0;
+  const withdrawalLoading = loadingWallet || loadingTeacherWallet;
 
   return (
     <Box component="main" sx={{ minHeight: '100%', bgcolor: '#FAF9F6', px: { xs: 2, md: 4 }, py: { xs: 3, md: 5 } }}>
@@ -211,11 +220,11 @@ export function StudentPaymentsPage() {
         <Box sx={{ position: 'relative', zIndex: 1 }}>
         <PageHeader
           title="Ví & Thanh toán"
-          subtitle="Thanh toán & Số dư tiền hoàn"
+          subtitle="Thanh toán & Số dư ví"
           breadcrumbs={[{ label: 'Học viên' }, { label: 'Ví & Thanh toán' }]}
         />
 
-        {/* Refund wallet and withdrawal action live with payment history. Direct top-up is not offered. */}
+        {/* Keep the student purchase wallet separate from the teacher revenue wallet. */}
         <Box
           sx={{
             display: 'grid',
@@ -254,9 +263,9 @@ export function StudentPaymentsPage() {
                   <AccountBalanceWalletIcon />
                 </Box>
                 <Box>
-                  <Typography sx={{ fontWeight: 900 }}>Ví</Typography>
+                  <Typography sx={{ fontWeight: 900 }}>Ví học viên</Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)' }}>
-                    Tiền hoàn hợp lệ từ các giao dịch khóa học
+                    Tiền nạp, hoàn tiền và thưởng học tập
                   </Typography>
                 </Box>
               </Stack>
@@ -265,26 +274,12 @@ export function StudentPaymentsPage() {
                   Số dư mua khóa học
                 </Typography>
                 <Typography variant="h4" sx={{ fontWeight: 900 }}>
-                  {loadingWallet ? '…' : formatMoney(wallet?.availableBalance ?? 0, wallet?.currency ?? 'VND')}
+                  {loadingWallet ? '…' : formatMoney(studentPurchaseBalance, currency)}
                 </Typography>
               </Box>
-              <Stack direction="row" divider={<Box sx={{ borderLeft: '1px solid rgba(255,255,255,0.24)' }} />} spacing={2}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Số dư có thể rút</Typography>
-                  <Typography sx={{ fontWeight: 800 }}>
-                    {loadingWallet ? '…' : formatMoney(wallet?.availableWithdrawableBalance ?? 0, wallet?.currency ?? 'VND')}
-                  </Typography>
-                  <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.62)', mt: 0.35 }}>
-                    Tiền hoàn; hoa hồng giảng viên ở Ví doanh thu.
-                  </Typography>
-                </Box>
-                <Box sx={{ flex: 1, pl: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>Đang giữ / xử lý</Typography>
-                  <Typography sx={{ fontWeight: 800 }}>
-                    {loadingWallet ? '…' : formatMoney(wallet?.frozenBalance ?? 0, wallet?.currency ?? 'VND')}
-                  </Typography>
-                </Box>
-              </Stack>
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.72)' }}>
+                Số dư này không bao gồm hoa hồng giảng viên. Thưởng trò chơi và điểm danh hằng ngày được cộng vào ví học viên sau khi hệ thống quyết toán.
+              </Typography>
             </Stack>
           </Box>
 
@@ -303,45 +298,61 @@ export function StudentPaymentsPage() {
                   <AccountBalanceIcon />
                 </Box>
                 <Box>
-                  <Typography sx={{ fontWeight: 900 }}>Rút tiền hoàn</Typography>
+                  <Typography sx={{ fontWeight: 900 }}>Ví doanh thu giảng viên</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Chuyển khoản hoàn tiền về tài khoản ngân hàng chính chủ.
+                    Hoa hồng khóa học được đối soát và quản lý tách biệt với tiền mua khóa học.
                   </Typography>
                 </Box>
               </Stack>
+              {isTeacher && (
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <Box sx={{ flex: 1, bgcolor: '#F8FAFC', borderRadius: 2, p: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary">Hoa hồng có thể rút</Typography>
+                    <Typography sx={{ fontWeight: 900 }}>
+                      {loadingTeacherWallet ? '…' : formatMoney(commissionAvailableBalance, currency)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ flex: 1, bgcolor: '#F8FAFC', borderRadius: 2, p: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary">Hoa hồng đang đối soát</Typography>
+                    <Typography sx={{ fontWeight: 900 }}>
+                      {loadingTeacherWallet ? '…' : formatMoney(commissionPendingBalance, currency)}
+                    </Typography>
+                  </Box>
+                </Stack>
+              )}
               <Alert severity="info" sx={{ borderRadius: 2 }}>
-                Chỉ số dư từ các khoản hoàn tiền hợp lệ mới được rút. Tài khoản cần xác thực số điện thoại và CCCD.
+                Số dư hoàn tiền chỉ dùng để mua khóa học. Chỉ hoa hồng đã đối soát trong Ví doanh thu mới được rút; tài khoản cần xác thực số điện thoại và CCCD.
               </Alert>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
                 <Typography variant="body2" color="text.secondary">
-                  Tối thiểu {formatMoney(minimumAmount, wallet?.currency ?? 'VND')}
+                  Tối thiểu {formatMoney(minimumAmount, currency)}
                 </Typography>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
                   <Button
                     variant="outlined"
-                    disabled={loadingWallet || identityVerified}
-                    onClick={() => navigate(`${ROUTES.STUDENT.IDENTITY_VERIFICATION}?returnTo=${encodeURIComponent(ROUTES.STUDENT.PAYMENTS)}`)}
+                    disabled={withdrawalLoading || identityVerified}
+                    onClick={() => navigate(ROUTES.STUDENT.IDENTITY_VERIFICATION)}
                     sx={{ borderColor: '#C41E3A', color: '#C41E3A', borderRadius: 10, fontWeight: 800, px: 2, textTransform: 'none' }}
                   >
                     {identityVerified ? 'Đã xác thực CCCD thành công' : 'Xác thực CCCD'}
                   </Button>
                   <Button
                     variant="contained"
-                    disabled={loadingWallet || (canWithdraw && (wallet?.availableWithdrawableBalance ?? 0) < minimumAmount)}
+                    disabled={withdrawalLoading}
                     onClick={() => {
-                      if (!phoneVerified) {
-                        navigate(ROUTES.STUDENT.PROFILE);
-                        return;
-                      }
                       if (!identityVerified) {
-                        navigate(`${ROUTES.STUDENT.IDENTITY_VERIFICATION}?returnTo=${encodeURIComponent(ROUTES.STUDENT.PAYMENTS)}`);
+                        navigate(ROUTES.STUDENT.IDENTITY_VERIFICATION);
                         return;
                       }
-                      setWithdrawalModalOpen(true);
+                      navigate(isTeacher ? ROUTES.TEACHER.WALLET : ROUTES.TEACHER.KYC);
                     }}
                     sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 800, px: 3, textTransform: 'none' }}
                   >
-                    {identityVerified ? 'Yêu cầu rút tiền' : 'Xác minh SĐT & CCCD để rút tiền'}
+                    {!identityVerified
+                      ? 'Xác minh SĐT & CCCD để rút hoa hồng'
+                      : isTeacher
+                        ? 'Mở Ví doanh thu để rút hoa hồng'
+                        : 'Trở thành giảng viên để rút hoa hồng'}
                   </Button>
                 </Stack>
               </Stack>
@@ -374,7 +385,7 @@ export function StudentPaymentsPage() {
             }}
           >
             <Tab icon={<ShoppingBagOutlinedIcon fontSize="small" />} iconPosition="start" label="Lịch sử đơn hàng" />
-            <Tab icon={<AccountBalanceIcon fontSize="small" />} iconPosition="start" label="Lịch sử rút tiền" />
+            <Tab icon={<AccountBalanceIcon fontSize="small" />} iconPosition="start" label="Lịch sử rút hoa hồng" />
           </Tabs>
         </Box>
 
@@ -534,7 +545,7 @@ export function StudentPaymentsPage() {
           </Box>
         )}
 
-        {/* SUBTAB 2: Lịch sử rút tiền */}
+        {/* SUBTAB 2: Lịch sử rút hoa hồng */}
         {mainTab === 1 && (
           <Box
             sx={{
@@ -545,16 +556,33 @@ export function StudentPaymentsPage() {
               boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
             }}
           >
-            <StudentWithdrawalHistory
-              withdrawals={withdrawals}
-              loading={loadingWithdrawals}
-              error={errorWithdrawals}
-              onRetry={() => void loadWithdrawalData(withdrawalPage)}
-              onChanged={() => loadWithdrawalData(withdrawalPage)}
-              page={withdrawalPage}
-              totalPages={withdrawalTotalPages}
-              onPageChange={setWithdrawalPage}
-            />
+            {!isTeacher ? (
+              <Stack spacing={1.5} sx={{ py: 6, alignItems: 'center', textAlign: 'center' }}>
+                <AccountBalanceIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
+                <Typography sx={{ fontWeight: 700 }}>Bạn chưa có Ví doanh thu</Typography>
+                <Typography color="text.secondary">
+                  Hoàn tất xác minh giáo viên để nhận hoa hồng và tạo yêu cầu rút tiền.
+                </Typography>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate(ROUTES.TEACHER.KYC)}
+                  sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#9D182E' }, borderRadius: 10, fontWeight: 700, textTransform: 'none' }}
+                >
+                  Trở thành giảng viên
+                </Button>
+              </Stack>
+            ) : loadingWithdrawals ? (
+              <Stack spacing={1.5} sx={{ py: 6, alignItems: 'center' }}>
+                <CircularProgress aria-label="Đang tải lịch sử rút hoa hồng" sx={{ color: '#C41E3A' }} />
+                <Typography color="text.secondary">Đang tải lịch sử rút hoa hồng…</Typography>
+              </Stack>
+            ) : errorWithdrawals ? (
+              <Alert severity="error" action={<Button onClick={() => void loadWithdrawalData()}>Thử lại</Button>}>
+                Không thể tải lịch sử rút hoa hồng.
+              </Alert>
+            ) : (
+              <WithdrawalHistoryTable withdrawals={withdrawals} />
+            )}
           </Box>
         )}
         </Box>
@@ -568,15 +596,6 @@ export function StudentPaymentsPage() {
         onClose={() => { setDialogItem(null); setDialogRefund(null); }}
       />
 
-      {/* Withdrawal modal */}
-      <StudentWithdrawalModal
-        open={withdrawalModalOpen}
-        onClose={() => setWithdrawalModalOpen(false)}
-        wallet={wallet}
-        minimumAmount={minimumAmount}
-        identityVerified={identityVerified}
-        onSuccess={refreshAll}
-      />
     </Box>
   );
 }

@@ -191,6 +191,24 @@ class PublicCourseControllerTest {
     }
 
     @Test
+    void searchCourses_acceptsAggregateSortsForCatalogTabs() throws Exception {
+        Page<PublicCourseSummaryResponse> emptyPage = new PageImpl<>(Collections.emptyList());
+        when(courseService.searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)
+        )).thenReturn(emptyPage);
+
+        mockMvc.perform(get("/api/v1/public/courses")
+                        .param("sort", "enrollmentCount,desc")
+                        .param("size", "24"))
+                .andExpect(status().isOk());
+
+        verify(courseService).searchPublicCourses(
+                isNull(), isNull(), isNull(), isNull(), isNull(),
+                eq(PageRequest.of(0, 24, Sort.by(Sort.Direction.DESC, "enrollmentCount")))
+        );
+    }
+
+    @Test
     void searchCourses_withNegativePage_returnsBadRequest() throws Exception {
         mockMvc.perform(get("/api/v1/public/courses")
                         .param("page", "-1"))

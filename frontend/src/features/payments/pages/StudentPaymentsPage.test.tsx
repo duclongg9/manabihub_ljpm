@@ -120,11 +120,12 @@ describe('StudentPaymentsPage', () => {
     expect(screen.getByText('Đã thanh toán')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Vào học/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Yêu cầu hoàn tiền/i })).toBeInTheDocument();
-    expect(screen.getByText('Ví')).toBeInTheDocument();
-    expect(screen.getByText('Rút tiền hoàn')).toBeInTheDocument();
-    expect(screen.getByText('Tiền hoàn hợp lệ từ các giao dịch khóa học')).toBeInTheDocument();
+    expect(screen.getByText('Ví học viên')).toBeInTheDocument();
+    expect(screen.getByText('Ví doanh thu giảng viên')).toBeInTheDocument();
+    expect(screen.getByText('Tiền nạp, hoàn tiền và thưởng học tập')).toBeInTheDocument();
+    expect(screen.getByText(/không bao gồm hoa hồng giảng viên/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Nạp tiền/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Xác minh SĐT & CCCD để rút tiền' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Xác minh SĐT & CCCD để rút hoa hồng' })).toBeInTheDocument();
   });
 
   it('opens CCCD verification with a safe return path to Ví & Thanh toán', async () => {
@@ -135,9 +136,9 @@ describe('StudentPaymentsPage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Xác minh SĐT & CCCD để rút tiền' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Xác minh SĐT & CCCD để rút hoa hồng' }));
     expect(screen.getByTestId('current-location')).toHaveTextContent(
-      '/student/profile',
+      '/student/identity-verification',
     );
   });
 
@@ -238,9 +239,9 @@ describe('StudentPaymentsPage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Lịch sử rút tiền' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Lịch sử rút hoa hồng' }));
 
-    expect(await screen.findByText('Chưa có yêu cầu rút tiền về ngân hàng nào.')).toBeInTheDocument();
+    expect(await screen.findByText('Bạn chưa có Ví doanh thu')).toBeInTheDocument();
     expect(screen.queryByText('MHB-20260729-001')).not.toBeInTheDocument();
   });
 });
