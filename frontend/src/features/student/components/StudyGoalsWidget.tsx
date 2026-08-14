@@ -198,6 +198,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   const [bulkDuration, setBulkDuration] = useState<BulkDurationChoice>('keep');
   const [bulkCustomDuration, setBulkCustomDuration] = useState(25);
   const [bulkError, setBulkError] = useState('');
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const notifiedRef = useRef(new Set<string>());
 
   const openBulkSchedule = () => {
@@ -210,6 +211,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     setBulkDuration('keep');
     setBulkCustomDuration(25);
     setBulkError('');
+    setBulkDeleteConfirmOpen(false);
     setBulkOpen(true);
   };
 
@@ -377,6 +379,22 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     }
     setPlan((previous) => ({ ...previous, slots: updatedSlots }));
     setBulkOpen(false);
+  };
+
+  const requestBulkDelete = () => {
+    if (bulkSelectedCount === 0) {
+      setBulkError('Hãy chọn ít nhất một ca học để xóa.');
+      return;
+    }
+    setBulkDeleteConfirmOpen(true);
+  };
+
+  const confirmBulkDelete = () => {
+    const selectedIds = new Set(Object.entries(bulkSelectedIds).filter(([, selected]) => selected).map(([id]) => id));
+    setPlan((previous) => ({ ...previous, slots: previous.slots.filter((slot) => !selectedIds.has(slot.id)) }));
+    setBulkDeleteConfirmOpen(false);
+    setBulkOpen(false);
+    setBulkError('');
   };
 
   const resetSlotEditor = () => {
@@ -593,7 +611,24 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
           {bulkDuration === 'custom' && <TextField size="small" type="number" label="Thời lượng mới (phút)" value={bulkCustomDuration} onChange={(event) => setBulkCustomDuration(Number(event.target.value))} slotProps={{ htmlInput: { min: 5, max: 180, step: 5 } }} sx={{ mt: 1.25, width: 220 }} />}
           {bulkError && <Alert severity="warning" sx={{ mt: 1.5 }}>{bulkError}</Alert>}
         </DialogContent>
-        <DialogActions><Button onClick={() => setBulkOpen(false)}>Hủy</Button><Button variant="contained" disabled={bulkSelectedCount === 0 || !bulkHasChanges} onClick={applyBulkSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>Áp dụng cho {bulkSelectedCount} ca</Button></DialogActions>
+        <DialogActions sx={{ justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+          <Button color="error" variant="outlined" disabled={bulkSelectedCount === 0} onClick={requestBulkDelete} sx={{ textTransform: 'none' }}>Xóa {bulkSelectedCount} ca</Button>
+          <Stack direction="row" spacing={1}>
+            <Button onClick={() => setBulkOpen(false)}>Hủy</Button>
+            <Button variant="contained" disabled={bulkSelectedCount === 0 || !bulkHasChanges} onClick={applyBulkSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>Áp dụng cho {bulkSelectedCount} ca</Button>
+          </Stack>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bulkDeleteConfirmOpen} onClose={() => setBulkDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Xóa ca học đã chọn?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">Bạn sắp xóa {bulkSelectedCount} ca học khỏi lịch cá nhân. Thao tác này không thể hoàn tác.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDeleteConfirmOpen(false)}>Giữ lại</Button>
+          <Button color="error" variant="contained" onClick={confirmBulkDelete}>Xóa ca học</Button>
+        </DialogActions>
       </Dialog>
     </Paper>
   );

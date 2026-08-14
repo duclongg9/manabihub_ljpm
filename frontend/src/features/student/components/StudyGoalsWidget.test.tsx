@@ -124,4 +124,26 @@ describe('StudyGoalsWidget', () => {
     expect(slots.map((slot: { startTime: string }) => slot.startTime)).toEqual(['21:00', '21:00']);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
+
+  it('deletes many selected slots after confirmation', async () => {
+    const today = new Date();
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      weekKey: todayKey(today),
+      weeklyTargetMinutes: 150,
+      slots: [
+        { id: 'slot-1', dayOfWeek: today.getDay(), startTime: '19:00', durationMinutes: 25, skill: 'Kanji & Từ vựng', enabled: true },
+        { id: 'slot-2', dayOfWeek: (today.getDay() + 1) % 7, startTime: '20:00', durationMinutes: 25, skill: 'Ngữ pháp', enabled: true },
+      ],
+      focusTotals: {}, attendance: {},
+    }));
+
+    render(<StudyGoalsWidget courses={[]} />);
+    window.dispatchEvent(new Event(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Xóa 2 ca' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa 2 ca' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa ca học' }));
+
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').slots).toHaveLength(0));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
 });
