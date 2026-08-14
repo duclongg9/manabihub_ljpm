@@ -109,6 +109,8 @@ public class PublicCourseController {
         return "publishedAt".equals(field)
                 || "price".equals(field)
                 || "title".equals(field)
-                || "createdAt".equals(field);
+                || "createdAt".equals(field)
+                || "enrollmentCount".equals(field)
+                || "averageRating".equals(field);
     }
 }

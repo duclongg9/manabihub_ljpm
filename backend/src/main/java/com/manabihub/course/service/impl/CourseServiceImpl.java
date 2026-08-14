@@ -32,7 +32,9 @@ import com.manabihub.course.dto.response.TeacherCourseAnalyticsResponse;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -367,6 +369,54 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    public CourseDraftResponse unpublishCourse(UUID courseId) {
+        UUID currentUserId = currentUserService.getCurrentUserId();
+        // Unpublishing is a workspace operation. It must remain available when
+        // a teacher needs to correct a cover/content item; it is not a publish
+        // operation and therefore must not require a second KYC gate here.
+        TeacherProfile teacherProfile = resolveTeacherWorkspace(currentUserId);
+        Course course = courseRepository.findByIdAndTeacher_Id(courseId, teacherProfile.getId())
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COURSE_NOT_FOUND,
+                        "Course was not found",
+                        HttpStatus.NOT_FOUND
+                ));
+
+        if (course.getStatus() != CourseStatus.PUBLISHED) {
+            throw new BusinessException(
+                    MessageCodes.MSG_COURSE_007,
+                    "Only a published course can be hidden for editing.",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        CourseStatus previousStatus = course.getStatus();
+        Instant previousPublishedAt = course.getPublishedAt();
+        course.setStatus(CourseStatus.DRAFT);
+        course.setPublishedAt(null);
+        courseRepository.saveAndFlush(course);
+
+        auditLogService.logUserAction(
+                currentUserId,
+                "TEACHER",
+                "UNPUBLISH_COURSE",
+                "COURSE",
+                course.getId(),
+                Map.of(
+                        "status", previousStatus.name(),
+                        "publishedAt", previousPublishedAt == null ? "" : previousPublishedAt.toString()
+                ),
+                Map.of("status", CourseStatus.DRAFT.name()),
+                Map.of(
+                        "courseTitle", course.getTitle(),
+                        "reason", "Teacher requested editing"
+                )
+        );
+
+        return toResponse(course);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PublicCourseDetailResponse getPublicCourseDetail(String identifier) {
         Course course;
@@ -396,7 +446,14 @@ public class CourseServiceImpl implements CourseService {
 
         boolean isAdmin = currentUserService.hasRole("ADMIN") || currentUserService.hasRole("SUPER_ADMIN");
 
-        if (course.getStatus() != CourseStatus.PUBLISHED && !isAuthor && !isAdmin) {
+        // An unpublished course must disappear from the public catalogue, but
+        // existing students must still be able to open it while the teacher
+        // edits and resubmits the course. The learning endpoints enforce the
+        // same enrollment check, so keep the public detail response aligned.
+        boolean isEnrolled = currentUserIdOpt.isPresent()
+                && courseRepository.checkEnrollmentExists(course.getId(), currentUserIdOpt.get());
+
+        if (course.getStatus() != CourseStatus.PUBLISHED && !isAuthor && !isAdmin && !isEnrolled) {
             throw new BusinessException(
                     MessageCodes.MSG_CATALOG_001,
                     "Course was not found or is not published yet",
@@ -404,10 +461,6 @@ public class CourseServiceImpl implements CourseService {
             );
         }
 
-        boolean isEnrolled = false;
-        if (currentUserIdOpt.isPresent()) {
-            isEnrolled = courseRepository.checkEnrollmentExists(course.getId(), currentUserIdOpt.get());
-        }
         CourseReviewAggregateResponse reviewAggregate =
                 courseReviewService.getAggregate(course.getId());
 
@@ -734,8 +787,23 @@ public class CourseServiceImpl implements CourseService {
             BigDecimal maxPrice,
             Pageable pageable
     ) {
-        var spec = PublicCourseSpecification.buildSearch(keyword, category, jlptLevel, minPrice, maxPrice);
-        Page<Course> coursePage = courseRepository.findAll(spec, pageable);
+        Sort.Order requestedOrder = pageable.getSort().stream().findFirst().orElse(null);
+        String aggregateSort = requestedOrder != null && isAggregateSort(requestedOrder.getProperty())
+                ? requestedOrder.getProperty()
+                : null;
+        var spec = PublicCourseSpecification.buildSearch(
+                keyword,
+                category,
+                jlptLevel,
+                minPrice,
+                maxPrice,
+                aggregateSort,
+                requestedOrder == null ? Sort.Direction.DESC : requestedOrder.getDirection()
+        );
+        Pageable queryPageable = aggregateSort == null
+                ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        Page<Course> coursePage = courseRepository.findAll(spec, queryPageable);
         Map<UUID, Long> enrollmentCounts = new HashMap<>();
         List<UUID> courseIds = coursePage.getContent().stream().map(Course::getId).toList();
         if (!courseIds.isEmpty()) {
@@ -804,6 +872,10 @@ public class CourseServiceImpl implements CourseService {
                 .reviewCount(reviewAggregate.reviewCount())
                 .enrollmentCount(enrollmentCount)
                 .build();
+    }
+
+    private boolean isAggregateSort(String property) {
+        return "enrollmentCount".equals(property) || "averageRating".equals(property);
     }
 
 }

@@ -9,6 +9,9 @@ import {
   Chip,
   InputAdornment,
   TextField,
+  Tabs,
+  Tab,
+  MenuItem,
 } from '@mui/material';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -24,12 +27,15 @@ import { useCourseCategories } from '../hooks/useCourseCategories';
 import { EmptyState } from '../../../shared/components/EmptyState/EmptyState';
 import { ErrorState } from '../../../shared/components/ErrorState/ErrorState';
 import type { CourseCatalogFilters } from '../types/catalogTypes';
-import { CourseDiscoverySections } from '../components/CourseDiscoverySections';
 
-const PAGE_SIZE = 12;
-const DEFAULT_SORT = 'publishedAt,desc';
+const DEFAULT_PAGE_SIZE = 12;
+const PAGE_SIZE_OPTIONS = [12, 24, 36, 50];
+const DEFAULT_SORT = 'enrollmentCount,desc';
+const ALL_COURSES_SORT = 'publishedAt,desc';
 const ALLOWED_SORTS = new Set([
   DEFAULT_SORT,
+  'averageRating,desc',
+  ALL_COURSES_SORT,
   'price,asc',
   'price,desc',
   'title,asc',
@@ -39,8 +45,15 @@ const ALLOWED_JLPT_LEVELS = new Set(['N1', 'N2', 'N3', 'N4', 'N5']);
 interface CatalogQuery {
   filters: CourseCatalogFilters;
   page: number;
+  pageSize: number;
   sort: string;
 }
+
+const CATALOG_TABS = [
+  { value: DEFAULT_SORT, label: 'Bán chạy nhất' },
+  { value: 'averageRating,desc', label: 'Được đánh giá cao' },
+  { value: ALL_COURSES_SORT, label: 'Tất cả khóa học' },
+] as const;
 
 function cleanText(value: string | null): string | undefined {
   const cleaned = value?.trim();
@@ -70,6 +83,10 @@ function readCatalogQuery(params: URLSearchParams): CatalogQuery {
   const requestedPage = Number(params.get('page'));
   const page =
     Number.isInteger(requestedPage) && requestedPage >= 1 ? requestedPage - 1 : 0;
+  const requestedPageSize = Number(params.get('size'));
+  const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize)
+    ? requestedPageSize
+    : DEFAULT_PAGE_SIZE;
   const requestedSort = params.get('sort');
   const sort = requestedSort && ALLOWED_SORTS.has(requestedSort) ? requestedSort : DEFAULT_SORT;
 
@@ -82,6 +99,7 @@ function readCatalogQuery(params: URLSearchParams): CatalogQuery {
       maxPrice,
     },
     page,
+    pageSize,
     sort,
   };
 }
@@ -96,6 +114,7 @@ function buildCatalogParams(query: CatalogQuery): URLSearchParams {
   if (filters.minPrice !== undefined) params.set('minPrice', String(filters.minPrice));
   if (filters.maxPrice !== undefined) params.set('maxPrice', String(filters.maxPrice));
   if (page > 0) params.set('page', String(page + 1));
+  if (query.pageSize !== DEFAULT_PAGE_SIZE) params.set('size', String(query.pageSize));
   if (sort !== DEFAULT_SORT) params.set('sort', sort);
 
   return params;
@@ -138,17 +157,9 @@ export const CourseCatalogPage: React.FC = () => {
   } = useCourseCatalog({
     ...query.filters,
     page: query.page,
-    size: PAGE_SIZE,
+    size: query.pageSize,
     sort: query.sort,
   });
-
-  const isDiscoveryView = !query.filters.keyword && !query.filters.category
-    && query.filters.minPrice === undefined && query.filters.maxPrice === undefined
-    && query.page === 0;
-  const { data: discoveryData } = useCourseCatalog(
-    { page: 0, size: 50, sort: DEFAULT_SORT },
-    isDiscoveryView,
-  );
 
   useEffect(() => {
     if (data && data.totalPages > 0 && query.page >= data.totalPages) {
@@ -173,22 +184,32 @@ export const CourseCatalogPage: React.FC = () => {
 
   const handleFiltersChange = useCallback(
     (filters: CourseCatalogFilters) => {
-      replaceQuery({ filters, page: 0, sort: query.sort });
+      replaceQuery({ filters, page: 0, pageSize: query.pageSize, sort: query.sort });
     },
-    [query.sort, replaceQuery],
+    [query.pageSize, query.sort, replaceQuery],
   );
 
   const handleSortChange = useCallback(
     (sort: string) => {
-      replaceQuery({ filters: query.filters, page: 0, sort });
+      replaceQuery({ filters: query.filters, page: 0, pageSize: query.pageSize, sort });
     },
-    [query.filters, replaceQuery],
+    [query.filters, query.pageSize, replaceQuery],
   );
 
   const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
     replaceQuery({ ...query, page: page - 1 });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const handlePageSizeChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const nextPageSize = Number(event.target.value);
+    if (!PAGE_SIZE_OPTIONS.includes(nextPageSize)) return;
+    replaceQuery({ ...query, page: 0, pageSize: nextPageSize });
+  };
+
+  const selectedCatalogTab = CATALOG_TABS.some((tab) => tab.value === query.sort)
+    ? query.sort
+    : ALL_COURSES_SORT;
 
   const updateKeyword = (keyword: string) => {
     handleFiltersChange({ ...query.filters, keyword: keyword.trim() || undefined });
@@ -209,6 +230,39 @@ export const CourseCatalogPage: React.FC = () => {
         />
 
         <Box sx={{ position: 'relative', zIndex: 1, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ position: 'sticky', top: { xs: 72, sm: 64 }, zIndex: 20, bgcolor: 'rgba(250, 249, 246, 0.92)', backdropFilter: 'blur(12px)', py: 2, mx: { xs: -2, sm: -3 }, px: { xs: 2, sm: 3 }, borderRadius: 2, transition: 'all 0.3s' }}>
+            <CourseCatalogFiltersBar
+              filters={query.filters}
+              onFiltersChange={handleFiltersChange}
+              categories={categories}
+              categoriesLoading={categoriesLoading}
+            />
+            <Tabs
+              value={selectedCatalogTab}
+              onChange={(_event, value: string) => handleSortChange(value)}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              aria-label="Cách sắp xếp khóa học"
+              sx={{
+                mt: 1.5,
+                minHeight: 42,
+                '& .MuiTabs-indicator': { bgcolor: '#C41E3A', height: 3, borderRadius: 3 },
+                '& .MuiTab-root': {
+                  minHeight: 42,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  color: '#64748B',
+                  '&.Mui-selected': { color: '#C41E3A' },
+                },
+              }}
+            >
+              {CATALOG_TABS.map((tab) => (
+                <Tab key={tab.value} value={tab.value} label={tab.label} />
+              ))}
+            </Tabs>
+          </Box>
+
           <Box
             component="section"
             aria-labelledby="course-discovery-search"
@@ -245,25 +299,6 @@ export const CourseCatalogPage: React.FC = () => {
               </Stack>
             </Box>
           </Box>
-
-          {isDiscoveryView && discoveryData?.content && discoveryData.content.length > 0 && (
-            <CourseDiscoverySections
-              courses={discoveryData.content}
-              selectedLevel={query.filters.jlptLevel}
-              onLevelChange={(level) => handleFiltersChange({ ...query.filters, jlptLevel: level })}
-            />
-          )}
-
-          <Box sx={{ position: 'sticky', top: { xs: 72, sm: 64 }, zIndex: 20, bgcolor: 'rgba(250, 249, 246, 0.92)', backdropFilter: 'blur(12px)', py: 2, mx: { xs: -2, sm: -3 }, px: { xs: 2, sm: 3 }, borderRadius: 2, transition: 'all 0.3s' }}>
-            <CourseCatalogFiltersBar
-            filters={query.filters}
-            onFiltersChange={handleFiltersChange}
-            categories={categories}
-            categoriesLoading={categoriesLoading}
-            sort={query.sort}
-            onSortChange={handleSortChange}
-          />
-        </Box>
 
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
@@ -308,7 +343,7 @@ export const CourseCatalogPage: React.FC = () => {
 
         {isLoading && (
           <Grid container spacing={3} sx={{ mt: 1 }}>
-            {Array.from(new Array(12)).map((_, index) => (
+                {Array.from(new Array(Math.min(query.pageSize, 12))).map((_, index) => (
               <Grid key={index} size={{ xs: 12, md: 6, lg: 4 }}>
                 <Box sx={{ bgcolor: 'white', borderRadius: 4, overflow: 'hidden', border: '1px solid', borderColor: 'grey.100', height: 340 }}>
                   <Box sx={{ width: '100%', aspectRatio: '16/9', bgcolor: 'grey.200', animation: 'pulse 1.5s infinite ease-in-out' }} />
@@ -343,7 +378,7 @@ export const CourseCatalogPage: React.FC = () => {
               icon={<SearchOffIcon sx={{ fontSize: 56, color: 'text.secondary' }} />}
               actionLabel="Xóa bộ lọc"
               onAction={() => {
-                replaceQuery({ filters: {}, page: 0, sort: DEFAULT_SORT });
+                replaceQuery({ filters: {}, page: 0, pageSize: query.pageSize, sort: DEFAULT_SORT });
               }}
             />
           </Box>
@@ -365,16 +400,35 @@ export const CourseCatalogPage: React.FC = () => {
           </Box>
         )}
 
-        {!isLoading && !isError && data && data.totalPages > 1 && (
-          <Box sx={{ mt: 5, display: 'flex', justifyContent: 'center' }}>
-            <Pagination
-              count={data.totalPages}
-              page={query.page + 1}
-              onChange={handlePageChange}
-              color="primary"
-              shape="rounded"
-            />
-          </Box>
+        {!isLoading && !isError && data && data.totalElements > 0 && (
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{ mt: 5, alignItems: 'center', justifyContent: 'center' }}
+          >
+            {data.totalPages > 1 && (
+              <Pagination
+                count={data.totalPages}
+                page={query.page + 1}
+                onChange={handlePageChange}
+                color="primary"
+                shape="rounded"
+              />
+            )}
+            <TextField
+              select
+              size="small"
+              label="Khóa học/trang"
+              value={query.pageSize}
+              onChange={handlePageSizeChange}
+              sx={{ minWidth: 150 }}
+              slotProps={{ select: { MenuProps: { disableScrollLock: true } } }}
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <MenuItem key={option} value={option}>{option}</MenuItem>
+              ))}
+            </TextField>
+          </Stack>
         )}
         </Box>
       </Box>

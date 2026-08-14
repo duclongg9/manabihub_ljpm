@@ -18,7 +18,6 @@ import InputAdornment from '@mui/material/InputAdornment';
 import CloseIcon from '@mui/icons-material/Close';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import type { SelectChangeEvent } from '@mui/material';
 import type { CourseCatalogFilters, CourseCategory } from '../types/catalogTypes';
 
 const JLPT_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
@@ -28,8 +27,6 @@ interface CourseCatalogFiltersBarProps {
   onFiltersChange: (filters: CourseCatalogFilters) => void;
   categories: CourseCategory[];
   categoriesLoading?: boolean;
-  sort: string;
-  onSortChange: (sort: string) => void;
 }
 
 function formatPriceInput(value?: number): string {
@@ -48,8 +45,6 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
   onFiltersChange,
   categories,
   categoriesLoading,
-  sort,
-  onSortChange,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -57,16 +52,11 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
   const [minPrice, setMinPrice] = useState(formatPriceInput(filters.minPrice));
   const [maxPrice, setMaxPrice] = useState(formatPriceInput(filters.maxPrice));
   const [priceError, setPriceError] = useState('');
-  const [keyword, setKeyword] = useState(filters.keyword || '');
 
   useEffect(() => {
     setMinPrice(formatPriceInput(filters.minPrice));
     setMaxPrice(formatPriceInput(filters.maxPrice));
   }, [filters.minPrice, filters.maxPrice]);
-
-  useEffect(() => {
-    setKeyword(filters.keyword || '');
-  }, [filters.keyword]);
 
   const updateFilter = useCallback((field: keyof CourseCatalogFilters, value?: string) => {
     onFiltersChange({
@@ -74,15 +64,6 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
       [field]: value || undefined,
     });
   }, [filters, onFiltersChange]);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      if (keyword !== (filters.keyword || '')) {
-        updateFilter('keyword', keyword);
-      }
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [filters.keyword, keyword, updateFilter]);
 
   const handlePriceChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const numericStr = e.target.value.replace(/\D/g, '');
@@ -118,35 +99,20 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
   const clearFilters = () => {
     setMinPrice('');
     setMaxPrice('');
-    setKeyword('');
     setPriceError('');
     onFiltersChange({});
     setDrawerOpen(false);
-  };
-
-  const handleSortChange = (event: SelectChangeEvent) => {
-    onSortChange(event.target.value);
   };
 
   const filterFields = (
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(7, minmax(0, 1fr))',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0, 1fr))',
         gap: 2,
         alignItems: 'center',
       }}
     >
-      <FormControl fullWidth size="small" sx={{ gridColumn: isMobile ? 'auto' : 'span 2' }}>
-        <TextField
-          placeholder="Tìm khóa học..."
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          size="small"
-          sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
-        />
-      </FormControl>
-
       <FormControl fullWidth size="small">
         <Select
           displayEmpty
@@ -222,20 +188,6 @@ export const CourseCatalogFiltersBar: React.FC<CourseCatalogFiltersBarProps> = (
           </Typography>
         )}
       </Stack>
-
-      <FormControl fullWidth size="small">
-        <Select
-          displayEmpty
-          value={sort}
-          onChange={handleSortChange}
-          sx={{ '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
-        >
-          <MenuItem value="publishedAt,desc">Mới xuất bản</MenuItem>
-          <MenuItem value="price,asc">Giá thấp đến cao</MenuItem>
-          <MenuItem value="price,desc">Giá cao đến thấp</MenuItem>
-          <MenuItem value="title,asc">Tên A-Z</MenuItem>
-        </Select>
-      </FormControl>
 
       <Button
         variant="text"
