@@ -309,6 +309,7 @@ function TeacherKycPageContent() {
   async function handleCertificateChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     setCertificateFile(file);
+    setCertificateCode('');
     setCertificateHolderName('');
     setCertificateDateOfBirth('');
     setCertificateLevel('');
@@ -338,7 +339,7 @@ function TeacherKycPageContent() {
       setCertificateHolderName(result.holderName);
       setCertificateDateOfBirth(result.dateOfBirth);
       setCertificateLevel(result.level);
-      if (!certificateCode.trim() && result.certificateCode) {
+      if (result.certificateCode) {
         setCertificateCode(result.certificateCode);
       }
       if (!result.rawText || !result.holderName || !result.dateOfBirth || !result.level) {
@@ -704,7 +705,7 @@ function TeacherKycPageContent() {
                 />
                 <TextField
                   fullWidth
-                  label="Nội dung OCR dùng để đối chiếu"
+                  label="Dữ liệu OCR đã chuẩn hóa để đối chiếu"
                   margin="normal"
                   minRows={4}
                   multiline
@@ -712,8 +713,9 @@ function TeacherKycPageContent() {
                   value={certificateOcrText}
                 />
                 <Typography sx={{ color: 'text.secondary', fontSize: 12 }}>
-                  Dữ liệu OCR chỉ được dùng cho đối chiếu hồ sơ. Nếu thông tin chưa rõ, hãy tải lại
-                  ảnh tốt hơn thay vì đoán hoặc tự nhập thay nội dung ảnh.
+                  Hệ thống chỉ gửi các trường đọc được chắc chắn (họ tên, ngày sinh, cấp độ và mã
+                  chứng chỉ), không gửi toàn bộ nền bảo an/tiếng Nhật bị nhiễu. Nếu còn thiếu trường,
+                  hãy chụp lại ảnh thẳng, đủ sáng và không cắt mất nội dung.
                 </Typography>
               </ModuleCard>
 
