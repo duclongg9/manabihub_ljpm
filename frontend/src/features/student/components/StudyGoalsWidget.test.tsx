@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { StudyGoalsWidget } from './StudyGoalsWidget';
+import { STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT, STUDY_PLAN_OPEN_SCHEDULE_EVENT, STORAGE_KEY, StudyGoalsWidget, todayKey } from './StudyGoalsWidget';
 
 describe('StudyGoalsWidget', () => {
   afterEach(cleanup);
@@ -46,5 +46,82 @@ describe('StudyGoalsWidget', () => {
 
     expect(screen.queryByRole('button', { name: /Bắt đầu Pomodoro/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('pomodoro-timer')).not.toBeInTheDocument();
+  });
+
+  it('opens a selected-day editor and persists edits and deletions', async () => {
+    const today = new Date();
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      weekKey: todayKey(today),
+      weeklyTargetMinutes: 150,
+      slots: [{
+        id: 'slot-1', dayOfWeek: today.getDay(), startTime: '19:00', durationMinutes: 25,
+        skill: 'Kanji & Từ vựng', courseId: 'course-1', courseTitle: 'JLPT N3 thực chiến', enabled: true,
+      }],
+      focusTotals: {}, attendance: {},
+    }));
+
+    render(<StudyGoalsWidget courses={[{ id: 'course-1', title: 'JLPT N3 thực chiến' }]} />);
+    window.dispatchEvent(new CustomEvent(STUDY_PLAN_OPEN_SCHEDULE_EVENT, {
+      detail: { dayOfWeek: today.getDay(), dateKey: todayKey(today) },
+    }));
+
+    await waitFor(() => expect(screen.getByTestId('schedule-day-editor')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Sửa 19:00' }));
+    fireEvent.change(screen.getByLabelText('Giờ bắt đầu'), { target: { value: '21:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').slots[0].startTime).toBe('21:00');
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa 21:00' }));
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').slots).toHaveLength(0);
+  });
+
+  it('blocks a new slot when the selected day already has an overlapping slot', async () => {
+    const today = new Date();
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      weekKey: todayKey(today),
+      weeklyTargetMinutes: 150,
+      slots: [{
+        id: 'slot-1', dayOfWeek: today.getDay(), startTime: '19:00', durationMinutes: 25,
+        skill: 'Kanji & Từ vựng', enabled: true,
+      }],
+      focusTotals: {}, attendance: {},
+    }));
+
+    render(<StudyGoalsWidget courses={[]} />);
+    window.dispatchEvent(new CustomEvent(STUDY_PLAN_OPEN_SCHEDULE_EVENT, {
+      detail: { dayOfWeek: today.getDay(), dateKey: todayKey(today) },
+    }));
+    await waitFor(() => expect(screen.getByTestId('schedule-day-editor')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu lịch' }));
+
+    expect(screen.getByText('Khung giờ này bị trùng với một ca khác. Hãy chọn giờ khác hoặc bấm Sửa ở ca đang có.')).toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').slots).toHaveLength(1);
+  });
+
+  it('applies a time change to many selected slots at once', async () => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      weekKey: todayKey(today),
+      weeklyTargetMinutes: 150,
+      slots: [
+        { id: 'slot-1', dayOfWeek: today.getDay(), startTime: '19:00', durationMinutes: 25, skill: 'Kanji & Từ vựng', enabled: true },
+        { id: 'slot-2', dayOfWeek: tomorrow.getDay(), startTime: '20:00', durationMinutes: 25, skill: 'Ngữ pháp', enabled: true },
+      ],
+      focusTotals: {}, attendance: {},
+    }));
+
+    render(<StudyGoalsWidget courses={[]} />);
+    window.dispatchEvent(new Event(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT));
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Thao tác giờ' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Đặt cùng một giờ' }));
+    fireEvent.change(screen.getByLabelText('Giờ mới'), { target: { value: '21:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng cho 2 ca' }));
+
+    const slots = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').slots;
+    expect(slots.map((slot: { startTime: string }) => slot.startTime)).toEqual(['21:00', '21:00']);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });
