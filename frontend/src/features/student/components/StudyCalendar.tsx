@@ -9,10 +9,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   FormControlLabel,
   IconButton,
+  InputAdornment,
   Paper,
+  Popover,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
@@ -24,6 +28,7 @@ import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
@@ -52,8 +57,15 @@ interface CalendarEvent {
 }
 
 const WEEKDAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-const COURSE_COLORS = ['#D97706', '#2563EB', '#2F855A', '#9333EA', '#C41E3A', '#0F766E'];
+const LEVEL_COLORS: Record<string, string> = {
+  N5: '#D97706',
+  N4: '#2563EB',
+  N3: '#2F855A',
+  N2: '#9333EA',
+  N1: '#C41E3A',
+};
 const UNASSIGNED_COURSE_KEY = '__unassigned__';
+const MAX_DAY_EVENTS = 2;
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -80,6 +92,11 @@ function slotCourseKey(slot: StudySlot) {
 function slotMinutes(slot: StudySlot) {
   const [hour, minute] = slot.startTime.split(':').map(Number);
   return (hour || 0) * 60 + (minute || 0);
+}
+
+function courseColor(title: string) {
+  const match = title.toUpperCase().match(/\bN([1-5])\b/);
+  return match ? LEVEL_COLORS[`N${match[1]}`] : '#64748B';
 }
 
 function buildVisibleDates(cursor: Date, view: CalendarView) {
@@ -112,7 +129,7 @@ function buildEvents(slots: StudySlot[], dates: Date[], colors: Record<string, s
         slot,
         date: eventDate,
         dateKey: dateKey(eventDate),
-        color: colors[slotCourseKey(slot)] || COURSE_COLORS[0],
+        color: colors[slotCourseKey(slot)] || '#64748B',
         startMinutes,
         endMinutes: startMinutes + slot.durationMinutes,
         conflict: false,
@@ -144,6 +161,8 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<Record<string, boolean>>({});
+  const [courseFilterAnchorEl, setCourseFilterAnchorEl] = useState<HTMLElement | null>(null);
+  const [courseSearch, setCourseSearch] = useState('');
 
   useEffect(() => {
     const refresh = () => setPlan(readPlan());
@@ -176,8 +195,10 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
   }, [courseOptions]);
 
   const colors = useMemo(() => Object.fromEntries(
-    courseOptions.map((option, index) => [option.key, COURSE_COLORS[index % COURSE_COLORS.length]]),
+    courseOptions.map((option) => [option.key, courseColor(option.title)]),
   ), [courseOptions]);
+  const filteredCourseOptions = courseOptions.filter((option) => option.title.toLocaleLowerCase('vi-VN').includes(courseSearch.trim().toLocaleLowerCase('vi-VN')));
+  const selectedCourseCount = courseOptions.filter((option) => selectedCourses[option.key] !== false).length;
   const visibleDates = useMemo(() => buildVisibleDates(cursor, view), [cursor, view]);
   const events = useMemo(() => buildEvents(plan.slots, visibleDates, colors), [plan.slots, visibleDates, colors]);
   const filteredEvents = events.filter((event) => selectedCourses[slotCourseKey(event.slot)] !== false);
@@ -233,6 +254,9 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
       {!compact && <Typography variant="caption" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#344054' }}>
         {event.slot.courseTitle || event.slot.skill}
       </Typography>}
+      {compact && <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#344054', fontWeight: 700 }}>
+        {event.slot.courseTitle || event.slot.skill}
+      </Typography>}
     </Box>
   );
 
@@ -275,16 +299,57 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
       </Stack>
 
       {courseOptions.length > 0 && (
-        <Stack direction="row" spacing={0.25} sx={{ mt: 1.25, flexWrap: 'wrap', rowGap: 0.25 }}>
-          {courseOptions.map((option) => (
-            <FormControlLabel
-              key={option.key}
-              control={<Checkbox size="small" slotProps={{ input: { 'aria-label': option.title } }} checked={selectedCourses[option.key] !== false} onChange={(event) => setSelectedCourses((previous) => ({ ...previous, [option.key]: event.target.checked }))} sx={{ color: colors[option.key], '&.Mui-checked': { color: colors[option.key] } }} />}
-              label={<Typography variant="caption" sx={{ color: '#475467' }}>{option.title}</Typography>}
-              sx={{ mr: 1, my: 0 }}
+        <>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.25, alignItems: { sm: 'center' } }}>
+            <Button
+              variant="outlined"
+              onClick={(event) => setCourseFilterAnchorEl(event.currentTarget)}
+              aria-haspopup="dialog"
+              aria-expanded={Boolean(courseFilterAnchorEl)}
+              data-testid="calendar-course-filter"
+              sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#334155', justifyContent: 'space-between', minWidth: { sm: 260 } }}
+            >
+              📚 Lọc khóa học ({selectedCourseCount}/{courseOptions.length}) ▾
+            </Button>
+            <Typography variant="caption" color="text.secondary">Màu sắc được gom theo cấp độ JLPT.</Typography>
+          </Stack>
+          <Popover
+            open={Boolean(courseFilterAnchorEl)}
+            anchorEl={courseFilterAnchorEl}
+            onClose={() => { setCourseFilterAnchorEl(null); setCourseSearch(''); }}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            slotProps={{ paper: { sx: { p: 1.5, width: { xs: 300, sm: 380 }, maxWidth: 'calc(100vw - 32px)' } } }}
+          >
+            <TextField
+              autoFocus
+              fullWidth
+              size="small"
+              value={courseSearch}
+              onChange={(event) => setCourseSearch(event.target.value)}
+              placeholder="Tìm khóa học..."
+              slotProps={{
+                input: { startAdornment: <InputAdornment position="start"><SearchOutlinedIcon fontSize="small" /></InputAdornment> },
+                htmlInput: { 'aria-label': 'Tìm khóa học' },
+              }}
             />
-          ))}
-        </Stack>
+            <Stack direction="row" spacing={0.5} sx={{ mt: 1, mb: 0.75 }}>
+              <Button size="small" onClick={() => setSelectedCourses(Object.fromEntries(courseOptions.map((option) => [option.key, true])))} sx={{ textTransform: 'none' }}>Chọn tất cả</Button>
+              <Button size="small" onClick={() => setSelectedCourses(Object.fromEntries(courseOptions.map((option) => [option.key, false])))} sx={{ textTransform: 'none' }}>Bỏ chọn hết</Button>
+            </Stack>
+            <Divider />
+            <Box sx={{ maxHeight: 280, overflowY: 'auto', mt: 0.5 }}>
+              {filteredCourseOptions.map((option) => (
+                <FormControlLabel
+                  key={option.key}
+                  control={<Checkbox size="small" slotProps={{ input: { 'aria-label': option.title } }} checked={selectedCourses[option.key] !== false} onChange={(event) => setSelectedCourses((previous) => ({ ...previous, [option.key]: event.target.checked }))} sx={{ color: colors[option.key], '&.Mui-checked': { color: colors[option.key] } }} />}
+                  label={<Typography variant="body2" noWrap sx={{ color: '#475467' }}>{option.title}</Typography>}
+                  sx={{ display: 'flex', mr: 0, my: 0.15 }}
+                />
+              ))}
+              {filteredCourseOptions.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>Không tìm thấy khóa học.</Typography>}
+            </Box>
+          </Popover>
+        </>
       )}
 
       {view === 'day' ? (
@@ -320,8 +385,8 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
                   >
                     <Typography variant="caption" sx={{ display: 'inline-flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: '50%', bgcolor: isToday ? '#C41E3A' : 'transparent', color: isToday ? '#fff' : '#344054', fontWeight: 900 }}>{date.getDate()}</Typography>
                     <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                      {dayEvents.slice(0, view === 'month' ? 3 : 8).map((event) => renderEvent(event, view === 'month'))}
-                      {dayEvents.length > (view === 'month' ? 3 : 8) && <Typography variant="caption" color="text.secondary">+{dayEvents.length - (view === 'month' ? 3 : 8)} suất khác</Typography>}
+                      {dayEvents.slice(0, MAX_DAY_EVENTS).map((event) => renderEvent(event, view === 'month'))}
+                      {dayEvents.length > MAX_DAY_EVENTS && <Typography variant="caption" color="text.secondary">+{dayEvents.length - MAX_DAY_EVENTS} ca khác</Typography>}
                     </Stack>
                   </Box>
                 );

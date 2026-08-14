@@ -89,7 +89,8 @@ describe('getHeaderBrand', () => {
 
     expect(screen.getByText('Khóa học của tôi')).toBeInTheDocument();
     expect(screen.getByText('Hồ sơ cá nhân')).toBeInTheDocument();
-    expect(screen.getByText('Ví Manabi')).toBeInTheDocument();
+    expect(screen.getByText('Ví')).toBeInTheDocument();
+    expect(screen.getByText('Trở thành giảng viên')).toBeInTheDocument();
     expect(screen.getByText('Thông báo')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/Số dư:/)).toBeInTheDocument());
     expect(screen.getByText(/250\.000/)).toBeInTheDocument();

@@ -120,9 +120,9 @@ describe('StudentPaymentsPage', () => {
     expect(screen.getByText('Đã thanh toán')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Vào học/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Yêu cầu hoàn tiền/i })).toBeInTheDocument();
-    expect(screen.getByText('Ví học viên')).toBeInTheDocument();
+    expect(screen.getByText('Ví')).toBeInTheDocument();
     expect(screen.getByText('Rút tiền hoàn')).toBeInTheDocument();
-    expect(screen.getByText('Tiền hoàn hợp lệ dùng để mua khóa học')).toBeInTheDocument();
+    expect(screen.getByText('Tiền hoàn hợp lệ từ các giao dịch khóa học')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Nạp tiền/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Xác minh SĐT & CCCD để rút tiền' })).toBeInTheDocument();
   });

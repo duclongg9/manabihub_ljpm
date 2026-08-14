@@ -130,11 +130,11 @@ export function StudentIdentityVerificationPage() {
                   disabled={launching || status?.verified || Boolean(statusError)}
                 >
                   {submitting
-                    ? 'Đang ghi nhận kết quả…'
-                    : launching
-                      ? 'Đang mở VNPT eKYC…'
-                      : status?.verified
-                        ? 'Đã hoàn tất xác minh'
+                      ? 'Đang ghi nhận kết quả…'
+                      : launching
+                        ? 'Đang mở VNPT eKYC…'
+                        : status?.verified
+                        ? 'Đã xác thực CCCD thành công'
                         : 'Bắt đầu xác minh'}
                 </Button>
                 {launching && (
