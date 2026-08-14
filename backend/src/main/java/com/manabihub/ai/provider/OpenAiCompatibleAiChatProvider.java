@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import com.manabihub.ai.dto.request.AiChatHistoryItem;
 
 import java.util.List;
 import java.util.Map;
@@ -22,12 +23,22 @@ public class OpenAiCompatibleAiChatProvider implements AiChatProvider {
     private final AiChatProviderProperties properties;
 
     @Override
-    public AiChatProviderResult generate(AiChatContext context, String question) {
+    public AiChatProviderResult generate(AiChatContext context, String question, List<AiChatHistoryItem> history) {
         if (!StringUtils.hasText(properties.getBaseUrl()) || !StringUtils.hasText(properties.getApiKey())) {
             throw new AiChatProviderException("AI_PROVIDER_NOT_CONFIGURED");
         }
 
         try {
+            List<Map<String, Object>> messages = new java.util.ArrayList<>();
+            messages.add(Map.of("role", "system", "content", buildSystemPrompt(context)));
+            
+            if (history != null && !history.isEmpty()) {
+                for (AiChatHistoryItem item : history) {
+                    messages.add(Map.of("role", item.role(), "content", item.content()));
+                }
+            }
+            messages.add(Map.of("role", "user", "content", question));
+
             ProviderResponse response = createClient()
                     .post()
                     .uri(resolveEndpoint())
@@ -36,10 +47,7 @@ public class OpenAiCompatibleAiChatProvider implements AiChatProvider {
                     .body(Map.of(
                             "model", resolveModel(),
                             "temperature", 0.2,
-                            "messages", List.of(
-                                    Map.of("role", "system", "content", buildSystemPrompt(context)),
-                                    Map.of("role", "user", "content", question)
-                            )
+                            "messages", messages
                     ))
                     .retrieve()
                     .body(ProviderResponse.class);
@@ -58,8 +66,16 @@ public class OpenAiCompatibleAiChatProvider implements AiChatProvider {
 
     private String buildSystemPrompt(AiChatContext context) {
         return """
-                You are ManabiHub's lesson assistant. Answer only from the current lesson block and the allowed course metadata below.
+                You are ManabiHub's helpful Japanese lesson assistant and tutor. 
+                Your goal is to guide the student's learning, not just give away direct answers.
+                Answer only from the current lesson block and the allowed course metadata below.
                 If the requested answer is not supported by this context, say that it is unavailable in the current lesson instead of using general knowledge.
+
+                PEDAGOGICAL RULES:
+                - Do NOT simply provide the correct answer option (e.g. A, B, C, D) right away.
+                - Explain the grammar or vocabulary rules related to the question.
+                - Guide the student's thinking process so they can figure it out themselves.
+                - Act as an encouraging tutor.
 
                 Course title: %s
                 Course description: %s

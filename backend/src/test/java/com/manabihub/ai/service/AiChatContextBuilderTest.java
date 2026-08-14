@@ -4,6 +4,7 @@ import com.manabihub.ai.domain.AiChatContext;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseModule;
 import com.manabihub.course.entity.LessonBlock;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -14,7 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AiChatContextBuilderTest {
 
-    private final AiChatContextBuilder contextBuilder = new AiChatContextBuilder();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final AiChatContextBuilder contextBuilder = new AiChatContextBuilder(objectMapper);
 
     @Test
     void build_UsesOnlyCurrentLessonBlockAndCourseMetadata() {
@@ -60,15 +62,8 @@ class AiChatContextBuilderTest {
                 .id(UUID.randomUUID())
                 .title("N5 Review")
                 .build();
-        CourseModule module = CourseModule.builder()
-                .id(UUID.randomUUID())
-                .course(course)
-                .title("Review")
-                .orderIndex(1)
-                .build();
         LessonBlock quizBlock = LessonBlock.builder()
                 .id(UUID.randomUUID())
-                .module(module)
                 .title("Particle quiz")
                 .quizQuestion("Choose the topic marker")
                 .quizOptionsJson("[\"wa\",\"o\"]")
@@ -81,5 +76,48 @@ class AiChatContextBuilderTest {
         assertTrue(context.lessonContent().contains("Choose the topic marker"));
         assertTrue(context.lessonContent().contains("[\"wa\",\"o\"]"));
         assertFalse(context.lessonContent().contains("SECRET_CORRECT_ANSWER"));
+    }
+
+    @Test
+    void build_ParsesQuizItemsJson() {
+        Course course = Course.builder().id(UUID.randomUUID()).title("N5 Review").build();
+        LessonBlock quizBlock = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .title("Multi-question quiz")
+                .quizItemsJson("""
+                        [
+                          {"question":"Q1","options":["A","B"],"answer":"A"},
+                          {"question":"Q2","options":["C","D"],"answer":"D"}
+                        ]
+                        """)
+                .build();
+
+        AiChatContext context = contextBuilder.build(course, quizBlock);
+
+        assertTrue(context.lessonContent().contains("Câu 1: Q1"));
+        assertTrue(context.lessonContent().contains("- A"));
+        assertTrue(context.lessonContent().contains("- B"));
+        assertTrue(context.lessonContent().contains("Câu 2: Q2"));
+        assertFalse(context.lessonContent().contains("\"answer\":\"A\""));
+    }
+
+    @Test
+    void build_ParsesFlashcardsJson() {
+        Course course = Course.builder().id(UUID.randomUUID()).title("N5 Vocab").build();
+        LessonBlock flashcardBlock = LessonBlock.builder()
+                .id(UUID.randomUUID())
+                .title("Vocab block")
+                .flashcardsJson("""
+                        [
+                          {"front":"Apple","back":"Ringo"},
+                          {"front":"Cat","back":"Neko"}
+                        ]
+                        """)
+                .build();
+
+        AiChatContext context = contextBuilder.build(course, flashcardBlock);
+
+        assertTrue(context.lessonContent().contains("Term: Apple | Definition: Ringo"));
+        assertTrue(context.lessonContent().contains("Term: Cat | Definition: Neko"));
     }
 }

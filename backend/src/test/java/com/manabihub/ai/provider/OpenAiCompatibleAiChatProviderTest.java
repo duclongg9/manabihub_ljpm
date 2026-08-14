@@ -67,7 +67,7 @@ class OpenAiCompatibleAiChatProviderTest {
 
     @Test
     void generate_SendsScopedContextAndParsesAnswerAndUsage() throws Exception {
-        AiChatProviderResult result = provider.generate(context(), "What does は do?");
+        AiChatProviderResult result = provider.generate(context(), "What does は do?", null);
 
         assertEquals("It marks the topic in this lesson.", result.answer());
         assertEquals("openai-compatible", result.provider());
@@ -95,7 +95,7 @@ class OpenAiCompatibleAiChatProviderTest {
 
         AiChatProviderException exception = assertThrows(
                 AiChatProviderException.class,
-                () -> provider.generate(context(), "What does は do?")
+                () -> provider.generate(context(), "What does は do?", null)
         );
 
         assertEquals("AI_PROVIDER_EMPTY_RESPONSE", exception.getMessage());
@@ -107,7 +107,7 @@ class OpenAiCompatibleAiChatProviderTest {
 
         AiChatProviderException exception = assertThrows(
                 AiChatProviderException.class,
-                () -> provider.generate(context(), "What does は do?")
+                () -> provider.generate(context(), "What does は do?", null)
         );
 
         assertEquals("AI_PROVIDER_NOT_CONFIGURED", exception.getMessage());

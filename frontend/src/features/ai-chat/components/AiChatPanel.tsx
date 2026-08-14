@@ -69,10 +69,16 @@ export function AiChatPanel({ courseId, lessonBlockId, lessonTitle, onClose }: A
     setRequestError(null);
 
     try {
+      const history = messages.slice(-6).map((msg) => ({
+        role: msg.sender === 'student' ? ('user' as const) : ('assistant' as const),
+        content: msg.content,
+      }));
+
       const response = await sendMessage.mutateAsync({
         courseId,
         lessonBlockId,
         question: trimmedQuestion,
+        history,
       });
       setMessages((current) => [
         ...current,
