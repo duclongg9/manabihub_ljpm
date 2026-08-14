@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import {
   Alert,
@@ -8,8 +9,10 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  IconButton,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useAiChatEligibility } from '../hooks/useAiChatEligibility';
@@ -24,21 +27,31 @@ interface ChatMessage {
 interface AiChatPanelProps {
   courseId: string;
   lessonBlockId: string;
+  lessonTitle?: string;
+  onClose?: () => void;
 }
 
 function errorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    return error.response?.data?.message ?? 'Unable to get an AI response right now.';
+    return error.response?.data?.message ?? 'AI hiện chưa thể trả lời. Vui lòng thử lại sau.';
   }
-  return 'Unable to get an AI response right now.';
+  return 'AI hiện chưa thể trả lời. Vui lòng thử lại sau.';
 }
 
-export function AiChatPanel({ courseId, lessonBlockId }: AiChatPanelProps) {
+export function AiChatPanel({ courseId, lessonBlockId, lessonTitle, onClose }: AiChatPanelProps) {
   const eligibility = useAiChatEligibility(courseId, lessonBlockId);
   const sendMessage = useSendAiChatMessage();
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [requestError, setRequestError] = useState<string | null>(null);
+
+  // A chat belongs to one lesson context. Keep it while the panel is closed,
+  // but never carry messages into a different lesson.
+  useEffect(() => {
+    setQuestion('');
+    setMessages([]);
+    setRequestError(null);
+  }, [courseId, lessonBlockId]);
 
   const handleSend = async () => {
     const trimmedQuestion = question.trim();
@@ -86,9 +99,9 @@ export function AiChatPanel({ courseId, lessonBlockId }: AiChatPanelProps) {
     return (
       <Alert
         severity="error"
-        action={<Button color="inherit" size="small" onClick={() => eligibility.refetch()}>Retry</Button>}
+        action={<Button color="inherit" size="small" onClick={() => eligibility.refetch()}>Thử lại</Button>}
       >
-        Unable to check AI chat availability for this lesson.
+        Không thể kiểm tra khả năng sử dụng AI cho bài học này.
       </Alert>
     );
   }
@@ -102,22 +115,33 @@ export function AiChatPanel({ courseId, lessonBlockId }: AiChatPanelProps) {
         spacing={1.5}
         sx={{ px: 2, py: 1.5, alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
       >
-        <Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>AI Study Assistant</Typography>
-          <Typography variant="body2" color="text.secondary">Current lesson context only</Typography>
-        </Box>
-        <Chip
-          label={available ? 'Available' : 'Unavailable'}
-          color={available ? 'success' : 'default'}
-          size="small"
-          sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
-        />
+        <Stack direction="row" spacing={1} sx={{ minWidth: 0, alignItems: 'center', flexGrow: 1 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Trợ lý AI</Typography>
+            <Typography variant="body2" color="text.secondary" noWrap title={lessonTitle}>
+              {lessonTitle ? `Đang hỗ trợ: ${lessonTitle}` : 'Chỉ sử dụng ngữ cảnh bài học hiện tại'}
+            </Typography>
+          </Box>
+          <Chip
+            label={available ? 'Đang bật' : 'Không khả dụng'}
+            color={available ? 'success' : 'default'}
+            size="small"
+            sx={{ flexShrink: 0 }}
+          />
+        </Stack>
+        {onClose && (
+          <Tooltip title="Đóng trợ lý AI">
+            <IconButton onClick={onClose} aria-label="Đóng trợ lý AI" size="small">
+              <CloseOutlinedIcon />
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
       <Divider />
 
       {!available ? (
         <Box sx={{ p: 2 }}>
-          <Alert severity="info">{eligibility.data?.message ?? 'AI chat is unavailable for this lesson.'}</Alert>
+          <Alert severity="info">{eligibility.data?.message ?? 'AI hiện không khả dụng cho bài học này.'}</Alert>
         </Box>
       ) : (
         <Stack spacing={2} sx={{ p: 2 }}>
@@ -127,7 +151,7 @@ export function AiChatPanel({ courseId, lessonBlockId }: AiChatPanelProps) {
             sx={{ minHeight: 280, maxHeight: 400, overflowY: 'auto', display: 'grid', alignContent: 'start', gap: 1.25 }}
           >
             {messages.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">Ask a question about this lesson.</Typography>
+              <Typography variant="body2" color="text.secondary">Đặt câu hỏi về bài học hiện tại.</Typography>
             ) : messages.map((message) => (
               <Box
                 key={message.id}
@@ -149,7 +173,7 @@ export function AiChatPanel({ courseId, lessonBlockId }: AiChatPanelProps) {
             {sendMessage.isPending && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CircularProgress size={16} />
-                <Typography variant="body2" color="text.secondary">Thinking...</Typography>
+                <Typography variant="body2" color="text.secondary">AI đang suy nghĩ...</Typography>
               </Box>
             )}
           </Box>
@@ -164,7 +188,7 @@ export function AiChatPanel({ courseId, lessonBlockId }: AiChatPanelProps) {
               maxRows={5}
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Ask about the current lesson"
+              placeholder="Hỏi về bài học hiện tại"
               slotProps={{ htmlInput: { maxLength: 2000 } }}
             />
             <Button
@@ -174,11 +198,11 @@ export function AiChatPanel({ courseId, lessonBlockId }: AiChatPanelProps) {
               disabled={!question.trim() || sendMessage.isPending}
               sx={{ minWidth: { sm: 112 }, alignSelf: { sm: 'flex-end' } }}
             >
-              Send
+              Gửi
             </Button>
           </Stack>
           <Typography variant="caption" color="text.secondary">
-            AI guidance is non-official learning support.
+            Nội dung AI chỉ mang tính hỗ trợ học tập, không thay thế kết quả chính thức.
           </Typography>
         </Stack>
       )}
