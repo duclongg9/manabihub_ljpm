@@ -17,6 +17,8 @@ import {
   Popover,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
@@ -200,6 +202,7 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
     courseOptions.map((option) => [option.key, courseColor(option.title)]),
   ), [courseOptions]);
   const filteredCourseOptions = courseOptions.filter((option) => option.title.toLocaleLowerCase('vi-VN').includes(courseSearch.trim().toLocaleLowerCase('vi-VN')));
+  const levelLegend = ['N5', 'N4', 'N3', 'N2', 'N1'].filter((level) => courseOptions.some((option) => new RegExp(`\\b${level}\\b`, 'i').test(option.title)));
   const selectedCourseCount = courseOptions.filter((option) => selectedCourses[option.key] !== false).length;
   const visibleDates = useMemo(() => buildVisibleDates(cursor, view), [cursor, view]);
   const events = useMemo(() => buildEvents(plan.slots, visibleDates, colors), [plan.slots, visibleDates, colors]);
@@ -278,12 +281,9 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
             <Typography variant="caption" color="text.secondary">Theo dõi lịch đan xen và vào học đúng suất đã đặt.</Typography>
           </Box>
         </Stack>
-        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-          {(['month', 'week', 'day'] as const).map((option) => (
-            <Button key={option} size="small" variant={view === option ? 'contained' : 'outlined'} onClick={() => setView(option)} sx={{ minWidth: option === 'month' ? 64 : 56, textTransform: 'none', bgcolor: view === option ? '#C41E3A' : undefined }}>
-              {option === 'month' ? 'Tháng' : option === 'week' ? 'Tuần' : 'Hôm nay'}
-            </Button>
-          ))}
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+          <Button size="small" variant="outlined" startIcon={<EditCalendarOutlinedIcon />} onClick={() => window.dispatchEvent(new Event(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT))} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Chỉnh lịch tổng</Button>
+          <Button size="small" variant="contained" startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none', bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>Thêm suất học</Button>
           <IconButton
             size="small"
             aria-label={expanded ? 'Thu gọn lịch học' : 'Mở rộng lịch học'}
@@ -297,21 +297,30 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
 
       {expanded && <>
       <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1, mt: 2 }}>
-        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
           <IconButton size="small" aria-label="Lịch trước" onClick={() => moveCursor(-1)}><ArrowBackIosNewOutlinedIcon sx={{ fontSize: 15 }} /></IconButton>
-          <Typography variant="subtitle1" sx={{ minWidth: 190, textAlign: 'center', fontWeight: 900, textTransform: 'capitalize' }}>{title}</Typography>
+          <Typography variant="subtitle1" sx={{ minWidth: { xs: 0, sm: 190 }, flex: { xs: 1, sm: 'initial' }, textAlign: 'center', fontWeight: 900, textTransform: 'capitalize' }}>{title}</Typography>
           <IconButton size="small" aria-label="Lịch sau" onClick={() => moveCursor(1)}><ArrowForwardIosOutlinedIcon sx={{ fontSize: 15 }} /></IconButton>
-          <Button size="small" onClick={() => { setCursor(startOfDay(new Date())); setView('day'); }} sx={{ textTransform: 'none', ml: 0.5 }}>Hôm nay</Button>
+          <Button size="small" onClick={() => { setCursor(startOfDay(new Date())); setView('day'); }} sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}>Hôm nay</Button>
         </Stack>
-        <Stack direction="row" spacing={0.75}>
-          <Button size="small" variant="outlined" startIcon={<EditCalendarOutlinedIcon />} onClick={() => window.dispatchEvent(new Event(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT))} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Chỉnh lịch tổng</Button>
-          <Button size="small" variant="outlined" startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Thêm suất học</Button>
-        </Stack>
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          color="primary"
+          value={view}
+          onChange={(_, nextView: CalendarView | null) => { if (nextView) setView(nextView); }}
+          aria-label="Chế độ xem lịch"
+          sx={{ alignSelf: { xs: 'stretch', sm: 'auto' }, '& .MuiToggleButton-root': { textTransform: 'none', px: 1.5, borderColor: '#CBD5E1', color: '#475569' }, '& .Mui-selected': { color: '#fff !important', bgcolor: '#C41E3A !important' } }}
+        >
+          <ToggleButton value="month">Tháng</ToggleButton>
+          <ToggleButton value="week">Tuần</ToggleButton>
+          <ToggleButton value="day">Ngày</ToggleButton>
+        </ToggleButtonGroup>
       </Stack>
 
       {courseOptions.length > 0 && (
         <>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.25, alignItems: { sm: 'center' } }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5, alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
             <Button
               variant="outlined"
               onClick={(event) => setCourseFilterAnchorEl(event.currentTarget)}
@@ -322,7 +331,10 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
             >
               📚 Lọc khóa học ({selectedCourseCount}/{courseOptions.length}) ▾
             </Button>
-            <Typography variant="caption" color="text.secondary">Màu sắc được gom theo cấp độ JLPT.</Typography>
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mr: 0.25 }}>Màu theo cấp độ:</Typography>
+              {levelLegend.map((level) => <Chip key={level} size="small" label={level} sx={{ height: 22, color: LEVEL_COLORS[level], bgcolor: `${LEVEL_COLORS[level]}15`, border: `1px solid ${LEVEL_COLORS[level]}45`, fontWeight: 800 }} />)}
+            </Stack>
           </Stack>
           <Popover
             open={Boolean(courseFilterAnchorEl)}
