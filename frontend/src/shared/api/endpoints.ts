@@ -18,6 +18,7 @@ export const ENDPOINTS = {
   ADMIN_PAYOUT: {
     QUEUE: '/admin/payouts',
     DETAIL: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}`,
+    BANK_QR: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/bank-qr`,
     RECONCILE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/reconcile`,
     APPROVE: (withdrawalRequestId: string) => `/admin/payouts/${withdrawalRequestId}/approve`,
     MOCK_APPROVE: (withdrawalRequestId: string) =>

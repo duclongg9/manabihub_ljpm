@@ -189,6 +189,20 @@ export function PayoutSettlementPage() {
     }
   };
 
+  const downloadBankQr = async () => {
+    try {
+      const blob = await adminPayoutService.downloadBankQr(id);
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = 'bank-account-qr';
+      anchor.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      toast.error(getPayoutErrorMessage(error));
+    }
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -342,6 +356,16 @@ export function PayoutSettlementPage() {
             >
               <Download className="h-4 w-4" />
               Tải chứng từ {detail.manualProofOriginalName || ''}
+            </button>
+          )}
+          {detail.bankQrAvailable && (
+            <button
+              type="button"
+              onClick={() => void downloadBankQr()}
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800 hover:bg-blue-100"
+            >
+              <Download className="h-4 w-4" />
+              Tải mã QR ngân hàng
             </button>
           )}
         </InfoCard>

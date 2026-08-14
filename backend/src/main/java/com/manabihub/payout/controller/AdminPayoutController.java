@@ -113,6 +113,21 @@ public class AdminPayoutController {
                 .body(proof.resource());
     }
 
+    @Operation(summary = "Download teacher bank QR")
+    @GetMapping("/{withdrawalRequestId}/bank-qr")
+    public ResponseEntity<org.springframework.core.io.Resource> getBankQr(
+            @PathVariable UUID withdrawalRequestId) {
+        PayoutSettlementService.PayoutProofDownload qr =
+                payoutSettlementService.getBankQrCode(withdrawalRequestId);
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(qr.fileName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.parseMediaType(qr.contentType()))
+                .body(qr.resource());
+    }
+
     @Operation(summary = "Approve payout", description = "Reconciles the request and executes an idempotent provider transfer.")
     @PostMapping("/{withdrawalRequestId}/approve")
     public ResponseEntity<ApiResponse<PayoutDecisionResponse>> approvePayout(

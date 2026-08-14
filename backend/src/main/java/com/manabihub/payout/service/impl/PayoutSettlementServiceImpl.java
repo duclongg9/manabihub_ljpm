@@ -54,6 +54,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -386,6 +387,33 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 resource,
                 settlement.getManualProofOriginalName(),
                 settlement.getManualProofContentType()
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('FINANCE_MANAGER')")
+    public PayoutProofDownload getBankQrCode(UUID withdrawalRequestId) {
+        requireFinanceAdmin();
+        WithdrawalRequest request = findRequest(withdrawalRequestId);
+        byte[] qr = request.getBankQrCode();
+        if (qr == null || qr.length == 0) {
+            throw new BusinessException(
+                    MessageCodes.PAYOUT_BANK_QR_REQUIRED,
+                    "This payout has no bank QR image.",
+                    HttpStatus.NOT_FOUND
+            );
+        }
+        String contentType = isBlank(request.getBankQrContentType())
+                ? "image/png"
+                : request.getBankQrContentType();
+        String extension = "image/jpeg".equals(contentType)
+                ? "jpg"
+                : "image/webp".equals(contentType) ? "webp" : "png";
+        return new PayoutProofDownload(
+                new ByteArrayResource(qr),
+                "bank-account-qr." + extension,
+                contentType
         );
     }
 
@@ -1136,6 +1164,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 .transferMethod(settlement == null ? null : settlement.getTransferMethod())
                 .manualProofAvailable(settlement != null
                         && !isBlank(settlement.getManualProofStorageKey()))
+                .bankQrAvailable(request.getBankQrCode() != null && request.getBankQrCode().length > 0)
                 .manualProofOriginalName(settlement == null
                         ? null
                         : settlement.getManualProofOriginalName())

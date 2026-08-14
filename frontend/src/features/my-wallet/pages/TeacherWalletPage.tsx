@@ -14,6 +14,7 @@ import {
   Link,
 } from '@mui/material';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
 import { WalletBalanceCards } from '../components/WalletBalanceCards';
@@ -26,6 +27,7 @@ import { useTeacherWithdrawals } from '../hooks/useTeacherWithdrawals';
 import { useTeacherEscrowLedger } from '../hooks/useTeacherEscrowLedger';
 import { useTeacherRevenueSummary } from '../hooks/useTeacherRevenueSummary';
 import { TeacherRevenueSummary } from '../components/TeacherRevenueSummary';
+import { getMyTeacherProfile } from '../../profile/profileApi';
 
 export function TeacherWalletPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,6 +35,10 @@ export function TeacherWalletPage() {
   const withdrawalsQuery = useTeacherWithdrawals();
   const escrowLedgerQuery = useTeacherEscrowLedger();
   const revenueQuery = useTeacherRevenueSummary();
+  const profileQuery = useQuery({
+    queryKey: ['teacher-profile'],
+    queryFn: getMyTeacherProfile,
+  });
 
   if (walletQuery.isLoading) {
     return (
@@ -122,11 +128,26 @@ export function TeacherWalletPage() {
   }
 
   const wallet = walletQuery.data;
+  const phoneVerificationPending = profileQuery.isLoading;
+  const phoneVerified = profileQuery.data?.phoneVerified === true;
+  const phoneProfileUnavailable = profileQuery.isError;
+  const phoneVerificationRequired = !phoneVerificationPending
+    && !phoneProfileUnavailable
+    && !phoneVerified;
   const isWithdrawalDisabled = wallet.walletFrozen
-    || wallet.availableBalance < wallet.minimumPayoutAmount;
+    || wallet.availableBalance < wallet.minimumPayoutAmount
+    || phoneVerificationPending
+    || phoneProfileUnavailable
+    || phoneVerificationRequired;
   const disableReason = wallet.walletFrozen
     ? 'Ví doanh thu đang bị khóa'
-    : `Số dư khả dụng phải từ ${formatCurrency(wallet.minimumPayoutAmount)}`;
+    : phoneProfileUnavailable
+      ? 'Không tải được trạng thái số điện thoại'
+      : phoneVerificationPending
+        ? 'Đang tải trạng thái số điện thoại'
+        : phoneVerificationRequired
+          ? 'Cần xác thực số điện thoại'
+          : `Số dư khả dụng phải từ ${formatCurrency(wallet.minimumPayoutAmount)}`;
 
   return (
     <Box>
@@ -157,6 +178,34 @@ export function TeacherWalletPage() {
       {wallet.walletFrozen && (
         <Alert severity="error" sx={{ mb: 2.5 }}>
           <strong>Ví đang bị khóa.</strong> Bạn chưa thể tạo yêu cầu rút tiền. Vui lòng liên hệ bộ phận hỗ trợ.
+        </Alert>
+      )}
+
+      {phoneVerificationRequired && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2.5 }}
+          action={(
+            <Button component={RouterLink} to="/teacher/profile" color="inherit" sx={{ fontWeight: 700 }}>
+              Xác thực ngay
+            </Button>
+          )}
+        >
+          Giáo viên chỉ cần xác thực số điện thoại để rút hoa hồng; luồng này không yêu cầu xác thực CCCD lại.
+        </Alert>
+      )}
+
+      {phoneProfileUnavailable && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2.5 }}
+          action={(
+            <Button color="inherit" onClick={() => void profileQuery.refetch()} sx={{ fontWeight: 700 }}>
+              Thử lại
+            </Button>
+          )}
+        >
+          Không tải được trạng thái số điện thoại. Vui lòng thử lại trước khi rút hoa hồng.
         </Alert>
       )}
 

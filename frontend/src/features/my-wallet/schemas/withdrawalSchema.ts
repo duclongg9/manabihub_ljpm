@@ -9,6 +9,7 @@ export const withdrawalSchema = z.object({
   accountNumber: z.string().optional(),
   accountHolderName: z.string().optional(),
   branch: z.string().optional(),
+  bankQrDataUrl: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.useNewAccount) {
     if (!data.bankCode) {

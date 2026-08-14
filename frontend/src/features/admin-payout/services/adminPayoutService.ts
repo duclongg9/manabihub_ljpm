@@ -90,6 +90,14 @@ export const adminPayoutService = {
     return response.data;
   },
 
+  async downloadBankQr(withdrawalRequestId: string) {
+    const response = await axiosClient.get<Blob>(
+      ENDPOINTS.ADMIN_PAYOUT.BANK_QR(withdrawalRequestId),
+      { responseType: 'blob' },
+    );
+    return response.data;
+  },
+
   async rejectPayout(withdrawalRequestId: string, payload: RejectPayoutPayload) {
     const response = await axiosClient.post<ApiResponse<PayoutDecision>>(
       ENDPOINTS.ADMIN_PAYOUT.REJECT(withdrawalRequestId),

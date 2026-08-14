@@ -55,6 +55,7 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
       accountNumber: '',
       accountHolderName: '',
       branch: '',
+      bankQrDataUrl: '',
     },
   });
 
@@ -317,6 +318,52 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
             </div>
           </div>
         )}
+      </div>
+
+      <div className="border-t pt-4">
+        <Controller
+          name="bankQrDataUrl"
+          control={control}
+          rules={{ required: 'Vui lòng chọn ảnh QR ngân hàng để Finance quét.' }}
+          render={({ field, fieldState }) => (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Ảnh mã QR ngân hàng <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) {
+                    field.onChange('');
+                    return;
+                  }
+                  if (file.size > 2 * 1024 * 1024) {
+                    toast.error('Ảnh QR không được vượt quá 2 MB.');
+                    event.target.value = '';
+                    field.onChange('');
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => field.onChange(String(reader.result ?? ''));
+                  reader.onerror = () => {
+                    toast.error('Không thể đọc ảnh QR. Vui lòng chọn lại.');
+                    field.onChange('');
+                  };
+                  reader.readAsDataURL(file);
+                }}
+                className={`block w-full rounded-lg border px-3 py-2 text-sm ${fieldState.error ? 'border-red-500' : 'border-slate-300'}`}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Ảnh chỉ được gửi riêng cho Finance để quét, không hiển thị công khai.
+              </p>
+              {fieldState.error && (
+                <p className="mt-1 text-sm text-red-600">{fieldState.error.message}</p>
+              )}
+            </div>
+          )}
+        />
       </div>
 
       <button
