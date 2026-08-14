@@ -12,15 +12,19 @@ export interface JlptOcrResult {
 type OcrInput = File | HTMLCanvasElement;
 
 /**
- * OCR the certificate in a few focused passes. JLPT certificates contain a
- * security background and Japanese/English boilerplate; asking Tesseract to
- * read the whole page in one pass makes the useful fields less reliable.
+ * OCR the certificate in focused passes.  JLPT certificates contain a security
+ * background plus Japanese / English boilerplate.  We crop individual zones so
+ * that Tesseract sees less noise and returns better field values.
+ *
+ * Language note – we load **jpn+eng** so that Tesseract can properly segment
+ * kanji labels (氏名, 生年月日, 受験地) and not misread them as random ASCII.
+ * The trained-data files are fetched lazily on first use (~15 MB total).
  */
 export async function recognizeJlptCertificate(
   file: File,
   onProgress?: (progress: number) => void,
 ): Promise<JlptOcrResult> {
-  const worker = await createWorker('eng', OEM.LSTM_ONLY, {
+  const worker = await createWorker('jpn+eng', OEM.LSTM_ONLY, {
     logger: (message: LoggerMessage) => {
       if (message.status === 'recognizing text') {
         onProgress?.(Math.round(message.progress * 100));
@@ -52,8 +56,8 @@ export function parseJlptOcrText(rawText: string): JlptOcrResult {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
   const holderName = findCertificateName(lines);
   const rawDateOfBirth = findFirstMatch(text, [
-    /(?:date\s*of\s*birth|birth\s*date|dob)\s*[:：-]?\s*(\d{4}[./-]\d{1,2}[./-]\d{1,2})/i,
-    /(?:date\s*of\s*birth|birth\s*date|dob)\s*[:：-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{4})/i,
+    /(?:date\s*of\s*birth|birth\s*date|dob|生年月日)\s*[(:：y/m/d)\s-]*\s*(\d{4}[./-]\d{1,2}[./-]\d{1,2})/i,
+    /(?:date\s*of\s*birth|birth\s*date|dob|生年月日)\s*[(:：y/m/d)\s-]*\s*(\d{1,2}[./-]\d{1,2}[./-]\d{4})/i,
     /\b(\d{4}[./-]\d{1,2}[./-]\d{1,2})\b/,
     /\b(\d{1,2}[./-]\d{1,2}[./-]\d{4})\b/,
   ]);
@@ -87,19 +91,32 @@ function normalizeOcrText(rawText: string) {
     .join('\n');
 }
 
+/**
+ * Find the holder's name on the certificate.
+ *
+ * Strategy:
+ * 1. Look for a label line (Name, 氏名, etc.) and take the next line.
+ * 2. Look for an inline "Name: VALUE" pattern.
+ * 3. Fall back to the first line that looks like an all-caps person name.
+ */
 function findCertificateName(lines: string[]) {
-  const labelIndex = lines.findIndex((line) => /^(?:name|full\s*name|holder|氏名|名前)\s*[:：]?$/i.test(line));
+  // Strategy 1: label on its own line, value on the next line
+  const labelIndex = lines.findIndex((line) =>
+    /^(?:name|full\s*name|holder|氏名|名前)\s*[:：]?\s*$/i.test(line),
+  );
   if (labelIndex >= 0) {
     const labeled = cleanName(lines[labelIndex + 1] ?? '');
     if (isLikelyPersonName(labeled)) return labeled;
   }
 
+  // Strategy 2: inline "Name: SOME VALUE" or "氏名 SOME VALUE"
   for (const line of lines) {
-    const inline = line.match(/^(?:name|full\s*name|holder)\s*[:：-]?\s*(.+)$/i);
+    const inline = line.match(/^(?:name|full\s*name|holder|氏名)\s*[:：-]?\s+(.+)$/i);
     const labeled = cleanName(inline?.[1] ?? '');
     if (isLikelyPersonName(labeled)) return labeled;
   }
 
+  // Strategy 3: first line that looks like a person name (all-caps, multi-word)
   for (const line of lines) {
     const candidate = cleanName(line);
     if (isLikelyPersonName(candidate)) return candidate;
@@ -107,6 +124,17 @@ function findCertificateName(lines: string[]) {
   return '';
 }
 
+/**
+ * Heuristic check: does `value` look like a person name printed on a JLPT
+ * certificate?
+ *
+ * Filters:
+ * - Must be 5–50 characters long.
+ * - Must not contain digits.
+ * - Must not contain known boilerplate words.
+ * - Must have 2–5 space-separated words, each at least 2 characters.
+ * - Each word must be alphabetic (including Vietnamese diacritics).
+ */
 function isLikelyPersonName(value: string) {
   if (!value || value.length < 5 || value.length > 50 || /\d/.test(value)) return false;
   const upper = value.toUpperCase();
@@ -114,18 +142,22 @@ function isLikelyPersonName(value: string) {
     'CERTIFICATE', 'JAPANESE', 'LANGUAGE', 'PROFICIENCY', 'DATE OF BIRTH',
     'TEST SITE', 'VIETNAM', 'THIS IS TO CERTIFY', 'EDUCATIONAL', 'EXCHANGES',
     'SERVICES', 'LEVEL', 'NAME', 'ROSSA', 'JAPAN FOUNDATION',
+    'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+    'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
   ];
   if (blocked.some((word) => upper.includes(word))) return false;
   const words = value.split(' ').filter(Boolean);
-  return words.length >= 2 && words.length <= 5 && words.every((word) => /^[A-Za-zÀ-ỹ'’-]+$/.test(word));
+  // Each word must be at least 2 chars to block garbage like "HH y m d"
+  return words.length >= 2 && words.length <= 5 && words.every((word) => word.length >= 2 && /^[A-Za-zÀ-ỹ''-]+$/.test(word));
 }
 
 function findCertificateCode(text: string) {
   const candidates = [
     // JLPT certificate registration number, e.g. 25B2080102-33745.
     ...Array.from(text.matchAll(/\d{2}[A-Z]\d{6,}-\d{3,}/gi), (match) => match[0]),
-    // The serial printed at the lower-left corner is a useful fallback.
-    ...Array.from(text.matchAll(/\bN[1-5][A-Z]\d{6,}[A-Z]\b/gi), (match) => match[0]),
+    // The serial printed at the lower-left corner, e.g. N3A568591A.
+    ...Array.from(text.matchAll(/\bN[1-5][A-Z]\d{5,}[A-Z]\b/gi), (match) => match[0]),
+    // Looser fallback: CODE-DIGITS pattern.
     ...Array.from(text.matchAll(/\b[A-Z0-9]{2,}\d[A-Z0-9]*-\d{3,}\b/gi), (match) => match[0]),
   ];
   const code = candidates
@@ -145,8 +177,11 @@ function findFirstMatch(text: string, patterns: RegExp[]) {
 function cleanName(value: string) {
   return value
     .replace(/^(?:RA|R\s*A|A|ZZ[YV])\s+/i, '')
+    // Strip trailing field labels that sometimes bleed into the name line.
     .replace(/\b(?:date|dob|birth|level|registration|certificate)\b.*$/i, '')
-    .replace(/[^A-Za-zÀ-ỹ'’ -]/g, ' ')
+    // Strip any Japanese / CJK characters that leaked in from label proximity.
+    .replace(/[\u3000-\u9FFF\uF900-\uFAFF]/g, ' ')
+    .replace(/[^A-Za-zÀ-ỹ'' -]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -163,6 +198,17 @@ function normalizeDate(value: string) {
   return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 }
 
+/**
+ * Create focused crop zones for the major certificate areas.
+ *
+ * A JLPT certificate has a stable layout:
+ *   - Top centre: level badge (N1–N5)
+ *   - Upper-middle: Name row, DOB row (values on right side)
+ *   - Bottom strip: two serial/registration codes
+ *
+ * We crop each zone independently so Tesseract processes smaller, cleaner
+ * images rather than the full noisy page.
+ */
 async function createOcrInputs(file: File): Promise<OcrInput[]> {
   if (typeof document === 'undefined' || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
     return [file];
@@ -176,8 +222,13 @@ async function createOcrInputs(file: File): Promise<OcrInput[]> {
     if (!width || !height) return [file];
 
     return [
-      cropImage(image, width, height, 0.18, 0.22, 0.64, 0.48),
-      cropImage(image, width, height, 0.05, 0.82, 0.90, 0.18),
+      // Zone 1 – Level badge at top centre (the "N3" emblem)
+      cropImage(image, width, height, 0.25, 0.02, 0.50, 0.14),
+      // Zone 2 – Name + DOB area (right side where the Latin values are printed)
+      cropImage(image, width, height, 0.22, 0.25, 0.60, 0.18),
+      // Zone 3 – Bottom strip with certificate codes (both serial numbers)
+      cropImage(image, width, height, 0.0, 0.86, 1.0, 0.14, { contrast: 1.6 }),
+      // Zone 4 – Full page as fallback
       file,
     ];
   } catch {
@@ -196,6 +247,10 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+interface CropOptions {
+  contrast?: number;
+}
+
 function cropImage(
   image: HTMLImageElement,
   sourceWidth: number,
@@ -204,12 +259,14 @@ function cropImage(
   topRatio: number,
   widthRatio: number,
   heightRatio: number,
+  options?: CropOptions,
 ) {
   const sourceLeft = Math.round(sourceWidth * leftRatio);
   const sourceTop = Math.round(sourceHeight * topRatio);
   const cropWidth = Math.round(sourceWidth * widthRatio);
   const cropHeight = Math.round(sourceHeight * heightRatio);
   const scale = Math.min(2, 1800 / cropWidth);
+  const contrast = options?.contrast ?? 1.3;
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(cropWidth * scale));
   canvas.height = Math.max(1, Math.round(cropHeight * scale));
@@ -217,7 +274,7 @@ function cropImage(
   if (!context) return canvas;
   context.fillStyle = '#fff';
   context.fillRect(0, 0, canvas.width, canvas.height);
-  context.filter = 'grayscale(1) contrast(1.12)';
+  context.filter = `grayscale(1) contrast(${contrast})`;
   context.drawImage(image, sourceLeft, sourceTop, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
   context.filter = 'none';
   return canvas;
