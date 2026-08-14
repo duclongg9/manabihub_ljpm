@@ -2,6 +2,7 @@ package com.manabihub.course.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.ai.service.AiCourseEligibilityService;
 import com.manabihub.course.dto.request.CreateCourseDraftRequest;
 import com.manabihub.course.dto.response.CourseDraftResponse;
 import com.manabihub.course.dto.response.ValidationResultResponse;
@@ -11,6 +12,7 @@ import com.manabihub.course.enums.JlptLevel;
 import com.manabihub.course.repository.CourseCategoryRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.service.CourseValidationService;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -87,6 +89,12 @@ class CourseServiceImplTest {
     @Mock
     private EscrowLedgerRepository escrowLedgerRepository;
 
+    @Mock
+    private CourseEditDraftService courseEditDraftService;
+
+    @Mock
+    private AiCourseEligibilityService aiCourseEligibilityService;
+
     @InjectMocks
     private CourseServiceImpl courseService;
     private UUID userId;
@@ -105,8 +113,13 @@ class CourseServiceImplTest {
                 courseReviewService,
                 settingValueService,
                 enrollmentRepository,
-                escrowLedgerRepository
+                escrowLedgerRepository,
+                courseEditDraftService,
+                aiCourseEligibilityService
         );
+        org.mockito.Mockito.lenient()
+                .when(courseEditDraftService.resolveEditableCourse(any(Course.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         org.mockito.Mockito.lenient()
                 .when(settingValueService.getInteger(any(String.class), any(Integer.class)))
                 .thenAnswer(invocation -> invocation.getArgument(1));
@@ -133,13 +146,15 @@ class CourseServiceImplTest {
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
         when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
         when(courseRepository.existsBySlug("jlpt-n5-foundation")).thenReturn(false);
+        CreateCourseDraftRequest request = validRequest();
+        when(aiCourseEligibilityService.isPriceEligible(request.price())).thenReturn(true);
         when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> {
             Course course = invocation.getArgument(0);
             course.setId(UUID.randomUUID());
             return course;
         });
 
-        CourseDraftResponse response = courseService.createDraft(validRequest());
+        CourseDraftResponse response = courseService.createDraft(request);
 
         assertNotNull(response.id());
         assertEquals(CourseStatus.DRAFT, response.status());
@@ -157,6 +172,7 @@ class CourseServiceImplTest {
         assertEquals(CourseStatus.DRAFT, savedCourse.getStatus());
         assertEquals(approvedTeacher.getId(), savedCourse.getTeacher().getId());
         assertEquals(4, savedCourse.getLearningGoals().size());
+        assertTrue(savedCourse.isAiSupported());
         assertTrue(savedCourse.getLearningGoals().stream().allMatch(goal -> goal.getGoalText().length() <= 160));
     }
 
@@ -288,12 +304,15 @@ class CourseServiceImplTest {
                 .thenReturn(Optional.of(draft));
         when(courseCategoryRepository.existsByCodeAndActiveTrue("GRAMMAR")).thenReturn(true);
         when(courseRepository.existsBySlugAndIdNot("jlpt-n5-foundation", draftId)).thenReturn(false);
+        CreateCourseDraftRequest request = validRequest();
+        when(aiCourseEligibilityService.isPriceEligible(request.price())).thenReturn(true);
 
-        CourseDraftResponse response = courseService.updateDraft(draftId, validRequest());
+        CourseDraftResponse response = courseService.updateDraft(draftId, request);
 
         assertEquals("JLPT N5 Foundation", response.title());
         assertEquals("jlpt-n5-foundation", response.slug());
         assertEquals(4, response.learningGoals().size());
+        assertTrue(draft.isAiSupported());
     }
 
     @Test
@@ -637,6 +656,78 @@ class CourseServiceImplTest {
         assertEquals(MessageCodes.MSG_KYC_010, exception.getMessageCode());
         assertEquals(HttpStatus.FORBIDDEN, exception.getHttpStatus());
         verify(courseRepository, never()).findByIdAndTeacher_Id(any(), any());
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("UTCID06 (N) - published course -> DRAFT for safe editing + audit")
+    void unpublishCourse_WhenPublished_ShouldReturnDraftForEditing() {
+        UUID courseId = UUID.randomUUID();
+        java.time.Instant publishedAt = java.time.Instant.parse("2026-08-10T10:15:30Z");
+        Course publishedCourse = Course.builder()
+                .id(courseId)
+                .teacher(approvedTeacher)
+                .title("JLPT N5 Foundation")
+                .slug("jlpt-n5-foundation")
+                .status(CourseStatus.PUBLISHED)
+                .publishedAt(publishedAt)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_Id(courseId, approvedTeacher.getId()))
+                .thenReturn(Optional.of(publishedCourse));
+
+        CourseDraftResponse response = courseService.unpublishCourse(courseId);
+
+        assertEquals(CourseStatus.DRAFT, publishedCourse.getStatus());
+        assertEquals(publishedAt, publishedCourse.getPublishedAt());
+        assertEquals(CourseStatus.DRAFT, response.status());
+        verify(courseEditDraftService).beginEditingPublishedCourse(publishedCourse);
+        verify(courseRepository).saveAndFlush(publishedCourse);
+        verify(auditLogService).logUserAction(
+                userId,
+                "TEACHER",
+                "UNPUBLISH_COURSE",
+                "COURSE",
+                courseId,
+                Map.of(
+                        "status", CourseStatus.PUBLISHED.name(),
+                        "publishedAt", publishedAt.toString()
+                ),
+                Map.of("status", CourseStatus.DRAFT.name()),
+                Map.of("courseTitle", publishedCourse.getTitle(), "reason", "Teacher requested editing")
+        );
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("UTCID07 (A) - non-published course cannot be hidden")
+    void unpublishCourse_WhenCourseIsNotPublished_ShouldRejectTransition() {
+        UUID courseId = UUID.randomUUID();
+        Course draft = Course.builder()
+                .id(courseId)
+                .teacher(approvedTeacher)
+                .title("Draft course")
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        when(currentUserService.getCurrentUserId()).thenReturn(userId);
+        when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(approvedTeacher));
+        when(courseRepository.findByIdAndTeacher_Id(courseId, approvedTeacher.getId()))
+                .thenReturn(Optional.of(draft));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> courseService.unpublishCourse(courseId)
+        );
+
+        assertEquals(MessageCodes.MSG_COURSE_007, exception.getMessageCode());
+        assertEquals(HttpStatus.CONFLICT, exception.getHttpStatus());
+        verify(courseRepository, never()).saveAndFlush(any());
+        verify(auditLogService, never()).logUserAction(
+                any(), any(), any(), any(), any(), any(), any(), any()
+        );
     }
     }
 

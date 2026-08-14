@@ -26,6 +26,7 @@ Configure these under **Configuration > Updates, monitoring, and logging >
 Environment properties**:
 
 ```text
+SPRING_PROFILES_ACTIVE=prod
 SERVER_PORT=5000
 SPRING_DATASOURCE_URL=jdbc:postgresql://<rds-endpoint>:5432/postgres?sslmode=require
 SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
@@ -46,6 +47,11 @@ AI_CHAT_PROVIDER_API_KEY=<provider API key>
 AI_CHAT_PROVIDER_MODEL=<provider-supported model>
 FRONTEND_BASE_URL=https://develop.d1sbjmyazduh3v.amplifyapp.com
 CORS_ALLOWED_ORIGINS=https://develop.d1sbjmyazduh3v.amplifyapp.com
+PHONE_VERIFICATION_SMS_MODE=esms
+PHONE_VERIFICATION_ESMS_API_KEY=<eSMS API key>
+PHONE_VERIFICATION_ESMS_SECRET_KEY=<eSMS secret key>
+PHONE_VERIFICATION_ESMS_BRANDNAME=ManabiHub
+PHONE_VERIFICATION_ESMS_SANDBOX=0
 ```
 
 For the `prod` profile, `VNPAY_RETURN_URL` is mandatory and the backend fails
@@ -63,6 +69,36 @@ authoritative payment confirmation. A copy-safe non-secret variable template is
 available at `deploy/.env.production.example`.
 
 Never commit real passwords, JWT secrets, or OAuth secrets to Git.
+
+### eSMS phone verification
+
+The eSMS API key and SecretKey are backend credentials. Store them only as
+Elastic Beanstalk environment properties; never expose them through Amplify or
+any `VITE_*` variable. Obtain them from **eSMS > Quan ly API**. The VNPT eKYC
+Token ID/Token Key/Access Token cannot be reused for SMS.
+
+ManabiHub sends its own six-digit OTP through the eSMS OTP/CSKH endpoint with
+`SmsType=2`. Before setting `PHONE_VERIFICATION_ESMS_SANDBOX=0`, ask eSMS to
+activate the configured Brandname and register a template whose delivered text
+matches the following pattern (only the six-digit value changes):
+
+```text
+Ma xac thuc ManabiHub cua ban la <OTP 6 digits>. Ma co hieu luc trong 5 phut.
+```
+
+The placeholder above is illustrative, not a value to paste into the eSMS
+portal. Copy the exact variable syntax and approved `TempContent` returned by
+eSMS; the application sends the actual six digits in the API `Content` field.
+
+`PHONE_VERIFICATION_ESMS_SANDBOX=1` validates the request but does not deliver
+an SMS or charge the account. A real handset smoke requires `0`, sufficient
+balance, an active Brandname, and the approved template. Provider response code
+`100` means eSMS accepted the request; it is not a delivery receipt.
+
+After deployment, sign in as one test student or teacher, open the profile,
+request one code, enter the six digits, confirm the phone becomes locked, and
+reload once to verify the state persists. Do not paste credentials, OTPs, or
+provider request bodies into tickets, screenshots, chat, or logs.
 
 `PAYOUT_SECURITY_SECRET` is not supplied by VNPay, AWS, or a bank. Generate it
 once for ManabiHub and store it as an Elastic Beanstalk environment property.

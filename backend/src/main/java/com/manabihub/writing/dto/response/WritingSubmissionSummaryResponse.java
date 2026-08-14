@@ -9,12 +9,14 @@ public record WritingSubmissionSummaryResponse(
         UUID id,
         UUID courseId,
         String courseTitle,
+        UUID lessonId,
         String lessonTitle,
         String studentName,
         String studentEmail,
         WritingSubmissionStatus status,
         Instant submittedAt,
         boolean hasAiSuggestion,
-        boolean hasTeacherFeedback
+        boolean hasTeacherFeedback,
+        java.math.BigDecimal score
 ) {
 }

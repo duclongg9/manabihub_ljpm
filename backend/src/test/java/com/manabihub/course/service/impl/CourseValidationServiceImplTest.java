@@ -8,6 +8,7 @@ import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.enums.JlptLevel;
 import com.manabihub.course.enums.LessonBlockType;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.finaltest.repository.FinalTestRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.AppUser;
@@ -51,6 +52,9 @@ class CourseValidationServiceImplTest {
     @Mock
     private FinalTestRepository finalTestRepository;
 
+    @Mock
+    private CourseEditDraftService courseEditDraftService;
+
     private CourseValidationServiceImpl courseValidationService;
     private UUID courseId;
     private UUID userId;
@@ -62,7 +66,11 @@ class CourseValidationServiceImplTest {
                 courseRepository,
                 objectMapper,
                 currentUserService,
-                finalTestRepository);
+                finalTestRepository,
+                courseEditDraftService);
+        org.mockito.Mockito.lenient()
+                .when(courseEditDraftService.resolveEditableCourse(org.mockito.ArgumentMatchers.any(Course.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         courseId = UUID.randomUUID();
         userId = UUID.randomUUID();
     }

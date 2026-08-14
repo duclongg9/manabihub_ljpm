@@ -607,31 +607,31 @@ export function CourseDraftPage() {
 
               <Paper variant="outlined" sx={{ p: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Thá»i háº¡n truy cáº­p khÃ³a há»c
+                  Thời hạn truy cập khóa học
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Há»c viÃªn Ä‘Æ°á»£c truy cáº­p theo sá»‘ ngÃ y ká»ƒ tá»« khi ghi danh; cÃ³ thá»ƒ Ä‘áº·t háº¡n cá»‘ Ä‘á»‹nh cho khÃ³a luyá»‡n thi.
+                  Học viên được truy cập theo số ngày kể từ khi ghi danh; có thể đặt hạn cố định cho khóa luyện thi.
                 </Typography>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   <TextField
                     fullWidth
                     type="number"
-                    label="Sá»‘ ngÃ y truy cáº­p"
+                    label="Số ngày truy cập"
                     value={form.accessDurationDays}
                     onChange={(event) => updateField('accessDurationDays')(event)}
                     slotProps={{ htmlInput: { min: 1 } }}
                     error={Boolean(errors.accessDurationDays)}
-                    helperText={errors.accessDurationDays || 'Máº·c Ä‘á»‹nh 180 ngÃ y'}
+                    helperText={errors.accessDurationDays || 'Mặc định 180 ngày'}
                   />
                   <TextField
                     fullWidth
                     type="date"
-                    label="Háº¡n cá»‘ Ä‘á»‹nh (tÃ¹y chá»n)"
+                    label="Hạn cố định (tùy chọn)"
                     value={form.accessExpiresAt}
                     onChange={(event) => updateField('accessExpiresAt')(event)}
                     slotProps={{ inputLabel: { shrink: true } }}
                     error={Boolean(errors.accessExpiresAt)}
-                    helperText={errors.accessExpiresAt || 'Äá»ƒ trá»‘ng náº¿u dÃ¹ng sá»‘ ngÃ y'}
+                    helperText={errors.accessExpiresAt || 'Để trống nếu dùng số ngày'}
                   />
                 </Stack>
               </Paper>
@@ -1103,10 +1103,10 @@ function collectStepErrors(step: number, form: CourseDraftForm, categoryLoadErro
 
     const accessDays = Number(form.accessDurationDays);
     if (!Number.isInteger(accessDays) || accessDays < 1) {
-      nextErrors.accessDurationDays = 'Thá»i háº¡n truy cáº­p pháº£i tá»« 1 ngÃ y trá» lÃªn.';
+      nextErrors.accessDurationDays = 'Thời hạn truy cập phải từ 1 ngày trở lên.';
     }
     if (form.accessExpiresAt && new Date(`${form.accessExpiresAt}T23:59:59Z`) <= new Date()) {
-      nextErrors.accessExpiresAt = 'Háº¡n cá»‘ Ä‘á»‹nh pháº£i náº±m trong tÆ°Æ¡ng lai.';
+      nextErrors.accessExpiresAt = 'Hạn cố định phải nằm trong tương lai.';
     }
 
     const validGoals = form.learningGoals

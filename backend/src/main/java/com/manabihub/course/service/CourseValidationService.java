@@ -12,4 +12,12 @@ public interface CourseValidationService {
      * @return ValidationResultResponse containing isValid flag and list of ValidationErrors.
      */
     ValidationResultResponse validateCourse(UUID courseId);
+
+    /**
+     * Runs the same publication checks for an authorized internal reviewer.
+     * Unlike {@link #validateCourse(UUID)}, this method does not require the
+     * current user to own the course because authorization is enforced by the
+     * Course Manager approval service.
+     */
+    ValidationResultResponse validateCourseForReview(UUID courseId);
 }

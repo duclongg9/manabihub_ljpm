@@ -103,12 +103,14 @@ export const ENDPOINTS = {
     weeklyChallenge: '/v1/student/weekly-challenge',
     startWeeklyChallenge: (challengeId: string) => `/v1/student/weekly-challenge/${challengeId}/attempts`,
     matchWeeklyChallenge: (attemptId: string) => `/v1/student/weekly-challenge/attempts/${attemptId}/matches`,
+    weeklyChallengeLeaderboard: (challengeId: string) => `/v1/student/weekly-challenge/${challengeId}/leaderboard`,
   },
   ADMIN_WEEKLY_CHALLENGES: {
     LIST: '/v1/admin/weekly-challenges',
     DETAIL: (id: string) => `/v1/admin/weekly-challenges/${id}`,
     PUBLISH: (id: string) => `/v1/admin/weekly-challenges/${id}/publish`,
     UNPUBLISH: (id: string) => `/v1/admin/weekly-challenges/${id}/unpublish`,
+    LEADERBOARD: (id: string) => `/v1/admin/weekly-challenges/${id}/leaderboard`,
   },
   studentAiChat: {
     eligibility: (courseId: string, lessonBlockId: string) =>
@@ -130,6 +132,7 @@ export const ENDPOINTS = {
     validate: (id: string) => `/v1/teacher/courses/drafts/${id}/validate`,
     submitReview: (id: string) => `/v1/teacher/courses/drafts/${id}/submit-review`,
     publish: (id: string) => `/v1/teacher/courses/${id}/publish`,
+    unpublish: (id: string) => `/v1/teacher/courses/${id}/unpublish`,
   },
   teacherCourseAssets: {
     thumbnails: '/v1/teacher/courses/assets/thumbnails',

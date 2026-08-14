@@ -3,13 +3,13 @@
 ## Goal
 Clarify physical table ownership by JPA entities, ensuring a clean single source of truth per table.
 
-## Physical Table Inventory (V002–V066)
+## Physical Table Inventory (V002–V070)
 
 All tables are created by Flyway migrations. "Latest migration" = most recent migration that alters the table schema (not seed/reference).
 
 | Table | Created | Latest Schema Migration | Writable Owner | Compat. Mapping | State |
 |---|---|---|---|---|---|
-| `app_users` | V002 | V013 (add phone_number) | `identity.entity.AppUser` | `kyc.domain.AppUser` (`@Immutable`) | Active |
+| `app_users` | V002 | V069 (verified phone uniqueness) | `identity.entity.AppUser` | `kyc.domain.AppUser` (`@Immutable`) | Active |
 | `roles` | V002 | V002 | `identity.entity.Role` | — | Active |
 | `permissions` | V002 | V002 | `identity.entity.Permission` | — | Active |
 | `user_roles` | V002 | V002 | — (join table) | — | Active |
@@ -51,6 +51,7 @@ All tables are created by Flyway migrations. "Latest migration" = most recent mi
 | `course_learning_goals` | V016 | V016 | `course.entity.CourseLearningGoal` | — | Active |
 | `course_categories` | V017 | V017 | `course.entity.CourseCategory` | — | Active |
 | `course_lesson_blocks` | V018 | V047 (violation target) | `course.entity.LessonBlock` | — | Active |
+| `course_thumbnail_assets` | V070 | V070 | `course.entity.CourseThumbnailAsset` | — | Active |
 | `final_tests` | V020 | V020 | `finaltest.entity.FinalTest` | — | Active |
 | `final_test_questions` | V020 | V020 | `finaltest.entity.FinalTestQuestion` | — | Active |
 | `final_test_choices` | V020 | V020 | `finaltest.entity.FinalTestChoice` | — | Active |

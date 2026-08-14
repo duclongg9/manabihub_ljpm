@@ -24,6 +24,7 @@ import com.manabihub.course.repository.CourseModuleRepository;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.course.repository.LessonBlockRepository;
 import com.manabihub.course.service.CourseBuilderService;
+import com.manabihub.course.revision.CourseEditDraftService;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherKycStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
@@ -64,6 +65,7 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
     private final TeacherProfileRepository teacherProfileRepository;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
+    private final CourseEditDraftService courseEditDraftService;
 
     @Override
     @Transactional(readOnly = true)
@@ -78,6 +80,7 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
         String title = validateModuleTitle(request.title());
 
         CourseModule module = CourseModule.builder()
+                .id(courseEditDraftService.hasEditDraft(course.getId()) ? UUID.randomUUID() : null)
                 .course(course)
                 .title(title)
                 .description(trimToNull(request.description()))
@@ -85,7 +88,9 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
                 .build();
 
         course.addModule(module);
-        courseModuleRepository.save(module);
+        if (!courseEditDraftService.saveIfVersioned(course)) {
+            courseModuleRepository.save(module);
+        }
 
         return toResponse(course);
     }
@@ -97,6 +102,7 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
 
         module.setTitle(validateModuleTitle(request.title()));
         module.setDescription(trimToNull(request.description()));
+        courseEditDraftService.saveIfVersioned(course);
 
         return toResponse(course);
     }
@@ -107,9 +113,14 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
         CourseModule module = resolveModule(course, moduleId);
 
         course.getModules().remove(module);
-        courseModuleRepository.delete(module);
-        courseModuleRepository.flush();
-        normalizeModuleOrder(course.getModules());
+        if (courseEditDraftService.hasEditDraft(course.getId())) {
+            normalizeModuleOrder(course.getModules());
+            courseEditDraftService.saveIfVersioned(course);
+        } else {
+            courseModuleRepository.delete(module);
+            courseModuleRepository.flush();
+            normalizeModuleOrder(course.getModules());
+        }
 
         return toResponse(course);
     }
@@ -122,6 +133,14 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
 
         Map<UUID, CourseModule> moduleById = modules.stream()
                 .collect(Collectors.toMap(CourseModule::getId, Function.identity()));
+
+        if (courseEditDraftService.hasEditDraft(course.getId())) {
+            for (int index = 0; index < request.orderedIds().size(); index++) {
+                moduleById.get(request.orderedIds().get(index)).setOrderIndex(index + 1);
+            }
+            courseEditDraftService.saveIfVersioned(course);
+            return toResponse(course);
+        }
 
         for (int index = 0; index < request.orderedIds().size(); index++) {
             moduleById.get(request.orderedIds().get(index)).setOrderIndex(-(index + 1));
@@ -143,13 +162,16 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
         assertKnowledgeBlockExistsBeforePractice(module, data.type(), null);
 
         LessonBlock block = LessonBlock.builder()
+                .id(courseEditDraftService.hasEditDraft(course.getId()) ? UUID.randomUUID() : null)
                 .module(module)
                 .orderIndex(module.getBlocks().size() + 1)
                 .build();
         applyBlockData(block, data);
 
         module.addBlock(block);
-        lessonBlockRepository.save(block);
+        if (!courseEditDraftService.saveIfVersioned(course)) {
+            lessonBlockRepository.save(block);
+        }
 
         return toResponse(course);
     }
@@ -163,6 +185,7 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
         assertKnowledgeBlockExistsBeforePractice(module, data.type(), block.getId());
 
         applyBlockData(block, data);
+        courseEditDraftService.saveIfVersioned(course);
 
         return toResponse(course);
     }
@@ -174,9 +197,14 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
         LessonBlock block = resolveBlock(module, blockId);
 
         module.getBlocks().remove(block);
-        lessonBlockRepository.delete(block);
-        lessonBlockRepository.flush();
-        normalizeBlockOrder(module.getBlocks());
+        if (courseEditDraftService.hasEditDraft(course.getId())) {
+            normalizeBlockOrder(module.getBlocks());
+            courseEditDraftService.saveIfVersioned(course);
+        } else {
+            lessonBlockRepository.delete(block);
+            lessonBlockRepository.flush();
+            normalizeBlockOrder(module.getBlocks());
+        }
 
         return toResponse(course);
     }
@@ -190,6 +218,14 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
 
         Map<UUID, LessonBlock> blockById = blocks.stream()
                 .collect(Collectors.toMap(LessonBlock::getId, Function.identity()));
+
+        if (courseEditDraftService.hasEditDraft(course.getId())) {
+            for (int index = 0; index < request.orderedIds().size(); index++) {
+                blockById.get(request.orderedIds().get(index)).setOrderIndex(index + 1);
+            }
+            courseEditDraftService.saveIfVersioned(course);
+            return toResponse(course);
+        }
 
         for (int index = 0; index < request.orderedIds().size(); index++) {
             blockById.get(request.orderedIds().get(index)).setOrderIndex(-(index + 1));
@@ -221,7 +257,7 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
             );
         }
 
-        return courseRepository.findByIdAndTeacher_IdAndStatusIn(
+        Course persistedCourse = courseRepository.findByIdAndTeacher_IdAndStatusIn(
                         draftId,
                         teacherProfile.getId(),
                         List.of(CourseStatus.DRAFT, CourseStatus.REJECTED, CourseStatus.FORCED_DRAFT)
@@ -231,6 +267,7 @@ public class CourseBuilderServiceImpl implements CourseBuilderService {
                         "Course draft was not found",
                         HttpStatus.NOT_FOUND
                 ));
+        return courseEditDraftService.resolveEditableCourse(persistedCourse);
     }
 
     private CourseModule resolveModule(Course course, UUID moduleId) {

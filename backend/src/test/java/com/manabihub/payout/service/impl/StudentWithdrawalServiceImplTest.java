@@ -2,9 +2,11 @@ package com.manabihub.payout.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.identity.entity.AccountIdentityVerification;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
+import com.manabihub.identity.service.AccountIdentityVerificationService;
 import com.manabihub.payout.dto.request.BankAccountDto;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
 import com.manabihub.payout.dto.response.WithdrawalRequestResponse;
@@ -30,6 +32,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -59,6 +62,7 @@ class StudentWithdrawalServiceImplTest {
     @Mock private CommercialPolicyService commercialPolicyService;
     @Mock private WithdrawalNotificationService notificationService;
     @Mock private StudentBankOwnershipVerificationService ownershipVerificationService;
+    @Mock private AccountIdentityVerificationService accountIdentityVerificationService;
 
     @InjectMocks private StudentWithdrawalServiceImpl service;
 
@@ -71,6 +75,8 @@ class StudentWithdrawalServiceImplTest {
         userId = UUID.randomUUID();
         AppUser user = new AppUser();
         user.setId(userId);
+        user.setPhoneNumber("+84912345678");
+        user.setPhoneVerifiedAt(Instant.now());
         student = new StudentProfile();
         student.setId(UUID.randomUUID());
         student.setUser(user);
@@ -96,6 +102,8 @@ class StudentWithdrawalServiceImplTest {
 
     @Test
     void createWithdrawal_reservesOnlyWithdrawableRefundBalance() {
+        student.setIdentityProvider("VNPT_EKYC_WEB_SDK_UAT");
+        ReflectionTestUtils.setField(service, "identityVerificationMode", "direct-sdk");
         CreateWithdrawalRequest request = request(new BigDecimal("200000.00"));
         UUID withdrawalId = UUID.randomUUID();
         stubOwnerAndWallet();
@@ -140,6 +148,79 @@ class StudentWithdrawalServiceImplTest {
         assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, error.getMessageCode());
         verify(otpService, never()).consumeOtp(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createWithdrawal_requiresVerifiedPhoneBeforeWalletOrOtp() {
+        student.getUser().setPhoneVerifiedAt(null);
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.createWithdrawal(
+                        userId, request(new BigDecimal("100000.00"))));
+
+        assertEquals(MessageCodes.PHONE_VERIFICATION_REQUIRED, error.getMessageCode());
+        verify(studentWalletService, never()).getOrCreateStudentWallet(any());
+        verify(walletRepository, never()).findByOwnerTypeAndStudent_IdForUpdate(any(), any());
+        verify(otpService, never()).consumeOtp(any(), any());
+        verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createWithdrawal_requiresVerifiedIdentityBeforeWalletOrOtp() {
+        student.setIdentityVerifiedAt(null);
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.createWithdrawal(
+                        userId, request(new BigDecimal("100000.00"))));
+
+        assertEquals(MessageCodes.MSG_KYC_002, error.getMessageCode());
+        verify(studentWalletService, never()).getOrCreateStudentWallet(any());
+        verify(walletRepository, never()).findByOwnerTypeAndStudent_IdForUpdate(any(), any());
+        verify(otpService, never()).consumeOtp(any(), any());
+        verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createWithdrawal_acceptsIdentityVerifiedThroughTeacherEntryPoint() {
+        student.setIdentityVerifiedAt(null);
+        ReflectionTestUtils.setField(service, "identityVerificationMode", "direct-sdk");
+        AccountIdentityVerification sharedVerification = new AccountIdentityVerification();
+        sharedVerification.setUserId(userId);
+        sharedVerification.setProvider("VNPT_EKYC_WEB_SDK");
+        when(accountIdentityVerificationService.findVerified(userId))
+                .thenReturn(Optional.of(sharedVerification));
+
+        CreateWithdrawalRequest request = request(new BigDecimal("200000.00"));
+        UUID withdrawalId = UUID.randomUUID();
+        stubOwnerAndWallet();
+        when(withdrawalRequestRepository.countByStudentIdAndStatus(
+                student.getId(), WithdrawalStatus.PENDING)).thenReturn(0L);
+        when(withdrawalRequestRepository.countByStudentIdAndCreatedAtAfter(
+                eq(student.getId()), any(LocalDateTime.class))).thenReturn(0L);
+        when(securityService.encryptAccountNumber("0123456789"))
+                .thenReturn("enc:student-account");
+        when(withdrawalRequestRepository.saveAndFlush(any()))
+                .thenAnswer(invocation -> {
+                    WithdrawalRequest saved = invocation.getArgument(0);
+                    saved.setId(withdrawalId);
+                    return saved;
+                });
+        when(withdrawalMapper.toResponse(any())).thenReturn(
+                WithdrawalRequestResponse.builder()
+                        .id(withdrawalId.toString())
+                        .status(WithdrawalStatus.PENDING)
+                        .build());
+
+        WithdrawalRequestResponse response = service.createWithdrawal(userId, request);
+
+        assertEquals(WithdrawalStatus.PENDING, response.getStatus());
+        verify(otpService).consumeOtp(userId.toString(), "123456");
+        verify(studentWalletService).reserveForWithdrawal(
+                student.getId(), withdrawalId, request.getAmount());
     }
 
     @Test

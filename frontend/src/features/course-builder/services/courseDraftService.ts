@@ -40,6 +40,7 @@ export interface CourseDraftResponse {
   accessDurationDays?: number | null;
   accessExpiresAt?: string | null;
   createdAt?: string | null;
+  updatedAt?: string | null;
   srsTrace: Record<string, unknown>;
 }
 
@@ -170,6 +171,14 @@ export async function submitCourseForReview(draftId: string) {
 export async function publishCourse(courseId: string) {
   const response = await axiosClient.post<ApiResponse<void>>(
     ENDPOINTS.teacherCourses.publish(courseId),
+  );
+
+  return response.data;
+}
+
+export async function unpublishCourse(courseId: string) {
+  const response = await axiosClient.post<ApiResponse<CourseDraftResponse>>(
+    ENDPOINTS.teacherCourses.unpublish(courseId),
   );
 
   return response.data;

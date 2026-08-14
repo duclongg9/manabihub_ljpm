@@ -369,14 +369,21 @@ class LearningServiceImplTest {
 
     @Test
     @Order(205)
-    @DisplayName("UTC05: Video position exceeds duration")
-    void testSaveVideoProgress_UTC05_InvalidPosition() {
+    @DisplayName("UTC05: Video position and replay time are capped at duration")
+    void testSaveVideoProgress_UTC05_CapsPositionAndReplayTime() {
         when(lessonBlockRepository.findById(blockVideoId)).thenReturn(Optional.of(videoBlock));
         mockActiveEnrollment();
+        when(lessonBlockProgressRepository.findByEnrollmentIdAndLessonBlockId(enrollmentId, blockVideoId)).thenReturn(Optional.empty());
+        when(lessonBlockProgressRepository.save(any(LessonBlockProgress.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> learningService.saveVideoProgress(blockVideoId, new SaveVideoProgressRequest(400)));
-        assertEquals(MessageCodes.LEARNING_INVALID_VIDEO_POSITION, ex.getMessageCode());
+        LessonProgressResponse response = learningService.saveVideoProgress(
+                blockVideoId,
+                new SaveVideoProgressRequest(400, 420)
+        );
+
+        assertEquals(300, response.lastVideoPositionSeconds());
+        assertEquals(300, response.watchedVideoSeconds());
+        assertEquals(LessonProgressStatus.COMPLETED, response.status());
     }
 
     @Test

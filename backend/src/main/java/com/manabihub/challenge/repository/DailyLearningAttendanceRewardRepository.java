@@ -7,4 +7,5 @@ import java.util.UUID;
 
 public interface DailyLearningAttendanceRewardRepository extends JpaRepository<DailyLearningAttendanceReward, UUID> {
     boolean existsByRewardDateAndStudentId(LocalDate rewardDate, UUID studentId);
+    boolean existsByChallengeId(UUID challengeId);
 }

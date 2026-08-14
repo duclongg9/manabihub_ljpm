@@ -9,6 +9,7 @@ import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
+import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined';
 import { adminKycService } from '../../admin-kyc/services/adminKycService';
 import type { KycRequestResponse } from '../../admin-kyc/services/adminKycService';
 import { courseApprovalService } from '../../admin-course-approval/services/courseApprovalService';
@@ -168,7 +169,7 @@ export const AdminDashboardPage: React.FC = () => {
       ) : (
         <>
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <CardContent sx={{ flexGrow: 1, pb: 0 }}>
                   <Stack direction="row" sx={{ alignItems: 'center', gap: 2, mb: 2 }}>
@@ -203,7 +204,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </Box>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <CardContent sx={{ flexGrow: 1, pb: 0 }}>
                   <Stack direction="row" sx={{ alignItems: 'center', gap: 2, mb: 2 }}>
@@ -239,7 +240,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </Box>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <CardContent sx={{ flexGrow: 1, pb: 0 }}>
                   <Stack direction="row" sx={{ alignItems: 'center', gap: 2, mb: 2 }}>
@@ -274,6 +275,15 @@ export const AdminDashboardPage: React.FC = () => {
                   </Button>
                 </Box>
               </Card>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <AdminActionCard
+                title="Trò chơi & thưởng tuần"
+                subtitle="Soạn nội dung, cấu hình phần thưởng và công khai thử thách học tập theo tuần"
+                icon={<SportsEsportsOutlinedIcon />}
+                actionLabel="Quản lý trò chơi tuần"
+                onAction={() => navigate(ROUTES.ADMIN.WEEKLY_CHALLENGES)}
+              />
             </Grid>
           </Grid>
         </>

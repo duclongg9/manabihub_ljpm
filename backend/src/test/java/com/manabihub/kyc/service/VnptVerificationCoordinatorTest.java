@@ -9,6 +9,7 @@ import com.manabihub.kyc.port.VnptVerificationPort;
 import com.manabihub.kyc.port.VnptServerVerificationResult;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.kyc.repository.VnptIdentityTransactionClaimRepository;
 import com.manabihub.kyc.service.VnptVerificationCoordinator.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,6 +45,7 @@ class VnptVerificationCoordinatorTest {
     @Mock private VnptVerificationPort vnptVerificationPort;
     @Mock private TeacherIdentityClaimService teacherIdentityClaimService;
     @Mock private SecurityAuditService securityAuditService;
+    @Mock private VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
     @Mock private ObjectProvider<VnptVerificationCoordinator> selfProvider;
 
     private final Instant fixedNow = Instant.parse("2026-01-01T10:00:00Z");
@@ -58,7 +60,8 @@ class VnptVerificationCoordinatorTest {
         clock = Clock.fixed(fixedNow, ZoneId.of("UTC"));
         coordinator = new VnptVerificationCoordinator(
                 teacherProfileRepository, kycRequestRepository, vnptVerificationPort,
-                teacherIdentityClaimService, securityAuditService, clock, selfProvider
+                teacherIdentityClaimService, securityAuditService,
+                vnptIdentityTransactionClaimRepository, clock, selfProvider
         );
         userId = UUID.randomUUID();
         user = new AppUser();
@@ -139,7 +142,7 @@ class VnptVerificationCoordinatorTest {
 
         when(teacherProfileRepository.findForUpdateByUserId(userId)).thenReturn(Optional.of(teacherProfile));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())).thenReturn(Optional.empty());
-        when(kycRequestRepository.existsByProviderTransactionId(anyString())).thenReturn(false);
+        when(kycRequestRepository.existsByEkycProviderAndProviderTransactionId(anyString(), anyString())).thenReturn(false);
         when(kycRequestRepository.saveAndFlush(any())).thenReturn(mockRequest);
         when(selfProvider.getObject()).thenReturn(coordinator);
 
@@ -345,7 +348,7 @@ class VnptVerificationCoordinatorTest {
     void pendingBind_certificateRemainsLocked() {
         when(teacherProfileRepository.findForUpdateByUserId(userId)).thenReturn(Optional.of(teacherProfile));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())).thenReturn(Optional.empty());
-        when(kycRequestRepository.existsByProviderTransactionId(anyString())).thenReturn(false);
+        when(kycRequestRepository.existsByEkycProviderAndProviderTransactionId(anyString(), anyString())).thenReturn(false);
         when(kycRequestRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         BindResult result = coordinator.bindVerificationAttempt(userId, req("session", "tx"), passSdk(), "127.0.0.1", "agent");
@@ -393,7 +396,7 @@ class VnptVerificationCoordinatorTest {
 
         when(teacherProfileRepository.findForUpdateByUserId(userId)).thenReturn(Optional.of(teacherProfile));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId())).thenReturn(Optional.empty());
-        when(kycRequestRepository.existsByProviderTransactionId(anyString())).thenReturn(false);
+        when(kycRequestRepository.existsByEkycProviderAndProviderTransactionId(anyString(), anyString())).thenReturn(false);
         when(kycRequestRepository.saveAndFlush(any())).thenThrow(dive);
 
         when(teacherProfileRepository.findByUserId(userId)).thenReturn(Optional.of(teacherProfile));

@@ -9,11 +9,13 @@ import com.manabihub.kyc.domain.IdentityVerificationStatus;
 import com.manabihub.kyc.domain.KycRequest;
 import com.manabihub.kyc.domain.KycRequestStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
+import com.manabihub.kyc.domain.VnptIdentityTransactionClaim;
 import com.manabihub.kyc.dto.KycIdentityVerificationRequest;
 import com.manabihub.kyc.port.VnptServerVerificationResult;
 import com.manabihub.kyc.port.VnptVerificationPort;
 import com.manabihub.kyc.repository.KycRequestRepository;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
+import com.manabihub.kyc.repository.VnptIdentityTransactionClaimRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -45,6 +47,7 @@ public class VnptVerificationCoordinator {
     private final VnptVerificationPort vnptVerificationPort;
     private final TeacherIdentityClaimService teacherIdentityClaimService;
     private final SecurityAuditService securityAuditService;
+    private final VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
     private final Clock clock;
     private final org.springframework.beans.factory.ObjectProvider<VnptVerificationCoordinator> selfProvider;
 
@@ -54,6 +57,7 @@ public class VnptVerificationCoordinator {
             VnptVerificationPort vnptVerificationPort,
             TeacherIdentityClaimService teacherIdentityClaimService,
             SecurityAuditService securityAuditService,
+            VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository,
             Clock clock,
             org.springframework.beans.factory.ObjectProvider<VnptVerificationCoordinator> selfProvider
     ) {
@@ -62,6 +66,7 @@ public class VnptVerificationCoordinator {
         this.vnptVerificationPort = vnptVerificationPort;
         this.teacherIdentityClaimService = teacherIdentityClaimService;
         this.securityAuditService = securityAuditService;
+        this.vnptIdentityTransactionClaimRepository = vnptIdentityTransactionClaimRepository;
         this.clock = clock;
         this.selfProvider = selfProvider;
     }
@@ -177,7 +182,7 @@ public class VnptVerificationCoordinator {
                     String mismatchType = !txMatch ? "TRANSACTION_MISMATCH" : "SESSION_MISMATCH";
                     if (incTxId == null || incSessionId == null) {
                         mismatchType = "MISSING_PROVIDER_IDENTIFIERS";
-                    } else if (kycRequestRepository.existsByProviderTransactionId(incTxId)) {
+                    } else if (kycRequestRepository.existsByEkycProviderAndProviderTransactionId(VNPT_PROVIDER, incTxId)) {
                         mismatchType = "DUPLICATE_TRANSACTION_ID";
                     }
 
@@ -205,13 +210,22 @@ public class VnptVerificationCoordinator {
         }
 
         // Fast-path duplicate check (non-authoritative; DB constraint is the real guard)
-        boolean isDuplicate = kycRequestRepository.existsByProviderTransactionId(incTxId);
+        boolean isDuplicate = kycRequestRepository.existsByEkycProviderAndProviderTransactionId(VNPT_PROVIDER, incTxId);
         if (isDuplicate) {
             securityAuditService.logVerificationEvent("DUPLICATE_TRANSACTION_ID", teacherProfile.getId(), kycRequest.getId(), user.getId(), ipAddress, userAgent);
             throw new BusinessException(MessageCodes.MSG_KYC_008, "Duplicate transaction id", HttpStatus.CONFLICT);
         }
 
         boolean sdkPassed = sdkDecision != null && sdkDecision.verified();
+
+        VnptIdentityTransactionClaim providerClaim = new VnptIdentityTransactionClaim();
+        providerClaim.setUserId(userId);
+        providerClaim.setSubjectType("TEACHER");
+        providerClaim.setProvider(VNPT_PROVIDER);
+        providerClaim.setProviderTransactionId(incTxId);
+        providerClaim.setProviderSessionId(incSessionId);
+        providerClaim.setClaimedAt(now);
+        vnptIdentityTransactionClaimRepository.saveAndFlush(providerClaim);
 
         kycRequest.setId(kycRequest.getId() != null ? kycRequest.getId() : UUID.randomUUID());
         kycRequest.setTeacherProfile(teacherProfile);
@@ -432,7 +446,8 @@ public class VnptVerificationCoordinator {
         try {
             bindResult = self.bindVerificationAttempt(userId, request, sdkDecision, ipAddress, userAgent);
         } catch (DataIntegrityViolationException dive) {
-            if (isUniqueConstraint(dive, "uq_kyc_requests_provider_tx")) {
+            if (isUniqueConstraint(dive, "uq_kyc_requests_provider_tx")
+                    || isUniqueConstraint(dive, "uq_vnpt_identity_claim_provider_transaction")) {
                 UUID teacherProfileId = resolveTeacherProfileIdSafe(userId);
                 self.auditDuplicateTransaction(teacherProfileId, userId, ipAddress, userAgent);
                 throw new BusinessException(MessageCodes.MSG_KYC_008, "Duplicate provider transaction", HttpStatus.CONFLICT);

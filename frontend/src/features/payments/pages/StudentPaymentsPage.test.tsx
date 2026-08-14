@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useOrderHistory } from '../hooks/useOrderHistory';
 import { useStudentRefunds } from '../../refunds/hooks/useStudentRefunds';
@@ -127,6 +127,20 @@ describe('StudentPaymentsPage', () => {
     expect(screen.getByRole('button', { name: 'Xác minh SĐT & CCCD để rút tiền' })).toBeInTheDocument();
   });
 
+  it('opens CCCD verification with a safe return path to Ví & Thanh toán', async () => {
+    render(
+      <MemoryRouter initialEntries={['/student/payments']}>
+        <StudentPaymentsPage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Xác minh SĐT & CCCD để rút tiền' }));
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      '/student/profile',
+    );
+  });
+
   it('filters out top-up orders from course order history', () => {
     vi.mocked(useOrderHistory).mockReturnValue({
       data: {
@@ -230,3 +244,8 @@ describe('StudentPaymentsPage', () => {
     expect(screen.queryByText('MHB-20260729-001')).not.toBeInTheDocument();
   });
 });
+
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="current-location">{location.pathname}{location.search}</span>;
+}

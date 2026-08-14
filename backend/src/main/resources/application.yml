@@ -37,11 +37,18 @@ manabihub:
     sms-mode: ${PHONE_VERIFICATION_SMS_MODE:console}
     sms-webhook-url: ${PHONE_VERIFICATION_SMS_WEBHOOK_URL:}
     sms-api-key: ${PHONE_VERIFICATION_SMS_API_KEY:}
+    sms-timeout-seconds: ${PHONE_VERIFICATION_SMS_TIMEOUT_SECONDS:5}
+    esms:
+      api-key: ${PHONE_VERIFICATION_ESMS_API_KEY:}
+      secret-key: ${PHONE_VERIFICATION_ESMS_SECRET_KEY:}
+      brandname: ${PHONE_VERIFICATION_ESMS_BRANDNAME:}
+      sandbox: ${PHONE_VERIFICATION_ESMS_SANDBOX:true}
   kyc:
     identity-secret: ${KYC_IDENTITY_SECRET:}
-    # SERVER is the production-safe default. DIRECT_SDK_MOCK is an explicit
-    # demo/UAT mode that uses the browser SDK result plus the synthetic registry.
-    identity-verification-mode: ${KYC_IDENTITY_VERIFICATION_MODE:server}
+    # direct-sdk-mock cross-checks synthetic fixtures. A sandbox may explicitly
+    # select direct-sdk to trust browser results and unlock sandbox withdrawals.
+    # A production tenant must select SERVER.
+    identity-verification-mode: ${KYC_IDENTITY_VERIFICATION_MODE:direct-sdk-mock}
   payout:
     security-secret: ${PAYOUT_SECURITY_SECRET:}
   ai:

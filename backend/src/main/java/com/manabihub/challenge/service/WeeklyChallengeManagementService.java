@@ -23,6 +23,8 @@ public class WeeklyChallengeManagementService {
     private final WeeklyLearningChallengeRepository challengeRepository;
     private final WeeklyLearningChallengePairRepository pairRepository;
     private final WeeklyLearningChallengeAttemptRepository attemptRepository;
+    private final WeeklyLearningChallengeRewardRepository rewardRepository;
+    private final DailyLearningAttendanceRewardRepository attendanceRewardRepository;
     private final CourseRepository courseRepository;
     private final AuditLogRepository auditLogRepository;
 
@@ -53,8 +55,8 @@ public class WeeklyChallengeManagementService {
         requireCourseManager(adminId);
         validate(request);
         WeeklyLearningChallenge challenge = requireLocked(id);
-        if (challenge.getStatus() != ChallengeStatus.DRAFT || attemptRepository.existsByChallengeId(id)) {
-            throw conflict("Chỉ được sửa bản nháp chưa có lượt chơi");
+        if (challenge.getStatus() != ChallengeStatus.DRAFT || hasRecordedActivity(id)) {
+            throw conflict("Chỉ được sửa bản nháp chưa phát sinh lượt chơi hoặc tiền thưởng");
         }
         challengeRepository.findByWeekStart(request.weekStart())
                 .filter(other -> !other.getId().equals(id))
@@ -88,8 +90,11 @@ public class WeeklyChallengeManagementService {
     public WeeklyChallengeResponse unpublish(UUID adminId, UUID id) {
         requireCourseManager(adminId);
         WeeklyLearningChallenge challenge = requireLocked(id);
-        if (attemptRepository.existsByChallengeId(id)) {
-            throw conflict("Không thể ẩn thử thách đã phát sinh lượt chơi; hãy để hệ thống chốt tuần");
+        if (challenge.getStatus() != ChallengeStatus.PUBLISHED) {
+            throw conflict("Chỉ thử thách đang công khai mới có thể chuyển về bản nháp");
+        }
+        if (hasRecordedActivity(id)) {
+            throw conflict("Không thể ẩn thử thách đã phát sinh lượt chơi hoặc tiền thưởng; hãy để hệ thống chốt tuần");
         }
         challenge.setStatus(ChallengeStatus.DRAFT);
         challenge.setPublishedBy(null);
@@ -102,8 +107,8 @@ public class WeeklyChallengeManagementService {
     public void delete(UUID adminId, UUID id) {
         requireCourseManager(adminId);
         WeeklyLearningChallenge challenge = requireLocked(id);
-        if (challenge.getStatus() != ChallengeStatus.DRAFT || attemptRepository.existsByChallengeId(id)) {
-            throw conflict("Không thể xóa thử thách đã công khai hoặc đã có lượt chơi");
+        if (challenge.getStatus() != ChallengeStatus.DRAFT || hasRecordedActivity(id)) {
+            throw conflict("Không thể xóa thử thách đã công khai hoặc đã phát sinh lượt chơi, tiền thưởng");
         }
         challengeRepository.delete(challenge);
         audit(adminId, "WEEKLY_CHALLENGE_DELETED", id, Map.of());
@@ -165,6 +170,12 @@ public class WeeklyChallengeManagementService {
                 .orElseThrow(() -> new BusinessException("WEEKLY_CHALLENGE_NOT_FOUND", "Không tìm thấy thử thách", HttpStatus.NOT_FOUND));
     }
 
+    private boolean hasRecordedActivity(UUID challengeId) {
+        return attemptRepository.existsByChallengeId(challengeId)
+                || rewardRepository.existsByChallengeId(challengeId)
+                || attendanceRewardRepository.existsByChallengeId(challengeId);
+    }
+
     private void requireCourseManager(UUID adminId) {
         if (!courseRepository.hasAdminRole(adminId, List.of("COURSE_MANAGER"))) {
             throw new BusinessException("COURSE_MANAGER_REQUIRED", "Chỉ Course Manager được quản lý trò chơi", HttpStatus.FORBIDDEN);
@@ -172,7 +183,7 @@ public class WeeklyChallengeManagementService {
     }
 
     private void audit(UUID adminId, String action, UUID targetId, Map<String, Object> metadata) {
-        auditLogRepository.save(AuditLog.builder().actorType("ADMIN").actorAdminId(adminId)
+        auditLogRepository.save(AuditLog.builder().actorType("INTERNAL_ADMIN").actorAdminId(adminId)
                 .actorRoleCode("COURSE_MANAGER").action(action).targetType("WEEKLY_CHALLENGE")
                 .targetId(targetId).metadata(metadata).build());
     }

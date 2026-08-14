@@ -10,6 +10,8 @@ public interface WritingSubmissionQueueProjection {
 
     String getCourseTitle();
 
+    UUID getLessonId();
+
     String getLessonTitle();
 
     String getStudentName();
@@ -23,4 +25,6 @@ public interface WritingSubmissionQueueProjection {
     boolean getHasAiSuggestion();
 
     boolean getHasTeacherFeedback();
+
+    java.math.BigDecimal getScore();
 }

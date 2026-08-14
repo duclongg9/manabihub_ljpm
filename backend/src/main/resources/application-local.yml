@@ -5,6 +5,7 @@ manabihub:
     admin-password: ${DEMO_ADMIN_PASSWORD:Admin@123}
   kyc:
     identity-secret: ${KYC_IDENTITY_SECRET:local-dev-only-identity-secret-key-32chars}
+    identity-verification-mode: ${KYC_IDENTITY_VERIFICATION_MODE:direct-sdk-mock}
   payout:
     security-secret: ${PAYOUT_SECURITY_SECRET:local-dev-only-payout-secret-key-32chars}
   payment:

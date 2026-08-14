@@ -10,6 +10,7 @@ import com.manabihub.kyc.dto.KycRestartVerificationResponse;
 import com.manabihub.kyc.dto.KycStatusResponse;
 import com.manabihub.kyc.service.TeacherKycService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -42,7 +43,7 @@ public class TeacherKycController {
 
     @PostMapping(value = "/identity-verifications", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<KycIdentityVerificationResponse>> verifyIdentity(
-            @RequestBody KycIdentityVerificationRequest payload,
+            @Valid @RequestBody KycIdentityVerificationRequest payload,
             HttpServletRequest request
     ) {
         KycIdentityVerificationResponse response = teacherKycService.verifyIdentity(
