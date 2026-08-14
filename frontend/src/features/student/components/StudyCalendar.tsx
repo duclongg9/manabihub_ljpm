@@ -219,9 +219,15 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
   };
 
   const openSchedule = () => {
-    const dayOfWeek = selectedDay?.getDay() ?? new Date().getDay();
+    const targetDay = selectedDay;
+    const dayOfWeek = targetDay?.getDay() ?? new Date().getDay();
     setSelectedDay(null);
-    window.dispatchEvent(new CustomEvent(STUDY_PLAN_OPEN_SCHEDULE_EVENT, { detail: { dayOfWeek } }));
+    window.dispatchEvent(new CustomEvent(STUDY_PLAN_OPEN_SCHEDULE_EVENT, {
+      detail: {
+        dayOfWeek,
+        dateKey: targetDay ? dateKey(targetDay) : undefined,
+      },
+    }));
   };
 
   const startLesson = (event: CalendarEvent) => {
