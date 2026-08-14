@@ -233,6 +233,47 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public void createAdminNotificationOnce(
+            String dedupeKey,
+            UUID recipientAdminId,
+            String recipientEmail,
+            String title,
+            String message,
+            String type,
+            String actionUrl
+    ) {
+        int inserted = jdbcTemplate.update("""
+                INSERT INTO notifications (
+                    id,
+                    recipient_admin_id,
+                    title,
+                    message,
+                    notification_type,
+                    action_url,
+                    dedupe_key,
+                    is_read,
+                    created_at
+                )
+                VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, FALSE, NOW())
+                ON CONFLICT DO NOTHING
+                """,
+                recipientAdminId,
+                title,
+                message,
+                type,
+                actionUrl,
+                dedupeKey);
+        if (inserted == 0) {
+            log.info("Skipped duplicate admin notification {}", dedupeKey);
+            return;
+        }
+        if (recipientEmail != null && !recipientEmail.isBlank()) {
+            scheduleEmailAfterCommit(recipientEmail, title, message, type);
+        }
+    }
+
+    @Override
+    @Transactional
     public void createNotificationOnce(
             String dedupeKey,
             UUID recipientUserId,

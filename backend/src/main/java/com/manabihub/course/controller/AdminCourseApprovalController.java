@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/admin/course-approvals")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('COURSE_MANAGER')")
 public class AdminCourseApprovalController {
 
     private final AdminCourseApprovalService courseApprovalService;

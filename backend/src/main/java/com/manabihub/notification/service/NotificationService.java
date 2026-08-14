@@ -39,6 +39,16 @@ public interface NotificationService {
     void createAdminNotification(UUID recipientAdminId, String recipientEmail,
                                  String title, String message, String type, String actionUrl);
 
+    void createAdminNotificationOnce(
+            String dedupeKey,
+            UUID recipientAdminId,
+            String recipientEmail,
+            String title,
+            String message,
+            String type,
+            String actionUrl
+    );
+
     /**
      * Creates and sends a notification at most once for the supplied business
      * event key. Callers use this from an AFTER_COMMIT callback.

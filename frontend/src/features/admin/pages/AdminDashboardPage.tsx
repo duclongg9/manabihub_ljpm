@@ -10,6 +10,9 @@ import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined
 import SettingsApplicationsOutlinedIcon from '@mui/icons-material/SettingsApplicationsOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined';
+import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
+import PolicyOutlinedIcon from '@mui/icons-material/PolicyOutlined';
 import { adminKycService } from '../../admin-kyc/services/adminKycService';
 import type { KycRequestResponse } from '../../admin-kyc/services/adminKycService';
 import { courseApprovalService } from '../../admin-course-approval/services/courseApprovalService';
@@ -63,7 +66,7 @@ export const AdminDashboardPage: React.FC = () => {
             size: 1,
             reconciliationStatus: 'CRITICAL_MISMATCH',
           }),
-          adminRefundApi.getPendingRefunds(0, 1)
+          adminRefundApi.getPendingRefunds(0, 1, { status: 'PENDING' })
         ]);
         setPendingPayouts(pendingData.totalElements);
         setReconciliationAlerts(reconciliationData.totalElements);
@@ -129,6 +132,15 @@ export const AdminDashboardPage: React.FC = () => {
               onAction={() => navigate(ROUTES.ADMIN.AUDIT_LOGS)}
             />
           </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AdminActionCard
+              title="Hậu kiểm quyết định"
+              subtitle="Xem quyết định của Course Manager và Finance Manager; cảnh báo mà không thay đổi luồng xử lý"
+              icon={<PolicyOutlinedIcon />}
+              actionLabel="Mở danh sách hậu kiểm"
+              onAction={() => navigate(ROUTES.ADMIN.DECISION_REVIEWS)}
+            />
+          </Grid>
         </Grid>
       ) : isFinanceManager ? (
         <Grid container spacing={3}>
@@ -163,6 +175,24 @@ export const AdminDashboardPage: React.FC = () => {
               icon={<FactCheckIcon />}
               actionLabel="Mở hàng đợi hoàn tiền"
               onAction={() => navigate(ROUTES.ADMIN.REFUND_REVIEW)}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AdminActionCard
+              title="Doanh thu hệ thống"
+              subtitle="Doanh số, hoàn tiền, doanh thu nền tảng, chi phí và kết quả vận hành theo thời gian"
+              icon={<TrendingUpOutlinedIcon />}
+              actionLabel="Mở báo cáo doanh thu"
+              onAction={() => navigate(ROUTES.ADMIN.FINANCE_REVENUE)}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <AdminActionCard
+              title="Chi phí vận hành"
+              subtitle="Nhập hóa đơn thực tế và tách các dòng AWS, SMS, AI, KYC theo từng thành phần"
+              icon={<ReceiptLongOutlinedIcon />}
+              actionLabel="Quản lý chi phí"
+              onAction={() => navigate(ROUTES.ADMIN.FINANCE_EXPENSES)}
             />
           </Grid>
         </Grid>

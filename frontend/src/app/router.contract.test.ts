@@ -23,6 +23,10 @@ describe('router contract for policy and notification links', () => {
     [ROUTES.PUBLIC.INSTRUCTOR_ESCROW_PAYOUTS, 'instructors/escrow-and-payouts'],
     [ROUTES.TEACHER.COURSES, 'courses'],
     ['/admin/violations/report-1', 'violations/:id'],
+    [ROUTES.ADMIN.FINANCE_REVENUE, 'finance/revenue'],
+    [ROUTES.ADMIN.FINANCE_EXPENSES, 'finance/expenses'],
+    [`${ROUTES.ADMIN.FINANCE_EXPENSES}/expense-1`, 'finance/expenses/:id'],
+    [ROUTES.ADMIN.DECISION_REVIEWS, 'decision-reviews'],
   ])('matches %s to a concrete route', (url, expectedRoutePath) => {
     expectConcreteRoute(url, expectedRoutePath);
   });

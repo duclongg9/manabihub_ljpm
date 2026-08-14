@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Card,
@@ -12,13 +13,13 @@ import {
   DialogContent,
   DialogTitle,
   Grid,
+  Pagination,
   Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
-  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -31,6 +32,12 @@ import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROUTES } from '../../../shared/constants/routes';
 import { ROLES } from '../../../shared/constants/roles';
 import { adminAuditApi, type AuditLogDto, type AuditLogFilterParams } from '../api/adminAuditApi';
+import {
+  ACTIVE_AUDIT_ROLE_CODES,
+  AUDIT_ROLE_LABELS,
+  filterAuditRoleOptions,
+  normalizeAuditRoleFilter,
+} from '../utils/auditRoleFilter';
 import { AdminAuditLogDetailPage } from './AdminAuditLogDetailPage';
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -67,7 +74,12 @@ export const AdminAuditLogPage: React.FC = () => {
   };
 
   const handleApplyFilter = () => {
-    setFilterParams({ ...filterDraft, page: 0, size: filterParams.size ?? DEFAULT_PAGE_SIZE });
+    setFilterParams({
+      ...filterDraft,
+      role: normalizeAuditRoleFilter(filterDraft.role),
+      page: 0,
+      size: DEFAULT_PAGE_SIZE,
+    });
   };
 
   const handleClearFilter = () => {
@@ -81,7 +93,7 @@ export const AdminAuditLogPage: React.FC = () => {
 
   const logs = data?.content ?? [];
   const page = filterParams.page ?? 0;
-  const size = filterParams.size ?? DEFAULT_PAGE_SIZE;
+  const totalPages = Math.max(data?.totalPages ?? 1, 1);
 
   return (
     <Box sx={{ p: { xs: 1.5, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
@@ -112,12 +124,35 @@ export const AdminAuditLogPage: React.FC = () => {
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 4, md: 2 }}>
-              <TextField
+              <Autocomplete
+                freeSolo
                 fullWidth
-                size="small"
-                label="Vai trò"
-                value={filterDraft.role ?? ''}
-                onChange={(event) => updateDraft('role', event.target.value)}
+                options={ACTIVE_AUDIT_ROLE_CODES}
+                inputValue={filterDraft.role ?? ''}
+                filterOptions={filterAuditRoleOptions}
+                onInputChange={(_, value) => updateDraft('role', value)}
+                onChange={(_, value) => updateDraft('role', value ?? '')}
+                noOptionsText="Không có vai trò phù hợp"
+                renderOption={(props, roleCode) => (
+                  <Box component="li" {...props} key={roleCode}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {AUDIT_ROLE_LABELS[roleCode] ?? roleCode}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {roleCode}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    size="small"
+                    label="Vai trò"
+                    placeholder="Chọn hoặc nhập vai trò"
+                  />
+                )}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 4, md: 2 }}>
@@ -216,21 +251,30 @@ export const AdminAuditLogPage: React.FC = () => {
             </TableBody>
           </Table>
         </TableContainer>
-        <TablePagination
-          component="div"
-          count={data?.totalElements ?? 0}
-          page={page}
-          onPageChange={(_, nextPage) => setFilterParams((current) => ({ ...current, page: nextPage }))}
-          rowsPerPage={size}
-          onRowsPerPageChange={(event) => setFilterParams((current) => ({
-            ...current,
-            size: Number.parseInt(event.target.value, 10),
-            page: 0,
-          }))}
-          rowsPerPageOptions={[10, 20, 50]}
-          labelRowsPerPage="Số dòng/trang"
-          labelDisplayedRows={({ from, to, count }) => `${from}–${to} trên ${count}`}
-        />
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{
+            alignItems: 'center',
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            justifyContent: 'space-between',
+            px: 3,
+            py: 2,
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {data?.totalElements ?? 0} nhật ký · Trang {page + 1}/{totalPages}
+          </Typography>
+          <Pagination
+            color="primary"
+            count={totalPages}
+            page={page + 1}
+            onChange={(_, value) => setFilterParams((current) => ({ ...current, page: value - 1 }))}
+            disabled={isFetching}
+            size="small"
+          />
+        </Stack>
       </Card>
 
       <Dialog open={selectedAuditId !== null} onClose={() => setSelectedAuditId(null)} maxWidth="md" fullWidth>

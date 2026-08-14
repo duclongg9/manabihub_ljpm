@@ -28,7 +28,7 @@ import java.nio.charset.StandardCharsets;
 @RestController
 @RequestMapping("/api/v1/admin/violations")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('COURSE_MANAGER', 'SYSTEM_ADMIN')")
+@PreAuthorize("hasRole('COURSE_MANAGER')")
 @Tag(name = "Admin Violation Moderation", description = "Permission-controlled UC-30 violation review and resolution")
 public class AdminViolationController {
 

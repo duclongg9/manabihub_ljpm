@@ -53,7 +53,7 @@ public class KycServiceImpl implements KycService {
 
     private static final UUID TEACHER_ROLE_ID =
             UUID.fromString("a0000000-0000-0000-0000-000000000002");
-    private static final List<String> REVIEW_ROLES = List.of("COURSE_MANAGER", "SYSTEM_ADMIN");
+    private static final List<String> REVIEW_ROLES = List.of("COURSE_MANAGER");
     private static final String RESTRICTED_DOCUMENT_PREFIX = "restricted://kyc/";
 
     private final KycRequestRepository kycRequestRepository;
@@ -198,7 +198,7 @@ public class KycServiceImpl implements KycService {
                     HttpStatus.FORBIDDEN
             );
         }
-        return new AdminContext(roleCodes.contains("SYSTEM_ADMIN") ? "SYSTEM_ADMIN" : "COURSE_MANAGER");
+        return new AdminContext("COURSE_MANAGER");
     }
 
     private void requireDecisionReason(KycRequestStatus targetStatus, String decisionNote) {
