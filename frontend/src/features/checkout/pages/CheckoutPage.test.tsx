@@ -58,4 +58,40 @@ describe('CheckoutPage', () => {
     expect(mocks.cancelOrder).toHaveBeenCalledWith('order-1');
     expect(screen.getByRole('link', { name: 'Xem lịch sử thanh toán' })).toBeInTheDocument();
   });
+
+  it('resolves a relative course thumbnail and falls back when the image cannot load', async () => {
+    mocks.getOrder.mockResolvedValue({
+      id: 'order-with-cover',
+      orderCode: 'MHB-COVER',
+      totalAmount: 99_000,
+      currency: 'VND',
+      status: 'CANCELLED',
+      type: 'COURSE',
+      createdAt: new Date().toISOString(),
+      items: [{
+        id: 'item-cover',
+        courseId: 'course-cover',
+        courseTitle: 'Tiếng Nhật du lịch',
+        courseThumbnailUrl: '/uploads/courses/travel.webp',
+        price: 99_000,
+      }],
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/checkout/order-with-cover']}>
+        <Routes>
+          <Route path="/checkout/:orderId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const cover = await screen.findByTestId('checkout-course-cover');
+    expect(cover).toHaveAttribute('src', expect.stringContaining('/uploads/courses/travel.webp'));
+
+    fireEvent.error(cover);
+    expect(screen.getByTestId('checkout-course-cover-fallback')).toHaveAttribute(
+      'alt',
+      'Ảnh mặc định cho Tiếng Nhật du lịch',
+    );
+  });
 });

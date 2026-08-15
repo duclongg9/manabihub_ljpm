@@ -3,6 +3,8 @@ import { useLocation, useNavigate, useParams, Link as RouterLink } from 'react-r
 import { cancelOrder, getOrder, simulatePayment } from '../services/checkoutService';
 import type { OrderResponse } from '../types';
 import { ROUTES } from '../../../shared/constants/routes';
+import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
+import fallbackCourseCover from '../../../assets/course1.png';
 
 interface CheckoutLocationState {
   paymentUrl?: string;
@@ -137,11 +139,10 @@ export const CheckoutPage = () => {
         <div className="p-6 border-b border-slate-100">
           {order.items.map((item) => (
             <div key={item.courseId} className="flex items-center gap-4">
-              {item.courseThumbnailUrl ? (
-                <img src={item.courseThumbnailUrl} alt={item.courseTitle} className="w-20 h-14 object-cover rounded-lg" />
-              ) : (
-                <div className="w-20 h-14 rounded-lg bg-slate-100" />
-              )}
+              <CheckoutCourseThumbnail
+                thumbnailUrl={item.courseThumbnailUrl}
+                courseTitle={item.courseTitle}
+              />
               <div className="flex-1">
                 <p className="font-semibold text-slate-900">{item.courseTitle}</p>
               </div>
@@ -288,5 +289,27 @@ export const CheckoutPage = () => {
 const CenteredMessage = ({ text }: { text: string }) => (
   <div className="max-w-2xl mx-auto px-4 py-20 text-center text-slate-500">{text}</div>
 );
+
+const CheckoutCourseThumbnail = ({
+  thumbnailUrl,
+  courseTitle,
+}: {
+  thumbnailUrl?: string | null;
+  courseTitle: string;
+}) => {
+  const [imageFailed, setImageFailed] = useState(false);
+  const resolvedThumbnailUrl = resolvePublicAssetUrl(thumbnailUrl);
+  const useFallback = !resolvedThumbnailUrl || imageFailed;
+
+  return (
+    <img
+      data-testid={useFallback ? 'checkout-course-cover-fallback' : 'checkout-course-cover'}
+      src={useFallback ? fallbackCourseCover : resolvedThumbnailUrl}
+      alt={useFallback ? `Ảnh mặc định cho ${courseTitle}` : courseTitle}
+      onError={() => setImageFailed(true)}
+      className="w-20 h-14 shrink-0 object-cover rounded-lg bg-slate-100"
+    />
+  );
+};
 
 export default CheckoutPage;
