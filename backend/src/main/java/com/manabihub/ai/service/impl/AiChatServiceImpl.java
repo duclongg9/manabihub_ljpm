@@ -125,7 +125,7 @@ public class AiChatServiceImpl implements AiChatService {
         AiChatContext context = aiChatContextBuilder.build(session.course(), session.lessonBlock());
         AiChatProviderResult result;
         try {
-            result = aiChatProvider.generate(context, request.question());
+            result = aiChatProvider.generate(context, request.question(), request.history());
         } catch (RuntimeException exception) {
             aiUsageLogService.record(
                     currentUserId,

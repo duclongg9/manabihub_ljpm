@@ -6,6 +6,7 @@ export interface AiChatEligibility {
 
 export interface AiChatMessageRequest {
   question: string;
+  history?: { role: 'user' | 'assistant'; content: string }[];
 }
 
 export interface AiChatMessage {

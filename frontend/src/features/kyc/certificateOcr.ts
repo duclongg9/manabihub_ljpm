@@ -62,7 +62,17 @@ export function parseJlptOcrText(rawText: string): JlptOcrResult {
     /\b(\d{1,2}[./-]\d{1,2}[./-]\d{4})\b/,
   ]);
   const dateOfBirth = normalizeDate(rawDateOfBirth);
-  const level = findFirstMatch(text, [/\b(N[1-5])\b/i]).toUpperCase();
+  const rawLevel = findFirstMatch(text, [
+    /(?:Level|級|レベル)\s*([NＮ]\s*[1-5１-５])/i,
+    /([NＮ]\s*[1-5１-５])\s*(?:Level|級|レベル)/i,
+    /([NＮ][1-5１-５])[A-Z0-9]{7,8}A\b/i,
+    /(?:^|[^A-Za-z0-9])([NＮ]\s*[1-5１-５])(?:[^A-Za-z0-9]|$)/i,
+  ]);
+  const level = rawLevel
+    .toUpperCase()
+    .replace(/\s+/g, '')
+    .replace(/Ｎ/g, 'N')
+    .replace(/[１-５]/g, (match) => String.fromCharCode(match.charCodeAt(0) - 0xFEE0));
   const certificateCode = findCertificateCode(text);
 
   const evidenceLines = [
