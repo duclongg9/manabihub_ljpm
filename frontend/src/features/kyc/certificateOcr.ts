@@ -232,13 +232,11 @@ async function createOcrInputs(file: File): Promise<OcrInput[]> {
     if (!width || !height) return [file];
 
     return [
-      // Zone 1 – Level badge at top centre (the "N3" emblem)
-      cropImage(image, width, height, 0.25, 0.02, 0.50, 0.14),
-      // Zone 2 – Name + DOB + Level text area (middle section containing "Level N3 of...")
-      cropImage(image, width, height, 0.15, 0.22, 0.70, 0.45),
-      // Zone 3 – Bottom strip with certificate codes (both serial numbers)
-      cropImage(image, width, height, 0.0, 0.82, 1.0, 0.18, { contrast: 1.6 }),
-      // Zone 4 – Full page as fallback
+      // Zone 1 – Name + DOB + Level text area (middle section)
+      cropImage(image, width, height, 0.18, 0.22, 0.64, 0.48),
+      // Zone 2 – Bottom strip with certificate codes
+      cropImage(image, width, height, 0.05, 0.82, 0.90, 0.18),
+      // Full page as fallback
       file,
     ];
   } catch {
