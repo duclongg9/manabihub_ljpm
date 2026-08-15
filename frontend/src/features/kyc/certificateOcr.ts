@@ -11,6 +11,13 @@ export interface JlptOcrResult {
 
 type OcrInput = File | HTMLCanvasElement;
 
+interface OcrPass {
+  input: OcrInput;
+  pageSegMode: PSM;
+  characterWhitelist?: string;
+  fallback?: boolean;
+}
+
 /**
  * OCR the certificate in focused passes.  JLPT certificates contain a security
  * background plus Japanese / English boilerplate.  We crop individual zones so
@@ -24,23 +31,32 @@ export async function recognizeJlptCertificate(
   file: File,
   onProgress?: (progress: number) => void,
 ): Promise<JlptOcrResult> {
+  const passes = await createOcrPasses(file);
+  let activePass = 0;
   const worker = await createWorker('jpn+eng', OEM.LSTM_ONLY, {
     logger: (message: LoggerMessage) => {
       if (message.status === 'recognizing text') {
-        onProgress?.(Math.round(message.progress * 100));
+        const overallProgress = ((activePass + message.progress) / passes.length) * 100;
+        onProgress?.(Math.min(99, Math.round(overallProgress)));
       }
     },
   });
 
   try {
-    await worker.setParameters({
-      tessedit_pageseg_mode: PSM.SPARSE_TEXT,
-      preserve_interword_spaces: '1',
-    });
-    const inputs = await createOcrInputs(file);
     const transcripts: string[] = [];
-    for (const input of inputs) {
-      const result = await worker.recognize(input);
+    for (const [index, pass] of passes.entries()) {
+      if (pass.fallback && hasAllRequiredFields(parseJlptOcrText(transcripts.join('\n')))) {
+        break;
+      }
+
+      activePass = index;
+      await worker.setParameters({
+        tessedit_pageseg_mode: pass.pageSegMode,
+        preserve_interword_spaces: '1',
+        // Clear the previous focused pass whitelist before reading normal text.
+        tessedit_char_whitelist: pass.characterWhitelist ?? '',
+      });
+      const result = await worker.recognize(pass.input);
       if (result.data.text.trim()) transcripts.push(result.data.text);
     }
     onProgress?.(100);
@@ -62,18 +78,18 @@ export function parseJlptOcrText(rawText: string): JlptOcrResult {
     /\b(\d{1,2}[./-]\d{1,2}[./-]\d{4})\b/,
   ]);
   const dateOfBirth = normalizeDate(rawDateOfBirth);
+  const certificateCode = findCertificateCode(text);
   const rawLevel = findFirstMatch(text, [
-    /(?:Level|級|レベル)\s*([NＮ]\s*[1-5１-５])/i,
-    /([NＮ]\s*[1-5１-５])\s*(?:Level|級|レベル)/i,
-    /([NＮ][1-5１-５])[A-Z0-9]{7,8}A\b/i,
-    /(?:^|[^A-Za-z0-9])([NＮ]\s*[1-5１-５])(?:[^A-Za-z0-9]|$)/i,
+    /(?:Level|級|レベル)\s*[:：-]?\s*([NＮ]\s*[-.:]?\s*[1-5１-５])/i,
+    /([NＮ]\s*[-.:]?\s*[1-5１-５])\s*(?:Level|級|レベル)/i,
+    /([NＮ]\s*[-.:]?\s*[1-5１-５])\s*[A-Z]\s*[A-Z0-9\s]{5,}\s*[A-Z]\b/i,
+    /(?:^|[^A-Za-z0-9])([NＮ]\s*[-.:]?\s*[1-5１-５])(?:[^A-Za-z0-9]|$)/i,
   ]);
   const level = rawLevel
     .toUpperCase()
-    .replace(/\s+/g, '')
+    .replace(/[\s\-.:]+/g, '')
     .replace(/Ｎ/g, 'N')
     .replace(/[１-５]/g, (match) => String.fromCharCode(match.charCodeAt(0) - 0xFEE0));
-  const certificateCode = findCertificateCode(text);
 
   const evidenceLines = [
     holderName && `Name: ${holderName}`,
@@ -93,7 +109,9 @@ export function parseJlptOcrText(rawText: string): JlptOcrResult {
 
 function normalizeOcrText(rawText: string) {
   return rawText
+    .normalize('NFKC')
     .replace(/\r/g, '')
+    .replace(/[‐‑‒–—−]/g, '-')
     .replace(/[ \t]+/g, ' ')
     .split('\n')
     .map((line) => line.trim())
@@ -162,18 +180,49 @@ function isLikelyPersonName(value: string) {
 }
 
 function findCertificateCode(text: string) {
-  const candidates = [
-    // JLPT certificate registration number, e.g. 25B2080102-33745.
-    ...Array.from(text.matchAll(/\d{2}[A-Z]\d{6,}-\d{3,}/gi), (match) => match[0]),
-    // The serial printed at the lower-left corner, e.g. N3A568591A.
-    ...Array.from(text.matchAll(/\bN[1-5][A-Z]\d{5,}[A-Z]\b/gi), (match) => match[0]),
-    // Looser fallback: CODE-DIGITS pattern.
-    ...Array.from(text.matchAll(/\b[A-Z0-9]{2,}\d[A-Z0-9]*-\d{3,}\b/gi), (match) => match[0]),
-  ];
-  const code = candidates
-    .map((candidate) => candidate.toUpperCase())
-    .find((candidate) => !/JAPANESE|LANGUAGE|CERTIFICATE|PROFICIENCY/.test(candidate));
-  return code ?? '';
+  const compactLines = text
+    .split('\n')
+    .map((line) => line.toUpperCase().replace(/[^A-Z0-9-]/g, ''))
+    .filter(Boolean);
+
+  // Prefer the registration number at the lower-right corner. It is the
+  // stable number used to identify a JLPT sitting, e.g. 25B2080102-33745.
+  for (const line of compactLines) {
+    const match = line.match(/([0-9OQIL]{2})([A-Z])([0-9OQILSBZ]{6,})-([0-9OQILSBZ]{3,})/i);
+    if (match) {
+      return `${normalizeOcrDigits(match[1])}${match[2].toUpperCase()}${normalizeOcrDigits(match[3])}-${normalizeOcrDigits(match[4])}`;
+    }
+  }
+
+  // Fall back to the serial at the lower-left corner, e.g. N3A568591A.
+  // Focused OCR commonly inserts spaces or mistakes 0/1/2/5/8 for letters.
+  for (const line of compactLines) {
+    const match = line.match(/N([1-5])([A-Z])([0-9OQILSBZ]{5,})([A-Z])/i);
+    if (match) {
+      return `N${match[1]}${match[2].toUpperCase()}${normalizeOcrDigits(match[3])}${match[4].toUpperCase()}`;
+    }
+  }
+
+  return '';
+}
+
+function normalizeOcrDigits(value: string) {
+  return value
+    .toUpperCase()
+    .replace(/[OQ]/g, '0')
+    .replace(/[IL]/g, '1')
+    .replace(/Z/g, '2')
+    .replace(/S/g, '5')
+    .replace(/B/g, '8');
+}
+
+function hasAllRequiredFields(result: JlptOcrResult) {
+  return Boolean(
+    result.holderName
+    && result.dateOfBirth
+    && result.level
+    && result.certificateCode,
+  );
 }
 
 function findFirstMatch(text: string, patterns: RegExp[]) {
@@ -219,9 +268,9 @@ function normalizeDate(value: string) {
  * We crop each zone independently so Tesseract processes smaller, cleaner
  * images rather than the full noisy page.
  */
-async function createOcrInputs(file: File): Promise<OcrInput[]> {
+async function createOcrPasses(file: File): Promise<OcrPass[]> {
   if (typeof document === 'undefined' || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
-    return [file];
+    return [{ input: file, pageSegMode: PSM.SPARSE_TEXT }];
   }
 
   const url = URL.createObjectURL(file);
@@ -229,18 +278,41 @@ async function createOcrInputs(file: File): Promise<OcrInput[]> {
     const image = await loadImage(url);
     const width = image.naturalWidth || image.width;
     const height = image.naturalHeight || image.height;
-    if (!width || !height) return [file];
+    if (!width || !height) return [{ input: file, pageSegMode: PSM.SPARSE_TEXT }];
 
     return [
-      // Zone 1 – Name + DOB + Level text area (middle section)
-      cropImage(image, width, height, 0.18, 0.22, 0.64, 0.48),
-      // Zone 2 – Bottom strip with certificate codes
-      cropImage(image, width, height, 0.05, 0.82, 0.90, 0.18),
-      // Full page as fallback
-      file,
+      // The large N1-N5 badge is above the old 22%-high crop and therefore
+      // needs its own pass. SINGLE_WORD prevents the guilloche background and
+      // Japanese heading from competing with the two-character level. RAW_LINE
+      // works better here because the large serif glyphs have a wide gap.
+      {
+        input: cropImage(image, width, height, 0.40, 0.06, 0.20, 0.09, { contrast: 1.6 }),
+        pageSegMode: PSM.RAW_LINE,
+        characterWhitelist: 'N12345',
+      },
+      // Name + date of birth block.
+      {
+        input: cropImage(image, width, height, 0.08, 0.22, 0.72, 0.25, { contrast: 1.5 }),
+        pageSegMode: PSM.SPARSE_TEXT,
+      },
+      // Registration number at the lower-right corner.
+      {
+        input: cropImage(image, width, height, 0.71875, 0.9335, 0.229, 0.04, { contrast: 1.7 }),
+        pageSegMode: PSM.SINGLE_LINE,
+        characterWhitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
+      },
+      // Serial number at the lower-left corner, used if the registration
+      // number cannot be read.
+      {
+        input: cropImage(image, width, height, 0.0415, 0.9335, 0.167, 0.04, { contrast: 1.7 }),
+        pageSegMode: PSM.SINGLE_LINE,
+        characterWhitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
+      },
+      // Full page only when one of the four required fields is still missing.
+      { input: file, pageSegMode: PSM.SPARSE_TEXT, fallback: true },
     ];
   } catch {
-    return [file];
+    return [{ input: file, pageSegMode: PSM.SPARSE_TEXT }];
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -257,6 +329,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 
 interface CropOptions {
   contrast?: number;
+  threshold?: number;
 }
 
 function cropImage(
@@ -285,5 +358,29 @@ function cropImage(
   context.filter = `grayscale(1) contrast(${contrast})`;
   context.drawImage(image, sourceLeft, sourceTop, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
   context.filter = 'none';
+  if (options?.threshold !== undefined) {
+    applyBinaryThreshold(context, canvas.width, canvas.height, options.threshold);
+  }
   return canvas;
+}
+
+function applyBinaryThreshold(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  threshold: number,
+) {
+  const imageData = context.getImageData(0, 0, width, height);
+  for (let index = 0; index < imageData.data.length; index += 4) {
+    const luminance = (
+      imageData.data[index] * 0.299
+      + imageData.data[index + 1] * 0.587
+      + imageData.data[index + 2] * 0.114
+    );
+    const value = luminance < threshold ? 0 : 255;
+    imageData.data[index] = value;
+    imageData.data[index + 1] = value;
+    imageData.data[index + 2] = value;
+  }
+  context.putImageData(imageData, 0, 0);
 }
