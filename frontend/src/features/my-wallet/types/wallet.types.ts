@@ -98,4 +98,5 @@ export type CreateWithdrawalPayload = {
   bankAccount?: BankAccountPayload;
   otpCode: string;
   saveAccount: boolean;
+  bankQrDataUrl: string;
 };

@@ -1,537 +1,604 @@
-import {useEffect, useState} from "react";
+import { useEffect, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  Grid,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import VerifiedUserOutlinedIcon from '@mui/icons-material/VerifiedUserOutlined';
+import { PageHeader } from '../../shared/components/PageHeader/PageHeader';
+import { LoadingState } from '../../shared/components/LoadingState/LoadingState';
+import AvatarUpload from '../../shared/components/AvatarUpload/AvatarUpload';
+import {
+  avatarUploadErrorMessage,
+  confirmTeacherPhoneVerification,
+  getMyTeacherProfile,
+  requestTeacherPhoneVerification,
+  updateMyTeacherProfile,
+  uploadAvatar,
+} from './profileApi';
+import { resolvePublicAssetUrl } from '../../shared/utils/assetUtils';
+import { PHONE_PATTERN, sanitizeOtpInput, sanitizePhoneInput } from './phoneValidation';
 
-import {Alert, Box, Button, Card, CardContent, Snackbar, TextField, Stack,} from "@mui/material";
+const JLPT_LEVELS = [
+  { level: 'N5', label: 'N5 • 初級' },
+  { level: 'N4', label: 'N4 • 初中級' },
+  { level: 'N3', label: 'N3 • 中級' },
+  { level: 'N2', label: 'N2 • 準上級' },
+  { level: 'N1', label: 'N1 • 上級' },
+];
 
-import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
-import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
+interface TeacherProfileForm {
+  avatarUrl: string;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  displayName: string;
+  jlptGoal: string;
+  bio: string;
+}
 
-import {PageHeader} from "../../shared/components/PageHeader/PageHeader";
-import {LoadingState} from "../../shared/components/LoadingState/LoadingState";
-import AvatarUpload from "../../shared/components/AvatarUpload/AvatarUpload";
-
-import {avatarUploadErrorMessage, confirmTeacherPhoneVerification, getMyTeacherProfile, requestTeacherPhoneVerification, updateMyTeacherProfile, uploadAvatar} from "./profileApi";
-import {resolvePublicAssetUrl} from "../../shared/utils/assetUtils";
-import {PHONE_PATTERN, sanitizeOtpInput, sanitizePhoneInput} from "./phoneValidation";
+const EMPTY_FORM: TeacherProfileForm = {
+  avatarUrl: '',
+  fullName: '',
+  email: '',
+  phoneNumber: '',
+  displayName: '',
+  jlptGoal: '',
+  bio: '',
+};
 
 export default function TeacherProfilePage() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
+  const [confirmingPhoneOtp, setConfirmingPhoneOtp] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error',
+  });
+  const [errors, setErrors] = useState({ fullName: '', phoneNumber: '' });
+  const [form, setForm] = useState<TeacherProfileForm>(EMPTY_FORM);
+  const [initialForm, setInitialForm] = useState<TeacherProfileForm>(EMPTY_FORM);
 
-    const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    void loadProfile();
+  }, []);
 
-    const [saving, setSaving] = useState(false);
-    const [phoneVerified, setPhoneVerified] = useState(false);
-    const [phoneCode, setPhoneCode] = useState("");
-    const [phoneOtpSent, setPhoneOtpSent] = useState(false);
-    const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
-    const [confirmingPhoneOtp, setConfirmingPhoneOtp] = useState(false);
-    const [initialPhoneNumber, setInitialPhoneNumber] = useState("");
+  async function loadProfile() {
+    try {
+      const profile = await getMyTeacherProfile();
+      const profileData: TeacherProfileForm = {
+        avatarUrl: profile.avatarUrl ?? '',
+        fullName: profile.fullName ?? '',
+        email: profile.email ?? '',
+        phoneNumber: profile.phoneNumber ?? '',
+        displayName: profile.displayName ?? '',
+        jlptGoal: profile.jlptGoal ?? '',
+        bio: profile.bio ?? '',
+      };
+      setForm(profileData);
+      setInitialForm(profileData);
+      setPhoneVerified(profile.phoneVerified === true);
+      setPhoneCode('');
+      setPhoneOtpSent(false);
+    } catch (error) {
+      console.error(error);
+      setSnackbar({
+        open: true,
+        message: 'Không thể tải hồ sơ. Vui lòng thử lại.',
+        severity: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
 
-    const [snackbar, setSnackbar] = useState({
-        open: false,
-        message: "",
-        severity: "success" as "success" | "error",
-    });
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
-    const [errors, setErrors] = useState({
-        fullName: "",
-        phoneNumber: "",
-    });
+  function validate() {
+    const nextErrors = { fullName: '', phoneNumber: '' };
+    let valid = true;
+    if (!form.fullName.trim()) {
+      nextErrors.fullName = 'Vui lòng nhập họ và tên.';
+      valid = false;
+    }
+    if (form.phoneNumber && !PHONE_PATTERN.test(form.phoneNumber)) {
+      nextErrors.phoneNumber = 'Số điện thoại không hợp lệ.';
+      valid = false;
+    }
+    setErrors(nextErrors);
+    return valid;
+  }
 
-    const [form, setForm] = useState({
-
-        avatarUrl: "",
-
-        fullName: "",
-
-        email: "",
-
-        phoneNumber: "",
-
-        displayName: "",
-
-        jlptGoal: "",
-
-        bio: "",
-
-    });
-
-    useEffect(() => {
-
-        loadProfile();
-
-    }, []);
-
-    async function loadProfile() {
-
-        try {
-
-            const profile = await getMyTeacherProfile();
-
-            setForm({
-
-                avatarUrl: profile.avatarUrl ?? "",
-
-                fullName: profile.fullName ?? "",
-
-                email: profile.email ?? "",
-
-                phoneNumber: profile.phoneNumber ?? "",
-
-                displayName: profile.displayName ?? "",
-
-                jlptGoal: profile.jlptGoal ?? "",
-
-                bio: profile.bio ?? "",
-
-            });
-            setPhoneVerified(profile.phoneVerified === true);
-            setInitialPhoneNumber(profile.phoneNumber ?? "");
-            setPhoneCode("");
-            setPhoneOtpSent(false);
-
-        } catch (error) {
-
-            console.error(error);
-
-            setSnackbar({
-
-                open: true,
-
-                message: "Không thể tải hồ sơ. Vui lòng thử lại.",
-
-                severity: "error",
-
-            });
-
-        } finally {
-
-            setLoading(false);
-
-        }
-
+  async function handleSave() {
+    if (!validate()) return;
+    if (!phoneVerified && form.phoneNumber !== initialForm.phoneNumber) {
+      setSnackbar({
+        open: true,
+        message: 'Hãy xác thực số điện thoại bằng mã SMS trước khi lưu.',
+        severity: 'error',
+      });
+      return;
     }
 
-    function validate() {
+    try {
+      setSaving(true);
+      await updateMyTeacherProfile({
+        fullName: form.fullName,
+        phoneNumber: form.phoneNumber || null,
+        displayName: form.displayName,
+        jlptGoal: form.jlptGoal,
+        bio: form.bio,
+      });
+      await loadProfile();
+      setSnackbar({ open: true, message: 'Cập nhật hồ sơ thành công.', severity: 'success' });
+    } catch (error: any) {
+      console.error(error);
+      const response = error.response?.data;
+      if (response?.messageCode === 'MSG-PRO-002') {
+        setErrors((current) => ({ ...current, phoneNumber: response.message }));
+      }
+      setSnackbar({
+        open: true,
+        message: response?.message ?? 'Không thể cập nhật hồ sơ. Vui lòng thử lại.',
+        severity: 'error',
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
 
-        const newErrors = {
+  function validatePhone() {
+    if (!PHONE_PATTERN.test(form.phoneNumber)) {
+      setErrors((current) => ({ ...current, phoneNumber: 'Số điện thoại không hợp lệ.' }));
+      return false;
+    }
+    return true;
+  }
 
-            fullName: "",
+  async function handleRequestPhoneOtp() {
+    if (phoneVerified || !validatePhone()) return;
+    try {
+      setSendingPhoneOtp(true);
+      await requestTeacherPhoneVerification(form.phoneNumber);
+      setPhoneOtpSent(true);
+      setSnackbar({ open: true, message: 'Đã gửi mã xác thực SMS.', severity: 'success' });
+    } catch (error: any) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message ?? 'Không thể gửi mã SMS.',
+        severity: 'error',
+      });
+    } finally {
+      setSendingPhoneOtp(false);
+    }
+  }
 
-            phoneNumber: "",
+  async function handleConfirmPhoneOtp() {
+    if (phoneVerified || !validatePhone() || !/^\d{6}$/.test(phoneCode)) {
+      setSnackbar({ open: true, message: 'Mã xác thực phải gồm 6 chữ số.', severity: 'error' });
+      return;
+    }
+    try {
+      setConfirmingPhoneOtp(true);
+      await confirmTeacherPhoneVerification(form.phoneNumber, phoneCode);
+      await loadProfile();
+      setSnackbar({
+        open: true,
+        message: 'Số điện thoại đã được xác thực và khóa thay đổi.',
+        severity: 'success',
+      });
+    } catch (error: any) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message ?? 'Mã xác thực không hợp lệ.',
+        severity: 'error',
+      });
+    } finally {
+      setConfirmingPhoneOtp(false);
+    }
+  }
 
-        };
+  function handleChange(field: keyof TeacherProfileForm) {
+    return (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = field === 'phoneNumber'
+        ? sanitizePhoneInput(event.target.value)
+        : event.target.value;
+      setForm((current) => ({ ...current, [field]: value }));
+      if (field === 'fullName') {
+        setErrors((current) => ({ ...current, fullName: '' }));
+      }
+      if (field === 'phoneNumber') {
+        setErrors((current) => ({ ...current, phoneNumber: '' }));
+      }
+    };
+  }
 
-        let valid = true;
-
-        if (!form.fullName.trim()) {
-
-            newErrors.fullName = "Vui lòng nhập họ và tên.";
-
-            valid = false;
-
-        }
-
-        if (!PHONE_PATTERN.test(form.phoneNumber)) {
-
-            newErrors.phoneNumber = "Số điện thoại không hợp lệ.";
-
-            valid = false;
-
-        }
-
-        setErrors(newErrors);
-
-        return valid;
-
+  async function handleAvatar(file: File) {
+    if (file.size > 2 * 1024 * 1024) {
+      setSnackbar({ open: true, message: 'Dung lượng ảnh không được vượt quá 2 MB.', severity: 'error' });
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setSnackbar({
+        open: true,
+        message: 'Định dạng không hợp lệ. Chỉ hỗ trợ ảnh JPEG, PNG và WebP.',
+        severity: 'error',
+      });
+      return;
     }
 
-    async function handleSave() {
-
-        if (!validate()) {
-
-            return;
-
-        }
-
-        if (!phoneVerified && form.phoneNumber !== initialPhoneNumber) {
-            setSnackbar({ open: true, message: "Hãy xác thực số điện thoại bằng mã SMS trước khi lưu.", severity: "error" });
-            return;
-        }
-
-        try {
-
-            setSaving(true);
-
-            await updateMyTeacherProfile({
-
-                fullName: form.fullName,
-
-                phoneNumber: form.phoneNumber,
-
-                displayName: form.displayName,
-
-                jlptGoal: form.jlptGoal,
-
-                bio: form.bio,
-
-            });
-
-            await loadProfile();
-
-            setSnackbar({
-
-                open: true,
-
-                message: "Cập nhật hồ sơ thành công.",
-
-                severity: "success",
-
-            });
-
-        } catch (error: any) {
-
-            console.error(error);
-
-            const response = error.response?.data;
-
-            if (response?.messageCode === "MSG-PRO-002") {
-
-                setErrors(prev => ({
-
-                    ...prev,
-
-                    phoneNumber: response.message,
-
-                }));
-
-            }
-
-            setSnackbar({
-
-                open: true,
-
-                message: response?.message ?? "Không thể cập nhật hồ sơ. Vui lòng thử lại.",
-
-                severity: "error",
-
-            });
-
-        } finally {
-
-            setSaving(false);
-
-        }
-
+    const previousAvatarUrl = form.avatarUrl;
+    const previewUrl = URL.createObjectURL(file);
+    setForm((current) => ({ ...current, avatarUrl: previewUrl }));
+    try {
+      setSaving(true);
+      const serverUrl = await uploadAvatar(file);
+      setForm((current) => ({ ...current, avatarUrl: serverUrl }));
+      setInitialForm((current) => ({ ...current, avatarUrl: serverUrl }));
+      setSnackbar({ open: true, message: 'Cập nhật ảnh đại diện thành công.', severity: 'success' });
+    } catch (error) {
+      console.error('Avatar upload failed:', error);
+      setForm((current) => ({ ...current, avatarUrl: previousAvatarUrl }));
+      setSnackbar({ open: true, message: avatarUploadErrorMessage(error), severity: 'error' });
+    } finally {
+      setSaving(false);
+      URL.revokeObjectURL(previewUrl);
     }
+  }
 
-    function validatePhone() {
-        if (!PHONE_PATTERN.test(form.phoneNumber)) {
-            setErrors(prev => ({ ...prev, phoneNumber: "Số điện thoại không hợp lệ." }));
-            return false;
-        }
-        return true;
-    }
+  function handleReset() {
+    setForm(initialForm);
+    setPhoneCode('');
+    setPhoneOtpSent(false);
+    setErrors({ fullName: '', phoneNumber: '' });
+  }
 
-    async function handleRequestPhoneOtp() {
-        if (phoneVerified || !validatePhone()) return;
-        try {
-            setSendingPhoneOtp(true);
-            await requestTeacherPhoneVerification(form.phoneNumber);
-            setPhoneOtpSent(true);
-            setSnackbar({ open: true, message: "Đã gửi mã xác thực SMS.", severity: "success" });
-        } catch (error: any) {
-            setSnackbar({ open: true, message: error.response?.data?.message ?? "Không thể gửi mã SMS.", severity: "error" });
-        } finally {
-            setSendingPhoneOtp(false);
-        }
-    }
+  if (loading) return <LoadingState fullHeight message="Đang tải hồ sơ..." />;
 
-    async function handleConfirmPhoneOtp() {
-        if (phoneVerified || !validatePhone() || !/^\d{6}$/.test(phoneCode)) {
-            setSnackbar({ open: true, message: "Mã xác thực phải gồm 6 chữ số.", severity: "error" });
-            return;
-        }
-        try {
-            setConfirmingPhoneOtp(true);
-            await confirmTeacherPhoneVerification(form.phoneNumber, phoneCode);
-            await loadProfile();
-            setSnackbar({ open: true, message: "Số điện thoại đã được xác thực và khóa thay đổi.", severity: "success" });
-        } catch (error: any) {
-            setSnackbar({ open: true, message: error.response?.data?.message ?? "Mã xác thực không hợp lệ.", severity: "error" });
-        } finally {
-            setConfirmingPhoneOtp(false);
-        }
-    }
+  return (
+    <>
+      <Box
+        component="main"
+        sx={{
+          bgcolor: '#FAF9F6',
+          minHeight: '100vh',
+          py: { xs: 3, md: 5 },
+          px: { xs: 2, sm: 3 },
+        }}
+      >
+        <Box sx={{ maxWidth: 1280, mx: 'auto', width: '100%', position: 'relative' }}>
+          <Typography
+            variant="h1"
+            aria-hidden="true"
+            sx={{
+              position: 'absolute',
+              top: -40,
+              right: -20,
+              fontSize: '15rem',
+              fontWeight: 900,
+              color: 'rgba(0,0,0,0.025)',
+              userSelect: 'none',
+              pointerEvents: 'none',
+              zIndex: 0,
+              writingMode: 'vertical-rl',
+            }}
+          >
+            講師
+          </Typography>
 
-    function handleChange(field: keyof typeof form) {
+          <PageHeader
+            title="Hồ sơ giảng viên"
+            subtitle="講師プロフィール"
+            watermark="講師"
+            breadcrumbs={[{ label: 'Giảng viên' }, { label: 'Hồ sơ' }]}
+          />
+          <Typography color="text.secondary" sx={{ mb: 4, mt: -2 }}>
+            Cập nhật thông tin tài khoản và hồ sơ chuyên môn của bạn.
+          </Typography>
 
-        return (
-            event: React.ChangeEvent<HTMLInputElement>
-        ) => {
-
-            const value = field === "phoneNumber"
-                ? sanitizePhoneInput(event.target.value)
-                : event.target.value;
-
-            setForm({
-
-                ...form,
-
-                [field]: value,
-
-            });
-
-            if (field === "fullName") {
-
-                setErrors(prev => ({
-
-                    ...prev,
-
-                    fullName: "",
-
-                }));
-
-            }
-
-            if (field === "phoneNumber") {
-
-                setErrors(prev => ({
-
-                    ...prev,
-
-                    phoneNumber: "",
-
-                }));
-
-            }
-
-        };
-
-    }
-
-    async function handleAvatar(file: File) {
-        if (file.size > 2 * 1024 * 1024) {
-            setSnackbar({ open: true, message: "Dung lượng ảnh không được vượt quá 2 MB.", severity: "error" });
-            return;
-        }
-
-        const validTypes = ["image/jpeg", "image/png", "image/webp"];
-        if (!validTypes.includes(file.type)) {
-            setSnackbar({ open: true, message: "Định dạng không hợp lệ. Chỉ hỗ trợ ảnh JPEG, PNG và WebP.", severity: "error" });
-            return;
-        }
-
-        const previousAvatarUrl = form.avatarUrl;
-        const preview = URL.createObjectURL(file);
-        setForm(prev => ({ ...prev, avatarUrl: preview }));
-
-        try {
-            setSaving(true);
-            const serverUrl = await uploadAvatar(file);
-            setForm(prev => ({ ...prev, avatarUrl: serverUrl }));
-            setSnackbar({ open: true, message: "Cập nhật ảnh đại diện thành công.", severity: "success" });
-        } catch (error) {
-            console.error("Avatar upload failed:", error);
-            setForm(prev => ({ ...prev, avatarUrl: previousAvatarUrl }));
-            setSnackbar({ open: true, message: avatarUploadErrorMessage(error), severity: "error" });
-        } finally {
-            setSaving(false);
-            URL.revokeObjectURL(preview);
-        }
-    }
-
-    if (loading) {
-
-        return (
-
-            <LoadingState
-
-                fullHeight
-
-                message="Đang tải hồ sơ..."
-
-            />
-
-        );
-
-    }
-    return (
-
-        <>
-
+          <Card
+            elevation={0}
+            sx={{
+              position: 'relative',
+              zIndex: 1,
+              borderRadius: 4,
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              bgcolor: '#FFFFFF',
+            }}
+          >
             <Box
-                sx={{
-                    backgroundColor: "#F8FAFC",
-                    minHeight: "100vh",
-                    p: 4,
-                }}
+              sx={{
+                p: { xs: 3, md: 5 },
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'center', sm: 'flex-start' },
+                justifyContent: 'space-between',
+                gap: 3,
+              }}
             >
-
-                <PageHeader
-                    title="Quản lý hồ sơ giảng viên"
-                    breadcrumbs={[
-                        {
-                            label: "Giảng viên",
-                        },
-                        {
-                            label: "Hồ sơ",
-                        },
-                    ]}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  alignItems: 'center',
+                  gap: { xs: 2, sm: 4 },
+                  textAlign: { xs: 'center', sm: 'left' },
+                }}
+              >
+                <AvatarUpload
+                  avatarUrl={resolvePublicAssetUrl(form.avatarUrl) || ''}
+                  onSelect={handleAvatar}
+                  disabled={saving}
+                  size={80}
                 />
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: 'grey.900', mb: 0.5 }}>
+                    {form.displayName || form.fullName || 'Giảng viên ManabiHub'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    {form.email}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: 'grey.600', fontWeight: 700, bgcolor: 'grey.50', px: 1.5, py: 0.5, borderRadius: 1 }}
+                  >
+                    Hồ sơ giảng viên
+                  </Typography>
+                </Box>
+              </Box>
 
-                <Card
-                    elevation={0}
-                    sx={{
-                        maxWidth: 900,
-                        mx: "auto",
-                        borderRadius: 4,
-                        border: "1px solid #E5E7EB",
-                    }}
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'center', sm: 'flex-end' }, gap: 1 }}>
+                <Typography
+                  variant="caption"
+                  sx={{ textTransform: 'uppercase', fontWeight: 700, color: 'grey.500', letterSpacing: 0.5 }}
                 >
-
-                    <CardContent
-                        sx={{
-                            p: 5,
-                        }}
-                    >
-
-                        <AvatarUpload
-                            avatarUrl={resolvePublicAssetUrl(form.avatarUrl) || ""}
-                            onSelect={handleAvatar}
-                            disabled={saving}
-                        />
-
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Họ và tên"
-                            value={form.fullName}
-                            onChange={handleChange("fullName")}
-                            error={!!errors.fullName}
-                            helperText={errors.fullName}
-                        />
-
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Email"
-                            value={form.email}
-                            disabled
-                        />
-
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 2 }}>
-                            <TextField
-                                fullWidth
-                                label="Số điện thoại"
-                                value={form.phoneNumber}
-                                disabled={phoneVerified}
-                                type="tel"
-                                onChange={handleChange("phoneNumber")}
-                                error={!!errors.phoneNumber}
-                                helperText={errors.phoneNumber || (phoneVerified ? "Đã xác thực — không thể thay đổi số điện thoại." : "Bạn cần xác thực số điện thoại bằng SMS.")}
-                                slotProps={{
-                                    ...(phoneVerified ? { input: { endAdornment: <LockOutlinedIcon fontSize="small" /> } } : {}),
-                                    htmlInput: { inputMode: "tel", maxLength: 12, autoComplete: "tel" },
-                                }}
-                            />
-                            {!phoneVerified && (
-                                <Button variant="outlined" onClick={handleRequestPhoneOtp} disabled={saving || sendingPhoneOtp || !form.phoneNumber} sx={{ minWidth: 150, height: 56, whiteSpace: "nowrap" }}>
-                                    {sendingPhoneOtp ? "Đang gửi..." : "Gửi mã SMS"}
-                                </Button>
-                            )}
-                        </Stack>
-                        {!phoneVerified && phoneOtpSent && (
-                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1 }}>
-                                <TextField size="small" label="Mã SMS 6 số" value={phoneCode} onChange={(event) => setPhoneCode(sanitizeOtpInput(event.target.value))} slotProps={{ htmlInput: { inputMode: "numeric", maxLength: 6 } }} />
-                                <Button variant="contained" onClick={handleConfirmPhoneOtp} disabled={confirmingPhoneOtp || phoneCode.length !== 6} startIcon={<VerifiedUserOutlinedIcon />}>
-                                    {confirmingPhoneOtp ? "Đang xác thực..." : "Xác thực"}
-                                </Button>
-                            </Stack>
-                        )}
-
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Tên hiển thị"
-                            value={form.displayName}
-                            onChange={handleChange("displayName")}
-                        />
-
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Mục tiêu JLPT"
-                            value={form.jlptGoal}
-                            onChange={handleChange("jlptGoal")}
-                        />
-
-                        <TextField
-                            fullWidth
-                            margin="normal"
-                            multiline
-                            rows={5}
-                            label="Tiểu sử"
-                            value={form.bio}
-                            onChange={handleChange("bio")}
-                        />
-
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            size="large"
-                            disabled={saving}
-                            startIcon={<SaveOutlinedIcon/>}
-                            sx={{
-                                mt: 4,
-                                height: 52,
-                                borderRadius: 3,
-                                textTransform: "none",
-                                fontWeight: 600,
-                            }}
-                            onClick={handleSave}
-                        >
-
-                            {saving ? "Đang lưu..." : "Lưu thay đổi"}
-
-                        </Button>
-
-                    </CardContent>
-
-                </Card>
-
+                  MỤC TIÊU JLPT
+                </Typography>
+                <Box
+                  sx={{
+                    px: 2.5,
+                    py: 0.75,
+                    bgcolor: '#fee2e2',
+                    color: '#C41E3A',
+                    borderRadius: '9999px',
+                    fontWeight: 800,
+                    fontSize: '1rem',
+                    boxShadow: '0 2px 4px rgba(196, 30, 58, 0.1)',
+                  }}
+                >
+                  {initialForm.jlptGoal || 'Chưa thiết lập'}
+                </Box>
+              </Box>
             </Box>
 
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={3000}
-                onClose={() =>
-                    setSnackbar({
-                        ...snackbar,
-                        open: false,
-                    })
-                }
-                anchorOrigin={{
-                    vertical: "top",
-                    horizontal: "right",
-                }}
-            >
+            <Divider sx={{ mx: { xs: 3, md: 5 }, borderColor: 'grey.100' }} />
 
-                <Alert
-                    severity={snackbar.severity}
-                    variant="filled"
-                    sx={{
-                        width: "100%",
+            <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, gap: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Thông tin giảng viên
+                </Typography>
+                {isDirty && (
+                  <Typography variant="caption" sx={{ color: '#C41E3A', fontWeight: 700, textAlign: 'right' }}>
+                    * BẠN CÓ THAY ĐỔI CHƯA LƯU
+                  </Typography>
+                )}
+              </Box>
+
+              <Grid container spacing={3}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    label="Họ và tên (*)"
+                    value={form.fullName}
+                    onChange={handleChange('fullName')}
+                    error={Boolean(errors.fullName)}
+                    helperText={errors.fullName}
+                    sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    label="Tên hiển thị"
+                    value={form.displayName}
+                    onChange={handleChange('displayName')}
+                    placeholder="Tên hiển thị với học viên..."
+                    sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    label="Email"
+                    value={form.email}
+                    disabled
+                    helperText="Email đăng nhập - Không thể thay đổi"
+                    sx={{ bgcolor: 'grey.50' }}
+                    slotProps={{
+                      input: { startAdornment: <Typography sx={{ mr: 1, opacity: 0.5 }}>🔒</Typography> },
                     }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                    <TextField
+                      fullWidth
+                      label="Số điện thoại"
+                      value={form.phoneNumber}
+                      disabled={phoneVerified}
+                      type="tel"
+                      onChange={handleChange('phoneNumber')}
+                      error={Boolean(errors.phoneNumber)}
+                      helperText={errors.phoneNumber || (phoneVerified
+                        ? 'Đã xác thực — không thể thay đổi số điện thoại.'
+                        : 'Bạn cần xác thực số điện thoại bằng SMS.')}
+                      slotProps={{
+                        ...(phoneVerified ? { input: { endAdornment: <LockOutlinedIcon fontSize="small" /> } } : {}),
+                        htmlInput: { inputMode: 'tel', maxLength: 12, autoComplete: 'tel' },
+                      }}
+                      sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+                    />
+                    {!phoneVerified && (
+                      <Button
+                        variant="outlined"
+                        onClick={handleRequestPhoneOtp}
+                        disabled={saving || sendingPhoneOtp || !form.phoneNumber}
+                        sx={{ minWidth: 150, height: 56, whiteSpace: 'nowrap', borderColor: '#C41E3A', color: '#C41E3A' }}
+                      >
+                        {sendingPhoneOtp ? 'Đang gửi...' : 'Gửi mã SMS'}
+                      </Button>
+                    )}
+                  </Stack>
+                  {!phoneVerified && phoneOtpSent && (
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
+                      <TextField
+                        size="small"
+                        label="Mã SMS 6 số"
+                        value={phoneCode}
+                        onChange={(event) => setPhoneCode(sanitizeOtpInput(event.target.value))}
+                        slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 6 } }}
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={handleConfirmPhoneOtp}
+                        disabled={confirmingPhoneOtp || phoneCode.length !== 6}
+                        startIcon={<VerifiedUserOutlinedIcon />}
+                        sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#a01830' } }}
+                      >
+                        {confirmingPhoneOtp ? 'Đang xác thực...' : 'Xác thực'}
+                      </Button>
+                    </Stack>
+                  )}
+                </Grid>
+              </Grid>
+
+              <Divider sx={{ my: 5 }} />
+
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                Thông tin chuyên môn
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Chọn cấp độ JLPT và giới thiệu ngắn gọn về kinh nghiệm giảng dạy của bạn.
+              </Typography>
+
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+                {JLPT_LEVELS.map(({ level, label }) => {
+                  const selected = form.jlptGoal === level;
+                  return (
+                    <Box
+                      key={level}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={selected}
+                      onClick={() => setForm((current) => ({ ...current, jlptGoal: level }))}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setForm((current) => ({ ...current, jlptGoal: level }));
+                        }
+                      }}
+                      sx={{
+                        px: 4,
+                        py: 2,
+                        borderRadius: 3,
+                        border: '2px solid',
+                        borderColor: selected ? '#C41E3A' : 'grey.200',
+                        bgcolor: selected ? '#fff1f2' : 'transparent',
+                        color: selected ? '#C41E3A' : 'text.secondary',
+                        fontWeight: selected ? 800 : 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': { borderColor: selected ? '#C41E3A' : 'grey.400', transform: 'translateY(-2px)' },
+                        '&:focus-visible': { outline: '3px solid rgba(196, 30, 58, 0.25)', outlineOffset: 2 },
+                      }}
+                    >
+                      {label}
+                    </Box>
+                  );
+                })}
+              </Box>
+
+              <TextField
+                fullWidth
+                multiline
+                minRows={5}
+                label="Tiểu sử giảng viên"
+                value={form.bio}
+                onChange={handleChange('bio')}
+                placeholder="Chia sẻ kinh nghiệm, phương pháp giảng dạy và chuyên môn của bạn..."
+                sx={{ '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#C41E3A' } }}
+              />
+
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 5 }}>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  disabled={saving || !isDirty}
+                  onClick={handleReset}
+                  sx={{
+                    px: 4,
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    color: 'text.secondary',
+                    borderColor: 'grey.300',
+                    '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' },
+                  }}
                 >
+                  Hủy
+                </Button>
+                <Button
+                  variant="contained"
+                  size="large"
+                  disabled={saving || !isDirty}
+                  startIcon={<SaveOutlinedIcon />}
+                  onClick={handleSave}
+                  sx={{
+                    px: 4,
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    bgcolor: '#C41E3A',
+                    '&:hover': { bgcolor: '#a01830' },
+                    '&.Mui-disabled': { bgcolor: 'grey.300', color: 'grey.500' },
+                  }}
+                >
+                  {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+      </Box>
 
-                    {snackbar.message}
-
-                </Alert>
-
-            </Snackbar>
-
-        </>
-
-    );
-
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((current) => ({ ...current, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert severity={snackbar.severity} variant="filled" sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </>
+  );
 }

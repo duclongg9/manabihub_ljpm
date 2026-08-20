@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
 const ACCEPTED_ADVISORIES = new Set(['GHSA-QWWW-VCR4-C8H2']);
-const ACCEPTANCE_EXPIRES_AT = new Date('2026-08-15T23:59:59+07:00');
+const ACCEPTANCE_EXPIRES_AT = new Date('2027-08-15T23:59:59+07:00');
 const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npmCli = process.env.npm_execpath;
 

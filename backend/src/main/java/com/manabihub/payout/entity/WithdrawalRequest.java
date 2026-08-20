@@ -56,6 +56,13 @@ public class WithdrawalRequest {
     @Column(name = "bank_account_snapshot", columnDefinition = "jsonb")
     private BankAccountSnapshot bankAccountSnapshot;
 
+    @JdbcTypeCode(SqlTypes.BINARY)
+    @Column(name = "bank_qr_code", columnDefinition = "bytea")
+    private byte[] bankQrCode;
+
+    @Column(name = "bank_qr_content_type", length = 50)
+    private String bankQrContentType;
+
     @CreationTimestamp
     @Column(name = "requested_at", nullable = false, updatable = false)
     private LocalDateTime requestedAt;

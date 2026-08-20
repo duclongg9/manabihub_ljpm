@@ -38,6 +38,8 @@ public interface PayoutSettlementService {
 
     PayoutProofDownload getManualTransferProof(UUID withdrawalRequestId);
 
+    PayoutProofDownload getBankQrCode(UUID withdrawalRequestId);
+
     record PayoutProofDownload(Resource resource, String fileName, String contentType) {
     }
 }

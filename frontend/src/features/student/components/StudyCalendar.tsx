@@ -10,13 +10,16 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   Menu,
-  MenuItem,
   Paper,
+  Popover,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
@@ -25,6 +28,7 @@ import ArrowForwardIosOutlinedIcon from '@mui/icons-material/ArrowForwardIosOutl
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import FilterListOutlinedIcon from '@mui/icons-material/FilterListOutlined';
@@ -35,6 +39,7 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
   readPlan,
+  STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT,
   STUDY_PLAN_OPEN_SCHEDULE_EVENT,
   STUDY_PLAN_UPDATED_EVENT,
   type StudyCourseOption,
@@ -60,22 +65,18 @@ interface CalendarEvent {
   conflict: boolean;
 }
 
-interface LevelStyle {
-  label: string;
-  color: string;
-  tint: string;
-}
+
 
 const WEEKDAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-const UNASSIGNED_COURSE_KEY = '__unassigned__';
-const LEVEL_STYLES: Record<string, LevelStyle> = {
-  N5: { label: 'N5', color: '#D97706', tint: '#FFF7ED' },
-  N4: { label: 'N4', color: '#2563EB', tint: '#EFF6FF' },
-  N3: { label: 'N3', color: '#2F855A', tint: '#ECFDF3' },
-  N2: { label: 'N2', color: '#7C3AED', tint: '#F5F3FF' },
-  N1: { label: 'N1', color: '#C41E3A', tint: '#FFF1F2' },
-  OTHER: { label: 'Khác', color: '#475467', tint: '#F2F4F7' },
+const LEVEL_COLORS: Record<string, string> = {
+  N5: '#D97706',
+  N4: '#2563EB',
+  N3: '#2F855A',
+  N2: '#9333EA',
+  N1: '#C41E3A',
 };
+const UNASSIGNED_COURSE_KEY = '__unassigned__';
+const MAX_DAY_EVENTS = 2;
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -104,9 +105,9 @@ function slotMinutes(slot: StudySlot) {
   return (hour || 0) * 60 + (minute || 0);
 }
 
-function levelStyle(title?: string) {
-  const level = title?.match(/\bN[1-5]\b/i)?.[0].toUpperCase() ?? 'OTHER';
-  return LEVEL_STYLES[level] ?? LEVEL_STYLES.OTHER;
+function courseColor(title: string) {
+  const match = title.toUpperCase().match(/\bN([1-5])\b/);
+  return match ? LEVEL_COLORS[`N${match[1]}`] : '#64748B';
 }
 
 function buildVisibleDates(cursor: Date, view: CalendarView) {
@@ -130,7 +131,7 @@ function currentWeekDates(now = new Date()) {
   return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
 }
 
-function buildEvents(slots: StudySlot[], dates: Date[], courses: StudyCourseOption[]) {
+function buildEvents(slots: StudySlot[], dates: Date[], courses: StudyCourseOption[], colors: Record<string, string>) {
   if (dates.length === 0) return [];
   const first = dates[0];
   const last = dates[dates.length - 1];
@@ -147,7 +148,7 @@ function buildEvents(slots: StudySlot[], dates: Date[], courses: StudyCourseOpti
         slot,
         date: eventDate,
         dateKey: dateKey(eventDate),
-        color: levelStyle(slot.courseTitle).color,
+        color: colors[slotCourseKey(slot)] || '#64748B',
         startMinutes,
         endMinutes: startMinutes + slot.durationMinutes,
         conflict: false,
@@ -180,8 +181,8 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<Record<string, boolean>>({});
-  const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
-  const [filterSearch, setFilterSearch] = useState('');
+  const [courseFilterAnchorEl, setCourseFilterAnchorEl] = useState<HTMLElement | null>(null);
+  const [courseSearch, setCourseSearch] = useState('');
   const [pinnedCourseIds, setPinnedCourseIds] = useState(readPinnedCourseIds);
 
   useEffect(() => {
@@ -241,25 +242,24 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
     selectionInitialized.current = true;
   }, [courseOptions, pinnedCourseIds, thisWeekCourseIds]);
 
+  const colors = useMemo(() => Object.fromEntries(
+    courseOptions.map((option) => [option.id, courseColor(option.title)]),
+  ), [courseOptions]);
+  const filteredCourseOptions = courseOptions.filter((option) => option.title.toLocaleLowerCase('vi-VN').includes(courseSearch.trim().toLocaleLowerCase('vi-VN')));
+  const levelLegend = ['N5', 'N4', 'N3', 'N2', 'N1'].filter((level) => courseOptions.some((option) => new RegExp(`\\b${level}\\b`, 'i').test(option.title)));
+  const selectedCourseCount = courseOptions.filter((option) => selectedCourses[option.id] !== false).length;
   const visibleDates = useMemo(() => buildVisibleDates(cursor, view), [cursor, view]);
-  const events = useMemo(() => buildEvents(plan.slots, visibleDates, courses), [courses, plan.slots, visibleDates]);
+  const events = useMemo(() => buildEvents(plan.slots, visibleDates, courses, colors), [courses, plan.slots, visibleDates, colors]);
   const filteredEvents = events.filter((event) => selectedCourses[slotCourseKey(event.slot)] === true);
-  const selectedCount = courseOptions.filter((course) => selectedCourses[course.id] === true).length;
   const selectedDayKey = selectedDay ? dateKey(selectedDay) : null;
   const selectedDayEvents = filteredEvents.filter((event) => event.dateKey === selectedDayKey)
     .sort((first, second) => first.startMinutes - second.startMinutes);
-  const searchedOptions = courseOptions.filter((course) => course.title.toLocaleLowerCase('vi').includes(filterSearch.trim().toLocaleLowerCase('vi')));
-  const onlyWeekSelected = thisWeekCourseIds.size > 0
-    && courseOptions.every((course) => selectedCourses[course.id] === thisWeekCourseIds.has(course.id));
   const title = view === 'day'
     ? formatDate(cursor, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : view === 'week'
       ? `${formatDate(visibleDates[0], { day: 'numeric', month: 'short' })} – ${formatDate(visibleDates[6], { day: 'numeric', month: 'short', year: 'numeric' })}`
       : formatDate(cursor, { month: 'long', year: 'numeric' });
 
-  const setOnlyCourses = (ids: Set<string>) => {
-    setSelectedCourses(Object.fromEntries(courseOptions.map((course) => [course.id, ids.has(course.id)])));
-  };
 
   const moveCursor = (amount: number) => {
     const next = new Date(cursor);
@@ -269,9 +269,15 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
   };
 
   const openSchedule = () => {
-    const dayOfWeek = selectedDay?.getDay() ?? new Date().getDay();
+    const targetDay = selectedDay;
+    const dayOfWeek = targetDay?.getDay() ?? new Date().getDay();
     setSelectedDay(null);
-    window.dispatchEvent(new CustomEvent(STUDY_PLAN_OPEN_SCHEDULE_EVENT, { detail: { dayOfWeek } }));
+    window.dispatchEvent(new CustomEvent(STUDY_PLAN_OPEN_SCHEDULE_EVENT, {
+      detail: {
+        dayOfWeek,
+        dateKey: targetDay ? dateKey(targetDay) : undefined,
+      },
+    }));
   };
 
   const editSchedule = (event: CalendarEvent) => {
@@ -285,32 +291,35 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
     navigate(ROUTES.STUDENT.COURSE_LEARN(event.slot.courseId));
   };
 
-  const renderEvent = (event: CalendarEvent) => {
-    const style = levelStyle(event.slot.courseTitle);
-    return (
-      <Box
-        key={event.key}
-        data-testid={`calendar-event-${event.key}`}
-        sx={{
-          minWidth: 0,
-          px: 0.65,
-          py: 0.45,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 0.5,
-          borderRadius: 999,
-          bgcolor: style.tint,
-          border: `1px solid ${style.color}35`,
-          color: style.color,
-        }}
-      >
-        <Box aria-hidden="true" sx={{ width: 7, height: 7, flexShrink: 0, borderRadius: '50%', bgcolor: style.color }} />
-        <Typography variant="caption" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'inherit', fontWeight: 900, lineHeight: 1.2 }}>
-          {event.slot.startTime} {event.slot.courseTitle || event.slot.skill} {event.conflict && '⚠'}
-        </Typography>
-      </Box>
-    );
-  };
+  const renderEvent = (event: CalendarEvent, compact = false) => (
+    <Box
+      key={event.key}
+      data-testid={`calendar-event-${event.key}`}
+      sx={{
+        px: compact ? 0.65 : 0.75,
+        py: compact ? 0.35 : 0.5,
+        borderRadius: compact ? 999 : 1,
+        bgcolor: `${event.color}18`,
+        border: `1px solid ${event.color}35`,
+        borderLeft: compact ? undefined : `3px solid ${event.color}`,
+        minWidth: 0,
+        display: compact ? 'flex' : 'block',
+        alignItems: compact ? 'center' : undefined,
+        gap: compact ? 0.5 : undefined,
+      }}
+    >
+      {compact && <Box aria-hidden="true" sx={{ width: 7, height: 7, flexShrink: 0, borderRadius: '50%', bgcolor: event.color }} />}
+      <Typography variant="caption" sx={{ display: 'block', color: event.color, fontWeight: 900, lineHeight: 1.2 }}>
+        {event.slot.startTime} {event.conflict && '⚠'}
+      </Typography>
+      {!compact && <Typography variant="caption" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#344054' }}>
+        {event.slot.courseTitle || event.slot.skill}
+      </Typography>}
+      {compact && <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#344054', fontWeight: 700 }}>
+        {event.slot.courseTitle || event.slot.skill}
+      </Typography>}
+    </Box>
+  );
 
   return (
     <Paper data-testid="study-calendar" elevation={0} sx={{ p: { xs: 1.5, sm: 2.5 }, border: '1px solid #E4E7EC', borderRadius: '8px', bgcolor: '#fff' }}>
@@ -322,130 +331,150 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
             <Typography variant="caption" color="text.secondary">Lịch chỉ xuất hiện trong thời gian bạn còn quyền truy cập khóa học.</Typography>
           </Box>
         </Stack>
-        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-          {(['month', 'week', 'day'] as const).map((option) => (
-            <Button key={option} size="small" variant={view === option ? 'contained' : 'outlined'} onClick={() => setView(option)} sx={{ minWidth: option === 'month' ? 64 : 56, textTransform: 'none', bgcolor: view === option ? '#C41E3A' : undefined }}>
-              {option === 'month' ? 'Tháng' : option === 'week' ? 'Tuần' : 'Hôm nay'}
-            </Button>
-          ))}
-          <IconButton size="small" aria-label={expanded ? 'Thu gọn lịch học' : 'Mở rộng lịch học'} onClick={() => setExpanded((current) => !current)} sx={{ ml: 0.5, color: '#667085' }}>
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+          <Button size="small" variant="outlined" startIcon={<EditCalendarOutlinedIcon />} onClick={() => window.dispatchEvent(new Event(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT))} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Chỉnh lịch tổng</Button>
+          <Button size="small" variant="contained" startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none', bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>Thêm suất học</Button>
+          <IconButton
+            size="small"
+            aria-label={expanded ? 'Thu gọn lịch học' : 'Mở rộng lịch học'}
+            onClick={() => setExpanded((current) => !current)}
+            sx={{ ml: 0.5, color: '#667085' }}
+          >
             {expanded ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
           </IconButton>
         </Stack>
       </Stack>
 
       {expanded && <>
-        <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1, mt: 2 }}>
-          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-            <IconButton size="small" aria-label="Lịch trước" onClick={() => moveCursor(-1)}><ArrowBackIosNewOutlinedIcon sx={{ fontSize: 15 }} /></IconButton>
-            <Typography variant="subtitle1" sx={{ minWidth: 190, textAlign: 'center', fontWeight: 900, textTransform: 'capitalize' }}>{title}</Typography>
-            <IconButton size="small" aria-label="Lịch sau" onClick={() => moveCursor(1)}><ArrowForwardIosOutlinedIcon sx={{ fontSize: 15 }} /></IconButton>
-            <Button size="small" onClick={() => { setCursor(startOfDay(new Date())); setView('day'); }} sx={{ textTransform: 'none', ml: 0.5 }}>Hôm nay</Button>
-          </Stack>
-          <Button size="small" variant="outlined" startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Thêm suất học</Button>
+      <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1, mt: 2 }}>
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+          <IconButton size="small" aria-label="Lịch trước" onClick={() => moveCursor(-1)}><ArrowBackIosNewOutlinedIcon sx={{ fontSize: 15 }} /></IconButton>
+          <Typography variant="subtitle1" sx={{ minWidth: { xs: 0, sm: 190 }, flex: { xs: 1, sm: 'initial' }, textAlign: 'center', fontWeight: 900, textTransform: 'capitalize' }}>{title}</Typography>
+          <IconButton size="small" aria-label="Lịch sau" onClick={() => moveCursor(1)}><ArrowForwardIosOutlinedIcon sx={{ fontSize: 15 }} /></IconButton>
+          <Button size="small" onClick={() => { setCursor(startOfDay(new Date())); setView('day'); }} sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}>Hôm nay</Button>
         </Stack>
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          color="primary"
+          value={view}
+          onChange={(_, nextView: CalendarView | null) => { if (nextView) setView(nextView); }}
+          aria-label="Chế độ xem lịch"
+          sx={{ alignSelf: { xs: 'stretch', sm: 'auto' }, '& .MuiToggleButton-root': { textTransform: 'none', px: 1.5, borderColor: '#CBD5E1', color: '#475569' }, '& .Mui-selected': { color: '#fff !important', bgcolor: '#C41E3A !important' } }}
+        >
+          <ToggleButton value="month">Tháng</ToggleButton>
+          <ToggleButton value="week">Tuần</ToggleButton>
+          <ToggleButton value="day">Ngày</ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
 
-        {courseOptions.length > 0 && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5, alignItems: { sm: 'center' } }}>
-          <Button
-            variant="outlined"
-            startIcon={<FilterListOutlinedIcon />}
-            onClick={(event) => setFilterAnchor(event.currentTarget)}
-            aria-haspopup="menu"
-            aria-expanded={Boolean(filterAnchor)}
-            sx={{ maxWidth: '100%', justifyContent: 'flex-start', textTransform: 'none', borderColor: '#CBD5E1', color: '#344054', fontWeight: 800 }}
+      {courseOptions.length > 0 && (
+        <>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5, alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
+            <Button
+              variant="outlined"
+              onClick={(event) => setCourseFilterAnchorEl(event.currentTarget)}
+              aria-haspopup="dialog"
+              aria-expanded={Boolean(courseFilterAnchorEl)}
+              data-testid="calendar-course-filter"
+              sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#334155', justifyContent: 'space-between', minWidth: { sm: 260 } }}
+            >
+              📚 Lọc khóa học ({selectedCourseCount}/{courseOptions.length}) ▾
+            </Button>
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mr: 0.25 }}>Màu theo cấp độ:</Typography>
+              {levelLegend.map((level) => <Chip key={level} size="small" label={level} sx={{ height: 22, color: LEVEL_COLORS[level], bgcolor: `${LEVEL_COLORS[level]}15`, border: `1px solid ${LEVEL_COLORS[level]}45`, fontWeight: 800 }} />)}
+            </Stack>
+          </Stack>
+          <Popover
+            open={Boolean(courseFilterAnchorEl)}
+            anchorEl={courseFilterAnchorEl}
+            onClose={() => { setCourseFilterAnchorEl(null); setCourseSearch(''); }}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            slotProps={{ paper: { sx: { p: 1.5, width: { xs: 300, sm: 380 }, maxWidth: 'calc(100vw - 32px)' } } }}
           >
-            Khóa học hiển thị ({selectedCount}/{courseOptions.length}) ▾
-          </Button>
-          <Button
-            size="small"
-            variant={onlyWeekSelected ? 'contained' : 'outlined'}
-            onClick={() => setOnlyCourses(thisWeekCourseIds)}
-            sx={{ textTransform: 'none', borderColor: '#E5484D', color: onlyWeekSelected ? '#fff' : '#C41E3A', bgcolor: onlyWeekSelected ? '#C41E3A' : undefined }}
-          >
-            Chỉ hiện khóa có lịch tuần này
-          </Button>
-          <Menu
-            anchorEl={filterAnchor}
-            open={Boolean(filterAnchor)}
-            onClose={() => setFilterAnchor(null)}
-            slotProps={{ paper: { sx: { width: { xs: 'calc(100vw - 32px)', sm: 390 }, maxWidth: 'calc(100vw - 32px)', maxHeight: 480, p: 1 } } }}
-          >
-            <Box sx={{ px: 1, pt: 0.5, pb: 1 }}>
-              <TextField
-                autoFocus
-                fullWidth
-                size="small"
-                placeholder="Tìm tên khóa học..."
-                value={filterSearch}
-                onChange={(event) => setFilterSearch(event.target.value)}
-                slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchOutlinedIcon fontSize="small" /></InputAdornment> } }}
-              />
-              <Stack direction="row" spacing={0.5} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 0.5 }}>
-                <Button size="small" onClick={() => setOnlyCourses(new Set(courseOptions.map((course) => course.id)))}>Chọn tất cả</Button>
-                <Button size="small" onClick={() => setOnlyCourses(new Set())}>Bỏ chọn hết</Button>
-                <Button size="small" onClick={() => setOnlyCourses(new Set(courseOptions.filter((course) => isCourseAvailableOnDate(course, new Date())).map((course) => course.id)))}>Chỉ khóa đang học</Button>
+            <TextField
+              autoFocus
+              fullWidth
+              size="small"
+              value={courseSearch}
+              onChange={(event) => setCourseSearch(event.target.value)}
+              placeholder="Tìm khóa học..."
+              slotProps={{
+                input: { startAdornment: <InputAdornment position="start"><SearchOutlinedIcon fontSize="small" /></InputAdornment> },
+                htmlInput: { 'aria-label': 'Tìm khóa học' },
+              }}
+            />
+            <Stack direction="row" spacing={0.5} sx={{ mt: 1, mb: 0.75 }}>
+              <Button size="small" onClick={() => setSelectedCourses(Object.fromEntries(courseOptions.map((option) => [option.id, true])))} sx={{ textTransform: 'none' }}>Chọn tất cả</Button>
+              <Button size="small" onClick={() => setSelectedCourses(Object.fromEntries(courseOptions.map((option) => [option.id, false])))} sx={{ textTransform: 'none' }}>Bỏ chọn hết</Button>
+            </Stack>
+            <Divider />
+            <Box sx={{ maxHeight: 280, overflowY: 'auto', mt: 0.5 }}>
+              {filteredCourseOptions.map((option) => {
+                const isPinned = pinnedCourseIds.has(option.id);
+                return (
+                  <FormControlLabel
+                    key={option.id}
+                    control={<Checkbox size="small" slotProps={{ input: { 'aria-label': option.title } }} checked={selectedCourses[option.id] !== false} onChange={(event) => setSelectedCourses((previous) => ({ ...previous, [option.id]: event.target.checked }))} sx={{ color: colors[option.id], '&.Mui-checked': { color: colors[option.id] } }} />}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
+                        <Typography variant="body2" noWrap sx={{ color: '#475467', flex: 1, minWidth: 0 }}>{option.title}</Typography>
+                        {isPinned && <Chip size="small" label="Đã ghim" sx={{ ml: 1, height: 22 }} />}
+                      </Box>
+                    }
+                    sx={{ display: 'flex', mr: 0, my: 0.15 }}
+                  />
+                );
+              })}
+              {filteredCourseOptions.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>Không tìm thấy khóa học.</Typography>}
+            </Box>
+          </Popover>
+        </>
+      )}
+
+      {view === 'day' ? (
+        <Stack spacing={1} sx={{ mt: 2 }}>
+          {filteredEvents.filter((event) => event.dateKey === dateKey(cursor)).sort((first, second) => first.startMinutes - second.startMinutes).map((event) => (
+            <Box key={event.key} sx={{ p: 1.25, border: '1px solid #E4E7EC', borderLeft: `4px solid ${event.color}`, borderRadius: 1 }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', gap: 1 }}>
+                <Box><Typography variant="body2" sx={{ fontWeight: 900 }}>{formatTimeRange(event)} · {event.slot.skill}</Typography><Typography variant="caption" color="text.secondary">{event.slot.courseTitle || 'Khóa học chưa chọn'}</Typography></Box>
+                <Button size="small" variant="contained" startIcon={<PlayArrowOutlinedIcon />} disabled={!event.slot.courseId} onClick={() => startLesson(event)} sx={{ alignSelf: { sm: 'center' }, bgcolor: '#C41E3A', textTransform: 'none' }}>Vào học ngay</Button>
               </Stack>
             </Box>
-            <Divider />
-            {searchedOptions.map((course) => {
-              const style = levelStyle(course.title);
-              const isPinned = pinnedCourseIds.has(course.id);
-              return (
-                <MenuItem key={course.id} dense onClick={() => setSelectedCourses((previous) => ({ ...previous, [course.id]: !previous[course.id] }))}>
-                  <Checkbox size="small" checked={selectedCourses[course.id] === true} slotProps={{ input: { 'aria-label': course.title } }} />
-                  <Box aria-hidden="true" sx={{ width: 8, height: 8, mr: 1, flexShrink: 0, borderRadius: '50%', bgcolor: style.color }} />
-                  <Typography variant="body2" noWrap sx={{ minWidth: 0, flex: 1 }}>{course.title}</Typography>
-                  {isPinned && <Chip size="small" label="Đã ghim" sx={{ ml: 1, height: 22 }} />}
-                </MenuItem>
-              );
-            })}
-            {searchedOptions.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>Không tìm thấy khóa học.</Typography>}
-          </Menu>
-        </Stack>}
-
-        {view === 'day' ? (
-          <Stack spacing={1} sx={{ mt: 2 }}>
-            {filteredEvents.filter((event) => event.dateKey === dateKey(cursor)).sort((first, second) => first.startMinutes - second.startMinutes).map((event) => (
-              <Box key={event.key} sx={{ p: 1.25, border: '1px solid #E4E7EC', borderLeft: `4px solid ${event.color}`, borderRadius: 1 }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', gap: 1 }}>
-                  <Box><Typography variant="body2" sx={{ fontWeight: 900 }}>{formatTimeRange(event)} · {event.slot.skill}</Typography><Typography variant="caption" color="text.secondary">{event.slot.courseTitle || 'Khóa học chưa chọn'}</Typography></Box>
-                  <Stack direction="row" spacing={0.5}><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => editSchedule(event)}>Sửa</Button><Button size="small" variant="contained" startIcon={<PlayArrowOutlinedIcon />} disabled={!event.slot.courseId} onClick={() => startLesson(event)} sx={{ bgcolor: '#C41E3A', textTransform: 'none' }}>Vào học ngay</Button></Stack>
-                </Stack>
-                {event.conflict && <Chip size="small" color="warning" icon={<WarningAmberOutlinedIcon />} label="Trùng lịch" sx={{ mt: 0.75 }} />}
-              </Box>
-            ))}
-            {filteredEvents.filter((event) => event.dateKey === dateKey(cursor)).length === 0 && <Alert severity="info" sx={{ mt: 1 }}>Ngày này chưa có suất học trong thời hạn khóa.</Alert>}
-          </Stack>
-        ) : (
-          <Box sx={{ mt: 2, overflowX: 'auto' }}>
-            <Box sx={{ minWidth: view === 'month' ? 650 : 760 }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderTop: '1px solid #E4E7EC', borderLeft: '1px solid #E4E7EC' }}>
-                {WEEKDAY_LABELS.map((label) => <Typography key={label} variant="caption" sx={{ p: 0.75, textAlign: 'center', color: '#667085', fontWeight: 900, borderRight: '1px solid #E4E7EC', borderBottom: '1px solid #E4E7EC' }}>{label}</Typography>)}
-                {visibleDates.map((date) => {
-                  const dayEvents = filteredEvents.filter((event) => event.dateKey === dateKey(date));
-                  const isCurrentMonth = date.getMonth() === cursor.getMonth();
-                  const isToday = dateKey(date) === dateKey(new Date());
-                  return (
-                    <Box
-                      component="button"
-                      type="button"
-                      key={dateKey(date)}
-                      data-testid={`calendar-day-${dateKey(date)}`}
-                      onClick={() => setSelectedDay(date)}
-                      sx={{ minHeight: view === 'month' ? 86 : 132, p: 0.75, textAlign: 'left', verticalAlign: 'top', border: 0, borderRight: '1px solid #E4E7EC', borderBottom: '1px solid #E4E7EC', bgcolor: isToday ? '#FFF7F8' : '#fff', opacity: view === 'month' && !isCurrentMonth ? 0.5 : 1, cursor: 'pointer', '&:hover': { bgcolor: '#FFF7F8' } }}
-                    >
-                      <Typography variant="caption" sx={{ display: 'inline-flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: '50%', bgcolor: isToday ? '#C41E3A' : 'transparent', color: isToday ? '#fff' : '#344054', fontWeight: 900 }}>{date.getDate()}</Typography>
-                      <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                        {dayEvents.slice(0, 2).map(renderEvent)}
-                        {dayEvents.length > 2 && <Typography variant="caption" sx={{ color: '#475467', fontWeight: 800 }}>+{dayEvents.length - 2} ca khác</Typography>}
-                      </Stack>
-                    </Box>
-                  );
-                })}
-              </Box>
+          ))}
+          {filteredEvents.filter((event) => event.dateKey === dateKey(cursor)).length === 0 && <Alert severity="info" sx={{ mt: 1 }}>Ngày này chưa có suất học. Bạn có thể thêm lịch ngay.</Alert>}
+        </Stack>
+      ) : (
+        <Box sx={{ mt: 2, overflowX: 'auto' }}>
+          <Box sx={{ minWidth: view === 'month' ? 650 : 760 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderTop: '1px solid #E4E7EC', borderLeft: '1px solid #E4E7EC' }}>
+              {WEEKDAY_LABELS.map((label) => <Typography key={label} variant="caption" sx={{ p: 0.75, textAlign: 'center', color: '#667085', fontWeight: 900, borderRight: '1px solid #E4E7EC', borderBottom: '1px solid #E4E7EC' }}>{label}</Typography>)}
+              {visibleDates.map((date) => {
+                const dayEvents = filteredEvents.filter((event) => event.dateKey === dateKey(date));
+                const isCurrentMonth = date.getMonth() === cursor.getMonth();
+                const isToday = dateKey(date) === dateKey(new Date());
+                return (
+                  <Box
+                    component="button"
+                    type="button"
+                    key={dateKey(date)}
+                    data-testid={`calendar-day-${dateKey(date)}`}
+                    onClick={() => setSelectedDay(date)}
+                    sx={{ minHeight: view === 'month' ? 86 : 150, p: 0.75, textAlign: 'left', verticalAlign: 'top', border: 0, borderRight: '1px solid #E4E7EC', borderBottom: '1px solid #E4E7EC', bgcolor: isToday ? '#FFF7F8' : '#fff', opacity: view === 'month' && !isCurrentMonth ? 0.5 : 1, cursor: 'pointer', '&:hover': { bgcolor: '#FFF7F8' } }}
+                  >
+                    <Typography variant="caption" sx={{ display: 'inline-flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: '50%', bgcolor: isToday ? '#C41E3A' : 'transparent', color: isToday ? '#fff' : '#344054', fontWeight: 900 }}>{date.getDate()}</Typography>
+                    <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                      {dayEvents.slice(0, MAX_DAY_EVENTS).map((event) => renderEvent(event, view === 'month'))}
+                      {dayEvents.length > MAX_DAY_EVENTS && <Typography variant="caption" color="text.secondary">+{dayEvents.length - MAX_DAY_EVENTS} ca khác</Typography>}
+                    </Stack>
+                  </Box>
+                );
+              })}
             </Box>
           </Box>
-        )}
+        </Box>
+      )}
 
         {filteredEvents.some((event) => event.conflict) && <Alert severity="warning" icon={<WarningAmberOutlinedIcon />} sx={{ mt: 1.5, py: 0.25 }}>Có suất học bị trùng giờ. Bấm vào ngày, chọn “Sửa” để đổi giờ hoặc xóa suất.</Alert>}
       </>}

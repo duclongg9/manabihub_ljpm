@@ -9,6 +9,9 @@ import AvatarUpload from "../../shared/components/AvatarUpload/AvatarUpload";
 import {avatarUploadErrorMessage, confirmStudentPhoneVerification, getMyStudentProfile, requestStudentPhoneVerification, updateMyStudentProfile, uploadAvatar} from "./profileApi";
 import {resolvePublicAssetUrl} from "../../shared/utils/assetUtils";
 import {PHONE_PATTERN, sanitizeOtpInput, sanitizePhoneInput} from "./phoneValidation";
+import {useNavigate} from "react-router-dom";
+import {ROUTES} from "../../shared/constants/routes";
+import {getStudentIdentityVerificationStatus, type StudentIdentityVerificationStatus} from "../wallet/services/studentIdentityVerificationService";
 
 const JLPT_LEVELS = [
     { level: "N5", label: "N5 • 初級" },
@@ -19,6 +22,7 @@ const JLPT_LEVELS = [
 ];
 
 export default function StudentProfilePage() {
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [phoneVerified, setPhoneVerified] = useState(false);
@@ -27,6 +31,9 @@ export default function StudentProfilePage() {
     const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
     const [confirmingPhoneOtp, setConfirmingPhoneOtp] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
+    const [identityStatus, setIdentityStatus] = useState<StudentIdentityVerificationStatus | null>(null);
+    const [identityStatusLoading, setIdentityStatusLoading] = useState(true);
+    const [identityStatusError, setIdentityStatusError] = useState(false);
     const [errors, setErrors] = useState({ fullName: "", phoneNumber: "" });
     const [form, setForm] = useState({ avatarUrl: "", fullName: "", email: "", phoneNumber: "", displayName: "", jlptGoal: "" });
     const [initialForm, setInitialForm] = useState({ avatarUrl: "", fullName: "", email: "", phoneNumber: "", displayName: "", jlptGoal: "" });
@@ -36,8 +43,14 @@ export default function StudentProfilePage() {
     }, []);
 
     async function loadProfile() {
+        setIdentityStatusLoading(true);
         try {
-            const profile = await getMyStudentProfile();
+            const [profile, identity] = await Promise.all([
+                getMyStudentProfile(),
+                getStudentIdentityVerificationStatus().catch(() => null),
+            ]);
+            setIdentityStatus(identity);
+            setIdentityStatusError(identity === null);
             const profileData = {
                 avatarUrl: profile.avatarUrl ?? "",
                 fullName: profile.fullName ?? "",
@@ -56,6 +69,7 @@ export default function StudentProfilePage() {
             setSnackbar({ open: true, message: "Không thể tải hồ sơ.", severity: "error" });
         } finally {
             setLoading(false);
+            setIdentityStatusLoading(false);
         }
     }
 
@@ -353,9 +367,60 @@ export default function StudentProfilePage() {
                                     </Stack>
                                 )}
                             </Grid>
-                                </Grid>
+                        </Grid>
 
-                                <Divider sx={{ my: 5 }} />
+                        <Divider sx={{ my: 5 }} />
+
+                        <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={2}
+                            sx={{
+                                alignItems: { sm: "center" },
+                                justifyContent: "space-between",
+                                p: { xs: 2, sm: 2.5 },
+                                borderRadius: 3,
+                                border: "1px solid",
+                                borderColor: identityStatus?.verified ? "#A7F3D0" : "#BFDBFE",
+                                bgcolor: identityStatus?.verified ? "#ECFDF5" : "#EFF6FF",
+                            }}
+                        >
+                            <Box>
+                                <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
+                                    <VerifiedUserOutlinedIcon sx={{ color: identityStatus?.verified ? "#059669" : "#2563EB" }} />
+                                    <Typography sx={{ fontWeight: 800 }}>
+                                        Xác thực CCCD
+                                    </Typography>
+                                </Stack>
+                                <Typography variant="body2" color="text.secondary">
+                                    {identityStatusLoading
+                                        ? "Đang kiểm tra trạng thái xác thực..."
+                                        : identityStatus?.verified
+                                            ? `Đã xác thực CCCD thành công${identityStatus.fullName ? ` · ${identityStatus.fullName}` : ""}.`
+                                            : identityStatusError
+                                                ? "Chưa tải được trạng thái. Bạn có thể mở trang xác thực để kiểm tra lại."
+                                                : "Bạn chưa xác thực CCCD. Xác thực để đủ điều kiện rút tiền."}
+                                </Typography>
+                            </Box>
+                            <Button
+                                variant={identityStatus?.verified ? "outlined" : "contained"}
+                                disabled={identityStatusLoading || identityStatus?.verified === true}
+                                onClick={() => navigate(ROUTES.STUDENT.IDENTITY_VERIFICATION)}
+                                startIcon={<VerifiedUserOutlinedIcon />}
+                                sx={{
+                                    flexShrink: 0,
+                                    borderRadius: 2,
+                                    textTransform: "none",
+                                    fontWeight: 800,
+                                    ...(identityStatus?.verified
+                                        ? { borderColor: "#059669", color: "#047857" }
+                                        : { bgcolor: "#2563EB", "&:hover": { bgcolor: "#1D4ED8" } }),
+                                }}
+                            >
+                                {identityStatus?.verified ? "Đã xác thực CCCD thành công" : "Xác thực CCCD"}
+                            </Button>
+                        </Stack>
+
+                        <Divider sx={{ my: 5 }} />
 
                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>
                                     Mục tiêu JLPT

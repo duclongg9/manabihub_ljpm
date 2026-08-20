@@ -144,6 +144,8 @@ class WithdrawalServiceImplTest {
                 .thenAnswer(invocation -> {
                     WithdrawalRequest saved = invocation.getArgument(0);
                     saved.setId(withdrawalId);
+                    assertNotNull(saved.getBankQrCode());
+                    assertEquals("image/png", saved.getBankQrContentType());
                     return saved;
                 });
         when(withdrawalMapper.toResponse(any(WithdrawalRequest.class)))
@@ -462,6 +464,22 @@ class WithdrawalServiceImplTest {
         verify(otpService).consumeOtp(userIdString, "123456");
         verify(withdrawalRepository).saveAndFlush(any(WithdrawalRequest.class));
     }
+
+    @Test
+    @Order(14)
+    @DisplayName("UTCID14 (A) - teacher withdrawal rejects an invalid QR image")
+    void createWithdrawalRequest_RejectsInvalidBankQr() {
+        CreateWithdrawalRequest request = newRequest();
+        request.setBankQrDataUrl("data:image/png;base64,AAAA");
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> withdrawalService.createWithdrawalRequest(userIdString, request));
+
+        assertEquals(MessageCodes.PAYOUT_BANK_QR_INVALID, exception.getMessageCode());
+        verifyNoInteractions(walletRepository, otpService, walletService);
+        verify(withdrawalRepository, never()).saveAndFlush(any());
+    }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -558,6 +576,7 @@ class WithdrawalServiceImplTest {
                         .accountHolderName("NGUYEN VAN A")
                         .accountNumber("123456789")
                         .build())
+                .bankQrDataUrl("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
                 .build();
     }
 

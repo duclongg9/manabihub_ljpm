@@ -103,6 +103,15 @@ class ManabiHubApplicationTests {
     private AppUserRepository appUserRepository;
 
     @MockBean
+    private com.manabihub.identity.repository.PublicUserDeviceRepository publicUserDeviceRepository;
+
+    @MockBean
+    private com.manabihub.identity.repository.PublicUserSessionRepository publicUserSessionRepository;
+
+    @MockBean
+    private com.manabihub.identity.repository.ActiveLearningSessionRepository activeLearningSessionRepository;
+
+    @MockBean
     private PhoneVerificationChallengeRepository phoneVerificationChallengeRepository;
 
     @MockBean

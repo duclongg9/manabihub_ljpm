@@ -45,6 +45,7 @@ export function WithdrawalRequestModal({
         : undefined,
       otpCode: values.otpCode,
       saveAccount: values.useNewAccount && values.saveAccount,
+      bankQrDataUrl: values.bankQrDataUrl || '',
     }, {
       onSuccess: () => {
         toast.success('Đã gửi yêu cầu rút tiền');
@@ -57,6 +58,9 @@ export function WithdrawalRequestModal({
           PAYOUT_AMOUNT_BELOW_MINIMUM: 'Số tiền rút chưa đạt mức tối thiểu.',
           PAYOUT_PENDING_REQUEST_EXISTS: 'Bạn đang có một yêu cầu rút tiền chờ xử lý.',
           PAYOUT_MONTHLY_LIMIT_EXCEEDED: 'Bạn đã vượt quá giới hạn rút tiền trong tháng.',
+          PAYOUT_PHONE_VERIFICATION_REQUIRED: 'Bạn cần xác thực số điện thoại trước khi rút hoa hồng.',
+          PAYOUT_BANK_QR_REQUIRED: 'Vui lòng chọn ảnh QR ngân hàng để Finance đối soát.',
+          PAYOUT_BANK_QR_INVALID: 'Ảnh QR không hợp lệ. Hãy chọn PNG, JPEG hoặc WEBP dưới 2 MB.',
         };
         const code = (error as {
           response?: { data?: { messageCode?: string } };

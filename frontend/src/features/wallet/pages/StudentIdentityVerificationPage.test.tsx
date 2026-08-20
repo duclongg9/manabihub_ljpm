@@ -44,7 +44,7 @@ describe('StudentIdentityVerificationPage', () => {
     renderPage('/student/identity-verification?returnTo=%2Fstudent%2Fpayments');
 
     expect(await screen.findByText(/Đã xác minh: NGUYỄN VĂN A/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Đã hoàn tất xác minh' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Đã xác thực CCCD thành công' })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Quay lại Ví & Thanh toán' }));
     expect(screen.getByTestId('current-location')).toHaveTextContent('/student/payments');

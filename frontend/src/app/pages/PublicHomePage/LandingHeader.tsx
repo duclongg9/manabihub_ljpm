@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppBar, Toolbar, Typography, Box, Button, IconButton, InputBase, Avatar, Badge, Tooltip } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
+import { AppBar, Toolbar, Typography, Box, Button, IconButton, Avatar, Badge, Tooltip } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
@@ -16,7 +15,6 @@ import { useUnreadCount } from '../../../features/notifications/hooks/useNotific
 
 export const LandingHeader: React.FC = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
   const [scrolled, setScrolled] = useState(false);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
@@ -37,18 +35,6 @@ export const LandingHeader: React.FC = () => {
     () => subscribeToAuthSessionChanges(() => setSession(getAuthSession('public'))),
     [],
   );
-
-  const handleSearch = () => {
-    navigate(
-      searchQuery.trim()
-        ? `${ROUTES.PUBLIC.COURSE_BROWSE}?keyword=${encodeURIComponent(searchQuery.trim())}`
-        : ROUTES.PUBLIC.COURSE_BROWSE,
-    );
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter') handleSearch();
-  };
 
   const handleLogout = () => {
     setProfileAnchorEl(null);
@@ -98,47 +84,6 @@ export const LandingHeader: React.FC = () => {
                 sx={{ display: 'block', height: { xs: 40, sm: 54 }, width: 'auto', maxWidth: '100%' }}
               />
             </Box>
-          </Box>
-        </Box>
-
-        <Box sx={{ flexGrow: 1, maxWidth: 420, mx: 2, display: { xs: 'none', md: 'block' } }}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              bgcolor: '#FAF8F5',
-              borderRadius: '12px',
-              px: 2,
-              py: 0.5,
-              border: '1.5px solid #e8e0d8',
-              transition: 'all 0.3s ease',
-              '&:hover': { borderColor: '#fca5a5' },
-              '&:focus-within': {
-                borderColor: '#C41E3A',
-                bgcolor: '#ffffff',
-                boxShadow: '0 0 0 3px rgba(196, 30, 58, 0.08)',
-              },
-            }}
-          >
-            <InputBase
-              placeholder="Tìm kiếm khóa học, giảng viên..."
-              sx={{ ml: 1, flex: 1, fontSize: '0.9rem', color: '#1A1A2E' }}
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              onKeyDown={handleKeyDown}
-            />
-            <IconButton
-              type="button"
-              sx={{
-                p: '8px',
-                color: '#94a3b8',
-                '&:hover': { color: '#C41E3A' },
-              }}
-              aria-label="Tìm kiếm"
-              onClick={handleSearch}
-            >
-              <SearchIcon fontSize="small" />
-            </IconButton>
           </Box>
         </Box>
 

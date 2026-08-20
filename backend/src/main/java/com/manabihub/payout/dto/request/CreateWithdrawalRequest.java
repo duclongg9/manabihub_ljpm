@@ -5,6 +5,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -40,6 +41,14 @@ public class CreateWithdrawalRequest {
      */
     @Builder.Default
     private boolean ownershipConfirmed = false;
+
+    /**
+     * Bank QR image selected by the teacher for Finance to scan. This is a
+     * data URL only at the transport boundary; the server decodes and stores
+     * the bytes privately on the withdrawal request.
+     */
+    @Size(max = 3_000_000, message = "Bank QR image is too large")
+    private String bankQrDataUrl;
 
     @AssertTrue(message = "Provide exactly one of bankAccountId or bankAccount")
     public boolean isBankAccountSelectionValid() {

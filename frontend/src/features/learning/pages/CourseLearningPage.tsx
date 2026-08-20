@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -59,6 +59,7 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { getAuthSession, hasAnyRole } from '../../../shared/auth/authSession';
 import { ROLES } from '../../../shared/constants/roles';
 import { ReportViolationModal } from '../../violation/components/ReportViolationModal';
+import { AiChatPanel } from '../../ai-chat/components/AiChatPanel';
 import {
   isSingleCharacterMutation,
   readLocalStorageValue,
@@ -126,8 +127,11 @@ interface LocalFinalTestState {
 export function CourseLearningPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedAiBlockId = searchParams.get('aiLessonBlockId');
   const [learning, setLearning] = useState<CourseLearning | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
@@ -173,13 +177,20 @@ export function CourseLearningPage() {
         const modules = applySequentialLocks(data.modules);
         const availableBlockIds = new Set(modules.flatMap((module) => module.blocks.map((block) => block.id)));
         const savedBlockId = readLocalStorageValue<string>(courseSelectionStorageKey(data.courseId));
+        const requestedBlock = requestedAiBlockId
+          ? modules.flatMap((module) => module.blocks).find((block) => block.id === requestedAiBlockId)
+          : undefined;
+        const requestedBlockIsAvailable = Boolean(requestedBlock && !requestedBlock.locked);
         const initialBlockId =
-          savedBlockId && availableBlockIds.has(savedBlockId)
-            ? savedBlockId
-            : data.currentLessonBlockId ?? modules[0]?.blocks[0]?.id ?? null;
+          requestedBlockIsAvailable
+            ? requestedAiBlockId
+            : savedBlockId && availableBlockIds.has(savedBlockId)
+              ? savedBlockId
+              : data.currentLessonBlockId ?? modules[0]?.blocks[0]?.id ?? null;
         const initialBlock = modules.flatMap((module) => module.blocks).find((block) => block.id === initialBlockId);
         setLearning({ ...data, modules });
         setSelectedBlockId(initialBlockId);
+        setAiChatOpen(requestedBlockIsAvailable);
         setSelectedContentLoading(initialBlock?.type === 'VIDEO');
       })
       .catch((err) => {
@@ -203,7 +214,7 @@ export function CourseLearningPage() {
     return () => {
       active = false;
     };
-  }, [courseId, navigate]);
+  }, [courseId, navigate, requestedAiBlockId]);
 
   useEffect(() => {
     if (!courseId || !selectedBlockId) return;
@@ -520,6 +531,15 @@ export function CourseLearningPage() {
         </Paper>
 
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 2,
+              alignItems: 'flex-start',
+              flexDirection: { xs: 'column', lg: 'row' },
+            }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
           {selectedBlock ? (
             <Card variant="outlined">
               <CardContent>
@@ -543,12 +563,12 @@ export function CourseLearningPage() {
                     <Tooltip title="Hỏi AI về bài học đang chọn">
                       <Button
                         size="small"
-                        variant="outlined"
+                        variant={aiChatOpen ? 'contained' : 'outlined'}
                         startIcon={<SmartToyOutlinedIcon fontSize="small" />}
                         aria-label="Hỏi AI về bài học đang chọn"
-                        onClick={() => navigate(ROUTES.STUDENT.AI_CHAT(learning.courseId, selectedBlock.id))}
+                        onClick={() => setAiChatOpen((open) => !open)}
                       >
-                        Hỏi AI
+                        {aiChatOpen ? 'Ẩn AI' : 'Hỏi AI'}
                       </Button>
                     </Tooltip>
                   )}
@@ -657,6 +677,29 @@ export function CourseLearningPage() {
           ) : learning.modules.length === 0 ? (
             <Alert severity="info">Khoá học chưa có nội dung bài học.</Alert>
           ) : null}
+            </Box>
+
+            {selectedBlock && (
+              <Box
+                component="aside"
+                aria-label="Trợ lý AI cho bài học"
+                sx={{
+                  width: { xs: '100%', lg: 360 },
+                  flexShrink: 0,
+                  display: aiChatOpen ? 'block' : 'none',
+                  position: { lg: 'sticky' },
+                  top: { lg: 16 },
+                }}
+              >
+                <AiChatPanel
+                  courseId={learning.courseId}
+                  lessonBlockId={selectedBlock.id}
+                  lessonTitle={selectedBlock.title}
+                  onClose={() => setAiChatOpen(false)}
+                />
+              </Box>
+            )}
+          </Box>
           <Box sx={{ mt: 2 }}>
             <CoursePomodoroPanel courseTitle={learning.courseTitle} />
           </Box>
