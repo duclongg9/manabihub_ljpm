@@ -161,8 +161,8 @@ public class PublicUserSessionServiceImpl implements PublicUserSessionService {
                 .actorType("PUBLIC_USER")
                 .actorUserId(userId)
                 .action(action)
-                .targetType(targetId != null ? "DEVICE_OR_SESSION" : null)
-                .targetId(targetId)
+                .targetType(targetId != null ? "DEVICE_OR_SESSION" : "USER")
+                .targetId(targetId != null ? targetId : userId)
                 .build());
     }
 }
