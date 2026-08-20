@@ -10,6 +10,8 @@ import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -41,15 +43,24 @@ public class PublicJwtTokenService {
                 .sorted()
                 .collect(Collectors.joining(" "));
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsBuilder = JwtClaimsSet.builder()
                 .issuer("self")
                 .issuedAt(now)
                 .expiresAt(now.plus(24, ChronoUnit.HOURS))
                 .subject(user.getId().toString())
                 .claim("email", user.getEmail())
                 .claim("role", roles)
-                .claim("type", "PUBLIC_USER")
-                .build();
+                .claim("type", "PUBLIC_USER");
+                
+        // Copy sid if present in current token
+        if (SecurityContextHolder.getContext().getAuthentication() != null &&
+            SecurityContextHolder.getContext().getAuthentication().getPrincipal() instanceof Jwt jwt) {
+            if (jwt.hasClaim("sid")) {
+                claimsBuilder.claim("sid", jwt.getClaimAsString("sid"));
+            }
+        }
+
+        JwtClaimsSet claims = claimsBuilder.build();
 
         return jwtEncoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(MacAlgorithm.HS256).build(),

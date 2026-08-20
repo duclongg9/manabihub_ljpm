@@ -70,8 +70,19 @@ axiosClient.interceptors.response.use(
 
       if (getAuthSession(kind) || isProtectedScreen(kind)) {
         clearAuthSession(kind);
-        redirectToLogin(kind);
+        const code = error.response?.data?.code;
+        if (code === 'AUTH_SESSION_REVOKED') {
+          redirectToLogin(kind, 'session-revoked');
+        } else {
+          redirectToLogin(kind, 'session-expired');
+        }
       }
+    }
+
+    if (status === 409 && error.response?.data?.code === 'ACCOUNT_IN_USE_ELSEWHERE') {
+      const kind = resolveSessionKind(requestUrl);
+      clearAuthSession(kind);
+      redirectToLogin(kind, 'account-in-use');
     }
 
     return Promise.reject(error);
@@ -117,7 +128,7 @@ function isProtectedScreen(kind: AuthSessionKind) {
     : path.startsWith('/student') || path.startsWith('/teacher');
 }
 
-function redirectToLogin(kind: AuthSessionKind) {
+function redirectToLogin(kind: AuthSessionKind, reason: string = 'session-expired') {
   if (typeof window === 'undefined' || redirectingToLogin) {
     return;
   }
@@ -129,5 +140,5 @@ function redirectToLogin(kind: AuthSessionKind) {
 
   redirectingToLogin = true;
   rememberPostLoginRoute(kind, `${window.location.pathname}${window.location.search}`);
-  window.location.assign(`${loginRoute}?reason=session-expired`);
+  window.location.assign(`${loginRoute}?reason=${reason}`);
 }
