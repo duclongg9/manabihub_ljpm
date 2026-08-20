@@ -13,7 +13,7 @@ import {
   FormControlLabel,
   IconButton,
   InputAdornment,
-  Menu,
+
   Paper,
   Popover,
   Stack,
@@ -31,7 +31,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
-import FilterListOutlinedIcon from '@mui/icons-material/FilterListOutlined';
+
 import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
@@ -64,8 +64,6 @@ interface CalendarEvent {
   endMinutes: number;
   conflict: boolean;
 }
-
-
 
 const WEEKDAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const LEVEL_COLORS: Record<string, string> = {
@@ -232,7 +230,7 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
 
   useEffect(() => {
     if (selectionInitialized.current || courseOptions.length === 0) return;
-    const validPins = courseOptions.filter((course) => pinnedCourseIds.has(course.id));
+    const validPins = courseOptions.filter((course) => pinnedCourseIds.has(course.id) && isCourseAvailableOnDate(course, new Date()));
     const defaultIds = validPins.length > 0
       ? new Set(validPins.map((course) => course.id))
       : thisWeekCourseIds.size > 0

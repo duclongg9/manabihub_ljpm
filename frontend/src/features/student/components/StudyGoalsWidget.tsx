@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -90,6 +90,7 @@ export interface StudySlot {
 interface ScheduleOpenDetail {
   dayOfWeek?: number;
   dateKey?: string;
+  slotId?: string;
 }
 
 interface FocusTotal {
@@ -110,10 +111,7 @@ interface StudyGoalsWidgetProps {
   courses?: StudyCourseOption[];
 }
 
-interface OpenScheduleDetail {
-  dayOfWeek?: number;
-  slotId?: string;
-}
+
 
 export function todayKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -212,7 +210,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const notifiedRef = useRef(new Set<string>());
 
-  const openBulkSchedule = () => {
+  const openBulkSchedule = useCallback(() => {
     setBulkSelectedIds(Object.fromEntries(plan.slots.filter((slot) => slot.enabled).map((slot) => [slot.id, true])));
     setBulkCourseSearch('');
     setBulkDayFilter('all');
@@ -224,7 +222,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     setBulkError('');
     setBulkDeleteConfirmOpen(false);
     setBulkOpen(true);
-  };
+  }, [plan.slots]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
@@ -232,8 +230,35 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   }, [plan]);
 
   useEffect(() => {
-    const openSchedule = (event: Event) => {
+    const handleOpenSchedule = (event: Event) => {
       const detail = (event as CustomEvent<ScheduleOpenDetail>).detail;
+      const requestedSlotId = detail?.slotId;
+      if (requestedSlotId) {
+        const slot = plan.slots.find((s) => s.id === requestedSlotId);
+        if (slot) {
+          setScheduleMode('custom');
+          setSelectedPreset('custom');
+          setScheduleDayOfWeek(null);
+          setScheduleDateKey(null);
+          setEditingSlotId(slot.id);
+          setScheduleError('');
+          setNewSlot({
+            dayOfWeek: slot.dayOfWeek,
+            startTime: slot.startTime,
+            skill: slot.skill,
+            courseId: slot.courseId ?? '',
+          });
+          if (slot.durationMinutes === 25 || slot.durationMinutes === 50 || slot.durationMinutes === 60) {
+            setDurationChoice(slot.durationMinutes);
+            setCustomDuration(slot.durationMinutes);
+          } else {
+            setDurationChoice('custom');
+            setCustomDuration(slot.durationMinutes);
+          }
+          setScheduleOpen(true);
+          return;
+        }
+      }
       const requestedDay = detail?.dayOfWeek;
       setScheduleMode('custom');
       setSelectedPreset('custom');
@@ -249,14 +274,14 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       }));
       setScheduleOpen(true);
     };
-    window.addEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, openSchedule);
-    return () => window.removeEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, openSchedule);
-  }, []);
+    window.addEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, handleOpenSchedule);
+    return () => window.removeEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, handleOpenSchedule);
+  }, [plan.slots]);
 
   useEffect(() => {
     window.addEventListener(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT, openBulkSchedule);
     return () => window.removeEventListener(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT, openBulkSchedule);
-  }, [plan.slots]);
+  }, [openBulkSchedule]);
 
   useEffect(() => {
     if (!newSlot.courseId && schedulableCourses.length > 0) {
@@ -573,7 +598,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       <Typography variant="caption" sx={{ display: 'block', mt: 1.5, color: '#667085' }}>Mỗi phút tập trung hoàn thành được tính là một điểm cho kỹ năng và khóa học đã chọn.</Typography>
 
       <Dialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{scheduleDateKey ? `Sửa lịch ngày ${formatDateKey(scheduleDateKey)}` : 'Thêm lịch học'}</DialogTitle>
+        <DialogTitle>{editingSlotId ? 'Sửa suất học' : scheduleDateKey ? `Sửa lịch ngày ${formatDateKey(scheduleDateKey)}` : 'Thêm lịch học'}</DialogTitle>
         <DialogContent>
           {scheduleDayOfWeek !== null && <Box data-testid="schedule-day-editor" sx={{ mb: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 0.75 }}>Các ca đang có trong ngày</Typography>
@@ -594,7 +619,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
           </Stack>}
           {scheduleDayOfWeek === null && <Alert severity="info" sx={{ mt: 2 }} icon={<TimerOutlinedIcon />}><Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 800 }}>Gợi ý từ hệ thống</Typography><Typography variant="caption">Để hoàn thành khóa Kanji N5 đúng tiến độ, bạn chỉ cần học 3 buổi/tuần (tổng 75 phút).</Typography></Box><Button size="small" onClick={applySuggestion}>Áp dụng gợi ý này</Button></Stack></Alert>}
         </DialogContent>
-        <DialogActions><Button onClick={() => { setScheduleOpen(false); resetSlotEditor(); }}>Hủy</Button><Button variant="contained" onClick={addSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>{editingSlotId ? 'Lưu thay đổi' : 'Lưu lịch'}</Button></DialogActions>
+        <DialogActions>{editingSlotId && <Button color="error" onClick={() => { deleteSlot(editingSlotId); setScheduleOpen(false); }} sx={{ mr: 'auto' }}>Xóa suất</Button>}<Button onClick={() => { setScheduleOpen(false); resetSlotEditor(); }}>Hủy</Button><Button variant="contained" onClick={addSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>{editingSlotId ? 'Lưu thay đổi' : 'Lưu lịch'}</Button></DialogActions>
       </Dialog>
 
       <Dialog open={bulkOpen} onClose={() => setBulkOpen(false)} fullWidth maxWidth="md">

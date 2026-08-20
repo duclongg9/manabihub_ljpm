@@ -126,4 +126,24 @@ describe('StudyCalendar', () => {
     expect(screen.getByTestId(`calendar-event-slot-active-${todayKey(today)}`)).toBeInTheDocument();
     expect(screen.queryByTestId(`calendar-event-slot-future-${todayKey(today)}`)).not.toBeInTheDocument();
   });
+
+  it('ignores expired pinned courses and falls back to active week courses', () => {
+    const today = new Date();
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    window.localStorage.setItem('manabihub.student.calendar-pins.v1', JSON.stringify(['expired']));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      weekKey: todayKey(today), weeklyTargetMinutes: 150,
+      slots: [
+        { id: 'slot-active', dayOfWeek: today.getDay(), startTime: '20:00', durationMinutes: 25, skill: 'Kanji', courseId: 'active', courseTitle: 'Kanji N5 đang học', enabled: true },
+      ], focusTotals: {}, attendance: {},
+    }));
+
+    renderCalendar([
+      { id: 'expired', title: 'Kanji N5 đã hết hạn', enrollmentStatus: 'EXPIRED', enrolledAt: '2026-01-01T00:00:00Z', expiresAt: yesterday.toISOString() },
+      { id: 'active', title: 'Kanji N5 đang học', enrollmentStatus: 'ACTIVE', enrolledAt: yesterday.toISOString(), expiresAt: tomorrow.toISOString() },
+    ]);
+
+    expect(screen.getByTestId(`calendar-event-slot-active-${todayKey(today)}`)).toBeInTheDocument();
+  });
 });
