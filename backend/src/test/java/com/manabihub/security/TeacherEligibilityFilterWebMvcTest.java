@@ -110,6 +110,12 @@ class TeacherEligibilityFilterWebMvcTest {
     @MockBean
     private InternalAdminRoleFilter internalAdminRoleFilter;
 
+    @MockBean
+    private com.manabihub.identity.service.PublicUserSessionService publicUserSessionService;
+
+    @MockBean
+    private com.manabihub.identity.service.LearningSessionLeaseService learningSessionLeaseService;
+
     @Test
     void activeTeacher_dashboardReturns200() throws Exception {
         UUID userId = UUID.randomUUID();
