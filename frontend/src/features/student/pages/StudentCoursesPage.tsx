@@ -68,7 +68,7 @@ export const StudentCoursesPage: React.FC = () => {
           <Grid container spacing={3}>
             {courses.map((course: StudentCourseSummary) => (
               <Grid size={{ xs: 12, sm: 6, md: 4 }} key={course.enrollmentId}>
-                <StudentCourseCard course={course} />
+                <StudentCourseCard course={course} showCalendarPin />
               </Grid>
             ))}
           </Grid>

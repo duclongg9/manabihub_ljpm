@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { StudyGoalsWidget } from './StudyGoalsWidget';
+import { STORAGE_KEY, STUDY_PLAN_OPEN_SCHEDULE_EVENT, StudyGoalsWidget, todayKey } from './StudyGoalsWidget';
 
 describe('StudyGoalsWidget', () => {
   afterEach(cleanup);
@@ -46,5 +46,25 @@ describe('StudyGoalsWidget', () => {
 
     expect(screen.queryByRole('button', { name: /Bắt đầu Pomodoro/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('pomodoro-timer')).not.toBeInTheDocument();
+  });
+
+  it('edits and deletes an existing conflicting schedule slot', () => {
+    const today = new Date();
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      weekKey: todayKey(today), weeklyTargetMinutes: 150,
+      slots: [{ id: 'slot-existing', dayOfWeek: today.getDay(), startTime: '20:00', durationMinutes: 25, skill: 'Kanji & Từ vựng', courseId: 'course-1', courseTitle: 'JLPT N3 thực chiến', enabled: true }],
+      focusTotals: {}, attendance: {},
+    }));
+    render(<StudyGoalsWidget jlptGoal="N3" courses={[{ id: 'course-1', title: 'JLPT N3 thực chiến' }]} />);
+
+    fireEvent(window, new CustomEvent(STUDY_PLAN_OPEN_SCHEDULE_EVENT, { detail: { slotId: 'slot-existing' } }));
+    expect(screen.getByText('Sửa suất học', { selector: 'h2' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Giờ bắt đầu'), { target: { value: '21:15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').slots[0].startTime).toBe('21:15');
+
+    fireEvent(window, new CustomEvent(STUDY_PLAN_OPEN_SCHEDULE_EVENT, { detail: { slotId: 'slot-existing' } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa suất' }));
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').slots).toHaveLength(0);
   });
 });

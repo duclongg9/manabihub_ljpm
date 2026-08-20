@@ -31,6 +31,7 @@ import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
 import { ROUTES } from '../../../shared/constants/routes';
+import { isCourseAvailableOnDate, isSlotAvailableOnDate } from './studyScheduleAvailability';
 
 export const STORAGE_KEY = 'manabihub.student.study-plan.v1';
 export const STUDY_PLAN_UPDATED_EVENT = 'manabihub:study-plan-updated';
@@ -64,6 +65,9 @@ type DurationChoice = 25 | 50 | 60 | 'custom';
 export interface StudyCourseOption {
   id: string;
   title: string;
+  enrollmentStatus?: string;
+  enrolledAt?: string | null;
+  expiresAt?: string | null;
 }
 
 export interface StudySlot {
@@ -94,6 +98,11 @@ export interface StudyPlan {
 interface StudyGoalsWidgetProps {
   jlptGoal?: string | null;
   courses?: StudyCourseOption[];
+}
+
+interface OpenScheduleDetail {
+  dayOfWeek?: number;
+  slotId?: string;
 }
 
 export function todayKey(date = new Date()) {
@@ -129,7 +138,7 @@ export function readPlan(): StudyPlan {
   }
 }
 
-function getUpcomingSlot(slots: StudySlot[], now = new Date()) {
+function getUpcomingSlot(slots: StudySlot[], courses: StudyCourseOption[], now = new Date()) {
   return slots
     .filter((slot) => slot.enabled)
     .map((slot) => {
@@ -141,6 +150,7 @@ function getUpcomingSlot(slots: StudySlot[], now = new Date()) {
       if (candidate <= now) candidate.setDate(candidate.getDate() + 7);
       return { slot, date: candidate };
     })
+    .filter(({ slot, date }) => isSlotAvailableOnDate(slot, date, courses))
     .sort((a, b) => a.date.getTime() - b.date.getTime())[0] ?? null;
 }
 
@@ -151,6 +161,7 @@ function newId() {
 }
 
 export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetProps) {
+  const schedulableCourses = useMemo(() => courses.filter((course) => isCourseAvailableOnDate(course, new Date())), [courses]);
   const [plan, setPlan] = useState<StudyPlan>(readPlan);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleMode, setScheduleMode] = useState<'preset' | 'custom'>('preset');
@@ -162,7 +173,8 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   const [targetInput, setTargetInput] = useState(WEEKLY_TARGET_MINUTES);
   const [durationChoice, setDurationChoice] = useState<DurationChoice>(25);
   const [customDuration, setCustomDuration] = useState(25);
-  const [newSlot, setNewSlot] = useState({ dayOfWeek: 1, startTime: '19:00', skill: SKILLS[0].label, courseId: courses[0]?.id ?? '' });
+  const [newSlot, setNewSlot] = useState<{ dayOfWeek: number; startTime: string; skill: string; courseId: string }>({ dayOfWeek: 1, startTime: '19:00', skill: SKILLS[0].label, courseId: schedulableCourses[0]?.id ?? '' });
+  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const notifiedRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -172,15 +184,33 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
 
   useEffect(() => {
     const openSchedule = (event: Event) => {
-      const requestedDay = (event as CustomEvent<{ dayOfWeek?: number }>).detail?.dayOfWeek;
+      const detail = (event as CustomEvent<OpenScheduleDetail>).detail;
+      const requestedDay = detail?.dayOfWeek;
+      const existing = detail?.slotId ? readPlan().slots.find((slot) => slot.id === detail.slotId) : undefined;
       setScheduleMode('custom');
       setSelectedPreset('custom');
-      setNewSlot((current) => ({
-        ...current,
-        dayOfWeek: typeof requestedDay === 'number' && requestedDay >= 0 && requestedDay <= 6
-          ? requestedDay
-          : new Date().getDay(),
-      }));
+      setEditingSlotId(existing?.id ?? null);
+      if (existing) {
+        setNewSlot({
+          dayOfWeek: existing.dayOfWeek,
+          startTime: existing.startTime,
+          skill: existing.skill,
+          courseId: existing.courseId ?? '',
+        });
+        if ([25, 50, 60].includes(existing.durationMinutes)) {
+          setDurationChoice(existing.durationMinutes as 25 | 50 | 60);
+        } else {
+          setDurationChoice('custom');
+          setCustomDuration(existing.durationMinutes);
+        }
+      } else {
+        setNewSlot((current) => ({
+          ...current,
+          dayOfWeek: typeof requestedDay === 'number' && requestedDay >= 0 && requestedDay <= 6
+            ? requestedDay
+            : new Date().getDay(),
+        }));
+      }
       setScheduleOpen(true);
     };
     window.addEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, openSchedule);
@@ -188,12 +218,12 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   }, []);
 
   useEffect(() => {
-    if (!newSlot.courseId && courses.length > 0) {
-      setNewSlot((current) => ({ ...current, courseId: courses[0].id }));
+    if (!newSlot.courseId && schedulableCourses.length > 0) {
+      setNewSlot((current) => ({ ...current, courseId: schedulableCourses[0].id }));
     }
-  }, [courses, newSlot.courseId]);
+  }, [newSlot.courseId, schedulableCourses]);
 
-  const upcoming = useMemo(() => getUpcomingSlot(plan.slots), [plan.slots]);
+  const upcoming = useMemo(() => getUpcomingSlot(plan.slots, courses), [courses, plan.slots]);
   const weeklyMinutes = SKILLS.reduce((sum, skill) => sum + (plan.focusTotals[skill.label]?.minutes ?? 0), 0);
   const progress = Math.min(100, Math.round((weeklyMinutes / Math.max(1, plan.weeklyTargetMinutes)) * 100));
   const courseTotals = Object.entries(plan.focusTotals)
@@ -206,6 +236,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       const now = new Date();
       for (const slot of plan.slots) {
         if (!slot.enabled || slot.dayOfWeek !== now.getDay()) continue;
+        if (!isSlotAvailableOnDate(slot, now, courses)) continue;
         const [hour, minute] = slot.startTime.split(':').map(Number);
         const scheduled = new Date(now);
         scheduled.setHours(hour, minute, 0, 0);
@@ -233,7 +264,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     check();
     const interval = window.setInterval(check, 30_000);
     return () => window.clearInterval(interval);
-  }, [plan.slots, reminderPermission]);
+  }, [courses, plan.slots, reminderPermission]);
 
   const requestReminders = async () => {
     if (!('Notification' in window)) return;
@@ -246,16 +277,17 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   };
 
   const openSchedule = () => {
+    setEditingSlotId(null);
     setScheduleMode('preset');
     setSelectedPreset('gentle');
     setDurationChoice(25);
     setScheduleOpen(true);
   };
 
-  const selectedCourse = courses.find((course) => course.id === newSlot.courseId);
+  const selectedCourse = schedulableCourses.find((course) => course.id === newSlot.courseId);
   const durationMinutes = durationChoice === 'custom' ? Math.min(180, Math.max(5, Number(customDuration) || 25)) : durationChoice;
 
-  const addSchedule = () => {
+  const saveSchedule = () => {
     const preset = PRESETS.find((item) => item.id === selectedPreset);
     const days = scheduleMode === 'preset' && preset ? preset.days : [newSlot.dayOfWeek];
     const time = scheduleMode === 'preset' && preset ? preset.time : newSlot.startTime;
@@ -270,8 +302,31 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       courseTitle: selectedCourse?.title,
       enabled: true,
     }));
-    setPlan((previous) => ({ ...previous, slots: [...previous.slots, ...created] }));
+    setPlan((previous) => {
+      if (!editingSlotId) return { ...previous, slots: [...previous.slots, ...created] };
+      const current = previous.slots.find((slot) => slot.id === editingSlotId);
+      if (!current) return previous;
+      const updated: StudySlot = {
+        ...current,
+        dayOfWeek: newSlot.dayOfWeek,
+        startTime: newSlot.startTime,
+        durationMinutes: duration,
+        skill: newSlot.skill,
+        courseId: selectedCourse?.id,
+        courseTitle: selectedCourse?.title,
+        enabled: true,
+      };
+      return { ...previous, slots: previous.slots.map((slot) => slot.id === editingSlotId ? updated : slot) };
+    });
     setScheduleOpen(false);
+    setEditingSlotId(null);
+  };
+
+  const deleteSchedule = () => {
+    if (!editingSlotId) return;
+    setPlan((previous) => ({ ...previous, slots: previous.slots.filter((slot) => slot.id !== editingSlotId) }));
+    setScheduleOpen(false);
+    setEditingSlotId(null);
   };
 
   const applySuggestion = () => {
@@ -353,21 +408,25 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       <Typography variant="caption" sx={{ display: 'block', mt: 1.5, color: '#667085' }}>Mỗi phút tập trung hoàn thành được tính là một điểm cho kỹ năng và khóa học đã chọn.</Typography>
 
       <Dialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Thêm lịch học</DialogTitle>
+        <DialogTitle>{editingSlotId ? 'Sửa suất học' : 'Thêm lịch học'}</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 1.25, color: '#667085' }}>Chọn lịch mẫu để bắt đầu nhanh hoặc chuyển sang tùy chỉnh.</Typography>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          <Typography variant="body2" sx={{ mb: 1.25, color: '#667085' }}>{editingSlotId ? 'Cập nhật khóa học, ngày, giờ hoặc thời lượng của suất đã chọn.' : 'Chọn lịch mẫu để bắt đầu nhanh hoặc chuyển sang tùy chỉnh.'}</Typography>
+          {!editingSlotId && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
             {[...PRESETS, { id: 'custom' as const, label: 'Tùy chỉnh', icon: '⚙️', summary: 'Tự chọn khóa học, kỹ năng, ngày và giờ' }].map((preset) => <Button key={preset.id} variant={selectedPreset === preset.id ? 'contained' : 'outlined'} onClick={() => { setSelectedPreset(preset.id); setScheduleMode(preset.id === 'custom' ? 'custom' : 'preset'); }} sx={{ flex: 1, minHeight: 74, textTransform: 'none', justifyContent: 'flex-start', alignItems: 'flex-start', flexDirection: 'column', bgcolor: selectedPreset === preset.id ? '#FFF1F2' : '#fff', color: '#172033', borderColor: selectedPreset === preset.id ? '#C41E3A' : '#CBD5E1' }}><Typography sx={{ fontWeight: 900 }}>{preset.icon} {preset.label}</Typography><Typography variant="caption" sx={{ textAlign: 'left', mt: 0.25 }}>{preset.summary}</Typography></Button>)}
-          </Stack>
+          </Stack>}
           {scheduleMode === 'custom' && <Stack spacing={2} sx={{ pt: 2 }}>
-            {courses.length > 1 ? <FormControl fullWidth size="small"><InputLabel id="study-course-label">Khóa học</InputLabel><Select labelId="study-course-label" label="Khóa học" value={newSlot.courseId} onChange={(event) => setNewSlot((current) => ({ ...current, courseId: event.target.value }))}>{courses.map((course) => <MenuItem key={course.id} value={course.id}>{course.title}</MenuItem>)}</Select></FormControl> : <Alert severity="info" sx={{ py: 0.25 }}>{selectedCourse ? `Khóa học đang học: ${selectedCourse.title}` : 'Bạn chưa có khóa học đang học.'}</Alert>}
+            {schedulableCourses.length > 1 ? <FormControl fullWidth size="small"><InputLabel id="study-course-label">Khóa học</InputLabel><Select labelId="study-course-label" label="Khóa học" value={newSlot.courseId} onChange={(event) => setNewSlot((current) => ({ ...current, courseId: event.target.value }))}>{schedulableCourses.map((course) => <MenuItem key={course.id} value={course.id}>{course.title}</MenuItem>)}</Select></FormControl> : <Alert severity="info" sx={{ py: 0.25 }}>{selectedCourse ? `Khóa học đang học: ${selectedCourse.title}` : 'Bạn chưa có khóa học còn thời hạn.'}</Alert>}
             <FormControl fullWidth size="small"><InputLabel id="study-skill-label">Kỹ năng</InputLabel><Select labelId="study-skill-label" label="Kỹ năng" value={newSlot.skill} onChange={(event) => setNewSlot((current) => ({ ...current, skill: event.target.value }))}>{SKILLS.map((skill) => <MenuItem key={skill.label} value={skill.label}>{skill.label}</MenuItem>)}</Select></FormControl>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}><FormControl fullWidth size="small"><InputLabel id="study-day-label">Ngày</InputLabel><Select labelId="study-day-label" label="Ngày" value={newSlot.dayOfWeek} onChange={(event) => setNewSlot((current) => ({ ...current, dayOfWeek: Number(event.target.value) }))}>{DAYS.map((day) => <MenuItem key={day.value} value={day.value}>{day.label}</MenuItem>)}</Select></FormControl><TextField size="small" label="Giờ bắt đầu" type="time" value={newSlot.startTime} onChange={(event) => setNewSlot((current) => ({ ...current, startTime: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} fullWidth /></Stack>
             <Box><Typography variant="caption" sx={{ color: '#667085', fontWeight: 800 }}>Thời lượng</Typography><Stack direction="row" spacing={1} sx={{ mt: 0.75, flexWrap: 'wrap' }}>{([25, 50, 60] as const).map((value) => <Button key={value} size="small" variant={durationChoice === value ? 'contained' : 'outlined'} aria-pressed={durationChoice === value} onClick={() => setDurationChoice(value)}>{value} phút{value === 25 ? ' (1 phiên)' : ''}</Button>)}<Button size="small" variant={durationChoice === 'custom' ? 'contained' : 'outlined'} aria-pressed={durationChoice === 'custom'} onClick={() => setDurationChoice('custom')}>Tùy chỉnh</Button></Stack>{durationChoice === 'custom' && <TextField size="small" type="number" label="Số phút" value={customDuration} onChange={(event) => setCustomDuration(Number(event.target.value))} slotProps={{ htmlInput: { min: 5, max: 180, step: 5 } }} sx={{ mt: 1, width: 140 }} />}</Box>
           </Stack>}
           <Alert severity="info" sx={{ mt: 2 }} icon={<TimerOutlinedIcon />}><Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 800 }}>Gợi ý từ hệ thống</Typography><Typography variant="caption">Để hoàn thành khóa Kanji N5 đúng tiến độ, bạn chỉ cần học 3 buổi/tuần (tổng 75 phút).</Typography></Box><Button size="small" onClick={applySuggestion}>Áp dụng gợi ý này</Button></Stack></Alert>
         </DialogContent>
-        <DialogActions><Button onClick={() => setScheduleOpen(false)}>Hủy</Button><Button variant="contained" onClick={addSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>Lưu lịch</Button></DialogActions>
+        <DialogActions>
+          {editingSlotId && <Button color="error" onClick={deleteSchedule} sx={{ mr: 'auto' }}>Xóa suất</Button>}
+          <Button onClick={() => setScheduleOpen(false)}>Hủy</Button>
+          <Button variant="contained" onClick={saveSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>{editingSlotId ? 'Lưu thay đổi' : 'Lưu lịch'}</Button>
+        </DialogActions>
       </Dialog>
     </Paper>
   );
