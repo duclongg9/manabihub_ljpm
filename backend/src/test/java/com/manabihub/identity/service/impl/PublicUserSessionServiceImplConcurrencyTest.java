@@ -42,11 +42,14 @@ class PublicUserSessionServiceImplConcurrencyTest {
     void setUp() {
         AppUser user = AppUser.builder()
                 .id(UUID.randomUUID())
-                .email("test.concurrency@manabihub.local")
+                .email("test.concurrency." + UUID.randomUUID() + "@manabihub.local")
                 .fullName("Test Concurrency")
                 .build();
-        appUserRepository.saveAndFlush(user);
+        user = appUserRepository.saveAndFlush(user);
         testUserId = user.getId();
+        
+        // Verify user exists in main thread
+        assertTrue(appUserRepository.findById(testUserId).isPresent(), "User should be saved");
     }
 
     @AfterEach
