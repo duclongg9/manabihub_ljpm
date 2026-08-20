@@ -48,4 +48,18 @@ public class DummyFilterConfig {
             }
         };
     }
+    @Bean
+    @Primary
+    public com.manabihub.identity.service.PublicUserSessionService publicUserSessionService() {
+        com.manabihub.identity.service.PublicUserSessionService mock = org.mockito.Mockito.mock(com.manabihub.identity.service.PublicUserSessionService.class);
+        org.mockito.Mockito.when(mock.isSessionValid(org.mockito.Mockito.any(), org.mockito.Mockito.any())).thenReturn(true);
+        return mock;
+    }
+    @Bean
+    @Primary
+    public com.manabihub.identity.service.LearningSessionLeaseService learningSessionLeaseService() {
+        com.manabihub.identity.service.LearningSessionLeaseService mock = org.mockito.Mockito.mock(com.manabihub.identity.service.LearningSessionLeaseService.class);
+        org.mockito.Mockito.when(mock.ownsLease(org.mockito.Mockito.any(), org.mockito.Mockito.any())).thenReturn(true);
+        return mock;
+    }
 }
