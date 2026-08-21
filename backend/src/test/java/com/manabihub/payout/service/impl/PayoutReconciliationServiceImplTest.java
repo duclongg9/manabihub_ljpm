@@ -6,8 +6,11 @@ import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.payout.entity.BankAccountSnapshot;
+import com.manabihub.payout.entity.PayoutSettlement;
 import com.manabihub.payout.entity.WithdrawalRequest;
+import com.manabihub.payout.enums.PayoutStatus;
 import com.manabihub.payout.enums.ReconciliationStatus;
+import com.manabihub.payout.enums.WithdrawalStatus;
 import com.manabihub.wallet.entity.Wallet;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.EscrowStatus;
@@ -52,6 +55,7 @@ class PayoutReconciliationServiceImplTest {
         request = WithdrawalRequest.builder()
                 .id(UUID.randomUUID())
                 .teacherId(teacherId)
+                .walletId(walletId)
                 .requestedAmount(new BigDecimal("500000.00"))
                 .bankAccountSnapshot(validBank())
                 .build();
@@ -146,6 +150,117 @@ class PayoutReconciliationServiceImplTest {
     }
 
     @Test
+    void completedReconciliationAcceptsReleasedReservedBalance() {
+        request.setStatus(WithdrawalStatus.EXECUTED);
+        wallet.setBalance(new BigDecimal("500000.00"));
+        wallet.setFrozenBalance(BigDecimal.ZERO);
+        PayoutSettlement settlement = completedSettlement();
+        WalletTransaction completion = WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .direction(WalletDirection.OUT)
+                .transactionType(WalletTransactionType.WITHDRAWAL_COMPLETED)
+                .build();
+        when(walletTransactionRepository.findByReferenceTypeAndReferenceIdAndTransactionType(
+                "WITHDRAWAL_REQUEST",
+                request.getId(),
+                WalletTransactionType.WITHDRAWAL_COMPLETED
+        )).thenReturn(Optional.of(completion));
+
+        var result = service.reconcileCompleted(request, wallet, settlement);
+
+        assertEquals(ReconciliationStatus.MATCHED, result.status());
+        assertTrue(result.alerts().stream()
+                .noneMatch(alert -> "PAYOUT_RESERVED_BALANCE_MISMATCH".equals(alert.code())));
+    }
+
+    @Test
+    void completedReconciliationBlocksMissingCompletionLedger() {
+        request.setStatus(WithdrawalStatus.EXECUTED);
+        wallet.setBalance(new BigDecimal("500000.00"));
+        wallet.setFrozenBalance(BigDecimal.ZERO);
+        when(walletTransactionRepository.findByReferenceTypeAndReferenceIdAndTransactionType(
+                "WITHDRAWAL_REQUEST",
+                request.getId(),
+                WalletTransactionType.WITHDRAWAL_COMPLETED
+        )).thenReturn(Optional.empty());
+
+        var result = service.reconcileCompleted(request, wallet, completedSettlement());
+
+        assertEquals(ReconciliationStatus.CRITICAL_MISMATCH, result.status());
+        assertTrue(result.alerts().stream()
+                .anyMatch(alert -> "PAYOUT_COMPLETION_LEDGER_MISSING".equals(alert.code())));
+    }
+
+    @Test
+    void rejectedReconciliationMatchesReleasedReservation() {
+        request.setStatus(WithdrawalStatus.REJECTED);
+        wallet.setFrozenBalance(BigDecimal.ZERO);
+        WalletTransaction release = WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .direction(WalletDirection.IN)
+                .transactionType(WalletTransactionType.WITHDRAWAL_REJECTED)
+                .build();
+        when(walletTransactionRepository.findByReferenceTypeAndReferenceIdAndTransactionType(
+                "WITHDRAWAL_REQUEST",
+                request.getId(),
+                WalletTransactionType.WITHDRAWAL_REJECTED
+        )).thenReturn(Optional.of(release));
+
+        var result = service.reconcileRejected(request, wallet, rejectedSettlement());
+
+        assertEquals(ReconciliationStatus.MATCHED, result.status());
+        assertTrue(result.alerts().isEmpty());
+    }
+
+    @Test
+    void rejectedReconciliationBlocksMissingReleaseLedger() {
+        request.setStatus(WithdrawalStatus.REJECTED);
+        wallet.setFrozenBalance(BigDecimal.ZERO);
+
+        var result = service.reconcileRejected(request, wallet, rejectedSettlement());
+
+        assertEquals(ReconciliationStatus.CRITICAL_MISMATCH, result.status());
+        assertTrue(result.alerts().stream()
+                .anyMatch(alert -> "PAYOUT_REJECTION_LEDGER_MISSING".equals(alert.code())));
+    }
+
+    @Test
+    void rejectedReconciliationBlocksCompletedLedgerConflict() {
+        request.setStatus(WithdrawalStatus.REJECTED);
+        wallet.setFrozenBalance(BigDecimal.ZERO);
+        WalletTransaction release = WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .direction(WalletDirection.IN)
+                .transactionType(WalletTransactionType.WITHDRAWAL_REJECTED)
+                .build();
+        WalletTransaction completion = WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .direction(WalletDirection.OUT)
+                .transactionType(WalletTransactionType.WITHDRAWAL_COMPLETED)
+                .build();
+        when(walletTransactionRepository.findByReferenceTypeAndReferenceIdAndTransactionType(
+                "WITHDRAWAL_REQUEST",
+                request.getId(),
+                WalletTransactionType.WITHDRAWAL_REJECTED
+        )).thenReturn(Optional.of(release));
+        when(walletTransactionRepository.findByReferenceTypeAndReferenceIdAndTransactionType(
+                "WITHDRAWAL_REQUEST",
+                request.getId(),
+                WalletTransactionType.WITHDRAWAL_COMPLETED
+        )).thenReturn(Optional.of(completion));
+
+        var result = service.reconcileRejected(request, wallet, rejectedSettlement());
+
+        assertEquals(ReconciliationStatus.CRITICAL_MISMATCH, result.status());
+        assertTrue(result.alerts().stream()
+                .anyMatch(alert -> "PAYOUT_REJECTED_COMPLETION_CONFLICT".equals(alert.code())));
+    }
+
+    @Test
     void studentReconciliationMatchesReservedWithdrawableBalance() {
         UUID studentId = UUID.randomUUID();
         UUID walletId = UUID.randomUUID();
@@ -198,5 +313,34 @@ class PayoutReconciliationServiceImplTest {
         bank.setAccountHolderName("NGUYEN SENSEI");
         bank.setAccountNumber("0123456789");
         return bank;
+    }
+
+    private PayoutSettlement completedSettlement() {
+        return PayoutSettlement.builder()
+                .withdrawalRequestId(request.getId())
+                .teacherId(request.getTeacherId())
+                .ownerType(WalletOwnerType.TEACHER)
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .currency("VND")
+                .status(PayoutStatus.SUCCEEDED)
+                .providerReferenceId("BANK-123")
+                .reconciliationStatus(ReconciliationStatus.MATCHED)
+                .build();
+    }
+
+    private PayoutSettlement rejectedSettlement() {
+        return PayoutSettlement.builder()
+                .withdrawalRequestId(request.getId())
+                .teacherId(request.getTeacherId())
+                .ownerType(WalletOwnerType.TEACHER)
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .currency("VND")
+                .status(PayoutStatus.REJECTED)
+                .decision("REJECTED")
+                .decisionReason("Bank account data does not match")
+                .reconciliationStatus(ReconciliationStatus.MATCHED)
+                .build();
     }
 }

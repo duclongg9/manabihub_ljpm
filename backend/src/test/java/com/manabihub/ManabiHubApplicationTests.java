@@ -52,6 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -65,6 +66,9 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private JdbcTemplate jdbcTemplate;
+
+    @MockBean
+    private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
     @MockBean
     private EntityManager entityManager;
@@ -289,6 +293,12 @@ class ManabiHubApplicationTests {
 
     @MockBean
     private com.manabihub.refund.repository.RefundProviderAttemptRepository refundProviderAttemptRepository;
+
+    @MockBean
+    private com.manabihub.finance.repository.SystemExpenseRepository systemExpenseRepository;
+
+    @MockBean
+    private com.manabihub.oversight.repository.OperationalDecisionReviewRepository operationalDecisionReviewRepository;
 
     @MockBean
     private com.manabihub.moderation.repository.ViolationReportRepository moderationViolationReportRepository;

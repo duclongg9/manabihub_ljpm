@@ -3,6 +3,7 @@ package com.manabihub.refund.controller;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.common.response.PageResponse;
 import com.manabihub.refund.dto.request.RefundDecisionRequest;
+import com.manabihub.refund.dto.request.RefundQueueFilterRequest;
 import com.manabihub.refund.dto.response.RefundDetailResponse;
 import com.manabihub.refund.dto.response.RefundQueueResponse;
 import com.manabihub.refund.service.RefundService;
@@ -16,20 +17,26 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.Sort;
 
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin/refunds")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('FINANCE_MANAGER', 'SYSTEM_ADMIN')")
+@PreAuthorize("hasRole('FINANCE_MANAGER')")
 public class RefundAdminController {
 
     private final RefundService refundService;
 
     @GetMapping
-    public ApiResponse<PageResponse<RefundQueueResponse>> getPendingRefunds(Pageable pageable) {
-        return ApiResponse.success(refundService.getPendingRefunds(pageable));
+    public ApiResponse<PageResponse<RefundQueueResponse>> searchRefunds(
+            @ModelAttribute RefundQueueFilterRequest filter,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ApiResponse.success(refundService.searchRefunds(filter, pageable));
     }
 
     @GetMapping("/{id}")

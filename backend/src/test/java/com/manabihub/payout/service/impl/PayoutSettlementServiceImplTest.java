@@ -15,6 +15,7 @@ import com.manabihub.kyc.domain.UserStatus;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
 import com.manabihub.notification.service.NotificationService;
 import com.manabihub.payout.dto.request.ManualTransferRequest;
+import com.manabihub.payout.dto.request.PayoutQueueFilterRequest;
 import com.manabihub.payout.dto.request.RejectPayoutRequest;
 import com.manabihub.payout.entity.BankAccountSnapshot;
 import com.manabihub.payout.entity.PayoutSettlement;
@@ -49,6 +50,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -137,6 +141,7 @@ class PayoutSettlementServiceImplTest {
         request = WithdrawalRequest.builder()
                 .id(requestId)
                 .teacherId(teacherId)
+                .walletId(walletId)
                 .requestedAmount(new BigDecimal("1000000.00"))
                 .status(WithdrawalStatus.PENDING)
                 .bankAccountSnapshot(bank)
@@ -166,8 +171,13 @@ class PayoutSettlementServiceImplTest {
         when(currentUserService.getCurrentUserId()).thenReturn(adminId);
         when(internalAdminAccountRepository.findById(adminId)).thenReturn(Optional.of(admin));
         when(withdrawalRequestRepository.findByIdWithLock(requestId)).thenReturn(Optional.of(request));
+        when(withdrawalRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
         when(teacherProfileRepository.findById(teacherId)).thenReturn(Optional.of(teacher));
+        when(walletRepository.findByOwnerTypeAndTeacher_Id(
+                WalletOwnerType.TEACHER, teacherId)).thenReturn(Optional.of(wallet));
         when(walletRepository.findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherId)).thenReturn(Optional.of(wallet));
+        when(payoutSettlementRepository.findByWithdrawalRequestId(requestId))
+                .thenAnswer(ignored -> Optional.ofNullable(settlementRef.get()));
         when(payoutSettlementRepository.findByWithdrawalRequestIdWithLock(requestId))
                 .thenAnswer(ignored -> Optional.ofNullable(settlementRef.get()));
         when(payoutSettlementRepository.findByIdWithLock(any()))
@@ -187,6 +197,14 @@ class PayoutSettlementServiceImplTest {
         )).thenReturn(Optional.of(reservation));
         when(reconciliationService.reconcile(request, wallet, teacher))
                 .thenReturn(matchedReconciliation());
+        when(reconciliationService.reconcileCompleted(request, wallet, null))
+                .thenReturn(matchedReconciliation());
+        when(reconciliationService.reconcileCompleted(eq(request), eq(wallet), any(PayoutSettlement.class)))
+                .thenReturn(matchedReconciliation());
+        when(reconciliationService.reconcileRejected(eq(request), eq(wallet), any(PayoutSettlement.class)))
+                .thenReturn(matchedReconciliation());
+        when(reconciliationLogRepository.findByWithdrawalRequestIdOrderByCreatedAtDesc(
+                eq(requestId), any())).thenReturn(List.of());
         when(payoutGateway.providerName()).thenReturn("TEST_GATEWAY");
         when(payoutSecurityService.decryptAccountNumber(any())).thenAnswer(
                 invocation -> invocation.getArgument(0)
@@ -241,6 +259,23 @@ class PayoutSettlementServiceImplTest {
         assertEquals(PayoutStatus.SUCCEEDED, repeated.getSettlementStatus());
         assertEquals(0, wallet.getBalance().compareTo(new BigDecimal("1000000.00")));
         assertEquals(0, wallet.getFrozenBalance().compareTo(BigDecimal.ZERO));
+
+        var detail = service.getPayoutDetail(requestId);
+        var pageable = PageRequest.of(0, 20);
+        when(withdrawalRequestRepository.findAll(
+                any(Specification.class),
+                eq(pageable)
+        )).thenReturn(new PageImpl<>(List.of(request), pageable, 1));
+        var queue = service.getPayoutQueue(new PayoutQueueFilterRequest(), pageable);
+        var reviewed = service.reviewReconciliation(requestId);
+
+        assertEquals(ReconciliationStatus.MATCHED, detail.getReconciliationStatus());
+        assertTrue(detail.getReconciliationAlerts().isEmpty());
+        assertEquals(ReconciliationStatus.MATCHED,
+                queue.getContent().get(0).getReconciliationStatus());
+        assertEquals(ReconciliationStatus.MATCHED, reviewed.getReconciliationStatus());
+        verify(reconciliationService, times(3))
+                .reconcileCompleted(eq(request), eq(wallet), any(PayoutSettlement.class));
         verify(payoutGateway, times(1)).transfer(any());
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(notificationService, times(1))
@@ -402,6 +437,11 @@ class PayoutSettlementServiceImplTest {
         assertEquals(PayoutStatus.REJECTED, settlementRef.get().getStatus());
         assertEquals(0, wallet.getFrozenBalance().compareTo(BigDecimal.ZERO));
         assertEquals(0, wallet.getBalance().compareTo(new BigDecimal("2000000.00")));
+        var detail = service.getPayoutDetail(requestId);
+        assertEquals(ReconciliationStatus.MATCHED, detail.getReconciliationStatus());
+        assertTrue(detail.getReconciliationAlerts().isEmpty());
+        verify(reconciliationService, times(2))
+                .reconcileRejected(eq(request), eq(wallet), any(PayoutSettlement.class));
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(notificationService, times(1))
                 .createNotification(any(), any(), any(), any(), eq("PAYOUT_REJECTED"), any());

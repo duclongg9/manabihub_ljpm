@@ -11,6 +11,7 @@ import com.manabihub.payment.entity.PaymentTransaction;
 import com.manabihub.payment.enums.PaymentStatus;
 import com.manabihub.payment.repository.PaymentTransactionRepository;
 import com.manabihub.refund.dto.request.RefundDecisionRequest;
+import com.manabihub.refund.dto.request.RefundQueueFilterRequest;
 import com.manabihub.refund.dto.response.RefundDetailResponse;
 import com.manabihub.refund.dto.response.RefundQueueResponse;
 import com.manabihub.refund.entity.RefundProviderAttempt;
@@ -19,22 +20,28 @@ import com.manabihub.refund.enums.RefundStatus;
 import com.manabihub.refund.mapper.RefundMapper;
 import com.manabihub.refund.repository.RefundProviderAttemptRepository;
 import com.manabihub.refund.repository.RefundRequestRepository;
+import com.manabihub.refund.repository.RefundRequestSpecifications;
 import com.manabihub.refund.service.RefundService;
 import com.manabihub.wallet.entity.EscrowLedger;
 import com.manabihub.wallet.repository.EscrowLedgerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class RefundServiceImpl implements RefundService {
+
+    private static final Set<String> ALLOWED_SORTS = Set.of("createdAt", "decidedAt", "status", "id");
 
     private final RefundRequestRepository refundRequestRepository;
     private final RefundMapper refundMapper;
@@ -47,22 +54,56 @@ public class RefundServiceImpl implements RefundService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<RefundQueueResponse> getPendingRefunds(Pageable pageable) {
+    public PageResponse<RefundQueueResponse> searchRefunds(
+            RefundQueueFilterRequest filter,
+            Pageable pageable
+    ) {
         decisionTransactionService.requireAccess(
                 currentUserService.getCurrentUserId()
         );
-        Page<RefundRequest> page = refundRequestRepository.findByStatusIn(
-                List.of(
-                        RefundStatus.PENDING,
-                        RefundStatus.PROCESSING,
-                        RefundStatus.RECONCILIATION_REQUIRED
-                ),
-                pageable
+        validateFilter(filter);
+        Page<RefundRequest> page = refundRequestRepository.findAll(
+                RefundRequestSpecifications.from(filter),
+                safePageable(pageable)
         );
         return PageResponse.from(page.map(refund -> enrichQueueResponse(
                 refundMapper.toQueueResponse(refund),
                 refund
         )));
+    }
+
+    private void validateFilter(RefundQueueFilterRequest filter) {
+        if (filter == null) {
+            return;
+        }
+        if (filter.getMinAmount() != null && filter.getMinAmount().signum() < 0
+                || filter.getMaxAmount() != null && filter.getMaxAmount().signum() < 0) {
+            throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Refund amount filters cannot be negative");
+        }
+        if (filter.getMinAmount() != null && filter.getMaxAmount() != null
+                && filter.getMinAmount().compareTo(filter.getMaxAmount()) > 0) {
+            throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Minimum amount cannot exceed maximum amount");
+        }
+        if (filter.getCreatedFrom() != null && filter.getCreatedTo() != null
+                && !filter.getCreatedFrom().isBefore(filter.getCreatedTo())) {
+            throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Created range must satisfy from < to");
+        }
+        if (filter.getDecidedFrom() != null && filter.getDecidedTo() != null
+                && !filter.getDecidedFrom().isBefore(filter.getDecidedTo())) {
+            throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Decision range must satisfy from < to");
+        }
+    }
+
+    private Pageable safePageable(Pageable requested) {
+        int page = Math.max(0, requested == null ? 0 : requested.getPageNumber());
+        int size = Math.min(100, Math.max(1, requested == null ? 20 : requested.getPageSize()));
+        List<Sort.Order> orders = requested == null ? List.of() : requested.getSort().stream()
+                .filter(order -> ALLOWED_SORTS.contains(order.getProperty()))
+                .toList();
+        Sort sort = orders.isEmpty()
+                ? Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
+                : Sort.by(orders).and(Sort.by(Sort.Order.desc("id")));
+        return PageRequest.of(page, size, sort);
     }
 
     @Override

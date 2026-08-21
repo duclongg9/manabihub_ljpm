@@ -126,7 +126,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 .findByWithdrawalRequestId(withdrawalRequestId)
                 .orElse(null);
         PayoutReconciliationService.ReconciliationResult reconciliation =
-                reconcile(request, owner);
+                reconcileForCurrentPhase(request, owner, settlement);
 
         return toDetail(request, owner, settlement, reconciliation);
     }
@@ -143,7 +143,12 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 .findByWithdrawalRequestId(withdrawalRequestId)
                 .orElse(null);
         PayoutReconciliationService.ReconciliationResult reconciliation =
-                reconcile(request, owner);
+                reconcileForCurrentPhase(request, owner, settlement);
+        if (settlement != null) {
+            settlement.setReconciliationStatus(reconciliation.status());
+            settlement.setReconciliationNote(reconciliationNote(reconciliation));
+            payoutSettlementRepository.save(settlement);
+        }
         saveReconciliationLog(
                 request,
                 settlement,
@@ -1068,11 +1073,10 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         settlement.setExecutedBy(admin.getId());
         settlement.setExecutedAt(Instant.now());
         settlement.setNotificationStatus(PayoutNotificationStatus.PENDING);
-        settlement.setReconciliationStatus(
-                settlement.getReconciliationStatus() == null
-                        ? ReconciliationStatus.MATCHED
-                        : settlement.getReconciliationStatus()
-        );
+        PayoutReconciliationService.ReconciliationResult reconciliation =
+                reconciliationService.reconcileRejected(request, wallet, settlement);
+        settlement.setReconciliationStatus(reconciliation.status());
+        settlement.setReconciliationNote(reconciliationNote(reconciliation));
         payoutSettlementRepository.save(settlement);
         audit(
                 admin,
@@ -1093,7 +1097,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 .findByWithdrawalRequestId(request.getId())
                 .orElse(null);
         PayoutReconciliationService.ReconciliationResult reconciliation =
-                reconcile(request, owner);
+                reconcileForCurrentPhase(request, owner, settlement);
 
         return PayoutQueueItemResponse.builder()
                 .withdrawalRequestId(request.getId())
@@ -1519,6 +1523,32 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                         request, owner.wallet(), owner.student())
                 : reconciliationService.reconcile(
                         request, owner.wallet(), owner.teacher());
+    }
+
+    private PayoutReconciliationService.ReconciliationResult reconcileForCurrentPhase(
+            WithdrawalRequest request,
+            OwnerContext owner,
+            PayoutSettlement settlement
+    ) {
+        boolean rejectionPhase = request.getStatus() == WithdrawalStatus.REJECTED
+                || settlement != null && settlement.getStatus() == PayoutStatus.REJECTED;
+        if (rejectionPhase) {
+            return reconciliationService.reconcileRejected(
+                    request,
+                    owner.wallet(),
+                    settlement
+            );
+        }
+        boolean completionPhase = request.getStatus() == WithdrawalStatus.EXECUTED
+                || settlement != null && settlement.getStatus() == PayoutStatus.SUCCEEDED;
+        if (completionPhase) {
+            return reconciliationService.reconcileCompleted(
+                    request,
+                    owner.wallet(),
+                    settlement
+            );
+        }
+        return reconcile(request, owner);
     }
 
     private UUID ownerProfileId(WithdrawalRequest request) {

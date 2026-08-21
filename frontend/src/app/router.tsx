@@ -54,6 +54,9 @@ import { StudentIdentityVerificationPage } from '../features/wallet/pages/Studen
 import { PublicTeacherProfilePage } from '../features/teacher-discovery/pages/PublicTeacherProfilePage';
 import { SystemSettingsPage } from '../features/system-administration/pages/SystemSettingsPage';
 import { InternalAdminAccountsPage } from '../features/system-administration/pages/InternalAdminAccountsPage';
+import { FinanceRevenueDashboardPage } from '../features/admin-finance/FinanceRevenueDashboardPage';
+import { SystemExpenseManagementPage } from '../features/admin-finance/SystemExpenseManagementPage';
+import { DecisionReviewPage } from '../features/admin-oversight/DecisionReviewPage';
 import { HelpCenterLayout } from '../features/help-center/layouts/HelpCenterLayout';
 import { HelpCenterIndexPage } from '../features/help-center/pages/HelpCenterIndexPage';
 import { InstructorRevenueSharePage } from '../features/help-center/pages/articles/InstructorRevenueSharePage';
@@ -316,6 +319,10 @@ export const router = createBrowserRouter([
         element: <AdminAuditLogPage />,
       },
       {
+        path: 'decision-reviews',
+        element: <DecisionReviewPage />,
+      },
+      {
         path: 'kyc/review',
         element: <Navigate to="/admin/kyc" replace />,
       },
@@ -354,6 +361,18 @@ export const router = createBrowserRouter([
       {
         path: 'payouts/:id',
         element: <PayoutSettlementPage />,
+      },
+      {
+        path: 'finance/revenue',
+        element: <FinanceRevenueDashboardPage />,
+      },
+      {
+        path: 'finance/expenses',
+        element: <SystemExpenseManagementPage />,
+      },
+      {
+        path: 'finance/expenses/:id',
+        element: <SystemExpenseManagementPage />,
       },
       {
         path: 'violations',
