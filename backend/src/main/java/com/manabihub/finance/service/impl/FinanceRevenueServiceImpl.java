@@ -164,7 +164,18 @@ public class FinanceRevenueServiceImpl implements FinanceRevenueService {
                         date_trunc('%s', ledger.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS bucket_date,
                         0::numeric, 0::bigint, 0::numeric, 0::bigint,
                         SUM(CASE WHEN ledger.event_type = 'COMMISSION_RECOGNIZED' THEN ledger.amount ELSE 0 END)::numeric,
-                        SUM(CASE WHEN ledger.event_type = 'COMMISSION_REVERSED' THEN ledger.amount ELSE 0 END)::numeric,
+                        SUM(CASE
+                            WHEN ledger.event_type = 'COMMISSION_REVERSED'
+                             AND EXISTS (
+                                SELECT 1
+                                FROM platform_commission_ledgers recognized
+                                WHERE recognized.order_item_id = ledger.order_item_id
+                                  AND recognized.event_type = 'COMMISSION_RECOGNIZED'
+                                  AND recognized.created_at <= ledger.created_at
+                             )
+                            THEN ledger.amount
+                            ELSE 0
+                        END)::numeric,
                         0::numeric, 0::numeric
                     FROM platform_commission_ledgers ledger
                     WHERE ledger.event_type IN ('COMMISSION_RECOGNIZED', 'COMMISSION_REVERSED')

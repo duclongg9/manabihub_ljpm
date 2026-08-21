@@ -201,6 +201,8 @@ class PayoutSettlementServiceImplTest {
                 .thenReturn(matchedReconciliation());
         when(reconciliationService.reconcileCompleted(eq(request), eq(wallet), any(PayoutSettlement.class)))
                 .thenReturn(matchedReconciliation());
+        when(reconciliationService.reconcileRejected(eq(request), eq(wallet), any(PayoutSettlement.class)))
+                .thenReturn(matchedReconciliation());
         when(reconciliationLogRepository.findByWithdrawalRequestIdOrderByCreatedAtDesc(
                 eq(requestId), any())).thenReturn(List.of());
         when(payoutGateway.providerName()).thenReturn("TEST_GATEWAY");
@@ -435,6 +437,11 @@ class PayoutSettlementServiceImplTest {
         assertEquals(PayoutStatus.REJECTED, settlementRef.get().getStatus());
         assertEquals(0, wallet.getFrozenBalance().compareTo(BigDecimal.ZERO));
         assertEquals(0, wallet.getBalance().compareTo(new BigDecimal("2000000.00")));
+        var detail = service.getPayoutDetail(requestId);
+        assertEquals(ReconciliationStatus.MATCHED, detail.getReconciliationStatus());
+        assertTrue(detail.getReconciliationAlerts().isEmpty());
+        verify(reconciliationService, times(2))
+                .reconcileRejected(eq(request), eq(wallet), any(PayoutSettlement.class));
         verify(walletTransactionRepository, times(1)).save(any(WalletTransaction.class));
         verify(notificationService, times(1))
                 .createNotification(any(), any(), any(), any(), eq("PAYOUT_REJECTED"), any());

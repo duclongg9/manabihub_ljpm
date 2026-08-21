@@ -144,6 +144,11 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
                 .orElse(null);
         PayoutReconciliationService.ReconciliationResult reconciliation =
                 reconcileForCurrentPhase(request, owner, settlement);
+        if (settlement != null) {
+            settlement.setReconciliationStatus(reconciliation.status());
+            settlement.setReconciliationNote(reconciliationNote(reconciliation));
+            payoutSettlementRepository.save(settlement);
+        }
         saveReconciliationLog(
                 request,
                 settlement,
@@ -1068,11 +1073,10 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
         settlement.setExecutedBy(admin.getId());
         settlement.setExecutedAt(Instant.now());
         settlement.setNotificationStatus(PayoutNotificationStatus.PENDING);
-        settlement.setReconciliationStatus(
-                settlement.getReconciliationStatus() == null
-                        ? ReconciliationStatus.MATCHED
-                        : settlement.getReconciliationStatus()
-        );
+        PayoutReconciliationService.ReconciliationResult reconciliation =
+                reconciliationService.reconcileRejected(request, wallet, settlement);
+        settlement.setReconciliationStatus(reconciliation.status());
+        settlement.setReconciliationNote(reconciliationNote(reconciliation));
         payoutSettlementRepository.save(settlement);
         audit(
                 admin,
@@ -1526,6 +1530,15 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             OwnerContext owner,
             PayoutSettlement settlement
     ) {
+        boolean rejectionPhase = request.getStatus() == WithdrawalStatus.REJECTED
+                || settlement != null && settlement.getStatus() == PayoutStatus.REJECTED;
+        if (rejectionPhase) {
+            return reconciliationService.reconcileRejected(
+                    request,
+                    owner.wallet(),
+                    settlement
+            );
+        }
         boolean completionPhase = request.getStatus() == WithdrawalStatus.EXECUTED
                 || settlement != null && settlement.getStatus() == PayoutStatus.SUCCEEDED;
         if (completionPhase) {

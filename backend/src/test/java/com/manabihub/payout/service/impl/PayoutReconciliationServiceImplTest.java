@@ -193,6 +193,74 @@ class PayoutReconciliationServiceImplTest {
     }
 
     @Test
+    void rejectedReconciliationMatchesReleasedReservation() {
+        request.setStatus(WithdrawalStatus.REJECTED);
+        wallet.setFrozenBalance(BigDecimal.ZERO);
+        WalletTransaction release = WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .direction(WalletDirection.IN)
+                .transactionType(WalletTransactionType.WITHDRAWAL_REJECTED)
+                .build();
+        when(walletTransactionRepository.findByReferenceTypeAndReferenceIdAndTransactionType(
+                "WITHDRAWAL_REQUEST",
+                request.getId(),
+                WalletTransactionType.WITHDRAWAL_REJECTED
+        )).thenReturn(Optional.of(release));
+
+        var result = service.reconcileRejected(request, wallet, rejectedSettlement());
+
+        assertEquals(ReconciliationStatus.MATCHED, result.status());
+        assertTrue(result.alerts().isEmpty());
+    }
+
+    @Test
+    void rejectedReconciliationBlocksMissingReleaseLedger() {
+        request.setStatus(WithdrawalStatus.REJECTED);
+        wallet.setFrozenBalance(BigDecimal.ZERO);
+
+        var result = service.reconcileRejected(request, wallet, rejectedSettlement());
+
+        assertEquals(ReconciliationStatus.CRITICAL_MISMATCH, result.status());
+        assertTrue(result.alerts().stream()
+                .anyMatch(alert -> "PAYOUT_REJECTION_LEDGER_MISSING".equals(alert.code())));
+    }
+
+    @Test
+    void rejectedReconciliationBlocksCompletedLedgerConflict() {
+        request.setStatus(WithdrawalStatus.REJECTED);
+        wallet.setFrozenBalance(BigDecimal.ZERO);
+        WalletTransaction release = WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .direction(WalletDirection.IN)
+                .transactionType(WalletTransactionType.WITHDRAWAL_REJECTED)
+                .build();
+        WalletTransaction completion = WalletTransaction.builder()
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .direction(WalletDirection.OUT)
+                .transactionType(WalletTransactionType.WITHDRAWAL_COMPLETED)
+                .build();
+        when(walletTransactionRepository.findByReferenceTypeAndReferenceIdAndTransactionType(
+                "WITHDRAWAL_REQUEST",
+                request.getId(),
+                WalletTransactionType.WITHDRAWAL_REJECTED
+        )).thenReturn(Optional.of(release));
+        when(walletTransactionRepository.findByReferenceTypeAndReferenceIdAndTransactionType(
+                "WITHDRAWAL_REQUEST",
+                request.getId(),
+                WalletTransactionType.WITHDRAWAL_COMPLETED
+        )).thenReturn(Optional.of(completion));
+
+        var result = service.reconcileRejected(request, wallet, rejectedSettlement());
+
+        assertEquals(ReconciliationStatus.CRITICAL_MISMATCH, result.status());
+        assertTrue(result.alerts().stream()
+                .anyMatch(alert -> "PAYOUT_REJECTED_COMPLETION_CONFLICT".equals(alert.code())));
+    }
+
+    @Test
     void studentReconciliationMatchesReservedWithdrawableBalance() {
         UUID studentId = UUID.randomUUID();
         UUID walletId = UUID.randomUUID();
@@ -257,6 +325,21 @@ class PayoutReconciliationServiceImplTest {
                 .currency("VND")
                 .status(PayoutStatus.SUCCEEDED)
                 .providerReferenceId("BANK-123")
+                .reconciliationStatus(ReconciliationStatus.MATCHED)
+                .build();
+    }
+
+    private PayoutSettlement rejectedSettlement() {
+        return PayoutSettlement.builder()
+                .withdrawalRequestId(request.getId())
+                .teacherId(request.getTeacherId())
+                .ownerType(WalletOwnerType.TEACHER)
+                .walletId(wallet.getId())
+                .amount(request.getRequestedAmount())
+                .currency("VND")
+                .status(PayoutStatus.REJECTED)
+                .decision("REJECTED")
+                .decisionReason("Bank account data does not match")
                 .reconciliationStatus(ReconciliationStatus.MATCHED)
                 .build();
     }

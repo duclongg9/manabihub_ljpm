@@ -51,7 +51,7 @@ WHERE mapping.role_id = role.id
       'FINANCE_EVIDENCE_VIEW'
   );
 
-CREATE TABLE system_expenses (
+CREATE TABLE IF NOT EXISTS system_expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     expense_code VARCHAR(50) NOT NULL UNIQUE,
     vendor_name VARCHAR(255) NOT NULL,
@@ -99,7 +99,7 @@ CREATE TABLE system_expenses (
         )
 );
 
-CREATE TABLE system_expense_lines (
+CREATE TABLE IF NOT EXISTS system_expense_lines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     expense_id UUID NOT NULL REFERENCES system_expenses(id) ON DELETE CASCADE,
     category_code VARCHAR(50) NOT NULL,
@@ -131,14 +131,14 @@ CREATE TABLE system_expense_lines (
     CONSTRAINT uq_system_expense_line_order UNIQUE (expense_id, line_order)
 );
 
-CREATE INDEX idx_system_expenses_status_incurred
+CREATE INDEX IF NOT EXISTS idx_system_expenses_status_incurred
     ON system_expenses(status, incurred_at DESC, id DESC);
-CREATE INDEX idx_system_expenses_vendor
+CREATE INDEX IF NOT EXISTS idx_system_expenses_vendor
     ON system_expenses(LOWER(vendor_name));
-CREATE INDEX idx_system_expense_lines_category
+CREATE INDEX IF NOT EXISTS idx_system_expense_lines_category
     ON system_expense_lines(category_code, expense_id);
 
-CREATE TABLE operational_decision_reviews (
+CREATE TABLE IF NOT EXISTS operational_decision_reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     audit_log_id UUID NOT NULL UNIQUE REFERENCES audit_logs(id),
     review_status VARCHAR(20) NOT NULL,
@@ -164,6 +164,6 @@ CREATE TABLE operational_decision_reviews (
         )
 );
 
-CREATE INDEX idx_operational_decision_reviews_status
+CREATE INDEX IF NOT EXISTS idx_operational_decision_reviews_status
     ON operational_decision_reviews(review_status, reviewed_at DESC);
 

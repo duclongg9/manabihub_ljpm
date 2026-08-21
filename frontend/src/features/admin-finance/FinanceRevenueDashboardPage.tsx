@@ -15,11 +15,8 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { adminFinanceApi } from './adminFinanceApi';
 import { getRevenueLoadErrorMessage } from './financeRevenueError';
+import { reportingMonthRange } from './revenueReportingDate';
 import type { MoneyValue, RevenueDashboard, RevenueGranularity, RevenuePoint } from './types';
-
-function dateInputValue(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
 
 function money(value: MoneyValue) {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 })
@@ -31,10 +28,9 @@ function percentage(value: MoneyValue) {
 }
 
 export function FinanceRevenueDashboardPage() {
-  const today = useMemo(() => new Date(), []);
-  const firstDay = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), [today]);
-  const [from, setFrom] = useState(dateInputValue(firstDay));
-  const [to, setTo] = useState(dateInputValue(today));
+  const defaultRange = useMemo(() => reportingMonthRange(new Date()), []);
+  const [from, setFrom] = useState(defaultRange.from);
+  const [to, setTo] = useState(defaultRange.to);
   const [granularity, setGranularity] = useState<RevenueGranularity>('DAY');
   const [dashboard, setDashboard] = useState<RevenueDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,9 +140,11 @@ function RevenueChart({ points }: { points: RevenuePoint[] }) {
     Number(point.platformRevenue),
     Number(point.paymentFees) + Number(point.operatingExpenses),
   ]);
-  const max = Math.max(...values, 1);
+  const chartMin = Math.min(...values, 0);
+  const chartMax = Math.max(...values, 1);
+  const chartSpan = Math.max(chartMax - chartMin, 1);
   const x = (index: number) => pad + (points.length <= 1 ? 0 : index * (width - pad * 2) / (points.length - 1));
-  const y = (value: number) => height - pad - value / max * (height - pad * 2);
+  const y = (value: number) => pad + (chartMax - value) / chartSpan * (height - pad * 2);
   const pointsFor = (key: 'grossSales' | 'platformRevenue' | 'expenses') => points.map((point, index) => {
     const value = key === 'expenses'
       ? Number(point.paymentFees) + Number(point.operatingExpenses)
@@ -162,14 +160,17 @@ function RevenueChart({ points }: { points: RevenuePoint[] }) {
     <Box>
       <Box sx={{ overflowX: 'auto' }}>
         <svg viewBox={`0 0 ${width} ${height}`} style={{ minWidth: 720, width: '100%', display: 'block' }} role="img" aria-label="Biểu đồ doanh thu theo thời gian">
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-            <g key={ratio}>
-              <line x1={pad} x2={width - pad} y1={y(max * ratio)} y2={y(max * ratio)} stroke="#e5e7eb" />
-              <text x={pad - 8} y={y(max * ratio) + 4} textAnchor="end" fontSize="11" fill="#6b7280">
-                {new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(max * ratio)}
-              </text>
-            </g>
-          ))}
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+            const tickValue = chartMin + chartSpan * ratio;
+            return (
+              <g key={ratio}>
+                <line x1={pad} x2={width - pad} y1={y(tickValue)} y2={y(tickValue)} stroke={tickValue === 0 ? '#94a3b8' : '#e5e7eb'} />
+                <text x={pad - 8} y={y(tickValue) + 4} textAnchor="end" fontSize="11" fill="#6b7280">
+                  {new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(tickValue)}
+                </text>
+              </g>
+            );
+          })}
           {series.map((item) => (
             <polyline key={item.key} points={pointsFor(item.key)} fill="none" stroke={item.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
           ))}

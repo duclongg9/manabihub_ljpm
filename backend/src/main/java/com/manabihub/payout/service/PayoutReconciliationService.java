@@ -36,6 +36,17 @@ public interface PayoutReconciliationService {
             PayoutSettlement settlement
     );
 
+    /**
+     * Reconciles a payout after Finance has rejected it. A valid rejection has
+     * already released the reservation, so the release ledger entry replaces the
+     * reserved wallet balance as the source of truth for this phase.
+     */
+    ReconciliationResult reconcileRejected(
+            WithdrawalRequest request,
+            Wallet wallet,
+            PayoutSettlement settlement
+    );
+
     record ReconciliationAlert(String code, String severity, String message) {
     }
 
