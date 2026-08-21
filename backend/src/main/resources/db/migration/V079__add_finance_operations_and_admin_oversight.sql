@@ -166,4 +166,3 @@ CREATE TABLE IF NOT EXISTS operational_decision_reviews (
 
 CREATE INDEX IF NOT EXISTS idx_operational_decision_reviews_status
     ON operational_decision_reviews(review_status, reviewed_at DESC);
-
