@@ -113,6 +113,30 @@ describe('parseJlptOcrText', () => {
     expect(result.certificateCode).toBe('N4B123456A');
   });
 
+  it('extracts spaced fields from focused OCR passes and prefers the registration number', () => {
+    const result = parseJlptOcrText(`
+      N 3
+      Name THAN VAN THANH
+      Date of Birth 2004 / 08 / 12
+      N 3 A 5 6 8 5 9 1 A
+      25 B 2080102 — 33745
+    `);
+
+    expect(result.level).toBe('N3');
+    expect(result.certificateCode).toBe('25B2080102-33745');
+  });
+
+  it('repairs common OCR letter substitutions inside the lower-left serial', () => {
+    const result = parseJlptOcrText(`
+      N3 A S68S9IA
+      Name THAN VAN THANH
+      Date of Birth 2004/08/12
+    `);
+
+    expect(result.level).toBe('N3');
+    expect(result.certificateCode).toBe('N3A568591A');
+  });
+
   it('strips leaked CJK characters from name lines', () => {
     // OCR sometimes partially reads the kanji label into the name value line.
     const result = parseJlptOcrText(`

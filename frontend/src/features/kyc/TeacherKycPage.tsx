@@ -380,10 +380,16 @@ function TeacherKycPageContent() {
       if (result.certificateCode) {
         setCertificateCode(result.certificateCode);
       }
-      if (!result.rawText || !result.holderName || !result.dateOfBirth || !result.level) {
+      if (
+        !result.rawText
+        || !result.holderName
+        || !result.dateOfBirth
+        || !result.level
+        || !result.certificateCode
+      ) {
         setErrors((current) => ({
           ...current,
-          ocr: 'OCR chưa đọc đủ họ tên, ngày sinh và cấp độ JLPT. Hãy dùng ảnh rõ, thẳng và đủ sáng.',
+          ocr: 'OCR chưa đọc đủ họ tên, ngày sinh, cấp độ JLPT và mã chứng chỉ. Hãy dùng ảnh rõ, thẳng, đủ sáng và không cắt mất mép dưới.',
         }));
       }
     } catch (error) {

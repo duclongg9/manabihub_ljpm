@@ -73,6 +73,10 @@ public final class MessageCodes {
     public static final String MSG_AUTH_007 = "MSG-AUTH-007"; // Admin login failed
     public static final String MSG_AUTH_008 = "MSG-AUTH-008"; // Admin account locked
     public static final String MSG_AUTH_009 = "MSG-AUTH-009";
+    public static final String AUTH_SESSION_INVALID = "AUTH_SESSION_INVALID";
+    public static final String AUTH_SESSION_REVOKED = "AUTH_SESSION_REVOKED";
+    public static final String PUBLIC_DEVICE_LIMIT_REACHED = "PUBLIC_DEVICE_LIMIT_REACHED";
+    public static final String ACCOUNT_IN_USE_ELSEWHERE = "ACCOUNT_IN_USE_ELSEWHERE";
 
     // ──────────────────────────────────────────────
     // PROFILE — user profile management

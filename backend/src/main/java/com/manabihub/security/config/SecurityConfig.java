@@ -54,17 +54,20 @@ public class SecurityConfig {
     private final TeacherEligibilityFilter teacherEligibilityFilter;
     private final InternalAdminRoleFilter internalAdminRoleFilter;
     private final AppUserStatusFilter appUserStatusFilter;
+    private final PublicUserSessionFilter publicUserSessionFilter;
     private final Environment environment;
 
     public SecurityConfig(
             TeacherEligibilityFilter teacherEligibilityFilter,
             InternalAdminRoleFilter internalAdminRoleFilter,
             AppUserStatusFilter appUserStatusFilter,
+            PublicUserSessionFilter publicUserSessionFilter,
             Environment environment
     ) {
         this.teacherEligibilityFilter = teacherEligibilityFilter;
         this.internalAdminRoleFilter = internalAdminRoleFilter;
         this.appUserStatusFilter = appUserStatusFilter;
+        this.publicUserSessionFilter = publicUserSessionFilter;
         this.environment = environment;
     }
 
@@ -121,6 +124,7 @@ public class SecurityConfig {
         http.addFilterAfter(teacherEligibilityFilter, BearerTokenAuthenticationFilter.class);
         http.addFilterAfter(internalAdminRoleFilter, BearerTokenAuthenticationFilter.class);
         http.addFilterAfter(appUserStatusFilter, BearerTokenAuthenticationFilter.class);
+        http.addFilterAfter(publicUserSessionFilter, AppUserStatusFilter.class);
 
         return http.build();
     }
@@ -263,6 +267,16 @@ public class SecurityConfig {
             AppUserStatusFilter filter
     ) {
         FilterRegistrationBean<AppUserStatusFilter> registration =
+                new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<PublicUserSessionFilter> publicUserSessionFilterRegistration(
+            PublicUserSessionFilter filter
+    ) {
+        FilterRegistrationBean<PublicUserSessionFilter> registration =
                 new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;

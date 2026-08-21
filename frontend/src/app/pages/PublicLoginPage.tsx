@@ -25,7 +25,8 @@ const GoogleIcon = () => (
 export function PublicLoginPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const sessionExpired = searchParams.get('reason') === 'session-expired';
+  const reason = searchParams.get('reason');
+  const error = searchParams.get('error');
   const session = getAuthSession('public');
 
   if (session) {
@@ -159,9 +160,24 @@ export function PublicLoginPage() {
             </Typography>
           </Box>
 
-          {sessionExpired && (
+          {reason === 'session-expired' && (
             <Alert severity="warning" sx={{ mb: 3 }}>
               Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.
+            </Alert>
+          )}
+          {reason === 'session-revoked' && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              Phiên đăng nhập của bạn đã bị thu hồi từ một thiết bị khác. Vui lòng đăng nhập lại.
+            </Alert>
+          )}
+          {reason === 'account-in-use' && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              Tài khoản của bạn đang được sử dụng để học trên một thiết bị khác. Vui lòng đăng nhập lại để tiếp tục học tại đây.
+            </Alert>
+          )}
+          {error === 'PUBLIC_DEVICE_LIMIT_REACHED' && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              Bạn đã đạt giới hạn thiết bị tối đa. Vui lòng đăng xuất từ thiết bị khác hoặc quản lý thiết bị của bạn.
             </Alert>
           )}
 
