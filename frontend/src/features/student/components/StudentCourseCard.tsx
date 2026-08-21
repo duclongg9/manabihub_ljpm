@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Card, CardContent, Typography, Box, Chip, Button, LinearProgress } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Card, CardContent, Typography, Box, Chip, Button, LinearProgress, Switch, FormControlLabel } from '@mui/material';
 import type { ChipProps } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import type { StudentCourseSummary } from '../types/studentTypes';
@@ -8,9 +8,11 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
 import { ROUTES } from '../../../shared/constants/routes';
 import fallbackCourseCover from '../../../assets/course1.png';
+import { CALENDAR_PINS_UPDATED_EVENT, readPinnedCourseIds, setCoursePinned } from './studyCalendarPreferences';
 
 interface StudentCourseCardProps {
   course: StudentCourseSummary;
+  showCalendarPin?: boolean;
 }
 
 const statusLabelFor = (status: StudentCourseSummary['enrollmentStatus']) => {
@@ -22,9 +24,20 @@ const statusLabelFor = (status: StudentCourseSummary['enrollmentStatus']) => {
   }
 };
 
-export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) => {
+export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course, showCalendarPin = false }) => {
   const navigate = useNavigate();
   const [imageFailed, setImageFailed] = useState(false);
+  const [calendarPinned, setCalendarPinned] = useState(() => readPinnedCourseIds().has(course.courseId));
+
+  useEffect(() => {
+    const refresh = () => setCalendarPinned(readPinnedCourseIds().has(course.courseId));
+    window.addEventListener(CALENDAR_PINS_UPDATED_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(CALENDAR_PINS_UPDATED_EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, [course.courseId]);
 
   const getStatusColor = (status: StudentCourseSummary['enrollmentStatus']): ChipProps['color'] => {
     switch (status) {
@@ -153,6 +166,22 @@ export const StudentCourseCard: React.FC<StudentCourseCardProps> = ({ course }) 
           >
             {expiryLabel}
           </Typography>
+        )}
+
+        {showCalendarPin && (
+          <FormControlLabel
+            control={(
+              <Switch
+                size="small"
+                checked={calendarPinned}
+                onChange={(event) => setCoursePinned(course.courseId, event.target.checked)}
+                disabled={course.enrollmentStatus !== 'ACTIVE'}
+                slotProps={{ input: { 'aria-label': `Ghim lịch ${course.courseTitle}` } }}
+              />
+            )}
+            label={<Typography variant="caption" sx={{ fontWeight: 800 }}>{calendarPinned ? 'Đã ghim lên lịch' : 'Ghim lên lịch'}</Typography>}
+            sx={{ mb: 1, mx: 0 }}
+          />
         )}
 
         <Box sx={{ mt: 'auto', pt: 2 }}>

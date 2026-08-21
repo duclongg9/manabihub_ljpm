@@ -313,7 +313,13 @@ export function StudentDashboardPage() {
             <Stack spacing={4}>
               <Box data-onboarding-target="student-calendar">
                 <StudyCalendar
-                  courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
+                  courses={courses.map((course) => ({
+                    id: course.courseId,
+                    title: course.courseTitle,
+                    enrollmentStatus: course.enrollmentStatus,
+                    enrolledAt: course.enrolledAt,
+                    expiresAt: course.expiresAt,
+                  }))}
                 />
               </Box>
 
@@ -408,7 +414,13 @@ export function StudentDashboardPage() {
             <Stack spacing={2.5} sx={{ position: { lg: 'sticky' }, top: { lg: 24 } }}>
               <StudyGoalsWidget
                 jlptGoal={goalLevel}
-                courses={courses.map((course) => ({ id: course.courseId, title: course.courseTitle }))}
+                courses={courses.map((course) => ({
+                  id: course.courseId,
+                  title: course.courseTitle,
+                  enrollmentStatus: course.enrollmentStatus,
+                  enrolledAt: course.enrolledAt,
+                  expiresAt: course.expiresAt,
+                }))}
               />
               <LearningChallengeWidget accountKey={profile?.id ?? profile?.email} />
             </Stack>

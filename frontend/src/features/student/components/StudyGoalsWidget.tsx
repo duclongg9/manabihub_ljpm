@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -33,6 +33,7 @@ import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
 import { ROUTES } from '../../../shared/constants/routes';
+import { isCourseAvailableOnDate, isSlotAvailableOnDate } from './studyScheduleAvailability';
 
 export const STORAGE_KEY = 'manabihub.student.study-plan.v1';
 export const STUDY_PLAN_UPDATED_EVENT = 'manabihub:study-plan-updated';
@@ -69,6 +70,9 @@ type BulkDurationChoice = 25 | 50 | 60 | 'custom' | 'keep';
 export interface StudyCourseOption {
   id: string;
   title: string;
+  enrollmentStatus?: string;
+  enrolledAt?: string | null;
+  expiresAt?: string | null;
 }
 
 export interface StudySlot {
@@ -86,6 +90,7 @@ export interface StudySlot {
 interface ScheduleOpenDetail {
   dayOfWeek?: number;
   dateKey?: string;
+  slotId?: string;
 }
 
 interface FocusTotal {
@@ -105,6 +110,8 @@ interface StudyGoalsWidgetProps {
   jlptGoal?: string | null;
   courses?: StudyCourseOption[];
 }
+
+
 
 export function todayKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -139,7 +146,7 @@ export function readPlan(): StudyPlan {
   }
 }
 
-function getUpcomingSlot(slots: StudySlot[], now = new Date()) {
+function getUpcomingSlot(slots: StudySlot[], courses: StudyCourseOption[], now = new Date()) {
   return slots
     .filter((slot) => slot.enabled)
     .map((slot) => {
@@ -151,6 +158,7 @@ function getUpcomingSlot(slots: StudySlot[], now = new Date()) {
       if (candidate <= now) candidate.setDate(candidate.getDate() + 7);
       return { slot, date: candidate };
     })
+    .filter(({ slot, date }) => isSlotAvailableOnDate(slot, date, courses))
     .sort((a, b) => a.date.getTime() - b.date.getTime())[0] ?? null;
 }
 
@@ -172,6 +180,7 @@ function formatDateKey(value: string | null) {
 }
 
 export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetProps) {
+  const schedulableCourses = useMemo(() => courses.filter((course) => isCourseAvailableOnDate(course, new Date())), [courses]);
   const [plan, setPlan] = useState<StudyPlan>(readPlan);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleMode, setScheduleMode] = useState<'preset' | 'custom'>('preset');
@@ -183,7 +192,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   const [targetInput, setTargetInput] = useState(WEEKLY_TARGET_MINUTES);
   const [durationChoice, setDurationChoice] = useState<DurationChoice>(25);
   const [customDuration, setCustomDuration] = useState(25);
-  const [newSlot, setNewSlot] = useState<{ dayOfWeek: number; startTime: string; skill: string; courseId: string }>({ dayOfWeek: 1, startTime: '19:00', skill: SKILLS[0].label, courseId: courses[0]?.id ?? '' });
+  const [newSlot, setNewSlot] = useState<{ dayOfWeek: number; startTime: string; skill: string; courseId: string }>({ dayOfWeek: 1, startTime: '19:00', skill: SKILLS[0].label, courseId: schedulableCourses[0]?.id ?? '' });
   const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState<number | null>(null);
   const [scheduleDateKey, setScheduleDateKey] = useState<string | null>(null);
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
@@ -201,7 +210,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const notifiedRef = useRef(new Set<string>());
 
-  const openBulkSchedule = () => {
+  const openBulkSchedule = useCallback(() => {
     setBulkSelectedIds(Object.fromEntries(plan.slots.filter((slot) => slot.enabled).map((slot) => [slot.id, true])));
     setBulkCourseSearch('');
     setBulkDayFilter('all');
@@ -213,7 +222,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     setBulkError('');
     setBulkDeleteConfirmOpen(false);
     setBulkOpen(true);
-  };
+  }, [plan.slots]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
@@ -221,8 +230,35 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   }, [plan]);
 
   useEffect(() => {
-    const openSchedule = (event: Event) => {
+    const handleOpenSchedule = (event: Event) => {
       const detail = (event as CustomEvent<ScheduleOpenDetail>).detail;
+      const requestedSlotId = detail?.slotId;
+      if (requestedSlotId) {
+        const slot = plan.slots.find((s) => s.id === requestedSlotId);
+        if (slot) {
+          setScheduleMode('custom');
+          setSelectedPreset('custom');
+          setScheduleDayOfWeek(null);
+          setScheduleDateKey(null);
+          setEditingSlotId(slot.id);
+          setScheduleError('');
+          setNewSlot({
+            dayOfWeek: slot.dayOfWeek,
+            startTime: slot.startTime,
+            skill: slot.skill,
+            courseId: slot.courseId ?? '',
+          });
+          if (slot.durationMinutes === 25 || slot.durationMinutes === 50 || slot.durationMinutes === 60) {
+            setDurationChoice(slot.durationMinutes);
+            setCustomDuration(slot.durationMinutes);
+          } else {
+            setDurationChoice('custom');
+            setCustomDuration(slot.durationMinutes);
+          }
+          setScheduleOpen(true);
+          return;
+        }
+      }
       const requestedDay = detail?.dayOfWeek;
       setScheduleMode('custom');
       setSelectedPreset('custom');
@@ -238,22 +274,22 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       }));
       setScheduleOpen(true);
     };
-    window.addEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, openSchedule);
-    return () => window.removeEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, openSchedule);
-  }, []);
+    window.addEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, handleOpenSchedule);
+    return () => window.removeEventListener(STUDY_PLAN_OPEN_SCHEDULE_EVENT, handleOpenSchedule);
+  }, [plan.slots]);
 
   useEffect(() => {
     window.addEventListener(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT, openBulkSchedule);
     return () => window.removeEventListener(STUDY_PLAN_OPEN_BULK_SCHEDULE_EVENT, openBulkSchedule);
-  }, [plan.slots]);
+  }, [openBulkSchedule]);
 
   useEffect(() => {
-    if (!newSlot.courseId && courses.length > 0) {
-      setNewSlot((current) => ({ ...current, courseId: courses[0].id }));
+    if (!newSlot.courseId && schedulableCourses.length > 0) {
+      setNewSlot((current) => ({ ...current, courseId: schedulableCourses[0].id }));
     }
-  }, [courses, newSlot.courseId]);
+  }, [newSlot.courseId, schedulableCourses]);
 
-  const upcoming = useMemo(() => getUpcomingSlot(plan.slots), [plan.slots]);
+  const upcoming = useMemo(() => getUpcomingSlot(plan.slots, courses), [courses, plan.slots]);
   const weeklyMinutes = SKILLS.reduce((sum, skill) => sum + (plan.focusTotals[skill.label]?.minutes ?? 0), 0);
   const progress = Math.min(100, Math.round((weeklyMinutes / Math.max(1, plan.weeklyTargetMinutes)) * 100));
   const courseTotals = Object.entries(plan.focusTotals)
@@ -266,6 +302,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       const now = new Date();
       for (const slot of plan.slots) {
         if (!slot.enabled || slot.dayOfWeek !== now.getDay()) continue;
+        if (!isSlotAvailableOnDate(slot, now, courses)) continue;
         const [hour, minute] = slot.startTime.split(':').map(Number);
         const scheduled = new Date(now);
         scheduled.setHours(hour, minute, 0, 0);
@@ -293,7 +330,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     check();
     const interval = window.setInterval(check, 30_000);
     return () => window.clearInterval(interval);
-  }, [plan.slots, reminderPermission]);
+  }, [courses, plan.slots, reminderPermission]);
 
   const requestReminders = async () => {
     if (!('Notification' in window)) return;
@@ -306,6 +343,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
   };
 
   const openSchedule = () => {
+    setEditingSlotId(null);
     setScheduleMode('preset');
     setSelectedPreset('gentle');
     setDurationChoice(25);
@@ -316,7 +354,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
     setScheduleOpen(true);
   };
 
-  const selectedCourse = courses.find((course) => course.id === newSlot.courseId);
+  const selectedCourse = schedulableCourses.find((course) => course.id === newSlot.courseId);
   const durationMinutes = durationChoice === 'custom' ? Math.min(180, Math.max(5, Number(customDuration) || 25)) : durationChoice;
 
   const daySlots = scheduleDayOfWeek === null
@@ -560,7 +598,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
       <Typography variant="caption" sx={{ display: 'block', mt: 1.5, color: '#667085' }}>Mỗi phút tập trung hoàn thành được tính là một điểm cho kỹ năng và khóa học đã chọn.</Typography>
 
       <Dialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{scheduleDateKey ? `Sửa lịch ngày ${formatDateKey(scheduleDateKey)}` : 'Thêm lịch học'}</DialogTitle>
+        <DialogTitle>{editingSlotId ? 'Sửa suất học' : scheduleDateKey ? `Sửa lịch ngày ${formatDateKey(scheduleDateKey)}` : 'Thêm lịch học'}</DialogTitle>
         <DialogContent>
           {scheduleDayOfWeek !== null && <Box data-testid="schedule-day-editor" sx={{ mb: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 0.75 }}>Các ca đang có trong ngày</Typography>
@@ -573,7 +611,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
             </Stack>
           </>}
           {scheduleMode === 'custom' && <Stack spacing={2} sx={{ pt: 2 }}>
-            {courses.length > 1 ? <FormControl fullWidth size="small"><InputLabel id="study-course-label">Khóa học</InputLabel><Select labelId="study-course-label" label="Khóa học" value={newSlot.courseId} onChange={(event) => setNewSlot((current) => ({ ...current, courseId: event.target.value }))}>{courses.map((course) => <MenuItem key={course.id} value={course.id}>{course.title}</MenuItem>)}</Select></FormControl> : <Alert severity="info" sx={{ py: 0.25 }}>{selectedCourse ? `Khóa học đang học: ${selectedCourse.title}` : 'Bạn chưa có khóa học đang học.'}</Alert>}
+            {schedulableCourses.length > 1 ? <FormControl fullWidth size="small"><InputLabel id="study-course-label">Khóa học</InputLabel><Select labelId="study-course-label" label="Khóa học" value={newSlot.courseId} onChange={(event) => setNewSlot((current) => ({ ...current, courseId: event.target.value }))}>{schedulableCourses.map((course) => <MenuItem key={course.id} value={course.id}>{course.title}</MenuItem>)}</Select></FormControl> : <Alert severity="info" sx={{ py: 0.25 }}>{selectedCourse ? `Khóa học đang học: ${selectedCourse.title}` : 'Bạn chưa có khóa học còn thời hạn.'}</Alert>}
             <FormControl fullWidth size="small"><InputLabel id="study-skill-label">Kỹ năng</InputLabel><Select labelId="study-skill-label" label="Kỹ năng" value={newSlot.skill} onChange={(event) => setNewSlot((current) => ({ ...current, skill: event.target.value }))}>{SKILLS.map((skill) => <MenuItem key={skill.label} value={skill.label}>{skill.label}</MenuItem>)}</Select></FormControl>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}><FormControl fullWidth size="small"><InputLabel id="study-day-label">Ngày</InputLabel><Select labelId="study-day-label" label="Ngày" value={newSlot.dayOfWeek} disabled={scheduleDayOfWeek !== null} onChange={(event) => setNewSlot((current) => ({ ...current, dayOfWeek: Number(event.target.value) }))}>{DAYS.map((day) => <MenuItem key={day.value} value={day.value}>{day.label}</MenuItem>)}</Select></FormControl><TextField size="small" label="Giờ bắt đầu" type="time" value={newSlot.startTime} onChange={(event) => setNewSlot((current) => ({ ...current, startTime: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} fullWidth /></Stack>
             <Box><Typography variant="caption" sx={{ color: '#667085', fontWeight: 800 }}>Thời lượng</Typography><Stack direction="row" spacing={1} sx={{ mt: 0.75, flexWrap: 'wrap' }}>{([25, 50, 60] as const).map((value) => <Button key={value} size="small" variant={durationChoice === value ? 'contained' : 'outlined'} aria-pressed={durationChoice === value} onClick={() => setDurationChoice(value)}>{value} phút{value === 25 ? ' (1 phiên)' : ''}</Button>)}<Button size="small" variant={durationChoice === 'custom' ? 'contained' : 'outlined'} aria-pressed={durationChoice === 'custom'} onClick={() => setDurationChoice('custom')}>Tùy chỉnh</Button></Stack>{durationChoice === 'custom' && <TextField size="small" type="number" label="Số phút" value={customDuration} onChange={(event) => setCustomDuration(Number(event.target.value))} slotProps={{ htmlInput: { min: 5, max: 180, step: 5 } }} sx={{ mt: 1, width: 140 }} />}</Box>
@@ -581,7 +619,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
           </Stack>}
           {scheduleDayOfWeek === null && <Alert severity="info" sx={{ mt: 2 }} icon={<TimerOutlinedIcon />}><Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 800 }}>Gợi ý từ hệ thống</Typography><Typography variant="caption">Để hoàn thành khóa Kanji N5 đúng tiến độ, bạn chỉ cần học 3 buổi/tuần (tổng 75 phút).</Typography></Box><Button size="small" onClick={applySuggestion}>Áp dụng gợi ý này</Button></Stack></Alert>}
         </DialogContent>
-        <DialogActions><Button onClick={() => { setScheduleOpen(false); resetSlotEditor(); }}>Hủy</Button><Button variant="contained" onClick={addSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>{editingSlotId ? 'Lưu thay đổi' : 'Lưu lịch'}</Button></DialogActions>
+        <DialogActions>{editingSlotId && <Button color="error" onClick={() => { deleteSlot(editingSlotId); setScheduleOpen(false); }} sx={{ mr: 'auto' }}>Xóa suất</Button>}<Button onClick={() => { setScheduleOpen(false); resetSlotEditor(); }}>Hủy</Button><Button variant="contained" onClick={addSchedule} sx={{ bgcolor: '#C41E3A', '&:hover': { bgcolor: '#A71931' } }}>{editingSlotId ? 'Lưu thay đổi' : 'Lưu lịch'}</Button></DialogActions>
       </Dialog>
 
       <Dialog open={bulkOpen} onClose={() => setBulkOpen(false)} fullWidth maxWidth="md">
@@ -628,6 +666,7 @@ export function StudyGoalsWidget({ jlptGoal, courses = [] }: StudyGoalsWidgetPro
         <DialogActions>
           <Button onClick={() => setBulkDeleteConfirmOpen(false)}>Giữ lại</Button>
           <Button color="error" variant="contained" onClick={confirmBulkDelete}>Xóa ca học</Button>
+
         </DialogActions>
       </Dialog>
     </Paper>

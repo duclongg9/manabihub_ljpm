@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -13,6 +13,7 @@ import {
   FormControlLabel,
   IconButton,
   InputAdornment,
+
   Paper,
   Popover,
   Stack,
@@ -26,12 +27,14 @@ import ArrowBackIosNewOutlinedIcon from '@mui/icons-material/ArrowBackIosNewOutl
 import ArrowForwardIosOutlinedIcon from '@mui/icons-material/ArrowForwardIosOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import EditCalendarOutlinedIcon from '@mui/icons-material/EditCalendarOutlined';
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+
 import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../../shared/constants/routes';
 import {
@@ -42,6 +45,8 @@ import {
   type StudyCourseOption,
   type StudySlot,
 } from './StudyGoalsWidget';
+import { CALENDAR_PINS_UPDATED_EVENT, readPinnedCourseIds } from './studyCalendarPreferences';
+import { isCourseAvailableOnDate, isSlotAvailableOnDate } from './studyScheduleAvailability';
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -118,7 +123,13 @@ function buildVisibleDates(cursor: Date, view: CalendarView) {
   return Array.from({ length }, (_, index) => addDays(firstDate, index));
 }
 
-function buildEvents(slots: StudySlot[], dates: Date[], colors: Record<string, string>) {
+function currentWeekDates(now = new Date()) {
+  const day = startOfDay(now);
+  const monday = addDays(day, -((day.getDay() + 6) % 7));
+  return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
+}
+
+function buildEvents(slots: StudySlot[], dates: Date[], courses: StudyCourseOption[], colors: Record<string, string>) {
   if (dates.length === 0) return [];
   const first = dates[0];
   const last = dates[dates.length - 1];
@@ -128,6 +139,8 @@ function buildEvents(slots: StudySlot[], dates: Date[], colors: Record<string, s
       if (!slot.enabled || slot.dayOfWeek !== current.getDay()) continue;
       const startMinutes = slotMinutes(slot);
       const eventDate = startOfDay(current);
+      eventDate.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+      if (!isSlotAvailableOnDate(slot, eventDate, courses)) continue;
       events.push({
         key: `${slot.id}-${dateKey(eventDate)}`,
         slot,
@@ -159,6 +172,7 @@ function formatTimeRange(event: CalendarEvent) {
 
 export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
   const navigate = useNavigate();
+  const selectionInitialized = useRef(false);
   const [plan, setPlan] = useState(readPlan);
   const [view, setView] = useState<CalendarView>('week');
   const [expanded, setExpanded] = useState(true);
@@ -167,6 +181,7 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
   const [selectedCourses, setSelectedCourses] = useState<Record<string, boolean>>({});
   const [courseFilterAnchorEl, setCourseFilterAnchorEl] = useState<HTMLElement | null>(null);
   const [courseSearch, setCourseSearch] = useState('');
+  const [pinnedCourseIds, setPinnedCourseIds] = useState(readPinnedCourseIds);
 
   useEffect(() => {
     const refresh = () => setPlan(readPlan());
@@ -178,35 +193,62 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
     };
   }, []);
 
+  useEffect(() => {
+    const refreshPins = () => setPinnedCourseIds(readPinnedCourseIds());
+    window.addEventListener(CALENDAR_PINS_UPDATED_EVENT, refreshPins);
+    window.addEventListener('storage', refreshPins);
+    return () => {
+      window.removeEventListener(CALENDAR_PINS_UPDATED_EVENT, refreshPins);
+      window.removeEventListener('storage', refreshPins);
+    };
+  }, []);
+
   const courseOptions = useMemo(() => {
-    const options = new Map<string, string>();
-    courses.forEach((course) => {
-      options.set(course.id, course.title);
-    });
+    const options = new Map<string, StudyCourseOption>();
+    courses.forEach((course) => options.set(course.id, course));
     plan.slots.forEach((slot) => {
       const key = slotCourseKey(slot);
-      if (!options.has(key)) options.set(key, slot.courseTitle || 'Khóa học chưa chọn');
+      if (!options.has(key)) options.set(key, { id: key, title: slot.courseTitle || 'Khóa học chưa chọn' });
     });
-    return Array.from(options, ([key, title]) => ({ key, title }));
+    return Array.from(options.values());
+  }, [courses, plan.slots]);
+
+  const thisWeekCourseIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const date of currentWeekDates()) {
+      plan.slots.forEach((slot) => {
+        const occurrence = new Date(date);
+        const minutes = slotMinutes(slot);
+        occurrence.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+        if (slot.enabled && slot.dayOfWeek === date.getDay() && isSlotAvailableOnDate(slot, occurrence, courses)) {
+          ids.add(slotCourseKey(slot));
+        }
+      });
+    }
+    return ids;
   }, [courses, plan.slots]);
 
   useEffect(() => {
-    setSelectedCourses((previous) => {
-      const next = { ...previous };
-      for (const option of courseOptions) if (next[option.key] === undefined) next[option.key] = true;
-      return next;
-    });
-  }, [courseOptions]);
+    if (selectionInitialized.current || courseOptions.length === 0) return;
+    const validPins = courseOptions.filter((course) => pinnedCourseIds.has(course.id) && isCourseAvailableOnDate(course, new Date()));
+    const defaultIds = validPins.length > 0
+      ? new Set(validPins.map((course) => course.id))
+      : thisWeekCourseIds.size > 0
+        ? thisWeekCourseIds
+        : new Set(courseOptions.filter((course) => isCourseAvailableOnDate(course, new Date())).map((course) => course.id));
+    setSelectedCourses(Object.fromEntries(courseOptions.map((course) => [course.id, defaultIds.has(course.id)])));
+    selectionInitialized.current = true;
+  }, [courseOptions, pinnedCourseIds, thisWeekCourseIds]);
 
   const colors = useMemo(() => Object.fromEntries(
-    courseOptions.map((option) => [option.key, courseColor(option.title)]),
+    courseOptions.map((option) => [option.id, courseColor(option.title)]),
   ), [courseOptions]);
   const filteredCourseOptions = courseOptions.filter((option) => option.title.toLocaleLowerCase('vi-VN').includes(courseSearch.trim().toLocaleLowerCase('vi-VN')));
   const levelLegend = ['N5', 'N4', 'N3', 'N2', 'N1'].filter((level) => courseOptions.some((option) => new RegExp(`\\b${level}\\b`, 'i').test(option.title)));
-  const selectedCourseCount = courseOptions.filter((option) => selectedCourses[option.key] !== false).length;
+  const selectedCourseCount = courseOptions.filter((option) => selectedCourses[option.id] !== false).length;
   const visibleDates = useMemo(() => buildVisibleDates(cursor, view), [cursor, view]);
-  const events = useMemo(() => buildEvents(plan.slots, visibleDates, colors), [plan.slots, visibleDates, colors]);
-  const filteredEvents = events.filter((event) => selectedCourses[slotCourseKey(event.slot)] !== false);
+  const events = useMemo(() => buildEvents(plan.slots, visibleDates, courses, colors), [courses, plan.slots, visibleDates, colors]);
+  const filteredEvents = events.filter((event) => selectedCourses[slotCourseKey(event.slot)] === true);
   const selectedDayKey = selectedDay ? dateKey(selectedDay) : null;
   const selectedDayEvents = filteredEvents.filter((event) => event.dateKey === selectedDayKey)
     .sort((first, second) => first.startMinutes - second.startMinutes);
@@ -215,6 +257,7 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
     : view === 'week'
       ? `${formatDate(visibleDates[0], { day: 'numeric', month: 'short' })} – ${formatDate(visibleDates[6], { day: 'numeric', month: 'short', year: 'numeric' })}`
       : formatDate(cursor, { month: 'long', year: 'numeric' });
+
 
   const moveCursor = (amount: number) => {
     const next = new Date(cursor);
@@ -233,6 +276,11 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
         dateKey: targetDay ? dateKey(targetDay) : undefined,
       },
     }));
+  };
+
+  const editSchedule = (event: CalendarEvent) => {
+    setSelectedDay(null);
+    window.dispatchEvent(new CustomEvent(STUDY_PLAN_OPEN_SCHEDULE_EVENT, { detail: { slotId: event.slot.id } }));
   };
 
   const startLesson = (event: CalendarEvent) => {
@@ -278,7 +326,7 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
           <CalendarMonthOutlinedIcon sx={{ color: '#C41E3A' }} />
           <Box>
             <Typography variant="h6" sx={{ color: '#172033', fontWeight: 900 }}>Lịch học của bạn</Typography>
-            <Typography variant="caption" color="text.secondary">Theo dõi lịch đan xen và vào học đúng suất đã đặt.</Typography>
+            <Typography variant="caption" color="text.secondary">Lịch chỉ xuất hiện trong thời gian bạn còn quyền truy cập khóa học.</Typography>
           </Box>
         </Stack>
         <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
@@ -356,19 +404,27 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
               }}
             />
             <Stack direction="row" spacing={0.5} sx={{ mt: 1, mb: 0.75 }}>
-              <Button size="small" onClick={() => setSelectedCourses(Object.fromEntries(courseOptions.map((option) => [option.key, true])))} sx={{ textTransform: 'none' }}>Chọn tất cả</Button>
-              <Button size="small" onClick={() => setSelectedCourses(Object.fromEntries(courseOptions.map((option) => [option.key, false])))} sx={{ textTransform: 'none' }}>Bỏ chọn hết</Button>
+              <Button size="small" onClick={() => setSelectedCourses(Object.fromEntries(courseOptions.map((option) => [option.id, true])))} sx={{ textTransform: 'none' }}>Chọn tất cả</Button>
+              <Button size="small" onClick={() => setSelectedCourses(Object.fromEntries(courseOptions.map((option) => [option.id, false])))} sx={{ textTransform: 'none' }}>Bỏ chọn hết</Button>
             </Stack>
             <Divider />
             <Box sx={{ maxHeight: 280, overflowY: 'auto', mt: 0.5 }}>
-              {filteredCourseOptions.map((option) => (
-                <FormControlLabel
-                  key={option.key}
-                  control={<Checkbox size="small" slotProps={{ input: { 'aria-label': option.title } }} checked={selectedCourses[option.key] !== false} onChange={(event) => setSelectedCourses((previous) => ({ ...previous, [option.key]: event.target.checked }))} sx={{ color: colors[option.key], '&.Mui-checked': { color: colors[option.key] } }} />}
-                  label={<Typography variant="body2" noWrap sx={{ color: '#475467' }}>{option.title}</Typography>}
-                  sx={{ display: 'flex', mr: 0, my: 0.15 }}
-                />
-              ))}
+              {filteredCourseOptions.map((option) => {
+                const isPinned = pinnedCourseIds.has(option.id);
+                return (
+                  <FormControlLabel
+                    key={option.id}
+                    control={<Checkbox size="small" slotProps={{ input: { 'aria-label': option.title } }} checked={selectedCourses[option.id] !== false} onChange={(event) => setSelectedCourses((previous) => ({ ...previous, [option.id]: event.target.checked }))} sx={{ color: colors[option.id], '&.Mui-checked': { color: colors[option.id] } }} />}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
+                        <Typography variant="body2" noWrap sx={{ color: '#475467', flex: 1, minWidth: 0 }}>{option.title}</Typography>
+                        {isPinned && <Chip size="small" label="Đã ghim" sx={{ ml: 1, height: 22 }} />}
+                      </Box>
+                    }
+                    sx={{ display: 'flex', mr: 0, my: 0.15 }}
+                  />
+                );
+              })}
               {filteredCourseOptions.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>Không tìm thấy khóa học.</Typography>}
             </Box>
           </Popover>
@@ -383,7 +439,6 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
                 <Box><Typography variant="body2" sx={{ fontWeight: 900 }}>{formatTimeRange(event)} · {event.slot.skill}</Typography><Typography variant="caption" color="text.secondary">{event.slot.courseTitle || 'Khóa học chưa chọn'}</Typography></Box>
                 <Button size="small" variant="contained" startIcon={<PlayArrowOutlinedIcon />} disabled={!event.slot.courseId} onClick={() => startLesson(event)} sx={{ alignSelf: { sm: 'center' }, bgcolor: '#C41E3A', textTransform: 'none' }}>Vào học ngay</Button>
               </Stack>
-              {event.conflict && <Chip size="small" color="warning" icon={<WarningAmberOutlinedIcon />} label="Trùng lịch" sx={{ mt: 0.75 }} />}
             </Box>
           ))}
           {filteredEvents.filter((event) => event.dateKey === dateKey(cursor)).length === 0 && <Alert severity="info" sx={{ mt: 1 }}>Ngày này chưa có suất học. Bạn có thể thêm lịch ngay.</Alert>}
@@ -419,7 +474,7 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
         </Box>
       )}
 
-      {filteredEvents.some((event) => event.conflict) && <Alert severity="warning" icon={<WarningAmberOutlinedIcon />} sx={{ mt: 1.5, py: 0.25 }}>Có suất học bị trùng giờ. Hãy bấm vào ngày đó để xem và chỉnh lại lịch.</Alert>}
+        {filteredEvents.some((event) => event.conflict) && <Alert severity="warning" icon={<WarningAmberOutlinedIcon />} sx={{ mt: 1.5, py: 0.25 }}>Có suất học bị trùng giờ. Bấm vào ngày, chọn “Sửa” để đổi giờ hoặc xóa suất.</Alert>}
       </>}
 
       <Dialog open={Boolean(selectedDay)} onClose={() => setSelectedDay(null)} fullWidth maxWidth="sm">
@@ -428,9 +483,9 @@ export function StudyCalendar({ courses = [] }: StudyCalendarProps) {
           <IconButton aria-label="Đóng" size="small" onClick={() => setSelectedDay(null)}><CloseRoundedIcon /></IconButton>
         </DialogTitle>
         <DialogContent dividers>
-          {selectedDayEvents.length === 0 ? <Alert severity="info">Ngày này chưa có suất học.</Alert> : <Stack spacing={1.25}>{selectedDayEvents.map((event) => <Box key={event.key} sx={{ p: 1.25, border: '1px solid #E4E7EC', borderLeft: `4px solid ${event.color}`, borderRadius: 1 }}><Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 900 }}>{formatTimeRange(event)} · {event.slot.skill}</Typography><Typography variant="caption" color="text.secondary">{event.slot.courseTitle || 'Khóa học chưa chọn'}</Typography><Typography variant="caption" sx={{ display: 'block', mt: 0.35, color: '#475467', fontWeight: 700 }}>Dự kiến: {event.slot.lessonTitle || 'tiếp tục bài học gần nhất'}</Typography></Box><Button size="small" variant="contained" startIcon={<PlayArrowOutlinedIcon />} disabled={!event.slot.courseId} onClick={() => startLesson(event)} sx={{ alignSelf: { sm: 'center' }, bgcolor: '#C41E3A', textTransform: 'none' }}>Bắt đầu học ngay</Button></Stack>{event.conflict && <Chip size="small" color="warning" icon={<WarningAmberOutlinedIcon />} label="Trùng lịch" sx={{ mt: 0.75 }} />}</Box>)}</Stack>}
+          {selectedDayEvents.length === 0 ? <Alert severity="info">Ngày này chưa có suất học trong thời hạn khóa.</Alert> : <Stack spacing={1.25}>{selectedDayEvents.map((event) => <Box key={event.key} sx={{ p: 1.25, border: '1px solid #E4E7EC', borderLeft: `4px solid ${event.color}`, borderRadius: 1 }}><Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 900 }}>{formatTimeRange(event)} · {event.slot.skill}</Typography><Typography variant="caption" color="text.secondary">{event.slot.courseTitle || 'Khóa học chưa chọn'}</Typography><Typography variant="caption" sx={{ display: 'block', mt: 0.35, color: '#475467', fontWeight: 700 }}>Dự kiến: {event.slot.lessonTitle || 'tiếp tục bài học gần nhất'}</Typography></Box><Stack direction="row" spacing={0.5} sx={{ alignSelf: { sm: 'center' } }}><Button size="small" startIcon={<EditOutlinedIcon />} onClick={() => editSchedule(event)}>Sửa</Button><Button size="small" variant="contained" startIcon={<PlayArrowOutlinedIcon />} disabled={!event.slot.courseId} onClick={() => startLesson(event)} sx={{ bgcolor: '#C41E3A', textTransform: 'none' }}>Vào học ngay</Button></Stack></Stack>{event.conflict && <Chip size="small" color="warning" icon={<WarningAmberOutlinedIcon />} label="Trùng lịch" sx={{ mt: 0.75 }} />}</Box>)}</Stack>}
         </DialogContent>
-        <DialogActions><Button variant="outlined" startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Thêm/sửa suất học ngày này</Button></DialogActions>
+        <DialogActions><Button variant="outlined" startIcon={<AddOutlinedIcon />} onClick={openSchedule} sx={{ textTransform: 'none', borderColor: '#CBD5E1', color: '#475569' }}>Thêm suất học ngày này</Button></DialogActions>
       </Dialog>
     </Paper>
   );
