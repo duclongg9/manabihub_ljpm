@@ -728,6 +728,62 @@ class TeacherKycServiceTest {
         assertEquals(HttpStatus.CONFLICT, exception.getHttpStatus());
         verify(kycDocumentRepository, never()).save(any());
     }
+
+    @Test
+    void submitCertificate_acceptsMatchingNameAndDobWithDifferentFormattingAndDiacritics() {
+        prepareCertificateSubmission();
+        identityVerifiedRequest.setServerFullName("PHẠM ĐỨC LONG");
+        identityVerifiedRequest.setServerDateOfBirth("20/05/2000");
+
+        KycCertificateSubmissionResponse response = teacherKycService.submitCertificate(
+                user.getId(),
+                validPng(),
+                "25B2080102-33745",
+                "PHAM DUC LONG",
+                "2000-05-20",
+                "N3",
+                "Name PHAM DUC LONG Date of Birth 2000-05-20 Level N3 Certificate 25B2080102-33745",
+                true,
+                "127.0.0.1",
+                "JUnit"
+        );
+
+        assertEquals("PENDING", response.teacherKycStatus());
+        assertFalse(response.canPublishCourse());
+        assertTrue(response.teacherWorkspaceAvailable());
+    }
+
+    @Test
+    void submitCertificate_rejectsBothNameAndDobMismatchAsBusinessErrorNot500() {
+        when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
+        when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacher.getId()))
+                .thenReturn(Optional.of(identityVerifiedRequest));
+        identityVerifiedRequest.setServerFullName("PHẠM ĐỨC LONG");
+        identityVerifiedRequest.setServerDateOfBirth("20/05/2000");
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> teacherKycService.submitCertificate(
+                        user.getId(),
+                        validPng(),
+                        "25B2080102-33745",
+                        "THAN VAN THANH",
+                        "2004-08-12",
+                        "N3",
+                        "Name THAN VAN THANH Date of Birth 2004-08-12 Level N3 Certificate 25B2080102-33745",
+                        true,
+                        "127.0.0.1",
+                        "JUnit"
+                )
+        );
+
+        assertEquals(MessageCodes.KYC_CERTIFICATE_OCR_MISMATCH, exception.getMessageCode());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getHttpStatus());
+        verify(teacherCertificateClaimService, never()).processCertificateClaim(
+                any(), any(), anyString(), any(), anyString(), anyString()
+        );
+        verify(kycDocumentRepository, never()).save(any());
+    }
     private void prepareCertificateSubmission() {
         when(teacherProfileRepository.findByUserId(user.getId())).thenReturn(Optional.of(teacher));
         when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacher.getId()))

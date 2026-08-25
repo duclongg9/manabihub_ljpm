@@ -30,6 +30,9 @@ axiosClient.interceptors.request.use(async (config) => {
   if (session) {
     config.headers.Authorization = `Bearer ${session.token}`;
   }
+  if (config.data instanceof FormData) {
+    config.headers['Content-Type'] = 'multipart/form-data';
+  }
 
   return config;
 });

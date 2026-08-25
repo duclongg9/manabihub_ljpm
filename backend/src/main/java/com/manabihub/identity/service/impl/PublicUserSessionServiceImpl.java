@@ -158,7 +158,7 @@ public class PublicUserSessionServiceImpl implements PublicUserSessionService {
 
     private void logSecurityEvent(UUID userId, String action, UUID targetId) {
         auditLogRepository.saveAndFlush(AuditLog.builder()
-                .actorType("PUBLIC_USER")
+                .actorType("USER")
                 .actorUserId(userId)
                 .action(action)
                 .targetType(targetId != null ? "DEVICE_OR_SESSION" : "USER")
