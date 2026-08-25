@@ -47,7 +47,7 @@ public class LearningSessionLeaseServiceImpl implements LearningSessionLeaseServ
             // If another session owns non-expired lease, reject
             if (now.isBefore(currentLease.getExpiresAt())) {
                 auditLogRepository.saveAndFlush(AuditLog.builder()
-                        .actorType("PUBLIC_USER")
+                        .actorType("USER")
                         .actorUserId(userId)
                         .action("LEARNING_SESSION_CONFLICT")
                         .targetType("LEARNING_LEASE")

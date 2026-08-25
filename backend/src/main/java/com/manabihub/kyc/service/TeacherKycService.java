@@ -1359,7 +1359,12 @@ public class TeacherKycService {
                 DateTimeFormatter.ISO_LOCAL_DATE,
                 DateTimeFormatter.ofPattern("dd/MM/uuuu"),
                 DateTimeFormatter.ofPattern("dd-MM-uuuu"),
-                DateTimeFormatter.ofPattern("ddMMyyyy")
+                DateTimeFormatter.ofPattern("dd.MM.uuuu"),
+                DateTimeFormatter.ofPattern("ddMMyyyy"),
+                DateTimeFormatter.ofPattern("uuuu/MM/dd"),
+                DateTimeFormatter.ofPattern("uuuu-MM-dd"),
+                DateTimeFormatter.ofPattern("uuuu.MM.dd"),
+                DateTimeFormatter.ofPattern("uuuuMMdd")
         );
         for (DateTimeFormatter formatter : formatters) {
             try {
@@ -1380,7 +1385,11 @@ public class TeacherKycService {
     }
 
     private String normalizePersonName(String value) {
-        return java.text.Normalizer.normalize(value == null ? "" : value, java.text.Normalizer.Form.NFD)
+        if (value == null) {
+            return "";
+        }
+        String preprocessed = value.replace('Đ', 'D').replace('đ', 'd');
+        return java.text.Normalizer.normalize(preprocessed, java.text.Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .replaceAll("[^A-Za-z0-9]", "")
                 .toUpperCase(Locale.ROOT);
@@ -1743,14 +1752,22 @@ public class TeacherKycService {
     }
 
     private String normalizeKey(String value) {
-        return java.text.Normalizer.normalize(value == null ? "" : value, java.text.Normalizer.Form.NFD)
+        if (value == null) {
+            return "";
+        }
+        String preprocessed = value.replace('Đ', 'D').replace('đ', 'd');
+        return java.text.Normalizer.normalize(preprocessed, java.text.Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .replaceAll("[^A-Za-z0-9]", "")
                 .toLowerCase();
     }
 
     private String normalizeSearchText(String value) {
-        return java.text.Normalizer.normalize(value == null ? "" : value, java.text.Normalizer.Form.NFD)
+        if (value == null) {
+            return "";
+        }
+        String preprocessed = value.replace('Đ', 'D').replace('đ', 'd');
+        return java.text.Normalizer.normalize(preprocessed, java.text.Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .toLowerCase();
     }

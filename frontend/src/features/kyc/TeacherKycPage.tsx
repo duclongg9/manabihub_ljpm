@@ -404,6 +404,9 @@ function TeacherKycPageContent() {
 
   async function handleCertificateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (certificateSubmitting) {
+      return;
+    }
     setActionError(null);
     setCertificateEnvelope(null);
 
@@ -1393,8 +1396,20 @@ function fallbackCertificateStatus(loadFailed: boolean): KycModuleStatusResponse
 
 function readErrorMessage(error: unknown) {
   if (typeof error === 'object' && error !== null && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string; messageCode?: string } } }).response;
-    const messageCode = response?.data?.messageCode;
+    const response = (error as {
+      response?: {
+        data?: {
+          message?: string;
+          messageCode?: string;
+          message_code?: string;
+          code?: string;
+        };
+      };
+    }).response;
+    const messageCode =
+      response?.data?.messageCode ||
+      response?.data?.code ||
+      response?.data?.message_code;
     const message = response?.data?.message;
 
     if (messageCode === 'MSG-KYC-008') {
@@ -1433,5 +1448,8 @@ const KYC_ERROR_MESSAGES: Record<string, string> = {
   KYC_ALREADY_PENDING: 'Hồ sơ của bạn đang được xét duyệt. Vui lòng chờ kết quả trước khi gửi lại.',
   KYC_ALREADY_APPROVED: 'Hồ sơ Giảng viên của bạn đã được phê duyệt.',
   'MSG-KYC-002': 'Thông tin xác minh chưa hợp lệ. Vui lòng kiểm tra và thực hiện lại.',
-  'MSG-KYC-006': 'Thông tin chứng chỉ không khớp với thông tin định danh.',
+  'MSG-KYC-006': 'Họ tên hoặc ngày sinh trên chứng chỉ không khớp với thông tin CCCD đã xác minh.',
+  KYC_CERTIFICATE_OCR_MISMATCH: 'Họ tên hoặc ngày sinh trên chứng chỉ không khớp với thông tin CCCD đã xác minh.',
+  CERTIFICATE_IDENTITY_MISMATCH: 'Họ tên hoặc ngày sinh trên chứng chỉ không khớp với thông tin CCCD đã xác minh.',
+  KYC_CERTIFICATE_ALREADY_CLAIMED: 'Chứng chỉ JLPT này đã được liên kết với một tài khoản Giảng viên khác.',
 };

@@ -413,14 +413,22 @@ public final class VnptSdkResultEvaluator {
     }
 
     private static String normalizeKey(String value) {
-        return Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD)
+        if (value == null) {
+            return "";
+        }
+        String preprocessed = value.replace('Đ', 'D').replace('đ', 'd');
+        return Normalizer.normalize(preprocessed, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .replaceAll("[^A-Za-z0-9]", "")
                 .toLowerCase();
     }
 
     private static String normalizeText(String value) {
-        return Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD)
+        if (value == null) {
+            return "";
+        }
+        String preprocessed = value.replace('Đ', 'D').replace('đ', 'd');
+        return Normalizer.normalize(preprocessed, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .toLowerCase();
     }

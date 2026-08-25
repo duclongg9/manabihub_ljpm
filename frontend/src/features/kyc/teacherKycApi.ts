@@ -151,6 +151,11 @@ export async function submitTeacherCertificate(payload: KycCertificateSubmission
   const response = await axiosClient.post<ApiEnvelope<KycCertificateSubmissionResponse>>(
     ENDPOINTS.teacherKyc.certificateSubmissions,
     formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    },
   );
 
   return response.data;
