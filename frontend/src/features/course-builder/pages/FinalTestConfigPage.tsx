@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Button, Stack, Typography, TextField, MenuItem, Alert, Snackbar, InputAdornment, Paper } from '@mui/material';
 import { finalTestService } from '../services/finalTestService';
-import type { UpdateFinalTestRequest } from '../services/finalTestService';
+import type { FinalTestConfig, UpdateFinalTestRequest } from '../services/finalTestService';
 import { ErrorState } from '../../../shared/components/ErrorState/ErrorState';
 import { LoadingState } from '../../../shared/components/LoadingState/LoadingState';
 import { PageHeader } from '../../../shared/components/PageHeader/PageHeader';
@@ -18,6 +18,49 @@ type FinalTestFormState = Omit<UpdateFinalTestRequest, 'timeLimitMinutes' | 'pas
   skillFocus: string;
 };
 
+type FinalTestSaveError = {
+  response?: {
+    data?: {
+      errors?: Array<{ message?: string }>;
+      message?: string;
+    };
+  };
+};
+
+const createEmptyForm = (): FinalTestFormState => ({
+  timeLimitMinutes: '',
+  passingScore: '',
+  maxRetakes: '',
+  jlptLevel: '',
+  skillFocus: 'Tổng hợp',
+  questions: [],
+});
+
+const toFormState = (config: FinalTestConfig): FinalTestFormState => ({
+  timeLimitMinutes: config.timeLimitMinutes ?? '',
+  passingScore: config.passingScore ?? '',
+  maxRetakes: config.maxRetakes ?? '',
+  jlptLevel: config.jlptLevel || '',
+  skillFocus: config.skillFocus || '',
+  questions: config.questions || [],
+});
+
+const comparableForm = (value: FinalTestFormState) => JSON.stringify({
+  timeLimitMinutes: value.timeLimitMinutes === '' ? null : Number(value.timeLimitMinutes),
+  passingScore: value.passingScore === '' ? null : Number(value.passingScore),
+  maxRetakes: value.maxRetakes === '' ? null : Number(value.maxRetakes),
+  jlptLevel: value.jlptLevel,
+  skillFocus: value.skillFocus,
+  questions: value.questions.map((question) => ({
+    content: question.content,
+    explanation: question.explanation,
+    choices: question.choices.map((choice) => ({
+      content: choice.content,
+      isCorrect: choice.isCorrect,
+    })),
+  })),
+});
+
 export const FinalTestConfigPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
@@ -26,6 +69,7 @@ export const FinalTestConfigPage = () => {
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [initialForm, setInitialForm] = useState<FinalTestFormState | null>(null);
+  const [hasPersistedConfig, setHasPersistedConfig] = useState(false);
   const [expanded, setExpanded] = useState<number | false>(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -37,14 +81,7 @@ export const FinalTestConfigPage = () => {
     setSnackbar({ open: true, message: msg, severity });
   };
 
-  const [form, setForm] = useState<FinalTestFormState>({
-    timeLimitMinutes: '',
-    passingScore: '',
-    maxRetakes: '',
-    jlptLevel: '',
-    skillFocus: 'Tổng hợp',
-    questions: [],
-  });
+  const [form, setForm] = useState<FinalTestFormState>(createEmptyForm);
 
   const loadData = () => {
     if (!courseId) return;
@@ -55,18 +92,15 @@ export const FinalTestConfigPage = () => {
     finalTestService.getFinalTest(courseId)
       .then((config) => {
         if (config) {
-          const loadedForm: FinalTestFormState = {
-            timeLimitMinutes: config.timeLimitMinutes || '',
-            passingScore: config.passingScore ?? '',
-            maxRetakes: config.maxRetakes || '',
-            jlptLevel: config.jlptLevel || '',
-            skillFocus: config.skillFocus || '',
-            questions: config.questions || [],
-          };
+          const loadedForm = toFormState(config);
           setForm(loadedForm);
           setInitialForm(loadedForm);
+          setHasPersistedConfig(true);
         } else {
-          setInitialForm(form); // Set current empty form as initial
+          const emptyForm = createEmptyForm();
+          setForm(emptyForm);
+          setInitialForm(emptyForm);
+          setHasPersistedConfig(false);
         }
       })
       .catch((err) => {
@@ -83,8 +117,15 @@ export const FinalTestConfigPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
+  const isDirty = initialForm !== null && comparableForm(form) !== comparableForm(initialForm);
+
   const handleSave = async (shouldExit: boolean = false) => {
     if (!courseId) return;
+
+    if (shouldExit && hasPersistedConfig && !isDirty) {
+      navigate('/teacher/courses', { state: { finalTestSaved: true } });
+      return;
+    }
 
     const showError = (msg: string) => {
       setSnackbar({ open: true, message: msg, severity: 'error' });
@@ -100,8 +141,8 @@ export const FinalTestConfigPage = () => {
       return;
     }
 
-    if (form.passingScore === '' || Number(form.passingScore) < 0 || Number(form.passingScore) > 100) {
-      showError('Vui lòng nhập điểm đạt (từ 0 đến 100%).');
+    if (form.passingScore === '' || Number(form.passingScore) < 1 || Number(form.passingScore) > 100) {
+      showError('Vui lòng nhập điểm đạt (từ 1 đến 100%).');
       return;
     }
 
@@ -141,7 +182,8 @@ export const FinalTestConfigPage = () => {
       for (let j = 0; j < q.choices.length; j++) {
         if (!q.choices[j].content.trim()) { validateError(`Lỗi ở Câu ${i + 1}: Lựa chọn số ${j + 1} đang bị bỏ trống.`); return; }
       }
-      if (!q.choices.some(c => c.isCorrect)) { validateError(`Lỗi ở Câu ${i + 1}: Chưa có đáp án đúng nào được chọn.`); return; }
+      const correctChoiceCount = q.choices.filter((choice) => choice.isCorrect).length;
+      if (correctChoiceCount !== 1) { validateError(`Lỗi ở Câu ${i + 1}: Phải chọn đúng 1 đáp án đúng.`); return; }
     }
 
     setSaving(true);
@@ -154,21 +196,49 @@ export const FinalTestConfigPage = () => {
         maxRetakes: Number(form.maxRetakes),
       };
 
-      await finalTestService.updateFinalTest(courseId, request);
+      const savedConfig = await finalTestService.updateFinalTest(courseId, request);
+      const savedForm = toFormState(savedConfig);
+      setForm(savedForm);
+      setInitialForm(savedForm);
+      setHasPersistedConfig(true);
       setSnackbar({
         open: true,
         message: 'Lưu cấu hình thành công!',
         severity: 'success',
       });
       if (shouldExit) {
-        setTimeout(() => {
-          navigate('/teacher/courses');
-        }, 1500);
+        navigate('/teacher/courses', { state: { finalTestSaved: true } });
       }
-    } catch (err: any) {
-      if (err.response?.data?.errors?.length > 0) {
-        showError(err.response.data.errors[0].message);
-      } else if (err.response?.data?.message) {
+    } catch (unknownError: unknown) {
+      const err = unknownError as FinalTestSaveError;
+
+      // A dropped connection can hide a successful commit. Confirm the
+      // persisted state before telling the teacher that the save failed.
+      if (!err.response) {
+        try {
+          const persistedConfig = await finalTestService.getFinalTest(courseId);
+          if (persistedConfig) {
+            const persistedForm = toFormState(persistedConfig);
+            if (comparableForm(persistedForm) === comparableForm(form)) {
+              setForm(persistedForm);
+              setInitialForm(persistedForm);
+              setHasPersistedConfig(true);
+              if (shouldExit) {
+                navigate('/teacher/courses', { state: { finalTestSaved: true } });
+              } else {
+                notify('Kết nối bị gián đoạn nhưng hệ thống đã xác nhận cấu hình được lưu.', 'warning');
+              }
+              return;
+            }
+          }
+        } catch {
+          // The verification request can fail on the same interrupted network.
+        }
+
+        showError('Kết nối bị gián đoạn nên chưa thể xác nhận trạng thái lưu. Dữ liệu có thể đã được lưu; vui lòng giữ trang và thử lại khi mạng ổn định.');
+      } else if (err.response.data?.errors?.length) {
+        showError(err.response.data.errors[0].message || 'Dữ liệu Final Test không hợp lệ.');
+      } else if (err.response.data?.message) {
         showError(err.response.data.message);
       } else {
         showError('Có lỗi xảy ra, vui lòng thử lại.');
@@ -198,8 +268,6 @@ export const FinalTestConfigPage = () => {
       </Box>
     );
   }
-
-  const isDirty = initialForm && JSON.stringify(form) !== JSON.stringify(initialForm);
 
   return (
     <Box sx={{ pb: 10 }}>
@@ -234,7 +302,7 @@ export const FinalTestConfigPage = () => {
               onChange={(e) => setForm({ ...form, passingScore: e.target.value === '' ? '' : Number(e.target.value) })}
               slotProps={{
                 input: { endAdornment: <InputAdornment position="end">%</InputAdornment> },
-                htmlInput: { min: 0, max: 100 }
+                htmlInput: { min: 1, max: 100 }
               }}
             />
             <TextField

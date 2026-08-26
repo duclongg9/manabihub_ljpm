@@ -2,7 +2,7 @@ package com.manabihub.finaltest.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,7 +27,7 @@ public class FinalTestQuestionDto {
     private String explanation;
 
     @Valid
-    @NotEmpty(message = "MSG-FTEST-002")
+    @Size(min = 2, message = "MSG-FTEST-002")
     @Builder.Default
     private List<FinalTestChoiceDto> choices = new ArrayList<>();
 }

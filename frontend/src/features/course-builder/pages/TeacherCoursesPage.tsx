@@ -59,6 +59,7 @@ interface CourseDraftSavedState {
   draftSaved?: boolean;
   draftId?: string;
   draftTitle?: string;
+  finalTestSaved?: boolean;
 }
 
 type Feedback = {
@@ -92,7 +93,7 @@ export function TeacherCoursesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const draftState = location.state as CourseDraftSavedState | null;
-  const recentlySaved = Boolean(draftState?.draftSaved);
+  const recentlySaved = Boolean(draftState?.draftSaved || draftState?.finalTestSaved);
   const [drafts, setDrafts] = useState<CourseDraftResponse[]>([]);
   const [categories, setCategories] = useState<CourseCategory[]>([]);
   const [query, setQuery] = useState('');
@@ -357,7 +358,9 @@ export function TeacherCoursesPage() {
           )}
           sx={{ mb: 2 }}
         >
-          Đã lưu bản nháp “{draftState?.draftTitle || 'khóa học mới'}”. Bạn có thể xem lại khóa học trong danh sách bản nháp bên dưới.
+          {draftState?.finalTestSaved
+            ? 'Đã lưu cấu hình Final Test. Bạn có thể tiếp tục hoàn thiện hoặc gửi khóa học để xét duyệt.'
+            : `Đã lưu bản nháp “${draftState?.draftTitle || 'khóa học mới'}”. Bạn có thể xem lại khóa học trong danh sách bản nháp bên dưới.`}
         </Alert>
       )}
 
