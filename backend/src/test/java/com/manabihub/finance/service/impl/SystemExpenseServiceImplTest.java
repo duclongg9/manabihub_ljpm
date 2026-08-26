@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -58,9 +59,11 @@ class SystemExpenseServiceImplTest {
     @Test
     void create_DerivesDocumentTotalsFromComponentLines() {
         allowFinanceManager();
-        when(expenseRepository.existsByProviderCodeIgnoreCaseAndInvoiceNumberIgnoreCase("AWS", "INV-001"))
+        when(expenseRepository.existsByProviderCodeIgnoreCaseAndInvoiceNumberIgnoreCaseAndIncurredAtAndStatusNot(
+                "AWS", "INV-001", LocalDate.now(), ExpenseStatus.VOID))
                 .thenReturn(false);
-        when(expenseRepository.save(any(SystemExpense.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(expenseRepository.saveAndFlush(any(SystemExpense.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ExpenseDetailResponse result = service.create(request());
 
@@ -78,13 +81,14 @@ class SystemExpenseServiceImplTest {
     @Test
     void create_RejectsDuplicateProviderInvoice() {
         allowFinanceManager();
-        when(expenseRepository.existsByProviderCodeIgnoreCaseAndInvoiceNumberIgnoreCase("AWS", "INV-001"))
+        when(expenseRepository.existsByProviderCodeIgnoreCaseAndInvoiceNumberIgnoreCaseAndIncurredAtAndStatusNot(
+                "AWS", "INV-001", LocalDate.now(), ExpenseStatus.VOID))
                 .thenReturn(true);
 
         BusinessException error = assertThrows(BusinessException.class, () -> service.create(request()));
 
         assertEquals(MessageCodes.COMMON_CONFLICT, error.getMessageCode());
-        verify(expenseRepository, never()).save(any());
+        verify(expenseRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -111,7 +115,77 @@ class SystemExpenseServiceImplTest {
         BusinessException error = assertThrows(BusinessException.class, () -> service.create(request()));
 
         assertEquals(MessageCodes.ADMIN_PERMISSION_DENIED, error.getMessageCode());
-        verify(expenseRepository, never()).save(any());
+        verify(expenseRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void get_UsesViewPermissionInsteadOfManagePermission() {
+        when(currentUserService.getCurrentUserId()).thenReturn(adminId);
+        when(adminRepository.hasPermission(adminId, "FINANCE_EXPENSE_VIEW")).thenReturn(true);
+        SystemExpense expense = existingDraft();
+        when(expenseRepository.findDetailById(expense.getId())).thenReturn(Optional.of(expense));
+
+        ExpenseDetailResponse result = service.get(expense.getId());
+
+        assertEquals(expense.getId(), result.id());
+        verify(adminRepository).hasPermission(adminId, "FINANCE_EXPENSE_VIEW");
+        verify(adminRepository, never()).hasPermission(adminId, "FINANCE_EXPENSE_MANAGE");
+    }
+
+    @Test
+    void create_MapsConcurrentDuplicateConstraintToConflict() {
+        allowFinanceManager();
+        when(expenseRepository.existsByProviderCodeIgnoreCaseAndInvoiceNumberIgnoreCaseAndIncurredAtAndStatusNot(
+                "AWS", "INV-001", LocalDate.now(), ExpenseStatus.VOID))
+                .thenReturn(false);
+        when(expenseRepository.saveAndFlush(any(SystemExpense.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "duplicate key violates uq_system_expenses_active_provider_invoice_date"));
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.create(request()));
+
+        assertEquals(MessageCodes.COMMON_CONFLICT, error.getMessageCode());
+    }
+
+    @Test
+    void create_DoesNotMisreportUnrelatedDatabaseFailuresAsDuplicates() {
+        allowFinanceManager();
+        when(expenseRepository.existsByProviderCodeIgnoreCaseAndInvoiceNumberIgnoreCaseAndIncurredAtAndStatusNot(
+                "AWS", "INV-001", LocalDate.now(), ExpenseStatus.VOID))
+                .thenReturn(false);
+        DataIntegrityViolationException databaseError = new DataIntegrityViolationException("connection lost");
+        when(expenseRepository.saveAndFlush(any(SystemExpense.class))).thenThrow(databaseError);
+
+        DataIntegrityViolationException result = assertThrows(
+                DataIntegrityViolationException.class,
+                () -> service.create(request())
+        );
+
+        assertEquals(databaseError, result);
+    }
+
+    @Test
+    void create_RejectsFutureInvoiceDateInVietnamTimezone() {
+        allowFinanceManager();
+        UpsertExpenseRequest request = request();
+        request.setIncurredAt(LocalDate.now().plusDays(1));
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.create(request));
+
+        assertEquals(MessageCodes.VALIDATION_FAILED, error.getMessageCode());
+        verify(expenseRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void create_RequiresForeignExchangeRateEvidence() {
+        allowFinanceManager();
+        UpsertExpenseRequest request = request();
+        request.setExchangeRateDate(null);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.create(request));
+
+        assertEquals(MessageCodes.VALIDATION_FAILED, error.getMessageCode());
+        verify(expenseRepository, never()).saveAndFlush(any());
     }
 
     private void allowFinanceManager() {
@@ -126,6 +200,8 @@ class SystemExpenseServiceImplTest {
         request.setInvoiceNumber("INV-001");
         request.setCurrency("USD");
         request.setExchangeRate(new BigDecimal("25000"));
+        request.setExchangeRateDate(LocalDate.now());
+        request.setExchangeRateSource("Vietcombank");
         request.setIncurredAt(LocalDate.now());
         request.setSourceType(ExpenseSourceType.MANUAL_INVOICE);
         request.setLines(List.of(

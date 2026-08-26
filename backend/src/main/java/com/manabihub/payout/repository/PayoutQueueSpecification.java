@@ -23,6 +23,12 @@ public final class PayoutQueueSpecification {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            if (filter.getPayoutId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("id"), filter.getPayoutId()));
+            }
+            if (filter.getWalletId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("walletId"), filter.getWalletId()));
+            }
             if (filter.getStatus() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("status"), filter.getStatus()));
             }
@@ -33,9 +39,19 @@ public final class PayoutQueueSpecification {
                 ));
             }
             if (filter.getRequestedTo() != null) {
-                predicates.add(criteriaBuilder.lessThanOrEqualTo(
+                predicates.add(criteriaBuilder.lessThan(
                         root.get("requestedAt"),
                         filter.getRequestedTo()
+                ));
+            }
+            if (filter.getMinAmount() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                        root.get("requestedAmount"), filter.getMinAmount()
+                ));
+            }
+            if (filter.getMaxAmount() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(
+                        root.get("requestedAmount"), filter.getMaxAmount()
                 ));
             }
 
@@ -58,6 +74,16 @@ public final class PayoutQueueSpecification {
             }
             if (filter.getReconciliationStatus() != null) {
                 predicates.add(reconciliationMatches(
+                        root,
+                        query.subquery(Integer.class),
+                        criteriaBuilder,
+                        filter
+                ));
+            }
+            if (filter.getSettlementStatus() != null
+                    || normalize(filter.getProvider()) != null
+                    || normalize(filter.getProviderReference()) != null) {
+                predicates.add(settlementMatches(
                         root,
                         query.subquery(Integer.class),
                         criteriaBuilder,
@@ -146,10 +172,46 @@ public final class PayoutQueueSpecification {
         return criteriaBuilder.exists(subquery);
     }
 
-    private static String normalizeKeyword(String keyword) {
-        if (keyword == null || keyword.isBlank()) {
-            return null;
+    private static Predicate settlementMatches(
+            Root<WithdrawalRequest> withdrawal,
+            Subquery<Integer> subquery,
+            CriteriaBuilder criteriaBuilder,
+            PayoutQueueFilterRequest filter
+    ) {
+        Root<PayoutSettlement> settlement = subquery.from(PayoutSettlement.class);
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(criteriaBuilder.equal(
+                settlement.get("withdrawalRequestId"),
+                withdrawal.get("id")
+        ));
+        if (filter.getSettlementStatus() != null) {
+            predicates.add(criteriaBuilder.equal(settlement.get("status"), filter.getSettlementStatus()));
         }
-        return "%" + keyword.trim().toLowerCase() + "%";
+        String provider = normalize(filter.getProvider());
+        if (provider != null) {
+            predicates.add(criteriaBuilder.equal(
+                    criteriaBuilder.lower(settlement.get("provider")),
+                    provider.toLowerCase()
+            ));
+        }
+        String reference = normalizeKeyword(filter.getProviderReference());
+        if (reference != null) {
+            predicates.add(criteriaBuilder.like(
+                    criteriaBuilder.lower(settlement.get("providerReferenceId")),
+                    reference
+            ));
+        }
+        subquery.select(criteriaBuilder.literal(1));
+        subquery.where(predicates.toArray(Predicate[]::new));
+        return criteriaBuilder.exists(subquery);
+    }
+
+    private static String normalizeKeyword(String keyword) {
+        String normalized = normalize(keyword);
+        return normalized == null ? null : "%" + normalized.toLowerCase() + "%";
+    }
+
+    private static String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

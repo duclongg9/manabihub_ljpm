@@ -6,6 +6,15 @@ export type RefundStatus =
   | 'RECONCILIATION_REQUIRED'
   | 'CANCELLED';
 
+export type RefundProviderStatus =
+  | 'NOT_REQUESTED'
+  | 'PROCESSING'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'PENDING'
+  | 'UNAVAILABLE'
+  | 'INVALID_RESULT';
+
 export type RefundDecisionReasonCode =
   | 'STANDARD_ELIGIBLE'
   | 'DUPLICATE_CHARGE'
@@ -35,7 +44,7 @@ interface RefundFinancialEvidence {
   escrowStatus?: string | null;
   escrowAmount?: RefundMoneyValue | null;
   escrowReleaseAt?: string | null;
-  providerStatus?: string | null;
+  providerStatus?: RefundProviderStatus | string | null;
   providerName?: string | null;
   providerReference?: string | null;
   providerResultCode?: string | null;
@@ -55,6 +64,8 @@ export interface RefundQueueResponse extends RefundFinancialEvidence {
   reason: string;
   status: RefundStatus;
   createdAt: string;
+  decidedBy?: string | null;
+  decidedAt?: string | null;
 }
 
 export interface RefundDetailResponse extends RefundFinancialEvidence {
@@ -79,7 +90,9 @@ export interface RefundDecisionRequest {
 }
 
 export interface RefundQueueFilters {
+  refundId?: string;
   status?: RefundStatus | '';
+  providerStatus?: RefundProviderStatus | '';
   orderCode?: string;
   student?: string;
   course?: string;

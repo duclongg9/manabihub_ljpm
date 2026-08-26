@@ -21,6 +21,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
@@ -72,6 +73,15 @@ public class SystemExpense {
 
     @Column(name = "incurred_at", nullable = false)
     private LocalDate incurredAt;
+
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
+    @Column(name = "exchange_rate_date")
+    private LocalDate exchangeRateDate;
+
+    @Column(name = "exchange_rate_source", length = 120)
+    private String exchangeRateSource;
 
     @Column(name = "billing_period_from")
     private LocalDate billingPeriodFrom;
@@ -126,7 +136,11 @@ public class SystemExpense {
     @Builder.Default
     @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("lineOrder ASC")
+    @org.hibernate.annotations.BatchSize(size = 50)
     private List<SystemExpenseLine> lines = new ArrayList<>();
+
+    @Formula("(SELECT COUNT(*) FROM system_expense_lines expense_line WHERE expense_line.expense_id = id)")
+    private int lineCount;
 
     public void replaceLines(List<SystemExpenseLine> replacement) {
         lines.clear();

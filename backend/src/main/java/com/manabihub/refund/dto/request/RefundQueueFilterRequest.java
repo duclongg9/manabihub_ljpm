@@ -1,6 +1,7 @@
 package com.manabihub.refund.dto.request;
 
 import com.manabihub.refund.enums.RefundStatus;
+import com.manabihub.refund.enums.RefundProviderStatus;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -12,7 +13,9 @@ import java.util.UUID;
 @Getter
 @Setter
 public class RefundQueueFilterRequest {
+    private UUID refundId;
     private RefundStatus status;
+    private RefundProviderStatus providerStatus;
     private String orderCode;
     private String student;
     private UUID courseId;

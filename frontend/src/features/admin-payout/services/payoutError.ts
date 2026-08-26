@@ -10,8 +10,8 @@ const PAYOUT_ERROR_MESSAGES: Record<string, string> = {
   PAYOUT_PENDING_RETRY: 'Cổng thanh toán chưa phản hồi ổn định. Yêu cầu đã được giữ để thử lại an toàn.',
   PAYOUT_GATEWAY_FAILED: 'Cổng thanh toán từ chối giao dịch. Tiền đang giữ vẫn được bảo toàn.',
   PAYOUT_INVALID_STATUS: 'Yêu cầu không còn ở trạng thái cho phép thực hiện thao tác này.',
-  PAYOUT_DUPLICATE_SETTLEMENT: 'Yêu cầu này đã có giao dịch quyết toán.',
-  PAYOUT_PERMISSION_DENIED: 'Bạn không có quyền Finance Manager để xử lý quyết toán.',
+  PAYOUT_DUPLICATE_SETTLEMENT: 'Yêu cầu này đã có giao dịch chi trả.',
+  PAYOUT_PERMISSION_DENIED: 'Bạn không có quyền Finance Manager để xử lý chi trả.',
   PAYOUT_NOT_FOUND: 'Không tìm thấy yêu cầu rút tiền.',
   PAYOUT_MANUAL_AMOUNT_MISMATCH: 'Số tiền chuyển khoản phải khớp chính xác số tiền yêu cầu.',
   PAYOUT_MANUAL_REFERENCE_DUPLICATE: 'Mã giao dịch ngân hàng này đã được sử dụng.',
@@ -28,7 +28,7 @@ export function getPayoutErrorMessage(error: unknown) {
       return mapped;
     }
   }
-  return 'Không thể xử lý yêu cầu quyết toán. Vui lòng thử lại.';
+  return 'Không thể xử lý yêu cầu chi trả. Vui lòng thử lại.';
 }
 
 export function getPayoutMessageByCode(messageCode: string | null | undefined) {

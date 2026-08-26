@@ -21,7 +21,7 @@ export function useApprovePayout() {
           )
         : adminPayoutService.approvePayout(withdrawalRequestId),
     onSuccess: () => {
-      toast.success('Đã quyết toán và ghi nhận giao dịch thành công.');
+      toast.success('Đã thực hiện chi trả và ghi nhận giao dịch thành công.');
     },
     onError: (error: unknown) => {
       toast.error(getPayoutErrorMessage(error));

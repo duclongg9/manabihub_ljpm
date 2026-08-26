@@ -80,7 +80,7 @@ describe('AdminRefundDetail', () => {
     getRefundDetailMock.mockResolvedValue({
       ...pendingRefund,
       status: 'RECONCILIATION_REQUIRED',
-      providerStatus: 'UNKNOWN',
+      providerStatus: 'INVALID_RESULT',
       providerReference: 'RF-VNP-456',
       providerResultCode: 'TIMEOUT',
       providerAttemptCount: 1,
@@ -93,15 +93,18 @@ describe('AdminRefundDetail', () => {
     renderDetail();
 
     expect(await screen.findByText('Spring Boot thực chiến')).toBeInTheDocument();
-    expect(screen.getByText('VNP-123')).toBeInTheDocument();
+    expect(screen.getAllByText('VNP-123').length).toBeGreaterThan(0);
     expect(screen.getByText('RF-VNP-456')).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('PROVIDER_RESULT_UNKNOWN');
+    expect(screen.getByRole('alert')).toHaveTextContent('Cần đối soát thủ công với provider');
     expect(screen.getByText('Tiến độ học')).toBeInTheDocument();
-    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getAllByText('12%').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1\.000\.000/).length).toBeGreaterThan(0);
     expect(
       screen.getByText(/Có thể thử lại bằng nút trên sau khi kiểm tra provider/),
     ).toBeInTheDocument();
+    const technicalDetails = screen.getByText('Chi tiết kỹ thuật và mã đối soát').closest('details');
+    expect(technicalDetails).not.toBeNull();
+    expect(within(technicalDetails!).getByText('PROVIDER_RESULT_UNKNOWN')).toBeInTheDocument();
   });
 
   it('submits the machine-readable reason and shows provider-confirmed success', async () => {
@@ -135,7 +138,8 @@ describe('AdminRefundDetail', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Đã ghi có khoản hoàn tiền vào ví học viên và khóa quyền truy cập khóa học.',
     );
-    expect(await screen.findByText('Đã hoàn tiền')).toBeInTheDocument();
+    expect(await screen.findByText('Provider / ví đã hoàn tiền')).toBeInTheDocument();
+    expect(screen.getAllByText('Provider xác nhận thành công').length).toBeGreaterThan(0);
   });
 
   it('closes the dialog and refreshes persisted reconciliation state', async () => {
@@ -175,13 +179,10 @@ describe('AdminRefundDetail', () => {
       expect(screen.getByText(/Chưa thể hoàn tất tự động/)).toBeInTheDocument();
     });
     expect(await screen.findByText('Cần đối soát')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        (_, element) =>
-          element?.tagName === 'P' &&
-          Boolean(element.textContent?.includes('PROVIDER_UNAVAILABLE')),
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getAllByText('Provider không khả dụng').length).toBeGreaterThan(0);
+    const technicalDetails = screen.getByText('Chi tiết kỹ thuật và mã đối soát').closest('details');
+    expect(technicalDetails).not.toBeNull();
+    expect(within(technicalDetails!).getByText('PROVIDER_UNAVAILABLE')).toBeInTheDocument();
   });
 
   it('shows correlation ID from response header on HTTP 500 and keeps modal open', async () => {

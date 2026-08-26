@@ -16,16 +16,25 @@ import java.util.UUID;
 @Builder
 public class PayoutQueueItemResponse {
     UUID withdrawalRequestId;
+    UUID walletId;
     WalletOwnerType ownerType;
     UUID ownerId;
     String ownerName;
     UUID teacherId;
     String teacherName;
     BigDecimal requestedAmount;
+    String bankName;
+    String accountNumberMasked;
     WithdrawalStatus status;
     PayoutStatus settlementStatus;
     ReconciliationStatus reconciliationStatus;
     LocalDateTime requestedAt;
     Instant processingStartedAt;
+    String provider;
+    String providerReference;
+    UUID decidedBy;
+    LocalDateTime decidedAt;
+    LocalDateTime updatedAt;
+    Instant settlementUpdatedAt;
     int retryCount;
 }

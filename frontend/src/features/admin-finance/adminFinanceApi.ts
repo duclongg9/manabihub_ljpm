@@ -3,6 +3,7 @@ import type { ApiResponse, PageResponse } from '../../shared/types/api';
 import type {
   ExpenseDetail,
   ExpenseFilters,
+  ExpenseOverview,
   ExpensePayload,
   ExpenseSummary,
   RevenueDashboard,
@@ -25,6 +26,13 @@ export const adminFinanceApi = {
   searchExpenses: async (filters: ExpenseFilters): Promise<PageResponse<ExpenseSummary>> => {
     const response = await axiosClient.get<ApiResponse<PageResponse<ExpenseSummary>>>(EXPENSE_BASE, {
       params: { ...filters, sort: 'incurredAt,desc' },
+    });
+    return response.data.data;
+  },
+
+  getExpenseOverview: async (from?: string, to?: string): Promise<ExpenseOverview> => {
+    const response = await axiosClient.get<ApiResponse<ExpenseOverview>>(`${EXPENSE_BASE}/overview`, {
+      params: { from, to },
     });
     return response.data.data;
   },
