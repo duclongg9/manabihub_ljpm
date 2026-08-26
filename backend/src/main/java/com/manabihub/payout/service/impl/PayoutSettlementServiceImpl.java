@@ -53,6 +53,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
@@ -69,6 +70,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -81,6 +83,9 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
     private static final String STUDENT_WALLET_LINK = "/student/wallet";
     private static final String WITHDRAWAL_REFERENCE = "WITHDRAWAL_REQUEST";
     private static final Duration PROCESSING_STALE_AFTER = Duration.ofMinutes(5);
+    private static final Set<String> PAYOUT_QUEUE_SORTS = Set.of(
+            "requestedAt", "updatedAt", "requestedAmount", "status", "id"
+    );
 
     private final WithdrawalRequestRepository withdrawalRequestRepository;
     private final PayoutSettlementRepository payoutSettlementRepository;
@@ -108,10 +113,48 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
             Pageable pageable
     ) {
         requireFinanceAdmin();
+        PayoutQueueFilterRequest safeFilter = filter == null ? new PayoutQueueFilterRequest() : filter;
+        validateQueueFilter(safeFilter);
         return withdrawalRequestRepository.findAll(
-                PayoutQueueSpecification.from(filter),
-                pageable
+                PayoutQueueSpecification.from(safeFilter),
+                safeQueuePageable(pageable)
         ).map(this::toQueueItem);
+    }
+
+    private Pageable safeQueuePageable(Pageable requested) {
+        int page = Math.max(0, requested == null ? 0 : requested.getPageNumber());
+        int size = Math.min(100, Math.max(1, requested == null ? 20 : requested.getPageSize()));
+        List<Sort.Order> orders = requested == null ? List.of() : requested.getSort().stream()
+                .filter(order -> PAYOUT_QUEUE_SORTS.contains(order.getProperty()))
+                .toList();
+        Sort sort = orders.isEmpty()
+                ? Sort.by(Sort.Order.desc("requestedAt"), Sort.Order.desc("id"))
+                : Sort.by(orders).and(Sort.by(Sort.Order.desc("id")));
+        return PageRequest.of(page, size, sort);
+    }
+
+    private void validateQueueFilter(PayoutQueueFilterRequest filter) {
+        if ((filter.getMinAmount() != null && filter.getMinAmount().signum() < 0)
+                || (filter.getMaxAmount() != null && filter.getMaxAmount().signum() < 0)) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Payout amount filters cannot be negative"
+            );
+        }
+        if (filter.getMinAmount() != null && filter.getMaxAmount() != null
+                && filter.getMinAmount().compareTo(filter.getMaxAmount()) > 0) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Minimum payout amount cannot exceed maximum payout amount"
+            );
+        }
+        if (filter.getRequestedFrom() != null && filter.getRequestedTo() != null
+                && !filter.getRequestedFrom().isBefore(filter.getRequestedTo())) {
+            throw new BusinessException(
+                    MessageCodes.VALIDATION_FAILED,
+                    "Payout range must satisfy from < to"
+            );
+        }
     }
 
     @Override
@@ -1092,7 +1135,7 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
 
     private PayoutQueueItemResponse toQueueItem(WithdrawalRequest request) {
         OwnerContext owner = findOwner(request, false);
-        Wallet wallet = owner.wallet();
+        BankAccountSnapshot bank = request.getBankAccountSnapshot();
         PayoutSettlement settlement = payoutSettlementRepository
                 .findByWithdrawalRequestId(request.getId())
                 .orElse(null);
@@ -1101,17 +1144,28 @@ public class PayoutSettlementServiceImpl implements PayoutSettlementService {
 
         return PayoutQueueItemResponse.builder()
                 .withdrawalRequestId(request.getId())
+                .walletId(request.getWalletId())
                 .ownerType(owner.ownerType())
                 .ownerId(owner.profileId())
                 .ownerName(owner.name())
                 .teacherId(request.getTeacherId())
                 .teacherName(owner.name())
                 .requestedAmount(request.getRequestedAmount())
+                .bankName(bank == null ? null : bank.getBankName())
+                .accountNumberMasked(bank == null
+                        ? null
+                        : payoutSecurityService.maskAccountNumber(bank.getAccountNumber()))
                 .status(request.getStatus())
                 .settlementStatus(settlement == null ? null : settlement.getStatus())
                 .reconciliationStatus(reconciliation.status())
                 .requestedAt(request.getRequestedAt())
                 .processingStartedAt(settlement == null ? null : settlement.getProcessingStartedAt())
+                .provider(settlement == null ? null : settlement.getProvider())
+                .providerReference(settlement == null ? null : settlement.getProviderReferenceId())
+                .decidedBy(request.getDecidedBy())
+                .decidedAt(request.getDecidedAt())
+                .updatedAt(request.getUpdatedAt())
+                .settlementUpdatedAt(settlement == null ? null : settlement.getUpdatedAt())
                 .retryCount(settlement == null ? 0 : settlement.getRetryCount())
                 .build();
     }

@@ -42,6 +42,22 @@ public final class SystemExpenseSpecifications {
                         filter.getIncurredTo()
                 ));
             }
+            if (filter.getCreatedBy() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("createdBy"), filter.getCreatedBy()));
+            }
+            if (filter.getMinAmountVnd() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                        root.get("totalAmountVnd"), filter.getMinAmountVnd()
+                ));
+            }
+            if (filter.getMaxAmountVnd() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(
+                        root.get("totalAmountVnd"), filter.getMaxAmountVnd()
+                ));
+            }
+            addLike(predicates, criteriaBuilder, root, "vendorName", filter.getVendor());
+            addLike(predicates, criteriaBuilder, root, "providerCode", filter.getProviderCode());
+            addLike(predicates, criteriaBuilder, root, "invoiceNumber", filter.getInvoiceNumber());
             String keyword = normalizedKeyword(filter.getKeyword());
             if (keyword != null) {
                 predicates.add(criteriaBuilder.or(
@@ -66,5 +82,21 @@ public final class SystemExpenseSpecifications {
             return null;
         }
         return "%" + keyword.trim().toLowerCase() + "%";
+    }
+
+    private static void addLike(
+            List<Predicate> predicates,
+            jakarta.persistence.criteria.CriteriaBuilder criteriaBuilder,
+            jakarta.persistence.criteria.Root<SystemExpense> root,
+            String field,
+            String value
+    ) {
+        String keyword = normalizedKeyword(value);
+        if (keyword != null) {
+            predicates.add(criteriaBuilder.like(
+                    criteriaBuilder.lower(criteriaBuilder.coalesce(root.<String>get(field), "")),
+                    keyword
+            ));
+        }
     }
 }

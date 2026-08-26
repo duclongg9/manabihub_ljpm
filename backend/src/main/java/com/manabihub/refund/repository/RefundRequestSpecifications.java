@@ -29,6 +29,12 @@ public final class RefundRequestSpecifications {
             if (filter.getStatus() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("status"), filter.getStatus()));
             }
+            if (filter.getRefundId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("id"), filter.getRefundId()));
+            }
+            if (filter.getProviderStatus() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("providerStatus"), filter.getProviderStatus()));
+            }
             if (filter.getCreatedFrom() != null) {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), filter.getCreatedFrom()));
             }

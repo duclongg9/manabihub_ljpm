@@ -52,6 +52,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.TransactionStatus;
@@ -262,10 +263,14 @@ class PayoutSettlementServiceImplTest {
 
         var detail = service.getPayoutDetail(requestId);
         var pageable = PageRequest.of(0, 20);
+        var safePageable = PageRequest.of(0, 20, Sort.by(
+                Sort.Order.desc("requestedAt"),
+                Sort.Order.desc("id")
+        ));
         when(withdrawalRequestRepository.findAll(
                 any(Specification.class),
-                eq(pageable)
-        )).thenReturn(new PageImpl<>(List.of(request), pageable, 1));
+                eq(safePageable)
+        )).thenReturn(new PageImpl<>(List.of(request), safePageable, 1));
         var queue = service.getPayoutQueue(new PayoutQueueFilterRequest(), pageable);
         var reviewed = service.reviewReconciliation(requestId);
 

@@ -8,6 +8,7 @@ export interface RevenueSummary {
   refundAmount: MoneyValue;
   refundCount: number;
   refundRate: MoneyValue;
+  netCollected: MoneyValue;
   commissionRecognized: MoneyValue;
   commissionReversed: MoneyValue;
   platformRevenue: MoneyValue;
@@ -35,6 +36,7 @@ export interface RevenueDashboard {
   to: string;
   timezone: string;
   granularity: RevenueGranularity;
+  generatedAt: string;
   summary: RevenueSummary;
   points: RevenuePoint[];
 }
@@ -76,6 +78,9 @@ export interface ExpensePayload {
   currency: string;
   exchangeRate: MoneyValue;
   incurredAt: string;
+  dueDate?: string;
+  exchangeRateDate?: string;
+  exchangeRateSource?: string;
   billingPeriodFrom?: string;
   billingPeriodTo?: string;
   evidenceReference?: string;
@@ -93,9 +98,11 @@ export interface ExpenseSummary {
   originalTotal: MoneyValue;
   totalAmountVnd: MoneyValue;
   incurredAt: string;
+  dueDate?: string;
   status: ExpenseStatus;
   sourceType: ExpenseSourceType;
   lineCount: number;
+  createdBy: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -103,6 +110,8 @@ export interface ExpenseSummary {
 export interface ExpenseDetail extends ExpenseSummary {
   description?: string;
   exchangeRate: MoneyValue;
+  exchangeRateDate?: string;
+  exchangeRateSource?: string;
   billingPeriodFrom?: string;
   billingPeriodTo?: string;
   paidAt?: string;
@@ -117,10 +126,28 @@ export interface ExpenseDetail extends ExpenseSummary {
   lines: Array<ExpenseLinePayload & { id: string; amountVnd: MoneyValue; lineOrder: number }>;
 }
 
+export interface ExpenseOverview {
+  from: string;
+  to: string;
+  totalDocuments: number;
+  totalConfirmedVnd: MoneyValue;
+  draftCount: number;
+  confirmedCount: number;
+  paidCount: number;
+  overdueCount: number;
+  generatedAt: string;
+}
+
 export interface ExpenseFilters {
   status?: ExpenseStatus | '';
   category?: ExpenseCategory | '';
   keyword?: string;
+  vendor?: string;
+  providerCode?: string;
+  invoiceNumber?: string;
+  createdBy?: string;
+  minAmountVnd?: string;
+  maxAmountVnd?: string;
   incurredFrom?: string;
   incurredTo?: string;
   page: number;

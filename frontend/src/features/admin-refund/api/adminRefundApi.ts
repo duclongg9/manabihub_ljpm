@@ -1,14 +1,18 @@
 import { axiosClient } from '../../../shared/api/axiosClient';
 import type { ApiResponse, PageResponse } from '../../../shared/types/api';
 import type { RefundQueueResponse, RefundDetailResponse, RefundDecisionRequest, RefundQueueFilters } from '../types';
+import { toExclusiveReportingRange } from '../../admin-finance/financeDisplay';
 
 export const adminRefundApi = {
   getPendingRefunds: async (page: number, size: number, filters: RefundQueueFilters = {}): Promise<PageResponse<RefundQueueResponse>> => {
+    const range = filters.createdFrom && filters.createdTo
+      ? toExclusiveReportingRange(filters.createdFrom, filters.createdTo)
+      : null;
     const response = await axiosClient.get<ApiResponse<PageResponse<RefundQueueResponse>>>('/v1/admin/refunds', {
       params: {
         ...filters,
-        createdFrom: filters.createdFrom ? new Date(`${filters.createdFrom}T00:00:00+07:00`).toISOString() : undefined,
-        createdTo: filters.createdTo ? new Date(`${filters.createdTo}T23:59:59.999+07:00`).toISOString() : undefined,
+        createdFrom: range?.from ?? (filters.createdFrom ? toExclusiveReportingRange(filters.createdFrom, filters.createdFrom).from : undefined),
+        createdTo: range?.to ?? (filters.createdTo ? toExclusiveReportingRange(filters.createdTo, filters.createdTo).to : undefined),
         page,
         size,
         sort: 'createdAt,desc',

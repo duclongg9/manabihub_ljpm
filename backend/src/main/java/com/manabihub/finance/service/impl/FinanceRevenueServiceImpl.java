@@ -105,6 +105,7 @@ public class FinanceRevenueServiceImpl implements FinanceRevenueService {
                 to,
                 REPORTING_ZONE.getId(),
                 granularity,
+                now,
                 summarize(points),
                 points
         );
@@ -236,6 +237,7 @@ public class FinanceRevenueServiceImpl implements FinanceRevenueService {
         BigDecimal gross = sum(points, RevenueTimePointResponse::grossSales);
         long orders = points.stream().mapToLong(RevenueTimePointResponse::successfulOrders).sum();
         BigDecimal refunds = sum(points, RevenueTimePointResponse::refundAmount);
+        BigDecimal netCollected = gross.subtract(refunds).setScale(2, RoundingMode.HALF_UP);
         long refundCount = points.stream().mapToLong(RevenueTimePointResponse::refundCount).sum();
         BigDecimal recognized = sum(points, RevenueTimePointResponse::commissionRecognized);
         BigDecimal reversed = sum(points, RevenueTimePointResponse::commissionReversed);
@@ -249,7 +251,7 @@ public class FinanceRevenueServiceImpl implements FinanceRevenueService {
                 : refunds.multiply(BigDecimal.valueOf(100))
                         .divide(gross, 2, RoundingMode.HALF_UP);
         return new RevenueSummaryResponse(
-                gross, orders, refunds, refundCount, refundRate, recognized, reversed,
+                gross, orders, refunds, refundCount, refundRate, netCollected, recognized, reversed,
                 platformRevenue, paymentFees, operatingExpenses, totalExpenses, net
         );
     }

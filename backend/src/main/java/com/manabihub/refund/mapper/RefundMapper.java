@@ -16,6 +16,7 @@ public interface RefundMapper {
     @Mapping(target = "studentId", source = "student.id")
     @Mapping(target = "studentName", source = "student.user.fullName")
     @Mapping(target = "studentEmail", source = "student.user.email")
+    @Mapping(target = "decidedBy", source = "decidedBy.id")
     RefundQueueResponse toQueueResponse(RefundRequest entity);
 
     @Mapping(target = "orderId", source = "order.id")

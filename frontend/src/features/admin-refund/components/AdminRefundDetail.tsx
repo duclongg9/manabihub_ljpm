@@ -10,30 +10,43 @@ import type {
   RefundStatus,
 } from '../types';
 import { RefundDecisionForm } from './RefundDecisionForm';
+import {
+  REFUND_DECISION_REASON_LABELS,
+  REFUND_STATUS_LABELS,
+  eligibilityReasonLabel,
+  refundEligibilityLabel,
+  refundPaymentStatusLabel,
+  refundProviderStatusLabel,
+} from '../refundDisplay';
+import {
+  formatFinanceDateTime,
+  formatMoney as formatFinanceMoney,
+  waitingCalendarDays,
+} from '../../admin-finance/financeDisplay';
 
 const STATUS_META: Record<RefundStatus, { label: string; className: string }> = {
   PENDING: {
-    label: 'Chờ quyết định',
+    label: REFUND_STATUS_LABELS.PENDING,
     className: 'bg-yellow-50 text-yellow-700 border-yellow-200',
   },
   PROCESSING: {
-    label: 'Đang gửi yêu cầu hoàn tiền',
+    label: REFUND_STATUS_LABELS.PROCESSING,
     className: 'bg-blue-50 text-blue-700 border-blue-200',
   },
   APPROVED: {
-    label: 'Đã hoàn tiền',
+    label: REFUND_STATUS_LABELS.APPROVED,
     className: 'bg-green-50 text-green-700 border-green-200',
   },
   REJECTED: {
-    label: 'Đã từ chối',
+    label: REFUND_STATUS_LABELS.REJECTED,
     className: 'bg-red-50 text-red-700 border-red-200',
   },
   RECONCILIATION_REQUIRED: {
-    label: 'Cần đối soát',
+    label: REFUND_STATUS_LABELS.RECONCILIATION_REQUIRED,
     className: 'bg-orange-50 text-orange-800 border-orange-200',
   },
   CANCELLED: {
-    label: 'Đã hủy',
+    label: REFUND_STATUS_LABELS.CANCELLED,
     className: 'bg-gray-50 text-gray-700 border-gray-200',
   },
 };
@@ -41,15 +54,31 @@ const STATUS_META: Record<RefundStatus, { label: string; className: string }> = 
 const EVIDENCE_LABELS: Record<string, string> = {
   eligible: 'Đủ điều kiện',
   eligibilityResult: 'Kết quả điều kiện',
-  refundWindowDays: 'Thời hạn hoàn tiền (ngày)',
-  daysSincePurchase: 'Số ngày từ khi mua',
+  result: 'Kết quả điều kiện',
+  refundWindowDays: 'Thời hạn chính sách (ngày)',
+  elapsedCalendarDays: 'Số ngày từ khi thanh toán',
+  daysSincePurchase: 'Số ngày từ khi thanh toán',
   progressPercent: 'Tiến độ học',
-  progressLimitPercent: 'Ngưỡng tiến độ (yêu cầu phải thấp hơn)',
+  measuredProgressPercent: 'Tiến độ học',
+  progressCompleted: 'Nội dung đã hoàn thành',
+  progressTotal: 'Tổng nội dung dùng tính tiến độ',
+  progressLimitPercent: 'Ngưỡng tiến độ chính sách',
+  progressThresholdPercent: 'Ngưỡng tiến độ chính sách',
   protectedContentConsumed: 'Đã dùng nội dung được bảo vệ',
+  protectedMaterialsFullyDownloaded: 'Đã tải toàn bộ tài liệu được bảo vệ',
+  protectedMaterialsFullyDownloadedAt: 'Thời điểm tải đủ tài liệu được bảo vệ',
+  actuallyPaidAmount: 'Số tiền thực trả',
+  paymentSucceededAt: 'Thanh toán thành công lúc',
+  requestedAt: 'Đánh giá điều kiện lúc',
+  reasonCodes: 'Căn cứ đánh giá',
   manualReviewReason: 'Lý do chuyển duyệt thủ công',
-  exceptionReasonCode: 'Mã ngoại lệ',
   evaluatedAt: 'Thời điểm đánh giá',
 };
+
+const TECHNICAL_EVIDENCE_KEYS = new Set([
+  'snapshotVersion', 'policyVersion', 'refundType', 'timezone', 'currency',
+  'orderId', 'orderItemId', 'courseId', 'exceptionReasonCode',
+]);
 
 interface DecisionNotice {
   tone: 'success' | 'error';
@@ -57,36 +86,35 @@ interface DecisionNotice {
 }
 
 function formatMoney(value: RefundMoneyValue | null | undefined, currency?: string | null) {
-  if (value === null || value === undefined || value === '') return 'Chưa có';
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) return String(value);
-
-  try {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: currency || 'VND',
-      maximumFractionDigits: currency === 'VND' || !currency ? 0 : 2,
-    }).format(numericValue);
-  } catch {
-    return `${numericValue.toLocaleString('vi-VN')} ${currency || 'VND'}`;
-  }
+  return formatFinanceMoney(value, currency || 'VND', 'Chưa ghi nhận');
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return 'Chưa có';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN');
+  return formatFinanceDateTime(value);
 }
 
-function formatEvidenceValue(value: unknown) {
-  if (value === null || value === undefined || value === '') return 'Chưa có';
+function formatEvidenceValue(key: string, value: unknown) {
+  if (value === null || value === undefined || value === '') return 'Chưa ghi nhận';
   if (typeof value === 'boolean') return value ? 'Có' : 'Không';
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (key === 'eligibilityResult' || key === 'result') return refundEligibilityLabel(value);
+  if (key === 'reasonCodes' && Array.isArray(value)) {
+    return value.map((code) => eligibilityReasonLabel(String(code))).join(' · ');
+  }
+  if (['paymentSucceededAt', 'requestedAt', 'evaluatedAt', 'protectedMaterialsFullyDownloadedAt'].includes(key)) {
+    return formatFinanceDateTime(String(value));
+  }
+  if (['progressPercent', 'measuredProgressPercent', 'progressLimitPercent', 'progressThresholdPercent'].includes(key)) {
+    return `${Number(value).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}%`;
+  }
+  if (key === 'actuallyPaidAmount') return formatMoney(value as RefundMoneyValue);
+  if (typeof value === 'object') return 'Có dữ liệu kỹ thuật';
   return String(value);
 }
 
 function EvidenceSnapshot({ snapshot }: { snapshot?: Record<string, unknown> | null }) {
   const entries = snapshot ? Object.entries(snapshot) : [];
+  const visibleEntries = entries.filter(([key]) => EVIDENCE_LABELS[key] && !TECHNICAL_EVIDENCE_KEYS.has(key));
+  const technicalEntries = entries.filter(([key]) => TECHNICAL_EVIDENCE_KEYS.has(key) || !EVIDENCE_LABELS[key]);
 
   if (entries.length === 0) {
     return (
@@ -99,14 +127,27 @@ function EvidenceSnapshot({ snapshot }: { snapshot?: Record<string, unknown> | n
 
   return (
     <dl className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      {entries.map(([key, value]) => (
+      {visibleEntries.map(([key, value]) => (
         <div key={key} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
           <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            {EVIDENCE_LABELS[key] || key}
+            {EVIDENCE_LABELS[key]}
           </dt>
-          <dd className="mt-1 break-words text-sm text-gray-900">{formatEvidenceValue(value)}</dd>
+          <dd className="mt-1 break-words text-sm text-gray-900">{formatEvidenceValue(key, value)}</dd>
         </div>
       ))}
+      {technicalEntries.length > 0 && (
+        <details className="rounded-lg border border-gray-200 bg-white p-3 md:col-span-2">
+          <summary className="cursor-pointer text-sm font-semibold text-gray-700">Chi tiết kỹ thuật của snapshot</summary>
+          <dl className="mt-3 space-y-2 text-xs">
+            {technicalEntries.map(([key, value]) => (
+              <div key={key} className="grid gap-1 sm:grid-cols-[180px_1fr]">
+                <dt className="font-mono text-gray-500">{key}</dt>
+                <dd className="break-all text-gray-700">{typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
     </dl>
   );
 }
@@ -248,6 +289,16 @@ export function AdminRefundDetail() {
     canDecide &&
     hasEligibilityEvidence &&
     detail.paymentStatus === 'SUCCESS';
+  const snapshot = detail.eligibilitySnapshot ?? {};
+  const waitingDays = waitingCalendarDays(detail.createdAt);
+  const elapsedDays = numberOrNull(snapshot.elapsedCalendarDays ?? snapshot.daysSincePurchase);
+  const refundWindowDays = numberOrNull(snapshot.refundWindowDays);
+  const policyDaysRemaining = elapsedDays === null || refundWindowDays === null
+    ? null
+    : refundWindowDays - elapsedDays;
+  const progressPercent = numberOrNull(snapshot.measuredProgressPercent ?? snapshot.progressPercent);
+  const progressThreshold = numberOrNull(snapshot.progressThresholdPercent ?? snapshot.progressLimitPercent);
+  const eligibility = snapshot.eligibilityResult ?? snapshot.result ?? snapshot.eligible;
 
   return (
     <div className="space-y-6">
@@ -281,7 +332,7 @@ export function AdminRefundDetail() {
               title={
                 canApprove
                   ? undefined
-                  : 'Cần payment SUCCESS và bản chụp điều kiện trước khi chấp thuận'
+                  : 'Cần giao dịch thanh toán thành công và bản chụp điều kiện trước khi chấp thuận'
               }
               className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -315,7 +366,7 @@ export function AdminRefundDetail() {
         <div role="alert" className="rounded-lg border border-orange-300 bg-orange-50 p-4 text-sm text-orange-900">
           <p className="font-semibold">Cần đối soát thủ công với provider.</p>
           <p className="mt-1">
-            Mã lý do: {detail.reconciliationReasonCode || 'Chưa có'}.{' '}
+            Hệ thống đã lưu mã nguyên nhân trong phần “Chi tiết kỹ thuật”.{' '}
             {detail.providerStatus === 'SUCCESS'
               ? 'Provider đã báo thành công; không được gọi hoàn tiền lại. Cần hoàn tất đối soát kế toán.'
               : 'Có thể thử lại bằng nút trên sau khi kiểm tra provider; hệ thống giữ nguyên idempotency key để chống hoàn tiền hai lần.'}
@@ -325,10 +376,27 @@ export function AdminRefundDetail() {
 
       {canDecide && !canApprove && (
         <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Nút chấp thuận đang khóa vì payment chưa ở trạng thái SUCCESS hoặc chưa có bản chụp điều
+          Nút chấp thuận đang khóa vì giao dịch thanh toán chưa thành công hoặc chưa có bản chụp điều
           kiện. Finance Manager vẫn có thể từ chối yêu cầu với mã lý do phù hợp.
         </div>
       )}
+
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-lg font-bold text-gray-900">Tóm tắt trước khi quyết định</h3>
+          <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-600">SLA vận hành: Chưa được backend cấu hình</span>
+        </div>
+        <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryItem label="Điều kiện hoàn tiền" value={refundEligibilityLabel(eligibility)} />
+          <SummaryItem label="Thời gian đã chờ" value={waitingDays === null ? 'Chưa tính được' : `${waitingDays} ngày theo lịch Việt Nam`} />
+          <SummaryItem label="Cửa sổ chính sách tại lúc gửi" value={policyDaysRemaining === null ? 'Chưa ghi nhận' : policyDaysRemaining >= 0 ? `Còn ${policyDaysRemaining} ngày` : `Đã vượt ${Math.abs(policyDaysRemaining)} ngày`} />
+          <SummaryItem label="Tiến độ sử dụng" value={progressPercent === null ? 'Chưa ghi nhận' : `${progressPercent.toLocaleString('vi-VN')}%${progressThreshold === null ? '' : ` / ngưỡng ${progressThreshold.toLocaleString('vi-VN')}%`}`} />
+          <SummaryItem label="Học viên sẽ nhận" value={formatMoney(detail.grossAmount ?? detail.paymentAmount, detail.currency)} />
+          <SummaryItem label="Ảnh hưởng nền tảng" value={`Đảo tối đa ${formatMoney(detail.commissionAmount, detail.currency)}`} />
+          <SummaryItem label="Ảnh hưởng giảng viên" value={`Thu hồi tối đa ${formatMoney(detail.teacherNetAmount, detail.currency)}`} />
+          <SummaryItem label="Escrow / ledger" value={detail.escrowAmount == null ? 'Chưa ghi nhận' : `${formatMoney(detail.escrowAmount, detail.currency)} · ${escrowStatusLabel(detail.escrowStatus)}`} />
+        </dl>
+      </section>
 
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 p-6">
@@ -414,7 +482,7 @@ export function AdminRefundDetail() {
           <dl className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div>
               <dt className="text-sm text-gray-500">Trạng thái thanh toán</dt>
-              <dd className="mt-1 font-semibold text-gray-900">{detail.paymentStatus || 'Chưa có'}</dd>
+              <dd className="mt-1 font-semibold text-gray-900">{refundPaymentStatusLabel(detail.paymentStatus)}</dd>
             </div>
             <div>
               <dt className="text-sm text-gray-500">Provider thanh toán</dt>
@@ -428,25 +496,40 @@ export function AdminRefundDetail() {
             </div>
             <div>
               <dt className="text-sm text-gray-500">Trạng thái refund provider</dt>
-              <dd className="mt-1 font-semibold text-gray-900">{detail.providerStatus || 'Chưa có'}</dd>
+              <dd className="mt-1 font-semibold text-gray-900">{refundProviderStatusLabel(detail.providerStatus)}</dd>
             </div>
             <div>
               <dt className="text-sm text-gray-500">Provider thực thi</dt>
               <dd className="mt-1 text-gray-900">{detail.providerName || 'Chưa có'}</dd>
             </div>
             <div>
-              <dt className="text-sm text-gray-500">Provider reference</dt>
-              <dd className="mt-1 break-all text-gray-900">{detail.providerReference || 'Chưa có'}</dd>
+              <dt className="text-sm text-gray-500">Mã tham chiếu provider</dt>
+              <dd className="mt-1 break-all text-gray-900">{detail.providerReference || 'Chưa ghi nhận'}</dd>
             </div>
             <div>
-              <dt className="text-sm text-gray-500">Mã kết quả provider</dt>
-              <dd className="mt-1 text-gray-900">{detail.providerResultCode || 'Chưa có'}</dd>
+              <dt className="text-sm text-gray-500">Phản hồi provider</dt>
+              <dd className="mt-1 text-gray-900">{detail.providerResultCode ? 'Đã lưu mã phản hồi kỹ thuật' : 'Chưa ghi nhận phản hồi'}</dd>
             </div>
             <div>
               <dt className="text-sm text-gray-500">Số lần gửi provider</dt>
-              <dd className="mt-1 text-gray-900">{detail.providerAttemptCount ?? 0}</dd>
+              <dd className="mt-1 text-gray-900">{detail.providerAttemptCount ?? 'Chưa ghi nhận'}</dd>
             </div>
           </dl>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="p-6">
+          <h3 className="mb-4 text-lg font-bold text-gray-900">Dòng thời gian nghiệp vụ</h3>
+          <ol className="relative ml-2 border-l border-gray-200 pl-6">
+            <TimelineItem label="Thanh toán thành công" value={snapshot.paymentSucceededAt as string | undefined} detail={refundPaymentStatusLabel(detail.paymentStatus)} />
+            <TimelineItem label="Tạo yêu cầu hoàn tiền" value={detail.createdAt} detail={`Refund ${shortId(detail.id)}`} />
+            <TimelineItem label="Đánh giá điều kiện" value={(snapshot.requestedAt ?? snapshot.evaluatedAt) as string | undefined} detail={refundEligibilityLabel(eligibility)} />
+            {detail.decidedAt && <TimelineItem label={detail.status === 'REJECTED' ? 'Finance từ chối' : 'Finance ghi nhận quyết định'} value={detail.decidedAt} detail={detail.decisionReasonCode ? REFUND_DECISION_REASON_LABELS[detail.decisionReasonCode] : 'Đã lưu quyết định'} />}
+            {detail.providerStatus && detail.providerStatus !== 'NOT_REQUESTED' && <TimelineItem label="Gửi và nhận trạng thái provider" value={detail.updatedAt} detail={refundProviderStatusLabel(detail.providerStatus)} />}
+            {detail.status === 'APPROVED' && <TimelineItem label="Cập nhật ví / ledger và hoàn tất" value={detail.updatedAt} detail="Hoàn tiền đã được hệ thống xác nhận" />}
+            {detail.status === 'RECONCILIATION_REQUIRED' && <TimelineItem label="Chuyển sang đối soát" value={detail.updatedAt} detail="Chưa được kết luận hoàn tất" />}
+          </ol>
         </div>
       </section>
 
@@ -456,7 +539,7 @@ export function AdminRefundDetail() {
           <dl className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
               <dt className="text-sm text-gray-500">Trạng thái escrow</dt>
-              <dd className="mt-1 font-semibold text-gray-900">{detail.escrowStatus || 'Chưa có'}</dd>
+              <dd className="mt-1 font-semibold text-gray-900">{escrowStatusLabel(detail.escrowStatus)}</dd>
             </div>
             <div>
               <dt className="text-sm text-gray-500">Số tiền escrow</dt>
@@ -492,9 +575,11 @@ export function AdminRefundDetail() {
             <h3 className="mb-4 text-lg font-bold text-gray-900">Quyết định kiểm toán</h3>
             <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <dt className="text-sm text-gray-500">Mã lý do quyết định</dt>
+                <dt className="text-sm text-gray-500">Lý do quyết định</dt>
                 <dd className="mt-1 font-semibold text-gray-900">
-                  {detail.decisionReasonCode || 'Chưa có'}
+                  {detail.decisionReasonCode
+                    ? REFUND_DECISION_REASON_LABELS[detail.decisionReasonCode]
+                    : 'Chưa ghi nhận'}
                 </dd>
               </div>
               <div>
@@ -512,9 +597,26 @@ export function AdminRefundDetail() {
         </section>
       )}
 
+      <details className="rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm">
+        <summary className="cursor-pointer font-bold text-gray-800">Chi tiết kỹ thuật và mã đối soát</summary>
+        <dl className="mt-4 grid gap-3 md:grid-cols-2">
+          <TechnicalItem label="Refund ID" value={detail.id} />
+          <TechnicalItem label="Order ID" value={detail.orderId} />
+          <TechnicalItem label="Order item ID" value={detail.orderItemId} />
+          <TechnicalItem label="Payment transaction ID" value={detail.paymentProviderTransactionId} />
+          <TechnicalItem label="Provider result code" value={detail.providerResultCode} />
+          <TechnicalItem label="Reconciliation reason code" value={detail.reconciliationReasonCode} />
+        </dl>
+      </details>
+
       {decisionAction && (
         <RefundDecisionForm
           action={decisionAction}
+          amount={formatMoney(detail.grossAmount ?? detail.paymentAmount, detail.currency)}
+          provider={detail.paymentProvider || detail.providerName || 'Chưa xác định'}
+          platformImpact={formatMoney(detail.commissionAmount, detail.currency)}
+          teacherImpact={formatMoney(detail.teacherNetAmount, detail.currency)}
+          escrowImpact={formatMoney(detail.escrowAmount, detail.currency)}
           onConfirm={handleDecision}
           onCancel={() => {
             setDecisionAction(null);
@@ -525,4 +627,48 @@ export function AdminRefundDetail() {
       )}
     </div>
   );
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+      <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</dt>
+      <dd className="mt-1 text-sm font-semibold text-gray-900">{value}</dd>
+    </div>
+  );
+}
+
+function TimelineItem({ label, value, detail }: { label: string; value?: string | null; detail: string }) {
+  return (
+    <li className="relative pb-5 last:pb-0">
+      <span className="absolute -left-[31px] top-1 h-3 w-3 rounded-full border-2 border-white bg-red-600 ring-1 ring-red-200" />
+      <p className="font-semibold text-gray-900">{label}</p>
+      <p className="text-xs text-gray-500">{formatFinanceDateTime(value)}</p>
+      <p className="mt-0.5 text-sm text-gray-700">{detail}</p>
+    </li>
+  );
+}
+
+function TechnicalItem({ label, value }: { label: string; value?: string | null }) {
+  return <div><dt className="text-xs text-gray-500">{label}</dt><dd className="mt-0.5 break-all font-mono text-xs text-gray-800">{value || 'Chưa ghi nhận'}</dd></div>;
+}
+
+function numberOrNull(value: unknown) {
+  const numeric = Number(value);
+  return value === null || value === undefined || value === '' || !Number.isFinite(numeric) ? null : numeric;
+}
+
+function escrowStatusLabel(status?: string | null) {
+  const labels: Record<string, string> = {
+    HELD: 'Đang giữ trong escrow',
+    PENDING: 'Đang chờ ghi nhận escrow',
+    RELEASED: 'Đã giải ngân cho giảng viên',
+    REFUNDED: 'Đã thu hồi để hoàn tiền',
+    FROZEN: 'Đang khóa để đối soát',
+  };
+  return status ? labels[status] ?? 'Trạng thái escrow chưa được ánh xạ' : 'Chưa ghi nhận';
+}
+
+function shortId(value: string) {
+  return value.length > 12 ? `${value.slice(0, 8)}…` : value;
 }

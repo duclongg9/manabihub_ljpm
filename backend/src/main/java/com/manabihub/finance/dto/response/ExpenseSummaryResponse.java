@@ -18,9 +18,11 @@ public record ExpenseSummaryResponse(
         BigDecimal originalTotal,
         BigDecimal totalAmountVnd,
         LocalDate incurredAt,
+        LocalDate dueDate,
         ExpenseStatus status,
         ExpenseSourceType sourceType,
         int lineCount,
+        UUID createdBy,
         Instant createdAt,
         Instant updatedAt
 ) {

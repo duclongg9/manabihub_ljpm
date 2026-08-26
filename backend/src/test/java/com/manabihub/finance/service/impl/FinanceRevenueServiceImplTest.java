@@ -73,9 +73,12 @@ class FinanceRevenueServiceImplTest {
 
         assertEquals(1, response.points().size());
         assertEquals(new BigDecimal("10.00"), response.summary().refundRate());
+        assertEquals(new BigDecimal("900.00"), response.summary().netCollected());
         assertEquals(new BigDecimal("250.00"), response.summary().platformRevenue());
         assertEquals(new BigDecimal("30.00"), response.summary().totalActualExpenses());
         assertEquals(new BigDecimal("220.00"), response.summary().netOperatingResult());
+        assertEquals("Asia/Ho_Chi_Minh", response.timezone());
+        assertEquals(true, response.generatedAt() != null);
 
         ArgumentCaptor<SqlParameterSource> parametersCaptor = ArgumentCaptor.forClass(SqlParameterSource.class);
         verify(jdbcTemplate).query(anyString(), parametersCaptor.capture(), any(RowCallbackHandler.class));

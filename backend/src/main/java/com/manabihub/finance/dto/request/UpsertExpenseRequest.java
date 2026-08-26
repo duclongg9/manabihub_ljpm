@@ -45,6 +45,13 @@ public class UpsertExpenseRequest {
     @NotNull
     private LocalDate incurredAt;
 
+    private LocalDate dueDate;
+
+    private LocalDate exchangeRateDate;
+
+    @Size(max = 120)
+    private String exchangeRateSource;
+
     private LocalDate billingPeriodFrom;
     private LocalDate billingPeriodTo;
 

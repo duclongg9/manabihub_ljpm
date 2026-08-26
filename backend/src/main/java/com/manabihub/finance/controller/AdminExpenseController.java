@@ -6,6 +6,7 @@ import com.manabihub.finance.dto.request.ExpenseFilterRequest;
 import com.manabihub.finance.dto.request.UpsertExpenseRequest;
 import com.manabihub.finance.dto.request.VoidExpenseRequest;
 import com.manabihub.finance.dto.response.ExpenseDetailResponse;
+import com.manabihub.finance.dto.response.ExpenseOverviewResponse;
 import com.manabihub.finance.dto.response.ExpenseSummaryResponse;
 import com.manabihub.finance.service.SystemExpenseService;
 import jakarta.validation.Valid;
@@ -21,8 +22,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -39,6 +43,16 @@ public class AdminExpenseController {
             @PageableDefault(size = 20, sort = "incurredAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         return ApiResponse.success(expenseService.search(filter, pageable));
+    }
+
+    @GetMapping("/overview")
+    public ApiResponse<ExpenseOverviewResponse> overview(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ApiResponse.success(expenseService.overview(from, to));
     }
 
     @GetMapping("/{id}")

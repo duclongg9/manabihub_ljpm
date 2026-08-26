@@ -26,6 +26,11 @@ const REJECTION_REASONS: ReasonOption[] = [
 
 interface RefundDecisionFormProps {
   action: 'approve' | 'reject';
+  amount?: string;
+  provider?: string;
+  platformImpact?: string;
+  teacherImpact?: string;
+  escrowImpact?: string;
   onConfirm: (request: RefundDecisionRequest) => Promise<void>;
   onCancel: () => void;
   errorMessage?: string | null;
@@ -33,6 +38,11 @@ interface RefundDecisionFormProps {
 
 export function RefundDecisionForm({
   action,
+  amount,
+  provider,
+  platformImpact,
+  teacherImpact,
+  escrowImpact,
   onConfirm,
   onCancel,
   errorMessage,
@@ -85,6 +95,20 @@ export function RefundDecisionForm({
           {errorMessage && (
             <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {errorMessage}
+            </div>
+          )}
+
+          {isApprove && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-semibold">Tác động tài chính trước khi chấp thuận</p>
+              <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                <dt>Học viên nhận</dt><dd className="text-right font-semibold">{amount || 'Chưa ghi nhận'}</dd>
+                <dt>Provider / phương thức</dt><dd className="text-right font-semibold">{provider || 'Chưa xác định'}</dd>
+                <dt>Hoa hồng nền tảng đảo</dt><dd className="text-right font-semibold">{platformImpact || 'Chưa ghi nhận'}</dd>
+                <dt>Phần giảng viên thu hồi</dt><dd className="text-right font-semibold">{teacherImpact || 'Chưa ghi nhận'}</dd>
+                <dt>Escrow / ledger</dt><dd className="text-right font-semibold">{escrowImpact || 'Chưa ghi nhận'}</dd>
+              </dl>
+              <p className="mt-2 text-xs">Hệ thống kiểm tra trạng thái và dùng idempotency key để chống submit / hoàn tiền trùng.</p>
             </div>
           )}
 

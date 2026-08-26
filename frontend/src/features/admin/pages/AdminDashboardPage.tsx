@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, CircularProgress, Alert, Button, Stack, Card, CardContent, Divider } from '@mui/material';
+import { Box, Typography, Grid, CircularProgress, Alert, Button, Stack, Card, CardContent, Divider, Chip, Tooltip, Skeleton } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import RuleIcon from '@mui/icons-material/Rule';
@@ -13,6 +13,7 @@ import SportsEsportsOutlinedIcon from '@mui/icons-material/SportsEsportsOutlined
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import PolicyOutlinedIcon from '@mui/icons-material/PolicyOutlined';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { adminKycService } from '../../admin-kyc/services/adminKycService';
 import type { KycRequestResponse } from '../../admin-kyc/services/adminKycService';
 import { courseApprovalService } from '../../admin-course-approval/services/courseApprovalService';
@@ -23,6 +24,10 @@ import { ROLES } from '../../../shared/constants/roles';
 import { adminPayoutService } from '../../admin-payout/services/adminPayoutService';
 import { adminRefundApi } from '../../admin-refund/api/adminRefundApi';
 import { adminViolationService } from '../../admin-violation/services/adminViolationService';
+import { adminFinanceApi } from '../../admin-finance/adminFinanceApi';
+import { RevenueChart } from '../../admin-finance/RevenueChart';
+import { formatDateRange, formatFinanceDateTime, formatMoney, reportingMonthRange, toExclusiveReportingRange } from '../../admin-finance/financeDisplay';
+import type { MoneyValue, RevenueDashboard } from '../../admin-finance/types';
 
 export const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -33,13 +38,22 @@ export const AdminDashboardPage: React.FC = () => {
   const [kycQueue, setKycQueue] = useState<KycRequestResponse[]>([]);
   const [courseQueue, setCourseQueue] = useState<CourseApproval[]>([]);
   const [pendingViolations, setPendingViolations] = useState(0);
-  const [pendingPayouts, setPendingPayouts] = useState(0);
-  const [pendingRefunds, setPendingRefunds] = useState(0);
-  const [reconciliationAlerts, setReconciliationAlerts] = useState(0);
+  const [pendingPayouts, setPendingPayouts] = useState<number | null>(null);
+  const [pendingRefunds, setPendingRefunds] = useState<number | null>(null);
+  const [reconciliationAlerts, setReconciliationAlerts] = useState<number | null>(null);
+  const [draftExpenses, setDraftExpenses] = useState<number | null>(null);
+  const [financeDashboard, setFinanceDashboard] = useState<RevenueDashboard | null>(null);
 
   const isCourseManager = session ? hasAnyRole(session, [ROLES.COURSE_MANAGER]) : false;
   const isFinanceManager = session ? hasAnyRole(session, [ROLES.FINANCE_MANAGER]) : false;
   const isSystemAdmin = session ? hasAnyRole(session, [ROLES.SYSTEM_ADMIN]) : false;
+  const hasFinanceData = Boolean(
+    financeDashboard
+    || pendingPayouts !== null
+    || pendingRefunds !== null
+    || reconciliationAlerts !== null
+    || draftExpenses !== null,
+  );
 
   const loadData = React.useCallback(async () => {
     if (!isCourseManager && !isFinanceManager) return;
@@ -59,18 +73,27 @@ export const AdminDashboardPage: React.FC = () => {
       }
 
       if (isFinanceManager) {
-        const [pendingData, reconciliationData, refundData] = await Promise.all([
+        const period = reportingMonthRange(new Date());
+        const instants = toExclusiveReportingRange(period.from, period.to);
+        const results = await Promise.allSettled([
           adminPayoutService.getPayoutQueue({ page: 0, size: 1, status: 'PENDING' }),
           adminPayoutService.getPayoutQueue({
             page: 0,
             size: 1,
             reconciliationStatus: 'CRITICAL_MISMATCH',
           }),
-          adminRefundApi.getPendingRefunds(0, 1, { status: 'PENDING' })
+          adminRefundApi.getPendingRefunds(0, 1, { status: 'PENDING' }),
+          adminFinanceApi.searchExpenses({ page: 0, size: 1, status: 'DRAFT' }),
+          adminFinanceApi.getRevenueDashboard({ ...instants, granularity: 'DAY' }),
         ]);
-        setPendingPayouts(pendingData.totalElements);
-        setReconciliationAlerts(reconciliationData.totalElements);
-        setPendingRefunds(refundData?.totalElements || 0);
+        if (results[0].status === 'fulfilled') setPendingPayouts(results[0].value.totalElements);
+        if (results[1].status === 'fulfilled') setReconciliationAlerts(results[1].value.totalElements);
+        if (results[2].status === 'fulfilled') setPendingRefunds(results[2].value.totalElements);
+        if (results[3].status === 'fulfilled') setDraftExpenses(results[3].value.totalElements);
+        if (results[4].status === 'fulfilled') setFinanceDashboard(results[4].value);
+        if (results.some((result) => result.status === 'rejected')) {
+          setError('Một phần dữ liệu tài chính chưa đồng bộ. Ô chưa từng tải giữ trạng thái “Chưa đồng bộ”; dữ liệu cũ, nếu có, giữ nguyên thời điểm cập nhật và không bị quy đổi thành 0.');
+        }
       }
     } catch {
       setError('Không thể tải dữ liệu vận hành. Vui lòng thử lại.');
@@ -90,12 +113,16 @@ export const AdminDashboardPage: React.FC = () => {
   return (
     <Box sx={{ p: 2 }}>
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Trung tâm Quản trị viên</Typography>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>{isFinanceManager ? 'Bảng điều hành tài chính' : 'Trung tâm Quản trị viên'}</Typography>
+          {isFinanceManager && <Typography variant="body2" color="text.secondary">Tiền, hàng đợi xử lý và trạng thái đồng bộ trong một màn hình.</Typography>}
+        </Box>
+        {isFinanceManager && <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadData} disabled={loading}>Làm mới</Button>}
       </Stack>
 
       {error && (
         <Alert
-          severity="error"
+          severity={isFinanceManager && hasFinanceData ? 'warning' : 'error'}
           sx={{ mb: 3 }}
           action={<Button color="inherit" size="small" onClick={loadData}>Thử lại</Button>}
         >
@@ -143,7 +170,42 @@ export const AdminDashboardPage: React.FC = () => {
           </Grid>
         </Grid>
       ) : isFinanceManager ? (
-        <Grid container spacing={3}>
+        <>
+          <Stack direction={{ xs: 'column', md: 'row' }} sx={{ gap: 1, alignItems: { md: 'center' }, mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>Tổng quan tháng này</Typography>
+            <Chip size="small" variant="outlined" label={`Kỳ xem: ${formatDateRange(reportingMonthRange(new Date()).from, reportingMonthRange(new Date()).to)}`} />
+            <Typography variant="caption" color="text.secondary">Múi giờ Asia/Ho_Chi_Minh · Cập nhật: {financeDashboard ? formatFinanceDateTime(financeDashboard.generatedAt) : 'Chưa đồng bộ'}</Typography>
+          </Stack>
+          <Grid container spacing={2} sx={{ mb: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}><FinanceKpiCard loading={loading && !financeDashboard} label="Tổng tiền thanh toán" value={financeDashboard?.summary.grossSales} formula="Tổng tiền trước khấu trừ của các đơn khóa học đã thanh toán thành công hoặc đã hoàn tiền trong tháng." onClick={() => navigate(ROUTES.ADMIN.FINANCE_REVENUE)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}><FinanceKpiCard loading={loading && !financeDashboard} label="Hoàn tiền" value={financeDashboard?.summary.refundAmount} formula="Tổng số tiền của các yêu cầu đã hoàn tất; thời điểm ghi nhận ưu tiên lúc hoàn tất, quyết định, rồi lần cập nhật cuối." onClick={() => navigate(ROUTES.ADMIN.REFUND_REVIEW)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}><FinanceKpiCard loading={loading && !financeDashboard} label="Tiền thu ròng" value={financeDashboard?.summary.netCollected} formula="Tổng tiền thanh toán − hoàn tiền." onClick={() => navigate(ROUTES.ADMIN.FINANCE_REVENUE)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}><FinanceKpiCard loading={loading && !financeDashboard} label="Doanh thu nền tảng" value={financeDashboard?.summary.platformRevenue} formula="Hoa hồng ghi nhận − hoa hồng đảo trên ledger." onClick={() => navigate(ROUTES.ADMIN.FINANCE_REVENUE)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}><FinanceKpiCard loading={loading && !financeDashboard} label="Phí thanh toán" value={financeDashboard?.summary.paymentFees} formula="Dòng chứng từ đã duyệt thuộc nhóm phí thanh toán." onClick={() => navigate(ROUTES.ADMIN.FINANCE_EXPENSES)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}><FinanceKpiCard loading={loading && !financeDashboard} label="Chi phí vận hành" value={financeDashboard?.summary.operatingExpenses} formula="Dòng chứng từ đã duyệt ngoài nhóm phí thanh toán." onClick={() => navigate(ROUTES.ADMIN.FINANCE_EXPENSES)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}><FinanceKpiCard loading={loading && !financeDashboard} label="Lợi nhuận vận hành" value={financeDashboard?.summary.netOperatingResult} formula="Doanh thu nền tảng − phí thanh toán − chi phí vận hành." onClick={() => navigate(ROUTES.ADMIN.FINANCE_REVENUE)} /></Grid>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}><FinanceKpiCard loading={false} label="Tiền đang chờ chi trả" value={null} formula="API hàng đợi hiện chưa cung cấp tổng tiền toàn bộ các yêu cầu chờ; không suy ra từ một trang dữ liệu." /></Grid>
+          </Grid>
+
+          <Card variant="outlined" sx={{ mb: 4 }}>
+            <CardContent>
+              <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, gap: 1, mb: 2 }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 800 }}>Xu hướng tài chính tháng này</Typography>
+                  <Typography variant="body2" color="text.secondary">Doanh số, hoàn tiền, doanh thu nền tảng, chi phí và lợi nhuận từ cùng nguồn dữ liệu báo cáo.</Typography>
+                </Box>
+                <Button variant="outlined" onClick={() => navigate(ROUTES.ADMIN.FINANCE_REVENUE)}>Mở báo cáo chi tiết</Button>
+              </Stack>
+              {loading && !financeDashboard
+                ? <Skeleton variant="rounded" height={320} />
+                : financeDashboard
+                  ? <RevenueChart points={financeDashboard.points} granularity={financeDashboard.granularity} />
+                  : <Alert severity="info">Biểu đồ chưa đồng bộ. Hãy làm mới dữ liệu tài chính.</Alert>}
+            </CardContent>
+          </Card>
+
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Hàng đợi cần xử lý</Typography>
+          <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 4 }}>
             <OperationalQueueCard
               title="Yêu cầu chi trả chờ xử lý"
@@ -177,6 +239,17 @@ export const AdminDashboardPage: React.FC = () => {
               onAction={() => navigate(ROUTES.ADMIN.REFUND_REVIEW)}
             />
           </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <OperationalQueueCard
+              title="Chứng từ nháp"
+              subtitle="Chứng từ chưa được duyệt; tổng tiền và tuổi lâu nhất chưa có trong API hàng đợi"
+              value={draftExpenses}
+              loading={loading}
+              icon={<ReceiptLongOutlinedIcon />}
+              actionLabel="Kiểm tra chứng từ"
+              onAction={() => navigate(ROUTES.ADMIN.FINANCE_EXPENSES)}
+            />
+          </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <AdminActionCard
               title="Doanh thu hệ thống"
@@ -195,7 +268,8 @@ export const AdminDashboardPage: React.FC = () => {
               onAction={() => navigate(ROUTES.ADMIN.FINANCE_EXPENSES)}
             />
           </Grid>
-        </Grid>
+          </Grid>
+        </>
       ) : (
         <>
           <Grid container spacing={3}>
@@ -325,7 +399,7 @@ export const AdminDashboardPage: React.FC = () => {
 interface OperationalQueueCardProps {
   title: string;
   subtitle: string;
-  value: number;
+  value: number | null;
   loading: boolean;
   icon: React.ReactNode;
   actionLabel: string;
@@ -354,9 +428,9 @@ function OperationalQueueCard({
           </Box>
         </Stack>
         <Box sx={{ minHeight: 72, display: 'grid', placeItems: 'center' }}>
-          {loading ? <CircularProgress size={36} /> : (
-            <Typography variant="h2" sx={{ fontWeight: 800 }}>{value}</Typography>
-          )}
+          {loading ? <CircularProgress size={36} /> : value === null ? (
+            <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 750 }}>Chưa đồng bộ</Typography>
+          ) : <Typography variant="h2" sx={{ fontWeight: 800 }}>{value}</Typography>}
         </Box>
       </CardContent>
       <Divider />
@@ -366,6 +440,40 @@ function OperationalQueueCard({
         </Button>
       </Box>
     </Card>
+  );
+}
+
+function FinanceKpiCard({ label, value, formula, onClick, loading }: {
+  label: string;
+  value: MoneyValue | null | undefined;
+  formula: string;
+  onClick?: () => void;
+  loading: boolean;
+}) {
+  return (
+    <Tooltip title={formula} arrow>
+      <Card
+        variant="outlined"
+        role={onClick ? 'link' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onClick={onClick}
+        onKeyDown={(event) => {
+          if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            onClick();
+          }
+        }}
+        sx={{ height: '100%', cursor: onClick ? 'pointer' : 'default' }}
+      >
+        <CardContent>
+          <Typography variant="body2" color="text.secondary">{label}</Typography>
+          {loading
+            ? <Skeleton width="70%" height={36} />
+            : <Typography variant="h6" sx={{ fontWeight: 800, mt: 1 }}>{value === null || value === undefined ? 'Chưa đồng bộ' : formatMoney(value)}</Typography>}
+          {onClick && <Typography variant="caption" color="primary">Mở dữ liệu liên quan →</Typography>}
+        </CardContent>
+      </Card>
+    </Tooltip>
   );
 }
 

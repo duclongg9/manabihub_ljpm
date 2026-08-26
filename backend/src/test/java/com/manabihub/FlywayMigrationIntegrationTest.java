@@ -90,7 +90,7 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("079");
+        assertThat(current).isEqualTo("080");
 
         MigrationInfo immutablePhoneMigration = Arrays.stream(flyway.info().all())
                 .filter(info -> info.getVersion() != null

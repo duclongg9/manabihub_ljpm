@@ -35,17 +35,26 @@ export interface ReconciliationAlert {
 
 export interface PayoutQueueItem {
   withdrawalRequestId: string;
+  walletId: string;
   ownerType: 'TEACHER' | 'STUDENT';
   ownerId: string;
   ownerName: string;
   teacherId: string | null;
   teacherName: string;
   requestedAmount: number;
+  bankName: string | null;
+  accountNumberMasked: string | null;
   status: WithdrawalStatus;
   settlementStatus: PayoutStatus | null;
   reconciliationStatus: ReconciliationStatus;
   requestedAt: string;
   processingStartedAt: string | null;
+  provider: string | null;
+  providerReference: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  updatedAt: string | null;
+  settlementUpdatedAt: string | null;
   retryCount: number;
 }
 
@@ -129,9 +138,16 @@ export interface ManualTransferPayload {
 export interface PayoutQueueParams {
   page: number;
   size: number;
+  payoutId?: string;
+  walletId?: string;
   status?: WithdrawalStatus;
+  settlementStatus?: PayoutStatus;
   reconciliationStatus?: ReconciliationStatus;
   teacherKeyword?: string;
+  provider?: string;
+  providerReference?: string;
+  minAmount?: string;
+  maxAmount?: string;
   requestedFrom?: string;
   requestedTo?: string;
   sort?: string;

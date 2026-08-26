@@ -29,5 +29,7 @@ public class RefundQueueResponse {
     private BigDecimal paymentAmount;
     private String providerStatus;
     private String reconciliationReasonCode;
+    private UUID decidedBy;
+    private Instant decidedAt;
     private Instant createdAt;
 }

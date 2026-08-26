@@ -8,6 +8,7 @@ public record RevenueSummaryResponse(
         BigDecimal refundAmount,
         long refundCount,
         BigDecimal refundRate,
+        BigDecimal netCollected,
         BigDecimal commissionRecognized,
         BigDecimal commissionReversed,
         BigDecimal platformRevenue,
