@@ -37,4 +37,14 @@ describe('ADMIN_MENU route permissions', () => {
         ROUTES.ADMIN.PAYOUTS,
       ]));
   });
+
+  it('exposes the read-only operations dashboard only to System Admin', () => {
+    const item = ADMIN_MENU.find((candidate) => candidate.path === ROUTES.ADMIN.OPERATIONS);
+
+    expect(item).toEqual(expect.objectContaining({
+      title: 'Vận hành hệ thống',
+      path: '/admin/operations',
+      roles: [ROLES.SYSTEM_ADMIN],
+    }));
+  });
 });

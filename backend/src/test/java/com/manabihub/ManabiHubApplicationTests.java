@@ -56,6 +56,8 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
+
 @SpringBootTest(properties = {
         "manabihub.kyc.identity-secret=test-secret-key-1234567890-32chars-min-length",
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
@@ -63,6 +65,9 @@ import org.springframework.transaction.support.TransactionTemplate;
                 + "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
 })
 class ManabiHubApplicationTests {
+
+    @MockBean
+    private DataSource dataSource;
 
     @MockBean
     private JdbcTemplate jdbcTemplate;
