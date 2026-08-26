@@ -49,6 +49,7 @@ export const ROUTES = {
     CHANGE_PASSWORD: '/admin/change-password',
     DASHBOARD: '/admin/dashboard',
     SYSTEM_SETTINGS: '/admin/settings',
+    OPERATIONS: '/admin/operations',
     USERS: '/admin/users',
     COURSE_APPROVAL: '/admin/courses/approvals',
     WEEKLY_CHALLENGES: '/admin/weekly-challenges',

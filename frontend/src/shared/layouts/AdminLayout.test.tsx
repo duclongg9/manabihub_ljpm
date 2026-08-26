@@ -32,6 +32,18 @@ describe('AdminLayout Navigation & RBAC', () => {
     );
   });
 
+  it('passes only SYSTEM_ADMIN to allowedRoles for /admin/operations', () => {
+    renderAdminLayout('/admin/operations');
+    expect(DashboardLayout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowedRoles: [ROLES.SYSTEM_ADMIN],
+        sessionKind: 'admin',
+        menuItems: ADMIN_MENU,
+      }),
+      undefined,
+    );
+  });
+
   it('passes FINANCE_MANAGER to allowedRoles for /admin/payouts', () => {
     renderAdminLayout('/admin/payouts');
     expect(DashboardLayout).toHaveBeenCalledWith(

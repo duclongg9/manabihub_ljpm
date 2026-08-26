@@ -56,6 +56,11 @@ export const ENDPOINTS = {
     INTERNAL_ACCOUNT_ROLE: (adminId: string) =>
       `/v1/admin/internal-accounts/${adminId}/role`,
   },
+  ADMIN_OPERATIONS: {
+    OVERVIEW: '/v1/admin/operations/overview',
+    RUNTIME_CONFIG: '/v1/admin/operations/runtime-config',
+    LOGS: '/v1/admin/operations/logs',
+  },
   teacherKyc: {
     status: '/v1/teacher/kyc/status',
     identityVerifications: '/v1/teacher/kyc/identity-verifications',

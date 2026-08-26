@@ -11,6 +11,7 @@ import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import PolicyOutlinedIcon from '@mui/icons-material/PolicyOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import MonitorHeartOutlinedIcon from '@mui/icons-material/MonitorHeartOutlined';
 import { ROLES } from '../constants/roles';
 import { ROUTES } from '../constants/routes';
 
@@ -25,6 +26,12 @@ export const ADMIN_MENU = [
     title: 'Cấu hình hệ thống',
     path: ROUTES.ADMIN.SYSTEM_SETTINGS,
     icon: SettingsApplicationsOutlinedIcon,
+    roles: [ROLES.SYSTEM_ADMIN],
+  },
+  {
+    title: 'Vận hành hệ thống',
+    path: ROUTES.ADMIN.OPERATIONS,
+    icon: MonitorHeartOutlinedIcon,
     roles: [ROLES.SYSTEM_ADMIN],
   },
   {

@@ -54,6 +54,7 @@ import { StudentIdentityVerificationPage } from '../features/wallet/pages/Studen
 import { PublicTeacherProfilePage } from '../features/teacher-discovery/pages/PublicTeacherProfilePage';
 import { SystemSettingsPage } from '../features/system-administration/pages/SystemSettingsPage';
 import { InternalAdminAccountsPage } from '../features/system-administration/pages/InternalAdminAccountsPage';
+import { OperationsDashboardPage } from '../features/admin-operations/pages/OperationsDashboardPage';
 import { FinanceRevenueDashboardPage } from '../features/admin-finance/FinanceRevenueDashboardPage';
 import { SystemExpenseManagementPage } from '../features/admin-finance/SystemExpenseManagementPage';
 import { DecisionReviewPage } from '../features/admin-oversight/DecisionReviewPage';
@@ -309,6 +310,10 @@ export const router = createBrowserRouter([
       {
         path: 'settings',
         element: <SystemSettingsPage />,
+      },
+      {
+        path: 'operations',
+        element: <OperationsDashboardPage />,
       },
       {
         path: 'users',
