@@ -45,6 +45,11 @@ actions and AWS logs for infrastructure/runtime investigation.
 
 ## Release verification
 
+The pull request must pass every job in `.github/workflows/ci.yml`: repository
+hygiene, the clean backend test suite, and frontend dependency audit, lint,
+tests, and production build. A mergeable PR with no recorded checks is not a
+successful CI result.
+
 After deploying backend before frontend:
 
 1. Verify `/actuator/health/readiness` returns `UP`.
