@@ -8,6 +8,7 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  FormControlLabel,
   FormControl,
   InputLabel,
   LinearProgress,
@@ -17,6 +18,7 @@ import {
   Select,
   Skeleton,
   Stack,
+  Switch,
   Tab,
   Table,
   TableBody,
@@ -50,6 +52,7 @@ import type {
 } from '../types/operationsTypes';
 
 const DEFAULT_LOG_LIMIT = 100;
+const LIVE_LOG_REFRESH_INTERVAL_MS = 3_000;
 const LOG_LEVELS: Array<{ value: '' | OperationsLogLevel; label: string }> = [
   { value: '', label: 'Tất cả mức độ' },
   { value: 'ERROR', label: 'Lỗi (ERROR)' },
@@ -184,6 +187,8 @@ export function OperationsDashboardPage() {
   const [overviewError, setOverviewError] = useState(false);
   const [runtimeError, setRuntimeError] = useState(false);
   const [logsError, setLogsError] = useState(false);
+  const [liveLogsEnabled, setLiveLogsEnabled] = useState(true);
+  const [logsUpdatedAt, setLogsUpdatedAt] = useState<Date | null>(null);
   const [filterDraft, setFilterDraft] = useState<LogFilterDraft>(EMPTY_LOG_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<OperationsLogFilters>({
     limit: DEFAULT_LOG_LIMIT,
@@ -213,15 +218,24 @@ export function OperationsDashboardPage() {
     }
   }, []);
 
-  const loadLogs = useCallback(async (filters: OperationsLogFilters) => {
-    setLogsLoading(true);
-    setLogsError(false);
+  const loadLogs = useCallback(async (
+    filters: OperationsLogFilters,
+    options: { background?: boolean } = {},
+  ) => {
+    if (!options.background) {
+      setLogsLoading(true);
+      setLogsError(false);
+    }
     try {
       setLogs(await operationsService.getRecentLogs(filters));
+      setLogsUpdatedAt(new Date());
+      setLogsError(false);
     } catch {
       setLogsError(true);
     } finally {
-      setLogsLoading(false);
+      if (!options.background) {
+        setLogsLoading(false);
+      }
     }
   }, []);
 
@@ -230,6 +244,38 @@ export function OperationsDashboardPage() {
     void loadRuntimeConfig();
     void loadLogs({ limit: DEFAULT_LOG_LIMIT });
   }, [loadLogs, loadOverview, loadRuntimeConfig]);
+
+  useEffect(() => {
+    if (activeTab !== 2 || !liveLogsEnabled) return undefined;
+
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const scheduleNextRefresh = () => {
+      if (cancelled) return;
+      timer = window.setTimeout(async () => {
+        if (document.visibilityState === 'visible') {
+          await loadLogs(appliedFilters, { background: true });
+        }
+        scheduleNextRefresh();
+      }, LIVE_LOG_REFRESH_INTERVAL_MS);
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (timer !== undefined) window.clearTimeout(timer);
+      void loadLogs(appliedFilters, { background: true }).finally(scheduleNextRefresh);
+    };
+
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    scheduleNextRefresh();
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [activeTab, appliedFilters, liveLogsEnabled, loadLogs]);
 
   const refreshCurrentTab = () => {
     if (activeTab === 0) void loadOverview();
@@ -332,10 +378,13 @@ export function OperationsDashboardPage() {
               draft={filterDraft}
               error={logsError}
               loading={logsLoading}
+              liveEnabled={liveLogsEnabled}
+              lastUpdatedAt={logsUpdatedAt}
               onApply={applyLogFilters}
               onClear={clearLogFilters}
               onDraftChange={setFilterDraft}
               onRetry={() => void loadLogs(appliedFilters)}
+              onToggleLive={setLiveLogsEnabled}
             />
           )}
         </Box>
@@ -495,28 +544,61 @@ function LogsPanel({
   draft,
   error,
   loading,
+  liveEnabled,
+  lastUpdatedAt,
   onApply,
   onClear,
   onDraftChange,
   onRetry,
+  onToggleLive,
 }: {
   data: OperationsLogPage | null;
   draft: LogFilterDraft;
   error: boolean;
   loading: boolean;
+  liveEnabled: boolean;
+  lastUpdatedAt: Date | null;
   onApply: (event: FormEvent) => void;
   onClear: () => void;
   onDraftChange: (draft: LogFilterDraft) => void;
   onRetry: () => void;
+  onToggleLive: (enabled: boolean) => void;
 }) {
   return (
     <Stack sx={{ gap: 2.5 }}>
       <Alert severity="warning">
-        Đây là bộ đệm log giới hạn của tiến trình backend hiện tại, không phải CloudWatch và không phải Audit Log.
+        Đây là technical log gần thời gian thực của tiến trình backend hiện tại, không phải CloudWatch và không phải Audit Log.
         Dữ liệu sẽ mất khi restart/deploy và không bảo đảm đầy đủ lịch sử.
         {' '}
         <Link component={RouterLink} to={ROUTES.ADMIN.AUDIT_LOGS}>Mở Audit Log nghiệp vụ</Link>
       </Alert>
+
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between', gap: 1 }}
+      >
+        <FormControlLabel
+          control={(
+            <Switch
+              checked={liveEnabled}
+              onChange={(event) => onToggleLive(event.target.checked)}
+              slotProps={{ input: { 'aria-label': 'Tự động cập nhật technical log' } }}
+            />
+          )}
+          label={`Theo dõi trực tiếp (mỗi ${LIVE_LOG_REFRESH_INTERVAL_MS / 1_000} giây)`}
+        />
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
+          <Chip
+            color={liveEnabled ? 'success' : 'default'}
+            label={liveEnabled ? 'LIVE' : 'Đã tạm dừng'}
+            size="small"
+            variant={liveEnabled ? 'filled' : 'outlined'}
+          />
+          <Typography aria-live="polite" color="text.secondary" variant="caption">
+            Cập nhật gần nhất: {lastUpdatedAt ? formatDateTime(lastUpdatedAt.toISOString()) : 'Chưa có dữ liệu'}
+          </Typography>
+        </Stack>
+      </Stack>
 
       <Box
         component="form"
