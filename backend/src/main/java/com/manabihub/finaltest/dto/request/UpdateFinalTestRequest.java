@@ -2,6 +2,7 @@ package com.manabihub.finaltest.dto.request;
 
 import com.manabihub.course.enums.JlptLevel;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -22,14 +23,17 @@ public class UpdateFinalTestRequest {
 
     @NotNull(message = "MSG-FTEST-003")
     @Min(value = 1, message = "MSG-FTEST-003")
+    @Max(value = 180, message = "MSG-FTEST-003")
     private Integer timeLimitMinutes;
 
     @NotNull(message = "MSG-FTEST-003")
     @Min(value = 1, message = "MSG-FTEST-003")
+    @Max(value = 100, message = "MSG-FTEST-003")
     private Integer passingScore;
 
     @NotNull(message = "MSG-FTEST-003")
-    @Min(value = 0, message = "MSG-FTEST-003")
+    @Min(value = 1, message = "MSG-FTEST-003")
+    @Max(value = 10, message = "MSG-FTEST-003")
     private Integer maxRetakes;
 
     @NotNull(message = "MSG-FTEST-003")
