@@ -54,7 +54,7 @@ class AdminOperationsControllerTest {
     void systemAdminCanReadOverview() throws Exception {
         when(operationsService.getOverview()).thenReturn(new OperationsOverviewResponse(
                 "UP", "UP", Instant.parse("2026-08-26T10:00:00Z"), 120,
-                List.of("prod"), "Asia/Ho_Chi_Minh", "21", "OpenJDK",
+                List.of("prod"), "UTC", "Asia/Ho_Chi_Minh", "21", "OpenJDK",
                 new MemorySnapshot(10, 20, 30, 5),
                 new ThreadSnapshot(8, 6, 10),
                 new BuildSnapshot("manabihub-backend", "1.0", null, "abc123")
@@ -66,6 +66,8 @@ class AdminOperationsControllerTest {
                 .andExpect(jsonPath("$.messageCode").value("COMMON_SUCCESS"))
                 .andExpect(jsonPath("$.data.applicationStatus").value("UP"))
                 .andExpect(jsonPath("$.data.databaseStatus").value("UP"))
+                .andExpect(jsonPath("$.data.timezone").value("UTC"))
+                .andExpect(jsonPath("$.data.businessTimezone").value("Asia/Ho_Chi_Minh"))
                 .andExpect(jsonPath("$.data.memory.heapMaxBytes").value(30));
     }
 
