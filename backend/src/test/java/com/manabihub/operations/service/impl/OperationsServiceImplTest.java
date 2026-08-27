@@ -15,6 +15,8 @@ import org.springframework.mock.env.MockEnvironment;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.time.Instant;
+import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -51,6 +53,7 @@ class OperationsServiceImplTest {
         assertThat(result.applicationStatus()).isEqualTo("UP");
         assertThat(result.databaseStatus()).isEqualTo("UP");
         assertThat(result.activeProfiles()).containsExactly("prod");
+        assertThat(result.businessTimezone()).isEqualTo("Asia/Ho_Chi_Minh");
         assertThat(result.uptimeSeconds()).isNotNegative();
         assertThat(result.memory().heapUsedBytes()).isPositive();
         assertThat(result.threads().live()).isPositive();
@@ -110,12 +113,40 @@ class OperationsServiceImplTest {
         assertThat(result.returned()).isZero();
     }
 
+    @Test
+    void overviewPrefersEmbeddedDeploymentMetadataAndFallsBackToGitProperties() throws Exception {
+        when(connection.isValid(2)).thenReturn(true);
+
+        Properties buildEntries = new Properties();
+        buildEntries.setProperty("version", "0.0.1-SNAPSHOT");
+        buildEntries.setProperty("time", "2026-08-27T01:02:03Z");
+        buildEntries.setProperty("deployment.version", "manabihub-v1-13");
+        buildEntries.setProperty("git.commit", "unknown");
+
+        Properties gitEntries = new Properties();
+        gitEntries.setProperty("commit.id.abbrev", "abc123def456");
+
+        OperationsOverviewResponse result = service(
+                new BuildProperties(buildEntries),
+                new GitProperties(gitEntries)
+        ).getOverview();
+
+        assertThat(result.build().version()).isEqualTo("manabihub-v1-13");
+        assertThat(result.build().gitCommit()).isEqualTo("abc123def456");
+        assertThat(result.build().buildTime()).isEqualTo(Instant.parse("2026-08-27T01:02:03Z"));
+    }
+
     @SuppressWarnings("unchecked")
     private OperationsServiceImpl service() {
+        return service(null, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private OperationsServiceImpl service(BuildProperties buildProperties, GitProperties gitProperties) {
         ObjectProvider<BuildProperties> buildProvider = mock(ObjectProvider.class);
         ObjectProvider<GitProperties> gitProvider = mock(ObjectProvider.class);
-        when(buildProvider.getIfAvailable()).thenReturn(null);
-        when(gitProvider.getIfAvailable()).thenReturn(null);
+        when(buildProvider.getIfAvailable()).thenReturn(buildProperties);
+        when(gitProvider.getIfAvailable()).thenReturn(gitProperties);
         return new OperationsServiceImpl(
                 dataSource,
                 environment,

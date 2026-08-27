@@ -22,6 +22,9 @@
         <springdoc-openapi.version>2.5.0</springdoc-openapi.version>
         <!-- 1.21.4 raises the Docker API baseline for Docker Engine 29 compatibility. -->
         <testcontainers.version>1.21.4</testcontainers.version>
+        <!-- Overridden by the release bundle script for traceable deployments. -->
+        <build.deployment.version>${project.version}</build.deployment.version>
+        <build.git.commit>unknown</build.git.commit>
     </properties>
 
     <dependencies>
@@ -129,6 +132,20 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>build-info</id>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                        <configuration>
+                            <additionalProperties>
+                                <deployment.version>${build.deployment.version}</deployment.version>
+                                <git.commit>${build.git.commit}</git.commit>
+                            </additionalProperties>
+                        </configuration>
+                    </execution>
+                </executions>
                 <configuration>
                     <excludes>
                         <exclude>

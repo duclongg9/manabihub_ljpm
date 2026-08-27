@@ -10,6 +10,7 @@ public record OperationsOverviewResponse(
         long uptimeSeconds,
         List<String> activeProfiles,
         String timezone,
+        String businessTimezone,
         String javaVersion,
         String jvmName,
         MemorySnapshot memory,

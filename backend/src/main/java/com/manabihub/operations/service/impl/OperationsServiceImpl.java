@@ -34,6 +34,8 @@ public class OperationsServiceImpl implements OperationsService {
 
     private static final String UP = "UP";
     private static final String DOWN = "DOWN";
+    private static final String UNKNOWN = "unknown";
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final DataSource dataSource;
     private final Environment environment;
@@ -71,7 +73,8 @@ public class OperationsServiceImpl implements OperationsService {
                 Math.max(0, runtime.getUptime() / 1_000),
                 List.copyOf(Arrays.asList(environment.getActiveProfiles())),
                 ZoneId.systemDefault().getId(),
-                System.getProperty("java.version", "unknown"),
+                BUSINESS_ZONE.getId(),
+                System.getProperty("java.version", UNKNOWN),
                 runtime.getVmName(),
                 new MemorySnapshot(
                         heap.getUsed(),
@@ -170,10 +173,35 @@ public class OperationsServiceImpl implements OperationsService {
 
     private BuildSnapshot buildSnapshot() {
         String applicationName = environment.getProperty("spring.application.name", "manabihub-backend");
-        String version = buildProperties == null ? "unknown" : buildProperties.getVersion();
+        String version = firstPresent(
+                environment.getProperty("MANABIHUB_BUILD_VERSION"),
+                buildProperty("deployment.version"),
+                buildProperties == null ? null : buildProperties.getVersion(),
+                UNKNOWN
+        );
         Instant buildTime = buildProperties == null ? null : buildProperties.getTime();
-        String gitCommit = gitProperties == null ? "unknown" : gitProperties.getShortCommitId();
+        String gitCommit = firstPresent(
+                environment.getProperty("MANABIHUB_GIT_COMMIT"),
+                buildProperty("git.commit"),
+                gitProperties == null ? null : gitProperties.getShortCommitId(),
+                UNKNOWN
+        );
         return new BuildSnapshot(applicationName, version, buildTime, gitCommit);
+    }
+
+    private String buildProperty(String key) {
+        return buildProperties == null ? null : buildProperties.get(key);
+    }
+
+    private String firstPresent(String... candidates) {
+        return Arrays.stream(candidates)
+                .filter(this::isUsableMetadata)
+                .findFirst()
+                .orElse(UNKNOWN);
+    }
+
+    private boolean isUsableMetadata(String value) {
+        return hasText(value) && !UNKNOWN.equalsIgnoreCase(value.trim());
     }
 
     private ComponentStatus status(String component, boolean configured, boolean enabled) {

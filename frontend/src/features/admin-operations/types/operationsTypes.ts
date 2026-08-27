@@ -8,6 +8,7 @@ export interface OperationsOverview {
   uptimeSeconds: number;
   activeProfiles: string[];
   timezone: string;
+  businessTimezone: string;
   javaVersion: string;
   jvmName: string;
   memory: {

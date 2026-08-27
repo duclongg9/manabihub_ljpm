@@ -444,7 +444,8 @@ function OverviewPanel({
               ['Khởi động lúc', formatDateTime(data.startedAt)],
               ['Uptime', formatDuration(data.uptimeSeconds)],
               ['Profile', data.activeProfiles.length > 0 ? data.activeProfiles.join(', ') : 'Chưa có dữ liệu'],
-              ['Múi giờ runtime', data.timezone || 'Chưa có dữ liệu'],
+              ['Múi giờ JVM', data.timezone || 'Chưa có dữ liệu'],
+              ['Múi giờ nghiệp vụ', data.businessTimezone || 'Chưa có dữ liệu'],
             ]} />
           </CardContent>
         </Card>

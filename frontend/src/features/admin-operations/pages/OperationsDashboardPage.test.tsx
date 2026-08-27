@@ -27,7 +27,8 @@ const overview: OperationsOverview = {
   startedAt: '2026-08-26T08:00:00Z',
   uptimeSeconds: 7_500,
   activeProfiles: ['prod'],
-  timezone: 'Asia/Ho_Chi_Minh',
+  timezone: 'UTC',
+  businessTimezone: 'Asia/Ho_Chi_Minh',
   javaVersion: '25',
   jvmName: 'OpenJDK 64-Bit Server VM',
   memory: {
@@ -94,6 +95,10 @@ describe('OperationsDashboardPage', () => {
     expect(await screen.findByText('ManabiHub')).toBeInTheDocument();
     expect(screen.getAllByText('Hoạt động')).toHaveLength(2);
     expect(screen.getByText('256 MB / 1 GB')).toBeInTheDocument();
+    expect(screen.getByText('Múi giờ JVM')).toBeInTheDocument();
+    expect(screen.getByText('Múi giờ nghiệp vụ')).toBeInTheDocument();
+    expect(screen.getByText('UTC')).toBeInTheDocument();
+    expect(screen.getByText('Asia/Ho_Chi_Minh')).toBeInTheDocument();
     expect(screen.getByText(/ảnh chụp tại thời điểm truy vấn/i)).toBeInTheDocument();
     expect(screen.getAllByText(/chỉ đọc/i).length).toBeGreaterThan(0);
 
