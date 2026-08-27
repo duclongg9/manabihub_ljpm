@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { operationsService } from '../services/operationsService';
@@ -76,7 +76,10 @@ function renderPage() {
   );
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe('OperationsDashboardPage', () => {
   beforeEach(() => {
@@ -128,7 +131,7 @@ describe('OperationsDashboardPage', () => {
       correlationId: 'req-42',
       limit: 100,
     }));
-    expect(screen.getByText(/bộ đệm log giới hạn của tiến trình backend hiện tại/i)).toBeInTheDocument();
+    expect(screen.getByText(/technical log gần thời gian thực của tiến trình backend hiện tại/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Mở Audit Log nghiệp vụ' })).toHaveAttribute('href', '/admin/audit-logs');
   });
 
@@ -142,6 +145,34 @@ describe('OperationsDashboardPage', () => {
     expect(within(table).getByText(/Save failed password=\[ĐÃ CHE\]/)).toBeInTheDocument();
     fireEvent.click(within(table).getByText('Chi tiết ngoại lệ đã làm sạch'));
     expect(within(table).getByText('Authorization: [ĐÃ CHE]')).toBeInTheDocument();
+  });
+
+  it('refreshes technical logs near real-time only while the live log tab is active', async () => {
+    renderPage();
+    await screen.findByText('ManabiHub');
+    const callsBeforeOpeningLogs = logsMock.mock.calls.length;
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('tab', { name: 'Log gần đây' }));
+
+    expect(screen.getByText('LIVE')).toBeInTheDocument();
+    expect(screen.getByText(/Theo dõi trực tiếp \(mỗi 3 giây\)/)).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+
+    expect(logsMock.mock.calls.length).toBeGreaterThan(callsBeforeOpeningLogs);
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Tự động cập nhật technical log' }));
+    const callsAfterPausing = logsMock.mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000);
+    });
+
+    expect(logsMock).toHaveBeenCalledTimes(callsAfterPausing);
+    expect(screen.getByText('Đã tạm dừng')).toBeInTheDocument();
   });
 
   it('shows a retryable error without inventing health values', async () => {

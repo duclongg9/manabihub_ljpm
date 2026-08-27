@@ -23,6 +23,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -168,7 +169,7 @@ class SystemExpenseServiceImplTest {
     void create_RejectsFutureInvoiceDateInVietnamTimezone() {
         allowFinanceManager();
         UpsertExpenseRequest request = request();
-        request.setIncurredAt(LocalDate.now().plusDays(1));
+        request.setIncurredAt(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(1));
 
         BusinessException error = assertThrows(BusinessException.class, () -> service.create(request));
 
