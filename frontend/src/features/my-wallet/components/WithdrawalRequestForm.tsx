@@ -7,6 +7,12 @@ import { formatCurrency } from '../../../shared/utils/formatCurrency';
 import type { TeacherWallet } from '../types/wallet.types';
 import { walletService } from '../services/walletService';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import {
+  firebasePhoneErrorMessage,
+  startFirebasePhoneOtp,
+  type FirebasePhoneOtpSession,
+  type PhoneOtpChallengeResponse,
+} from '../../../shared/auth/firebasePhoneAuth';
 
 const BANK_LIST = [
   { code: 'VCB', name: 'Vietcombank - Ngân hàng TMCP Ngoại thương VN' },
@@ -23,9 +29,16 @@ const BANK_LIST = [
 
 interface WithdrawalRequestFormProps {
   wallet: TeacherWallet;
-  onSubmit: (values: WithdrawalFormValues & { otpCode: string, saveAccount: boolean }) => void;
+  onSubmit: (values: WithdrawalSubmission) => Promise<void>;
   isSubmitting: boolean;
 }
+
+export type WithdrawalSubmission = WithdrawalFormValues & {
+  otpCode?: string;
+  phoneAuthChallengeId?: string;
+  firebaseIdToken?: string;
+  saveAccount: boolean;
+};
 
 export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: WithdrawalRequestFormProps) {
   const { data: savedAccountsResponse } = useQuery({
@@ -91,18 +104,41 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
   const [pendingValues, setPendingValues] = useState<WithdrawalFormValues | null>(null);
   const [countdown, setCountdown] = useState(0);
   const [saveAccount, setSaveAccount] = useState(true);
+  const [otpChallenge, setOtpChallenge] = useState<PhoneOtpChallengeResponse | null>(null);
+  const [firebaseOtpSession, setFirebaseOtpSession] = useState<FirebasePhoneOtpSession | null>(null);
+  const [isConfirmingOtp, setIsConfirmingOtp] = useState(false);
 
   const { mutate: sendOtp, isPending: isSendingOtp } = useMutation({
-    mutationFn: () => walletService.sendWithdrawalOtp(),
-    onSuccess: () => {
-      toast.success('Mã OTP đã được gửi đến thiết bị của bạn');
+    mutationFn: async () => {
+      await firebaseOtpSession?.cancel();
+      setFirebaseOtpSession(null);
+      const response = await walletService.sendWithdrawalOtp();
+      const challenge = response.data;
+      const session = challenge.verificationMethod === 'FIREBASE'
+        ? await startFirebasePhoneOtp({
+          challengeId: challenge.challengeId,
+          phoneNumberE164: requiredPhoneNumber(challenge),
+        })
+        : null;
+      return { challenge, session };
+    },
+    onSuccess: ({ challenge, session }) => {
+      setOtpChallenge(challenge);
+      setFirebaseOtpSession(session);
+      toast.success(challenge.verificationMethod === 'FIREBASE'
+        ? 'Firebase đã gửi SMS thật tới số điện thoại đã xác thực.'
+        : 'Mã OTP đã được gửi tới email của bạn.');
       setCountdown(60);
     },
-    onError: () => {
-      toast.error('Không thể gửi mã OTP, vui lòng thử lại');
+    onError: (error) => {
+      toast.error(apiErrorMessage(error) ?? firebasePhoneErrorMessage(error));
       setShowOtp(false);
     }
   });
+
+  useEffect(() => () => {
+    void firebaseOtpSession?.cancel();
+  }, [firebaseOtpSession]);
 
   useEffect(() => {
     let timer: any;
@@ -123,19 +159,40 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
     sendOtp();
   };
 
-  const handleConfirmOtp = () => {
+  const handleConfirmOtp = async () => {
     if (otpCode.length !== 6) {
       toast.error('Mã OTP phải gồm 6 chữ số');
       return;
     }
-    setShowOtp(false);
-    if (pendingValues) {
-      onSubmit({
+    if (!pendingValues || !otpChallenge) {
+      toast.error('Phiên xác thực không hợp lệ. Hãy yêu cầu mã mới.');
+      return;
+    }
+    try {
+      setIsConfirmingOtp(true);
+      const verification = firebaseOtpSession
+        ? await firebaseOtpSession.confirm(otpCode)
+        : { otpCode };
+      await onSubmit({
         ...pendingValues,
-        otpCode,
+        ...verification,
         saveAccount: useNewAccount ? saveAccount : false
       });
+      setShowOtp(false);
+      setFirebaseOtpSession(null);
+      setOtpChallenge(null);
+    } catch (error) {
+      toast.error(apiErrorMessage(error) ?? firebasePhoneErrorMessage(error));
+    } finally {
+      setIsConfirmingOtp(false);
     }
+  };
+
+  const closeOtpDialog = () => {
+    void firebaseOtpSession?.cancel();
+    setFirebaseOtpSession(null);
+    setOtpChallenge(null);
+    setShowOtp(false);
   };
 
   return (
@@ -375,12 +432,19 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
       </button>
     </form>
 
-    <Dialog open={showOtp} onClose={() => setShowOtp(false)} maxWidth="sm" fullWidth>
+    <Dialog
+      open={showOtp}
+      onClose={isSubmitting || isConfirmingOtp ? undefined : closeOtpDialog}
+      maxWidth="sm"
+      fullWidth
+    >
       <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold' }}>Xác thực OTP</DialogTitle>
       <DialogContent>
         <div className="flex flex-col items-center mt-2">
           <p className="text-sm text-slate-500 text-center mb-6">
-            Mã xác thực 6 số đã được gửi về email của bạn. Vui lòng kiểm tra hộp thư.
+            {otpChallenge?.verificationMethod === 'FIREBASE'
+              ? `Firebase đã gửi SMS thật tới ${otpChallenge.maskedDestination ?? 'số điện thoại đã xác thực'}.`
+              : 'Mã xác thực 6 số đã được gửi về email của bạn. Vui lòng kiểm tra hộp thư.'}
           </p>
           <input
             type="text"
@@ -408,20 +472,38 @@ export function WithdrawalRequestForm({ wallet, onSubmit, isSubmitting }: Withdr
         </div>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'center', gap: 2 }}>
-        <Button onClick={() => setShowOtp(false)} variant="outlined" color="inherit" sx={{ width: '120px' }}>
+        <Button
+          onClick={closeOtpDialog}
+          disabled={isSubmitting || isConfirmingOtp}
+          variant="outlined"
+          color="inherit"
+          sx={{ width: '120px' }}
+        >
           Hủy
         </Button>
         <Button 
           onClick={handleConfirmOtp} 
           variant="contained" 
           color="primary" 
-          disabled={otpCode.length !== 6 || isSubmitting}
+          disabled={otpCode.length !== 6 || isSubmitting || isConfirmingOtp}
           sx={{ width: '120px' }}
         >
-          {isSubmitting ? 'Đang gửi...' : 'Xác nhận'}
+          {isSubmitting || isConfirmingOtp ? 'Đang xác thực...' : 'Xác nhận'}
         </Button>
       </DialogActions>
     </Dialog>
     </>
   );
+}
+
+function requiredPhoneNumber(challenge: PhoneOtpChallengeResponse): string {
+  if (!challenge.challengeId || !challenge.phoneNumberE164) {
+    throw new Error('Backend không trả về challenge Firebase hợp lệ.');
+  }
+  return challenge.phoneNumberE164;
+}
+
+function apiErrorMessage(error: unknown): string | null {
+  return (error as { response?: { data?: { message?: string } } })
+    ?.response?.data?.message ?? null;
 }

@@ -1,8 +1,10 @@
 package com.manabihub.identity.service;
 
 import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.common.enums.PhoneOtpMethod;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.common.util.PhoneNumberNormalizer;
+import com.manabihub.identity.config.PhoneVerificationSmsProperties;
 import com.manabihub.identity.dto.response.PhoneVerificationResponse;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.PhoneVerificationChallenge;
@@ -29,12 +31,15 @@ public class PhoneVerificationService {
 
     private static final Duration OTP_LIFETIME = Duration.ofMinutes(5);
     private static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
+    private static final Duration FIREBASE_AUTH_TIME_SKEW = Duration.ofSeconds(5);
     private static final int MAX_FAILED_ATTEMPTS = 5;
 
     private final AppUserRepository appUserRepository;
     private final PhoneVerificationChallengeRepository challengeRepository;
     private final PayoutSecurityService securityService;
     private final SmsSender smsSender;
+    private final PhoneVerificationSmsProperties smsProperties;
+    private final FirebasePhoneIdentityVerifier firebasePhoneIdentityVerifier;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional
@@ -44,7 +49,7 @@ public class PhoneVerificationService {
 
         if (user.getPhoneVerifiedAt() != null) {
             if (Objects.equals(user.getPhoneNumber(), phoneNumber)) {
-                return new PhoneVerificationResponse(user.getPhoneNumber(), true, user.getPhoneVerifiedAt());
+                return PhoneVerificationResponse.verified(user.getPhoneNumber(), user.getPhoneVerifiedAt());
             }
             throw alreadyVerified();
         }
@@ -60,8 +65,10 @@ public class PhoneVerificationService {
             );
         }
 
-        String code = String.format("%06d", secureRandom.nextInt(1_000_000));
-        String nonce = securityService.newOtpNonce();
+        boolean firebaseMode = isFirebaseMode();
+        UUID challengeId = UUID.randomUUID();
+        String code = firebaseMode ? null : String.format("%06d", secureRandom.nextInt(1_000_000));
+        String nonce = firebaseMode ? null : securityService.newOtpNonce();
         if (challenge == null) {
             challenge = PhoneVerificationChallenge.builder()
                     .userId(userId)
@@ -69,16 +76,28 @@ public class PhoneVerificationService {
                     .build();
         }
         challenge.setPhoneNumber(phoneNumber);
+        challenge.setChallengeId(challengeId);
+        challenge.setVerificationMethod(firebaseMode ? PhoneOtpMethod.FIREBASE : PhoneOtpMethod.SMS);
         challenge.setNonce(nonce);
-        challenge.setCodeHash(securityService.hashOtp(userId, nonce, code));
+        challenge.setCodeHash(firebaseMode ? null : securityService.hashOtp(userId, nonce, code));
         challenge.setExpiresAt(now.plus(OTP_LIFETIME));
         challenge.setResendAvailableAt(now.plus(RESEND_COOLDOWN));
         challenge.setFailedAttempts(0);
         challenge.setUpdatedAt(now);
         challengeRepository.saveAndFlush(challenge);
 
-        smsSender.send(phoneNumber, "Ma xac thuc ManabiHub cua ban la " + code + ". Ma co hieu luc trong 5 phut.");
-        return new PhoneVerificationResponse(phoneNumber, false, null);
+        if (!firebaseMode) {
+            smsSender.send(phoneNumber, "Ma xac thuc ManabiHub cua ban la " + code + ". Ma co hieu luc trong 5 phut.");
+        }
+        return new PhoneVerificationResponse(
+                phoneNumber,
+                false,
+                null,
+                challenge.getVerificationMethod().name(),
+                challengeId,
+                PhoneNumberNormalizer.toE164(phoneNumber),
+                challenge.getExpiresAt()
+        );
     }
 
     @Transactional(
@@ -86,11 +105,25 @@ public class PhoneVerificationService {
             noRollbackFor = BusinessException.class
     )
     public PhoneVerificationResponse confirmCode(UUID userId, String requestedPhoneNumber, String code) {
+        return confirmCode(userId, requestedPhoneNumber, code, null, null);
+    }
+
+    @Transactional(
+            propagation = Propagation.REQUIRES_NEW,
+            noRollbackFor = BusinessException.class
+    )
+    public PhoneVerificationResponse confirmCode(
+            UUID userId,
+            String requestedPhoneNumber,
+            String code,
+            UUID challengeId,
+            String firebaseIdToken
+    ) {
         AppUser user = findUserForUpdate(userId);
         String phoneNumber = normalizeAndValidate(requestedPhoneNumber);
         if (user.getPhoneVerifiedAt() != null) {
             if (Objects.equals(user.getPhoneNumber(), phoneNumber)) {
-                return new PhoneVerificationResponse(user.getPhoneNumber(), true, user.getPhoneVerifiedAt());
+                return PhoneVerificationResponse.verified(user.getPhoneNumber(), user.getPhoneVerifiedAt());
             }
             throw alreadyVerified();
         }
@@ -107,7 +140,10 @@ public class PhoneVerificationService {
             throw invalidCode();
         }
 
-        if (!securityService.otpMatches(userId, challenge.getNonce(), code, challenge.getCodeHash())) {
+        boolean proofMatches = challenge.getVerificationMethod() == PhoneOtpMethod.FIREBASE
+                ? firebaseProofMatches(challenge, challengeId, firebaseIdToken, now)
+                : smsProofMatches(userId, challenge, code);
+        if (!proofMatches) {
             challenge.setFailedAttempts(challenge.getFailedAttempts() + 1);
             challenge.setUpdatedAt(now);
             challengeRepository.save(challenge);
@@ -119,7 +155,52 @@ public class PhoneVerificationService {
         user.setPhoneVerifiedAt(now);
         appUserRepository.saveAndFlush(user);
         challengeRepository.delete(challenge);
-        return new PhoneVerificationResponse(phoneNumber, true, now);
+        return PhoneVerificationResponse.verified(phoneNumber, now);
+    }
+
+    private boolean smsProofMatches(UUID userId, PhoneVerificationChallenge challenge, String code) {
+        return code != null
+                && challenge.getNonce() != null
+                && challenge.getCodeHash() != null
+                && securityService.otpMatches(userId, challenge.getNonce(), code, challenge.getCodeHash());
+    }
+
+    private boolean firebaseProofMatches(
+            PhoneVerificationChallenge challenge,
+            UUID challengeId,
+            String firebaseIdToken,
+            Instant now
+    ) {
+        if (!Objects.equals(challenge.getChallengeId(), challengeId)
+                || firebaseIdToken == null
+                || firebaseIdToken.isBlank()) {
+            return false;
+        }
+        try {
+            VerifiedFirebasePhone verified = firebasePhoneIdentityVerifier.verify(firebaseIdToken);
+            Instant challengeIssuedAt = challenge.getUpdatedAt() != null
+                    ? challenge.getUpdatedAt()
+                    : challenge.getCreatedAt();
+            return Objects.equals(challenge.getPhoneNumber(), verified.phoneNumber())
+                    && !verified.authenticatedAt().isBefore(
+                            challengeIssuedAt.minus(FIREBASE_AUTH_TIME_SKEW))
+                    && !verified.authenticatedAt().isAfter(now.plusSeconds(30));
+        } catch (FirebasePhoneVerificationException exception) {
+            if (exception.isConfigurationFailure()) {
+                throw new BusinessException(
+                        MessageCodes.PHONE_VERIFICATION_SMS_NOT_CONFIGURED,
+                        "Firebase Phone Auth is not configured",
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        exception
+                );
+            }
+            return false;
+        }
+    }
+
+    private boolean isFirebaseMode() {
+        return "firebase".equalsIgnoreCase(
+                smsProperties.getSmsMode() == null ? "" : smsProperties.getSmsMode().trim());
     }
 
     private AppUser findUserForUpdate(UUID userId) {

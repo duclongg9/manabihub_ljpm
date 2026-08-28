@@ -2,8 +2,8 @@ package com.manabihub.payout.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -12,6 +12,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -28,8 +29,13 @@ public class CreateWithdrawalRequest {
     @Valid
     private BankAccountDto bankAccount;
 
-    @NotBlank(message = "OTP code is required")
+    @Pattern(regexp = "^\\d{6}$", message = "OTP code must contain exactly 6 digits")
     private String otpCode;
+
+    private UUID phoneAuthChallengeId;
+
+    @Size(max = 10_000, message = "Firebase ID token is too large")
+    private String firebaseIdToken;
 
     @Builder.Default
     private boolean saveAccount = false;
@@ -55,5 +61,14 @@ public class CreateWithdrawalRequest {
         boolean hasSavedAccount = bankAccountId != null && !bankAccountId.isBlank();
         boolean hasNewAccount = bankAccount != null;
         return hasSavedAccount != hasNewAccount;
+    }
+
+    @AssertTrue(message = "Provide either an OTP code or a Firebase phone proof")
+    public boolean isOtpProofValid() {
+        boolean hasOtpCode = otpCode != null && !otpCode.isBlank();
+        boolean hasFirebaseChallenge = phoneAuthChallengeId != null;
+        boolean hasFirebaseToken = firebaseIdToken != null && !firebaseIdToken.isBlank();
+        return hasOtpCode != (hasFirebaseChallenge && hasFirebaseToken)
+                && hasFirebaseChallenge == hasFirebaseToken;
     }
 }

@@ -33,6 +33,11 @@ management:
       show-details: always
 
 manabihub:
+  firebase-phone-auth:
+    enabled: ${FIREBASE_PHONE_AUTH_ENABLED:false}
+    project-id: ${FIREBASE_PROJECT_ID:}
+    # Server secret; never expose this value through a VITE_* frontend variable.
+    service-account-json-base64: ${FIREBASE_SERVICE_ACCOUNT_JSON_BASE64:}
   phone-verification:
     sms-mode: ${PHONE_VERIFICATION_SMS_MODE:console}
     sms-webhook-url: ${PHONE_VERIFICATION_SMS_WEBHOOK_URL:}
@@ -51,6 +56,7 @@ manabihub:
     identity-verification-mode: ${KYC_IDENTITY_VERIFICATION_MODE:direct-sdk-mock}
   payout:
     security-secret: ${PAYOUT_SECURITY_SECRET:}
+    withdrawal-otp-mode: ${WITHDRAWAL_OTP_MODE:email}
   ai:
     chat:
       base-url: ${AI_CHAT_PROVIDER_BASE_URL:}

@@ -37,4 +37,15 @@ class PhoneNumberNormalizerTest {
     void normalizedInternationalNumberFitsPhoneNumberColumn() {
         assertEquals(10, PhoneNumberNormalizer.normalize("+84912345678").length());
     }
+
+    @Test
+    void toE164ConvertsCanonicalVietnameseNumberForFirebase() {
+        assertEquals("+84912345678", PhoneNumberNormalizer.toE164("0912345678"));
+        assertEquals("+84912345678", PhoneNumberNormalizer.toE164("+84912345678"));
+    }
+
+    @Test
+    void toE164KeepsBlankAsNull() {
+        assertNull(PhoneNumberNormalizer.toE164("  "));
+    }
 }

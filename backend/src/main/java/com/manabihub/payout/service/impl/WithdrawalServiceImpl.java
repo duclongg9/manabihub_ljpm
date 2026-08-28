@@ -12,6 +12,7 @@ import com.manabihub.payout.dto.request.BankAccountDto;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
 import com.manabihub.payout.dto.response.TeacherBankAccountResponse;
 import com.manabihub.payout.dto.response.WithdrawalRequestResponse;
+import com.manabihub.payout.dto.response.WithdrawalOtpResponse;
 import com.manabihub.payout.entity.BankAccountSnapshot;
 import com.manabihub.payout.entity.TeacherBankAccount;
 import com.manabihub.payout.entity.WithdrawalRequest;
@@ -81,7 +82,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 .map(user -> user.getPhoneVerifiedAt() == null)
                 .orElse(true)) {
             throw new BusinessException(
-                    MessageCodes.PHONE_VERIFICATION_REQUIRED,
+                    MessageCodes.PAYOUT_PHONE_VERIFICATION_REQUIRED,
                     "Vui lòng xác minh số điện thoại trước khi rút tiền",
                     HttpStatus.FORBIDDEN);
         }
@@ -126,7 +127,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         }
 
         BankAccountSnapshot snapshot = buildSnapshot(teacherProfileId, request);
-        otpService.consumeOtp(userId, request.getOtpCode());
+        otpService.consumeVerification(userId, request);
 
         WithdrawalRequest withdrawalRequest = WithdrawalRequest.builder()
                 .teacherId(teacherProfileId)
@@ -292,8 +293,8 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     }
 
     @Override
-    public void sendWithdrawalOtp(String userId) {
-        otpService.sendOtp(userId);
+    public WithdrawalOtpResponse sendWithdrawalOtp(String userId) {
+        return otpService.sendOtp(userId);
     }
 
     @Override

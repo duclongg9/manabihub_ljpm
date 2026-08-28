@@ -5,6 +5,7 @@ import com.manabihub.common.response.ApiResponse;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
 import com.manabihub.payout.dto.response.StudentBankAccountResponse;
 import com.manabihub.payout.dto.response.WithdrawalRequestResponse;
+import com.manabihub.payout.dto.response.WithdrawalOtpResponse;
 import com.manabihub.payout.service.StudentWithdrawalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -70,9 +71,9 @@ public class StudentWithdrawalController {
     }
 
     @PostMapping("/send-otp")
-    public ApiResponse<Void> sendOtp(@AuthenticationPrincipal Jwt jwt) {
-        withdrawalService.sendOtp(userId(jwt));
-        return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "OTP sent successfully", null);
+    public ApiResponse<WithdrawalOtpResponse> sendOtp(@AuthenticationPrincipal Jwt jwt) {
+        WithdrawalOtpResponse response = withdrawalService.sendOtp(userId(jwt));
+        return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "OTP challenge created", response);
     }
 
     @GetMapping("/bank-accounts")

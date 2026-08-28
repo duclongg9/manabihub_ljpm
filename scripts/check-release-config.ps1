@@ -20,7 +20,8 @@ $requiredVariables = @(
     'AI_CHAT_PROVIDER_MODEL',
     'FRONTEND_BASE_URL',
     'CORS_ALLOWED_ORIGINS',
-    'PHONE_VERIFICATION_SMS_MODE'
+    'PHONE_VERIFICATION_SMS_MODE',
+    'WITHDRAWAL_OTP_MODE'
 )
 
 $profile = [Environment]::GetEnvironmentVariable('SPRING_PROFILES_ACTIVE')
@@ -28,7 +29,7 @@ if ($profile -ne 'prod') {
     Write-Error 'Release configuration is not ready. SPRING_PROFILES_ACTIVE must be prod.'
 }
 
-$smsMode = [Environment]::GetEnvironmentVariable('PHONE_VERIFICATION_SMS_MODE')
+$smsMode = ([string][Environment]::GetEnvironmentVariable('PHONE_VERIFICATION_SMS_MODE')).Trim().ToLowerInvariant()
 if ($smsMode -eq 'esms') {
     $requiredVariables += @(
         'PHONE_VERIFICATION_ESMS_API_KEY',
@@ -41,14 +42,35 @@ if ($smsMode -eq 'esms') {
         'PHONE_VERIFICATION_SMS_WEBHOOK_URL',
         'PHONE_VERIFICATION_SMS_API_KEY'
     )
+} elseif ($smsMode -eq 'firebase') {
+    $requiredVariables += @(
+        'FIREBASE_PHONE_AUTH_ENABLED',
+        'FIREBASE_PROJECT_ID',
+        'FIREBASE_SERVICE_ACCOUNT_JSON_BASE64'
+    )
 } else {
-    Write-Error 'Release configuration is not ready. PHONE_VERIFICATION_SMS_MODE must be esms or webhook.'
+    Write-Error 'Release configuration is not ready. PHONE_VERIFICATION_SMS_MODE must be firebase, esms, or webhook.'
 }
+
+$withdrawalOtpMode = ([string][Environment]::GetEnvironmentVariable('WITHDRAWAL_OTP_MODE')).Trim().ToLowerInvariant()
+if ($withdrawalOtpMode -eq 'firebase') {
+    $requiredVariables += @(
+        'FIREBASE_PHONE_AUTH_ENABLED',
+        'FIREBASE_PROJECT_ID',
+        'FIREBASE_SERVICE_ACCOUNT_JSON_BASE64'
+    )
+} elseif ($withdrawalOtpMode -ne 'email') {
+    Write-Error 'Release configuration is not ready. WITHDRAWAL_OTP_MODE must be firebase or email.'
+}
+
+$requiredVariables = @($requiredVariables | Select-Object -Unique)
 
 $minimumLengthVariables = @{
     JWT_SECRET = 32
     KYC_IDENTITY_SECRET = 32
     PAYOUT_SECURITY_SECRET = 32
+    FIREBASE_PROJECT_ID = 6
+    FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 = 200
 }
 
 $states = foreach ($name in $requiredVariables) {
@@ -78,9 +100,9 @@ $invalid = @(
 )
 
 $placeholderPattern = '^(<.*>|replace-with.*|changeme|your[-_].*)$'
-$placeholderSmsVariables = @(
+$placeholderProviderVariables = @(
     $states | Where-Object {
-        $_.Name -like 'PHONE_VERIFICATION_*' -and
+        ($_.Name -like 'PHONE_VERIFICATION_*' -or $_.Name -like 'FIREBASE_*') -and
         [Environment]::GetEnvironmentVariable($_.Name) -match $placeholderPattern
     }
 )
@@ -92,15 +114,38 @@ if ($smsMode -eq 'esms') {
     }
 }
 
+if ($smsMode -eq 'firebase' -or $withdrawalOtpMode -eq 'firebase') {
+    $firebaseEnabled = [Environment]::GetEnvironmentVariable('FIREBASE_PHONE_AUTH_ENABLED')
+    if ($firebaseEnabled -ne 'true') {
+        Write-Error 'Release configuration is not ready. FIREBASE_PHONE_AUTH_ENABLED must be true.'
+    }
+    try {
+        $firebaseJsonBytes = [Convert]::FromBase64String(
+            [Environment]::GetEnvironmentVariable('FIREBASE_SERVICE_ACCOUNT_JSON_BASE64'))
+        $firebaseCredentials = [Text.Encoding]::UTF8.GetString($firebaseJsonBytes) | ConvertFrom-Json
+        $firebaseProjectId = [Environment]::GetEnvironmentVariable('FIREBASE_PROJECT_ID')
+        if ($firebaseCredentials.type -ne 'service_account' -or
+            [string]::IsNullOrWhiteSpace($firebaseCredentials.private_key) -or
+            [string]::IsNullOrWhiteSpace($firebaseCredentials.client_email) -or
+            $firebaseCredentials.project_id -ne $firebaseProjectId) {
+            Write-Error 'Release configuration is not ready. Firebase service-account JSON is invalid or belongs to another project.'
+        }
+    } catch {
+        Write-Error 'Release configuration is not ready. FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 is not valid Base64 service-account JSON.'
+    } finally {
+        Remove-Variable firebaseJsonBytes, firebaseCredentials -ErrorAction SilentlyContinue
+    }
+}
+
 if ($invalid.Count -gt 0) {
     $errorMessage = 'Release configuration is not ready. Missing or too-short variables: ' +
         ($invalid.Name -join ', ')
     Write-Error $errorMessage
 }
 
-if ($placeholderSmsVariables.Count -gt 0) {
-    Write-Error ('Release configuration is not ready. Placeholder SMS variables: ' +
-        ($placeholderSmsVariables.Name -join ', '))
+if ($placeholderProviderVariables.Count -gt 0) {
+    Write-Error ('Release configuration is not ready. Placeholder provider variables: ' +
+        ($placeholderProviderVariables.Name -join ', '))
 }
 
 Write-Host 'Release configuration is present. Values were intentionally not printed.'

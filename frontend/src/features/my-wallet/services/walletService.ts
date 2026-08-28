@@ -13,6 +13,7 @@ import type {
 } from '../../wallet/types';
 import { toTransactionParams } from '../../wallet/services/walletTransactionParams';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
+import type { PhoneOtpChallengeResponse } from '../../../shared/auth/firebasePhoneAuth';
 
 export const walletService = {
   getTeacherWallet: async (): Promise<ApiResponse<TeacherWallet>> => {
@@ -68,8 +69,10 @@ export const walletService = {
     return response.data;
   },
 
-  sendWithdrawalOtp: async (): Promise<ApiResponse<void>> => {
-    const response = await axiosClient.post(ENDPOINTS.teacherWallet.sendWithdrawalOtp);
+  sendWithdrawalOtp: async (): Promise<ApiResponse<PhoneOtpChallengeResponse>> => {
+    const response = await axiosClient.post<ApiResponse<PhoneOtpChallengeResponse>>(
+      ENDPOINTS.teacherWallet.sendWithdrawalOtp,
+    );
     return response.data;
   },
 

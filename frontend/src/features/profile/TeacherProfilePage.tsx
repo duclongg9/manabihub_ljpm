@@ -28,6 +28,11 @@ import {
 } from './profileApi';
 import { resolvePublicAssetUrl } from '../../shared/utils/assetUtils';
 import { PHONE_PATTERN, sanitizeOtpInput, sanitizePhoneInput } from './phoneValidation';
+import {
+  firebasePhoneErrorMessage,
+  startFirebasePhoneOtp,
+  type FirebasePhoneOtpSession,
+} from '../../shared/auth/firebasePhoneAuth';
 
 const JLPT_LEVELS = [
   { level: 'N5', label: 'N5 • 初級' },
@@ -63,6 +68,7 @@ export default function TeacherProfilePage() {
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [phoneCode, setPhoneCode] = useState('');
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [firebasePhoneSession, setFirebasePhoneSession] = useState<FirebasePhoneOtpSession | null>(null);
   const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
   const [confirmingPhoneOtp, setConfirmingPhoneOtp] = useState(false);
   const [snackbar, setSnackbar] = useState({
@@ -77,6 +83,10 @@ export default function TeacherProfilePage() {
   useEffect(() => {
     void loadProfile();
   }, []);
+
+  useEffect(() => () => {
+    void firebasePhoneSession?.cancel();
+  }, [firebasePhoneSession]);
 
   async function loadProfile() {
     try {
@@ -95,6 +105,7 @@ export default function TeacherProfilePage() {
       setPhoneVerified(profile.phoneVerified === true);
       setPhoneCode('');
       setPhoneOtpSent(false);
+      setFirebasePhoneSession(null);
     } catch (error) {
       console.error(error);
       setSnackbar({
@@ -174,13 +185,32 @@ export default function TeacherProfilePage() {
     if (phoneVerified || !validatePhone()) return;
     try {
       setSendingPhoneOtp(true);
-      await requestTeacherPhoneVerification(form.phoneNumber);
+      await firebasePhoneSession?.cancel();
+      setFirebasePhoneSession(null);
+      const challenge = await requestTeacherPhoneVerification(form.phoneNumber);
+      if (challenge.verificationMethod === 'FIREBASE') {
+        if (!challenge.challengeId || !challenge.phoneNumberE164) {
+          throw new Error('Backend không trả về challenge Firebase hợp lệ.');
+        }
+        const session = await startFirebasePhoneOtp({
+          challengeId: challenge.challengeId,
+          phoneNumberE164: challenge.phoneNumberE164,
+        });
+        setFirebasePhoneSession(session);
+      }
       setPhoneOtpSent(true);
-      setSnackbar({ open: true, message: 'Đã gửi mã xác thực SMS.', severity: 'success' });
-    } catch (error: any) {
       setSnackbar({
         open: true,
-        message: error.response?.data?.message ?? 'Không thể gửi mã SMS.',
+        message: challenge.verificationMethod === 'FIREBASE'
+          ? 'Firebase đã gửi SMS thật tới số điện thoại của bạn.'
+          : 'Đã gửi mã xác thực SMS.',
+        severity: 'success',
+      });
+    } catch (error: any) {
+      setPhoneOtpSent(false);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message ?? firebasePhoneErrorMessage(error),
         severity: 'error',
       });
     } finally {
@@ -195,7 +225,14 @@ export default function TeacherProfilePage() {
     }
     try {
       setConfirmingPhoneOtp(true);
-      await confirmTeacherPhoneVerification(form.phoneNumber, phoneCode);
+      const proof = firebasePhoneSession
+        ? await firebasePhoneSession.confirm(phoneCode).then((firebaseProof) => ({
+          challengeId: firebaseProof.phoneAuthChallengeId,
+          firebaseIdToken: firebaseProof.firebaseIdToken,
+        }))
+        : { code: phoneCode };
+      await confirmTeacherPhoneVerification(form.phoneNumber, proof);
+      setFirebasePhoneSession(null);
       await loadProfile();
       setSnackbar({
         open: true,
@@ -205,7 +242,7 @@ export default function TeacherProfilePage() {
     } catch (error: any) {
       setSnackbar({
         open: true,
-        message: error.response?.data?.message ?? 'Mã xác thực không hợp lệ.',
+        message: error.response?.data?.message ?? firebasePhoneErrorMessage(error),
         severity: 'error',
       });
     } finally {
@@ -224,6 +261,10 @@ export default function TeacherProfilePage() {
       }
       if (field === 'phoneNumber') {
         setErrors((current) => ({ ...current, phoneNumber: '' }));
+        void firebasePhoneSession?.cancel();
+        setFirebasePhoneSession(null);
+        setPhoneCode('');
+        setPhoneOtpSent(false);
       }
     };
   }
@@ -467,6 +508,11 @@ export default function TeacherProfilePage() {
                       </Button>
                     )}
                   </Stack>
+                  {!phoneVerified && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                      Khi gửi mã, số điện thoại được chuyển tới Google Firebase để chống lạm dụng và gửi SMS; cước SMS tiêu chuẩn có thể áp dụng.
+                    </Typography>
+                  )}
                   {!phoneVerified && phoneOtpSent && (
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
                       <TextField

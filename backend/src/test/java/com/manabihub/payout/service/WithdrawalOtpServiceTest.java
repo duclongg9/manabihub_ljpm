@@ -1,9 +1,14 @@
 package com.manabihub.payout.service;
 
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.common.enums.PhoneOtpMethod;
 import com.manabihub.common.mail.EmailService;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.repository.AppUserRepository;
+import com.manabihub.identity.service.FirebasePhoneIdentityVerifier;
+import com.manabihub.identity.service.VerifiedFirebasePhone;
+import com.manabihub.payout.config.WithdrawalOtpProperties;
+import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
 import com.manabihub.payout.entity.WithdrawalOtpChallenge;
 import com.manabihub.payout.repository.WithdrawalOtpChallengeRepository;
 import com.manabihub.payout.security.PayoutSecurityService;
@@ -36,9 +41,11 @@ class WithdrawalOtpServiceTest {
     @Mock private WithdrawalOtpChallengeRepository challengeRepository;
     @Mock private AppUserRepository appUserRepository;
     @Mock private EmailService emailService;
+    @Mock private FirebasePhoneIdentityVerifier firebasePhoneIdentityVerifier;
 
     private PayoutSecurityService securityService;
     private WithdrawalOtpService service;
+    private WithdrawalOtpProperties otpProperties;
     private UUID userId;
     private AppUser user;
 
@@ -51,11 +58,15 @@ class WithdrawalOtpServiceTest {
                 securityService,
                 "initialize"
         );
+        otpProperties = new WithdrawalOtpProperties();
+        otpProperties.setWithdrawalOtpMode("email");
         service = new WithdrawalOtpService(
                 challengeRepository,
                 appUserRepository,
                 emailService,
-                securityService
+                securityService,
+                otpProperties,
+                firebasePhoneIdentityVerifier
         );
         userId = UUID.randomUUID();
         user = AppUser.builder()
@@ -148,6 +159,8 @@ class WithdrawalOtpServiceTest {
         String nonce = securityService.newOtpNonce();
         return WithdrawalOtpChallenge.builder()
                 .userId(userId)
+                .challengeId(UUID.randomUUID())
+                .verificationMethod(PhoneOtpMethod.EMAIL)
                 .nonce(nonce)
                 .codeHash(securityService.hashOtp(userId, nonce, code))
                 .expiresAt(now.plusSeconds(300))
@@ -155,6 +168,109 @@ class WithdrawalOtpServiceTest {
                 .failedAttempts(0)
                 .createdAt(now)
                 .updatedAt(now)
+                .build();
+    }
+
+    @Test
+    void firebaseModeCreatesPhoneChallengeWithoutEmailOrPlaintextCode() {
+        otpProperties.setWithdrawalOtpMode("firebase");
+        user.setPhoneNumber("0912345678");
+        user.setPhoneVerifiedAt(Instant.now());
+        when(appUserRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+        when(challengeRepository.findById(userId)).thenReturn(Optional.empty());
+
+        var response = service.sendOtp(userId.toString());
+
+        assertEquals("FIREBASE", response.verificationMethod());
+        assertEquals("+84912345678", response.phoneNumberE164());
+        ArgumentCaptor<WithdrawalOtpChallenge> captor =
+                ArgumentCaptor.forClass(WithdrawalOtpChallenge.class);
+        verify(challengeRepository).saveAndFlush(captor.capture());
+        assertEquals(PhoneOtpMethod.FIREBASE, captor.getValue().getVerificationMethod());
+        assertEquals(null, captor.getValue().getCodeHash());
+        assertEquals("0912345678", captor.getValue().getPhoneNumber());
+        verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void firebaseWithdrawalProofIsFreshPhoneBoundAndConsumedOnce() {
+        otpProperties.setWithdrawalOtpMode("firebase");
+        Instant issuedAt = Instant.now().minusSeconds(2);
+        UUID challengeId = UUID.randomUUID();
+        WithdrawalOtpChallenge challenge = firebaseChallenge(challengeId, issuedAt);
+        when(challengeRepository.findByUserIdForUpdate(userId))
+                .thenReturn(Optional.of(challenge));
+        when(firebasePhoneIdentityVerifier.verify("firebase-token"))
+                .thenReturn(new VerifiedFirebasePhone("0912345678", Instant.now(), "firebase-uid"));
+        CreateWithdrawalRequest request = CreateWithdrawalRequest.builder()
+                .phoneAuthChallengeId(challengeId)
+                .firebaseIdToken("firebase-token")
+                .build();
+
+        service.consumeVerification(userId.toString(), request);
+
+        verify(challengeRepository).delete(challenge);
+        verify(challengeRepository, never()).save(any());
+    }
+
+    @Test
+    void firebaseWithdrawalRejectsTokenFromPreviousChallenge() {
+        otpProperties.setWithdrawalOtpMode("firebase");
+        Instant issuedAt = Instant.now();
+        UUID challengeId = UUID.randomUUID();
+        WithdrawalOtpChallenge challenge = firebaseChallenge(challengeId, issuedAt);
+        when(challengeRepository.findByUserIdForUpdate(userId))
+                .thenReturn(Optional.of(challenge));
+        when(firebasePhoneIdentityVerifier.verify("stale-token"))
+                .thenReturn(new VerifiedFirebasePhone(
+                        "0912345678", issuedAt.minusSeconds(10), "firebase-uid"));
+        CreateWithdrawalRequest request = CreateWithdrawalRequest.builder()
+                .phoneAuthChallengeId(challengeId)
+                .firebaseIdToken("stale-token")
+                .build();
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.consumeVerification(userId.toString(), request));
+
+        assertEquals("PAYOUT_INVALID_OTP", error.getMessageCode());
+        assertEquals(1, challenge.getFailedAttempts());
+        verify(challengeRepository).save(challenge);
+        verify(challengeRepository, never()).delete(challenge);
+    }
+
+    @Test
+    void firebaseWithdrawalRejectsTokenForDifferentPhone() {
+        otpProperties.setWithdrawalOtpMode("firebase");
+        Instant issuedAt = Instant.now().minusSeconds(2);
+        UUID challengeId = UUID.randomUUID();
+        WithdrawalOtpChallenge challenge = firebaseChallenge(challengeId, issuedAt);
+        when(challengeRepository.findByUserIdForUpdate(userId))
+                .thenReturn(Optional.of(challenge));
+        when(firebasePhoneIdentityVerifier.verify("wrong-phone-token"))
+                .thenReturn(new VerifiedFirebasePhone("0987654321", Instant.now(), "firebase-uid"));
+        CreateWithdrawalRequest request = CreateWithdrawalRequest.builder()
+                .phoneAuthChallengeId(challengeId)
+                .firebaseIdToken("wrong-phone-token")
+                .build();
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.consumeVerification(userId.toString(), request));
+
+        assertEquals("PAYOUT_INVALID_OTP", error.getMessageCode());
+        verify(challengeRepository, never()).delete(challenge);
+    }
+
+    private WithdrawalOtpChallenge firebaseChallenge(UUID challengeId, Instant issuedAt) {
+        return WithdrawalOtpChallenge.builder()
+                .userId(userId)
+                .challengeId(challengeId)
+                .verificationMethod(PhoneOtpMethod.FIREBASE)
+                .phoneNumber("0912345678")
+                .expiresAt(issuedAt.plusSeconds(300))
+                .resendAvailableAt(issuedAt.plusSeconds(60))
+                .failedAttempts(0)
+                .createdAt(issuedAt.minusSeconds(60))
+                .updatedAt(issuedAt)
                 .build();
     }
 }

@@ -128,7 +128,7 @@ class StudentWithdrawalServiceImplTest {
         WithdrawalRequestResponse response = service.createWithdrawal(userId, request);
 
         assertEquals(WithdrawalStatus.PENDING, response.getStatus());
-        verify(otpService).consumeOtp(userId.toString(), "123456");
+        verify(otpService).consumeVerification(userId.toString(), request);
         verify(studentWalletService).reserveForWithdrawal(
                 student.getId(), withdrawalId, request.getAmount());
         verify(notificationService).notifyFinanceManager(
@@ -146,7 +146,7 @@ class StudentWithdrawalServiceImplTest {
                         userId, request(new BigDecimal("100000.00"))));
 
         assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, error.getMessageCode());
-        verify(otpService, never()).consumeOtp(any(), any());
+        verify(otpService, never()).consumeVerification(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
     }
 
@@ -160,10 +160,10 @@ class StudentWithdrawalServiceImplTest {
                 () -> service.createWithdrawal(
                         userId, request(new BigDecimal("100000.00"))));
 
-        assertEquals(MessageCodes.PHONE_VERIFICATION_REQUIRED, error.getMessageCode());
+        assertEquals(MessageCodes.PAYOUT_PHONE_VERIFICATION_REQUIRED, error.getMessageCode());
         verify(studentWalletService, never()).getOrCreateStudentWallet(any());
         verify(walletRepository, never()).findByOwnerTypeAndStudent_IdForUpdate(any(), any());
-        verify(otpService, never()).consumeOtp(any(), any());
+        verify(otpService, never()).consumeVerification(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
     }
 
@@ -180,7 +180,7 @@ class StudentWithdrawalServiceImplTest {
         assertEquals(MessageCodes.MSG_KYC_002, error.getMessageCode());
         verify(studentWalletService, never()).getOrCreateStudentWallet(any());
         verify(walletRepository, never()).findByOwnerTypeAndStudent_IdForUpdate(any(), any());
-        verify(otpService, never()).consumeOtp(any(), any());
+        verify(otpService, never()).consumeVerification(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
     }
 
@@ -218,7 +218,7 @@ class StudentWithdrawalServiceImplTest {
         WithdrawalRequestResponse response = service.createWithdrawal(userId, request);
 
         assertEquals(WithdrawalStatus.PENDING, response.getStatus());
-        verify(otpService).consumeOtp(userId.toString(), "123456");
+        verify(otpService).consumeVerification(userId.toString(), request);
         verify(studentWalletService).reserveForWithdrawal(
                 student.getId(), withdrawalId, request.getAmount());
     }
@@ -242,7 +242,7 @@ class StudentWithdrawalServiceImplTest {
                 () -> service.createWithdrawal(userId, request));
 
         assertEquals(MessageCodes.PAYOUT_BANK_OWNERSHIP_REQUIRED, error.getMessageCode());
-        verify(otpService, never()).consumeOtp(any(), any());
+        verify(otpService, never()).consumeVerification(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
     }
 

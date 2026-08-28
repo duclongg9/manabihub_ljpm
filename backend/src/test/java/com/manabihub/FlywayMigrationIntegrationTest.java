@@ -73,7 +73,7 @@ public class FlywayMigrationIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
-    // ── Test 1: Clean build from V001 to V075 ──────────────────────────────
+    // ── Test 1: Clean build from V001 to V081 ──────────────────────────────
     @Test
     void cleanMigrationToLatestVersion() {
         assertThat(flyway).isNotNull();
@@ -90,7 +90,7 @@ public class FlywayMigrationIntegrationTest {
 
         // Exact latest version
         String current = flyway.info().current().getVersion().toString();
-        assertThat(current).isEqualTo("080");
+        assertThat(current).isEqualTo("081");
 
         MigrationInfo immutablePhoneMigration = Arrays.stream(flyway.info().all())
                 .filter(info -> info.getVersion() != null
@@ -105,7 +105,7 @@ public class FlywayMigrationIntegrationTest {
         verifyConstraintsAndIndexes();
     }
 
-    // ── Test 2: V031 → V075 upgrade preserves representative data ──────────
+    // ── Test 2: V031 → V081 upgrade preserves representative data ──────────
     @Test
     void upgradeFromV031PreservesData() {
         jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS upgrade_test");
@@ -661,6 +661,37 @@ public class FlywayMigrationIntegrationTest {
                         + "AND table_name = 'phone_verification_challenges'",
                 Integer.class);
         assertThat(phoneChallengeTable).as("phone_verification_challenges exists").isEqualTo(1);
+
+        Integer firebaseChallengeColumns = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND ("
+                        + "(table_name = 'phone_verification_challenges' "
+                        + "AND column_name IN ('challenge_id', 'verification_method')) OR "
+                        + "(table_name = 'withdrawal_otp_challenges' "
+                        + "AND column_name IN ('challenge_id', 'verification_method', 'phone_number')))",
+                Integer.class);
+        assertThat(firebaseChallengeColumns)
+                .as("Firebase phone-auth challenge columns exist")
+                .isEqualTo(5);
+
+        Integer firebaseChallengeIndexes = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_indexes WHERE schemaname = 'public' "
+                        + "AND indexname IN ('uq_phone_verification_challenge_id', "
+                        + "'uq_withdrawal_otp_challenge_id')",
+                Integer.class);
+        assertThat(firebaseChallengeIndexes)
+                .as("Firebase challenge identifiers are unique")
+                .isEqualTo(2);
+
+        Integer firebaseProofConstraints = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM information_schema.table_constraints "
+                        + "WHERE table_schema = 'public' AND constraint_name IN ("
+                        + "'chk_phone_verification_method', 'chk_phone_verification_proof_storage', "
+                        + "'chk_withdrawal_otp_method', 'chk_withdrawal_otp_proof_storage')",
+                Integer.class);
+        assertThat(firebaseProofConstraints)
+                .as("Firebase proof storage and method constraints exist")
+                .isEqualTo(4);
 
         Integer thumbnailAssetTable = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM information_schema.tables "

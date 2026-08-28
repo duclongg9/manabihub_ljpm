@@ -4,6 +4,7 @@ import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.payout.dto.request.CreateWithdrawalRequest;
 import com.manabihub.payout.dto.response.WithdrawalRequestResponse;
+import com.manabihub.payout.dto.response.WithdrawalOtpResponse;
 import com.manabihub.payout.service.WithdrawalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -70,10 +71,10 @@ public class TeacherWithdrawalController {
     @PostMapping("/send-otp")
     @PreAuthorize("hasRole('TEACHER')")
     @Operation(summary = "Send OTP for withdrawal")
-    public ApiResponse<Void> sendOtp(Authentication authentication) {
+    public ApiResponse<WithdrawalOtpResponse> sendOtp(Authentication authentication) {
         String teacherId = authentication.getName();
-        withdrawalService.sendWithdrawalOtp(teacherId);
-        return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "OTP sent successfully", null);
+        WithdrawalOtpResponse response = withdrawalService.sendWithdrawalOtp(teacherId);
+        return ApiResponse.success(MessageCodes.COMMON_SUCCESS, "OTP challenge created", response);
     }
 
     @GetMapping("/bank-accounts")

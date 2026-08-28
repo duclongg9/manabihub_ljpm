@@ -50,7 +50,9 @@ export interface CreateStudentWithdrawalPayload {
     accountHolderName: string;
     branch?: string;
   };
-  otpCode: string;
+  otpCode?: string;
+  phoneAuthChallengeId?: string;
+  firebaseIdToken?: string;
   saveAccount: boolean;
   ownershipConfirmed: boolean;
 }
