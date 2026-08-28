@@ -7,6 +7,7 @@ import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
+import com.manabihub.identity.enums.InternalAdminInvitationStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
@@ -314,6 +315,116 @@ public class SystemAdministrationServiceImpl implements SystemAdministrationServ
                 "/admin/dashboard"
         );
         return toAdminResponse(saved, invitationSummary(saved.getId()));
+    }
+
+    @Override
+    @Transactional
+    public InternalAdminAccountResponse updateInternalAdminStatus(
+            UUID actorId,
+            UUID targetAdminId,
+            AccountStatus status,
+            String reason
+    ) {
+        InternalAdminAccount actor = requireLiveSystemAdmin(actorId);
+        if (status != AccountStatus.ACTIVE && status != AccountStatus.DISABLED) {
+            throw invalidAdminStatus("Only ACTIVE and DISABLED statuses are supported");
+        }
+        if (actorId.equals(targetAdminId) && status == AccountStatus.DISABLED) {
+            throw new BusinessException(
+                    MessageCodes.INTERNAL_ADMIN_SELF_DISABLE_FORBIDDEN,
+                    "Use another active System Admin to change your own access status",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        List<InternalAdminAccount> activeSystemAdmins =
+                adminRepository.findAllByStatusAndRoleCodeForUpdate(
+                        AccountStatus.ACTIVE,
+                        RoleCode.SYSTEM_ADMIN
+                );
+        InternalAdminAccount target = adminRepository.findByIdForRoleUpdate(targetAdminId)
+                .orElseThrow(() -> new BusinessException(
+                        MessageCodes.COMMON_NOT_FOUND,
+                        "Internal administrator account not found",
+                        HttpStatus.NOT_FOUND
+                ));
+        if (target.getRole() == null || !INTERNAL_ROLES.contains(target.getRole().getCode())) {
+            throw invalidAdminStatus("The target does not have an internal administrator role");
+        }
+        if (target.getAccountStatus() == status) {
+            return toAdminResponse(target, invitationSummary(target.getId()));
+        }
+        if (target.getAccountStatus() != AccountStatus.ACTIVE
+                && target.getAccountStatus() != AccountStatus.DISABLED) {
+            throw invalidAdminStatus("Only active or disabled accounts can be changed here");
+        }
+
+        InternalAdminInvitationService.InvitationSummary invitation =
+                invitationSummary(target.getId());
+        if (status == AccountStatus.ACTIVE
+                && invitation.status()
+                != InternalAdminInvitationStatus.ACCEPTED
+                && invitation.status()
+                != InternalAdminInvitationStatus.NONE) {
+            throw invalidAdminStatus(
+                    "An invited administrator must set a password using a valid invitation"
+            );
+        }
+        if (status == AccountStatus.ACTIVE
+                && target.getEmail().endsWith("@manabihub.local")) {
+            throw invalidAdminStatus(
+                    "Built-in demo accounts can only be enabled by the local development profile"
+            );
+        }
+        if (status == AccountStatus.DISABLED
+                && target.getRole().getCode() == RoleCode.SYSTEM_ADMIN
+                && activeSystemAdmins.size() <= 1) {
+            throw new BusinessException(
+                    MessageCodes.LAST_SYSTEM_ADMIN_REQUIRED,
+                    "At least one active System Admin must remain",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        AccountStatus previousStatus = target.getAccountStatus();
+        Instant changedAt = Instant.now();
+        target.setAccountStatus(status);
+        target.setCredentialVersion(target.getCredentialVersion() + 1);
+        InternalAdminAccount saved = adminRepository.save(target);
+        if (status == AccountStatus.DISABLED) {
+            invitationService.revokeOpenInvitations(targetAdminId, changedAt);
+        }
+        eventPublisher.publishEvent(new InternalAdminSessionsInvalidatedEvent(
+                targetAdminId,
+                status == AccountStatus.DISABLED ? "ACCESS_DISABLED" : "ACCESS_REACTIVATED",
+                changedAt
+        ));
+
+        auditLogService.logAdminAction(
+                actorId,
+                actor.getRole().getCode().name(),
+                status == AccountStatus.DISABLED
+                        ? "DISABLE_INTERNAL_ADMIN_ACCOUNT"
+                        : "REACTIVATE_INTERNAL_ADMIN_ACCOUNT",
+                "INTERNAL_ADMIN_ACCOUNT",
+                targetAdminId,
+                Map.of("status", previousStatus.name()),
+                Map.of("status", status.name()),
+                Map.of(
+                        "reason", reason.trim(),
+                        "targetEmail", target.getEmail(),
+                        "sessionsInvalidated", true
+                )
+        );
+        return toAdminResponse(saved, invitationSummary(saved.getId()));
+    }
+
+    private BusinessException invalidAdminStatus(String message) {
+        return new BusinessException(
+                MessageCodes.INTERNAL_ADMIN_STATUS_INVALID,
+                message,
+                HttpStatus.CONFLICT
+        );
     }
 
     private String roleLabel(RoleCode roleCode) {

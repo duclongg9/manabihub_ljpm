@@ -21,6 +21,8 @@ public interface InternalAdminInvitationService {
 
     InternalAdminAccount resend(UUID actorId, UUID accountId, String reason);
 
+    void revokeOpenInvitations(UUID accountId, Instant revokedAt);
+
     void accept(String rawToken, String password, String ipAddress, String userAgent);
 
     Map<UUID, InvitationSummary> latestInvitationSummaries(Collection<UUID> accountIds);

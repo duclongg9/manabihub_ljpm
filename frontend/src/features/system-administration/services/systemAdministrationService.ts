@@ -6,6 +6,7 @@ import type {
   InviteInternalAdminPayload,
   ResendInternalAdminInvitationPayload,
   UpdateInternalAdminRolePayload,
+  UpdateInternalAdminStatusPayload,
   UpdateSystemSettingPayload,
   SystemSetting,
 } from '../types/systemAdministrationTypes';
@@ -39,6 +40,17 @@ export const systemAdministrationService = {
   ) {
     const response = await axiosClient.patch<ApiResponse<InternalAdminAccount>>(
       ENDPOINTS.SYSTEM_ADMIN.INTERNAL_ACCOUNT_ROLE(adminId),
+      payload,
+    );
+    return response.data.data;
+  },
+
+  async updateInternalAdminStatus(
+    adminId: string,
+    payload: UpdateInternalAdminStatusPayload,
+  ) {
+    const response = await axiosClient.patch<ApiResponse<InternalAdminAccount>>(
+      ENDPOINTS.SYSTEM_ADMIN.INTERNAL_ACCOUNT_STATUS(adminId),
       payload,
     );
     return response.data.data;

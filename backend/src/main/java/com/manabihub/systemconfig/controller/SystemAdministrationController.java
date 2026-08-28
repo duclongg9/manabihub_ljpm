@@ -3,6 +3,7 @@ package com.manabihub.systemconfig.controller;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.systemconfig.dto.request.UpdateInternalAdminRoleRequest;
+import com.manabihub.systemconfig.dto.request.UpdateInternalAdminStatusRequest;
 import com.manabihub.systemconfig.dto.request.UpdateSystemSettingRequest;
 import com.manabihub.systemconfig.dto.request.InviteInternalAdminRequest;
 import com.manabihub.systemconfig.dto.request.ResendInternalAdminInvitationRequest;
@@ -114,6 +115,24 @@ public class SystemAdministrationController {
                         actorId(jwt),
                         adminId,
                         request.roleCode(),
+                        request.reason()
+                )
+        );
+    }
+
+    @PatchMapping("/internal-accounts/{adminId}/status")
+    public ApiResponse<InternalAdminAccountResponse> updateInternalAdminStatus(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID adminId,
+            @Valid @RequestBody UpdateInternalAdminStatusRequest request
+    ) {
+        return ApiResponse.success(
+                MessageCodes.INTERNAL_ADMIN_STATUS_UPDATED,
+                "Internal administrator access status updated",
+                administrationService.updateInternalAdminStatus(
+                        actorId(jwt),
+                        adminId,
+                        request.status(),
                         request.reason()
                 )
         );

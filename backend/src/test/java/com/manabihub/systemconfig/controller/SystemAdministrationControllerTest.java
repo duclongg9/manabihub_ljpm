@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -160,6 +161,45 @@ class SystemAdministrationControllerTest {
                         .with(adminJwt(UUID.randomUUID(), "COURSE_MANAGER"))
                         .contentType("application/json")
                         .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void onlySystemAdminCanDisableAnInternalAccountWithAReason() throws Exception {
+        UUID actorId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+
+        mockMvc.perform(patch("/api/v1/admin/internal-accounts/{adminId}/status", targetId)
+                        .with(adminJwt(actorId, "SYSTEM_ADMIN"))
+                        .contentType("application/json")
+                        .content("""
+                                {"status":"DISABLED","reason":"Staff access revoked"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messageCode")
+                        .value("INTERNAL_ADMIN_STATUS_UPDATED"));
+        verify(administrationService).updateInternalAdminStatus(
+                actorId,
+                targetId,
+                com.manabihub.identity.enums.AccountStatus.DISABLED,
+                "Staff access revoked"
+        );
+
+        mockMvc.perform(patch("/api/v1/admin/internal-accounts/{adminId}/status", targetId)
+                        .with(adminJwt(actorId, "SYSTEM_ADMIN"))
+                        .contentType("application/json")
+                        .content("""
+                                {"status":"DISABLED","reason":"no"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messageCode").value("VALIDATION_FAILED"));
+
+        mockMvc.perform(patch("/api/v1/admin/internal-accounts/{adminId}/status", targetId)
+                        .with(adminJwt(UUID.randomUUID(), "COURSE_MANAGER"))
+                        .contentType("application/json")
+                        .content("""
+                                {"status":"DISABLED","reason":"Not authorized"}
+                                """))
                 .andExpect(status().isForbidden());
     }
 
