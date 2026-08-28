@@ -30,4 +30,16 @@ public class PhoneNumberNormalizer {
 
         return trimmed;
     }
+
+    /** Converts the canonical Vietnamese local form to Firebase's E.164 form. */
+    public static String toE164(String phoneNumber) {
+        String normalized = normalize(phoneNumber);
+        if (normalized == null) {
+            return null;
+        }
+        if (normalized.matches("0\\d{9}")) {
+            return VN_COUNTRY_CODE + normalized.substring(1);
+        }
+        return normalized;
+    }
 }

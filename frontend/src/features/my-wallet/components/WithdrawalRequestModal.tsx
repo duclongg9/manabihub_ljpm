@@ -11,9 +11,11 @@ import {
 } from '@mui/material';
 import toast from 'react-hot-toast';
 import { useCreateWithdrawal } from '../hooks/useCreateWithdrawal';
-import type { WithdrawalFormValues } from '../schemas/withdrawalSchema';
 import type { TeacherWallet } from '../types/wallet.types';
-import { WithdrawalRequestForm } from './WithdrawalRequestForm';
+import {
+  WithdrawalRequestForm,
+  type WithdrawalSubmission,
+} from './WithdrawalRequestForm';
 
 interface WithdrawalRequestModalProps {
   isOpen: boolean;
@@ -28,10 +30,9 @@ export function WithdrawalRequestModal({
 }: WithdrawalRequestModalProps) {
   const createWithdrawal = useCreateWithdrawal();
 
-  const handleSubmit = (
-    values: WithdrawalFormValues & { otpCode: string; saveAccount: boolean },
-  ) => {
-    createWithdrawal.mutate({
+  const handleSubmit = async (values: WithdrawalSubmission) => {
+    try {
+      await createWithdrawal.mutateAsync({
       amount: values.amount,
       bankAccountId: values.useNewAccount ? undefined : values.bankAccountId,
       bankAccount: values.useNewAccount
@@ -44,15 +45,15 @@ export function WithdrawalRequestModal({
           }
         : undefined,
       otpCode: values.otpCode,
+      phoneAuthChallengeId: values.phoneAuthChallengeId,
+      firebaseIdToken: values.firebaseIdToken,
       saveAccount: values.useNewAccount && values.saveAccount,
       bankQrDataUrl: values.bankQrDataUrl || '',
-    }, {
-      onSuccess: () => {
-        toast.success('Đã gửi yêu cầu rút tiền');
-        onClose();
-      },
-      onError: (error) => {
-        const messages: Record<string, string> = {
+      });
+      toast.success('Đã gửi yêu cầu rút tiền');
+      onClose();
+    } catch (error) {
+      const messages: Record<string, string> = {
           WALLET_INSUFFICIENT_BALANCE: 'Số dư khả dụng không đủ để thực hiện yêu cầu.',
           WALLET_FROZEN: 'Ví doanh thu đang bị tạm khóa.',
           PAYOUT_AMOUNT_BELOW_MINIMUM: 'Số tiền rút chưa đạt mức tối thiểu.',
@@ -61,13 +62,14 @@ export function WithdrawalRequestModal({
           PAYOUT_PHONE_VERIFICATION_REQUIRED: 'Bạn cần xác thực số điện thoại trước khi rút hoa hồng.',
           PAYOUT_BANK_QR_REQUIRED: 'Vui lòng chọn ảnh QR ngân hàng để Finance đối soát.',
           PAYOUT_BANK_QR_INVALID: 'Ảnh QR không hợp lệ. Hãy chọn PNG, JPEG hoặc WEBP dưới 2 MB.',
+          PAYOUT_PHONE_AUTH_NOT_CONFIGURED: 'Xác thực SMS cho rút tiền chưa được cấu hình.',
         };
-        const code = (error as {
-          response?: { data?: { messageCode?: string } };
-        }).response?.data?.messageCode ?? '';
-        toast.error(messages[code] ?? 'Không thể tạo yêu cầu rút tiền. Vui lòng thử lại.');
-      },
-    });
+      const response = (error as {
+        response?: { data?: { messageCode?: string; message?: string } };
+      }).response?.data;
+      const code = response?.messageCode ?? '';
+      throw new Error(messages[code] ?? response?.message ?? 'Không thể tạo yêu cầu rút tiền. Vui lòng thử lại.');
+    }
   };
 
   return (

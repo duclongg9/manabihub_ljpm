@@ -190,7 +190,7 @@ class WithdrawalServiceImplTest {
         assertNotNull(result);
         assertEquals(WithdrawalStatus.PENDING, result.getStatus());
         verify(walletRepository).findByOwnerTypeAndTeacher_IdForUpdate(com.manabihub.wallet.enums.WalletOwnerType.TEACHER, teacherProfileId);
-        verify(otpService).consumeOtp(userIdString, "123456");
+        verify(otpService).consumeVerification(userIdString, request);
         verify(walletService).reserveBalance(
                 teacherProfileId.toString(),
                 request.getAmount(),
@@ -262,7 +262,7 @@ class WithdrawalServiceImplTest {
 
         withdrawalService.createWithdrawalRequest(userIdString, request);
 
-        verify(otpService).consumeOtp(userIdString, "123456");
+        verify(otpService).consumeVerification(userIdString, request);
         verify(walletService).reserveBalance(
                 teacherProfileId.toString(), minimumPayout, withdrawalId.toString());
     }
@@ -396,7 +396,7 @@ class WithdrawalServiceImplTest {
                 BusinessException.class,
                 () -> withdrawalService.createWithdrawalRequest(userIdString, request));
 
-        assertEquals(MessageCodes.PHONE_VERIFICATION_REQUIRED, exception.getMessageCode());
+        assertEquals(MessageCodes.PAYOUT_PHONE_VERIFICATION_REQUIRED, exception.getMessageCode());
         verify(walletRepository, never()).findByOwnerTypeAndTeacher_IdForUpdate(any(), any());
         verifyNoInteractions(otpService, walletService);
         verify(withdrawalRepository, never()).saveAndFlush(any());
@@ -456,12 +456,13 @@ class WithdrawalServiceImplTest {
         UUID withdrawalId = UUID.randomUUID();
         stubAcceptedRequest(withdrawalId);
 
+        CreateWithdrawalRequest request = newRequest();
         WithdrawalRequestResponse response = withdrawalService.createWithdrawalRequest(
                 userIdString,
-                newRequest());
+                request);
 
         assertNotNull(response);
-        verify(otpService).consumeOtp(userIdString, "123456");
+        verify(otpService).consumeVerification(userIdString, request);
         verify(withdrawalRepository).saveAndFlush(any(WithdrawalRequest.class));
     }
 

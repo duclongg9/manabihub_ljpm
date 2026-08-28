@@ -12,6 +12,12 @@ import type {
   StudentWithdrawal,
   StudentWithdrawalStatus,
 } from '../types';
+import {
+  firebasePhoneErrorMessage,
+  startFirebasePhoneOtp,
+  type FirebasePhoneOtpSession,
+  type PhoneOtpChallengeResponse,
+} from '../../../shared/auth/firebasePhoneAuth';
 
 const BANKS = [
   { code: 'VCB', name: 'Vietcombank' },
@@ -60,6 +66,8 @@ export function StudentWithdrawalPanel({
   const [saveAccount, setSaveAccount] = useState(true);
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const [otpChallenge, setOtpChallenge] = useState<PhoneOtpChallengeResponse | null>(null);
+  const [firebaseOtpSession, setFirebaseOtpSession] = useState<FirebasePhoneOtpSession | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +93,10 @@ export function StudentWithdrawalPanel({
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => () => {
+    void firebaseOtpSession?.cancel();
+  }, [firebaseOtpSession]);
 
   const amountValue = Number(amount);
   const available = wallet?.availableWithdrawableBalance ?? 0;
@@ -120,10 +132,21 @@ export function StudentWithdrawalPanel({
     setProcessing(true);
     setError(null);
     try {
-      await sendStudentWithdrawalOtp();
+      await firebaseOtpSession?.cancel();
+      setFirebaseOtpSession(null);
+      const challenge = await sendStudentWithdrawalOtp();
+      const session = challenge.verificationMethod === 'FIREBASE'
+        ? await startFirebasePhoneOtp({
+          challengeId: challenge.challengeId,
+          phoneNumberE164: requiredPhoneNumber(challenge),
+        })
+        : null;
+      setOtpChallenge(challenge);
+      setFirebaseOtpSession(session);
       setOtpSent(true);
     } catch (requestError) {
-      setError(apiMessage(requestError, 'Không thể gửi OTP. Vui lòng thử lại.'));
+      setOtpSent(false);
+      setError(apiMessage(requestError, firebasePhoneErrorMessage(requestError)));
     } finally {
       setProcessing(false);
     }
@@ -142,6 +165,9 @@ export function StudentWithdrawalPanel({
     setProcessing(true);
     setError(null);
     try {
+      const verification = firebaseOtpSession
+        ? await firebaseOtpSession.confirm(otpCode)
+        : { otpCode };
       await createStudentWithdrawal({
         amount: amountValue,
         bankAccountId: accountId || undefined,
@@ -153,7 +179,7 @@ export function StudentWithdrawalPanel({
               accountNumber: accountNumber.trim(),
               accountHolderName: accountHolderName.trim().toUpperCase(),
             },
-        otpCode,
+        ...verification,
         saveAccount: !accountId && saveAccount,
         ownershipConfirmed: ownershipVerified,
       });
@@ -161,9 +187,11 @@ export function StudentWithdrawalPanel({
       setAmount('');
       setOtpCode('');
       setOtpSent(false);
+      setOtpChallenge(null);
+      setFirebaseOtpSession(null);
       await Promise.all([loadData(), onChanged()]);
     } catch (requestError) {
-      setError(apiMessage(requestError, 'Không thể tạo yêu cầu rút tiền.'));
+      setError(apiMessage(requestError, firebasePhoneErrorMessage(requestError)));
     } finally {
       setProcessing(false);
     }
@@ -196,7 +224,16 @@ export function StudentWithdrawalPanel({
             type="button"
             disabled={available < minimumAmount}
             onClick={() => {
-              setFormOpen((current) => !current);
+              setFormOpen((current) => {
+                if (current) {
+                  void firebaseOtpSession?.cancel();
+                  setFirebaseOtpSession(null);
+                  setOtpChallenge(null);
+                  setOtpCode('');
+                  setOtpSent(false);
+                }
+                return !current;
+              });
               setError(null);
             }}
             className="rounded-xl bg-slate-900 px-5 py-2.5 font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
@@ -316,7 +353,13 @@ export function StudentWithdrawalPanel({
                 Gửi OTP xác nhận
               </button>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <div className="grid gap-3">
+                <p className="text-sm text-slate-600">
+                  {otpChallenge?.verificationMethod === 'FIREBASE'
+                    ? `Firebase đã gửi SMS thật tới ${otpChallenge.maskedDestination ?? 'số điện thoại đã xác thực'}.`
+                    : 'Mã OTP đã được gửi tới email của bạn.'}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                 <input
                   inputMode="numeric"
                   maxLength={6}
@@ -333,6 +376,7 @@ export function StudentWithdrawalPanel({
                 >
                   Xác nhận rút tiền
                 </button>
+                </div>
               </div>
             )}
           </div>
@@ -390,4 +434,11 @@ export function StudentWithdrawalPanel({
 function apiMessage(error: unknown, fallback: string) {
   return (error as { response?: { data?: { message?: string } } })
     ?.response?.data?.message ?? fallback;
+}
+
+function requiredPhoneNumber(challenge: PhoneOtpChallengeResponse): string {
+  if (!challenge.challengeId || !challenge.phoneNumberE164) {
+    throw new Error('Backend không trả về challenge Firebase hợp lệ.');
+  }
+  return challenge.phoneNumberE164;
 }

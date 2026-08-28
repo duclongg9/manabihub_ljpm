@@ -28,6 +28,12 @@ import {
   sendStudentWithdrawalOtp,
 } from '../services/studentWalletService';
 import type { StudentBankAccount, StudentWalletResponse } from '../types';
+import {
+  firebasePhoneErrorMessage,
+  startFirebasePhoneOtp,
+  type FirebasePhoneOtpSession,
+  type PhoneOtpChallengeResponse,
+} from '../../../shared/auth/firebasePhoneAuth';
 
 const BANKS = [
   { code: 'VCB', name: 'Vietcombank (Ngân hàng TMCP Ngoại thương Việt Nam)' },
@@ -74,6 +80,8 @@ export function StudentWithdrawalModal({
   const [saveAccount, setSaveAccount] = useState<boolean>(true);
   const [otpCode, setOtpCode] = useState<string>('');
   const [otpSent, setOtpSent] = useState<boolean>(false);
+  const [otpChallenge, setOtpChallenge] = useState<PhoneOtpChallengeResponse | null>(null);
+  const [firebaseOtpSession, setFirebaseOtpSession] = useState<FirebasePhoneOtpSession | null>(null);
   const [processing, setProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,13 +110,24 @@ export function StudentWithdrawalModal({
     }
   }, [open, loadSavedAccounts]);
 
-  const handleClose = () => {
-    if (processing) return;
+  useEffect(() => () => {
+    void firebaseOtpSession?.cancel();
+  }, [firebaseOtpSession]);
+
+  const resetAndClose = () => {
+    void firebaseOtpSession?.cancel();
+    setFirebaseOtpSession(null);
+    setOtpChallenge(null);
     setAmount('');
     setOtpCode('');
     setOtpSent(false);
     setError(null);
     onClose();
+  };
+
+  const handleClose = () => {
+    if (processing) return;
+    resetAndClose();
   };
 
   const amountValue = Number(amount);
@@ -138,10 +157,21 @@ export function StudentWithdrawalModal({
     setProcessing(true);
     setError(null);
     try {
-      await sendStudentWithdrawalOtp();
+      await firebaseOtpSession?.cancel();
+      setFirebaseOtpSession(null);
+      const challenge = await sendStudentWithdrawalOtp();
+      const session = challenge.verificationMethod === 'FIREBASE'
+        ? await startFirebasePhoneOtp({
+          challengeId: challenge.challengeId,
+          phoneNumberE164: requiredPhoneNumber(challenge),
+        })
+        : null;
+      setOtpChallenge(challenge);
+      setFirebaseOtpSession(session);
       setOtpSent(true);
     } catch (requestError) {
-      setError(getErrorMessage(requestError, 'Không thể gửi mã OTP. Vui lòng thử lại.'));
+      setOtpSent(false);
+      setError(getErrorMessage(requestError, firebasePhoneErrorMessage(requestError)));
     } finally {
       setProcessing(false);
     }
@@ -160,6 +190,9 @@ export function StudentWithdrawalModal({
     setProcessing(true);
     setError(null);
     try {
+      const verification = firebaseOtpSession
+        ? await firebaseOtpSession.confirm(otpCode)
+        : { otpCode };
       await createStudentWithdrawal({
         amount: amountValue,
         bankAccountId: accountId || undefined,
@@ -171,15 +204,15 @@ export function StudentWithdrawalModal({
               accountNumber: accountNumber.trim(),
               accountHolderName: accountHolderName.trim().toUpperCase(),
             },
-        otpCode,
+        ...verification,
         saveAccount: !accountId && saveAccount,
         ownershipConfirmed: ownershipVerified,
       });
 
       await onSuccess();
-      handleClose();
+      resetAndClose();
     } catch (requestError) {
-      setError(getErrorMessage(requestError, 'Không thể gửi yêu cầu rút tiền. Vui lòng thử lại.'));
+      setError(getErrorMessage(requestError, firebasePhoneErrorMessage(requestError)));
     } finally {
       setProcessing(false);
     }
@@ -380,7 +413,9 @@ export function StudentWithdrawalModal({
           {otpSent && (
             <Stack spacing={1} sx={{ p: 2, borderRadius: 2, bgcolor: '#FEF2F2', border: '1px solid #FCA5A5' }}>
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#991B1B' }}>
-                Mã OTP xác nhận đã được gửi
+                {otpChallenge?.verificationMethod === 'FIREBASE'
+                  ? `Firebase đã gửi SMS thật tới ${otpChallenge.maskedDestination ?? 'số điện thoại đã xác thực'}`
+                  : 'Mã OTP xác nhận đã được gửi tới email'}
               </Typography>
               <TextField
                 label="Mã OTP (6 chữ số)"
@@ -445,4 +480,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return (
     (error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
   );
+}
+
+function requiredPhoneNumber(challenge: PhoneOtpChallengeResponse): string {
+  if (!challenge.challengeId || !challenge.phoneNumberE164) {
+    throw new Error('Backend không trả về challenge Firebase hợp lệ.');
+  }
+  return challenge.phoneNumberE164;
 }

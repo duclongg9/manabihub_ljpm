@@ -47,11 +47,11 @@ AI_CHAT_PROVIDER_API_KEY=<provider API key>
 AI_CHAT_PROVIDER_MODEL=<provider-supported model>
 FRONTEND_BASE_URL=https://develop.d1sbjmyazduh3v.amplifyapp.com
 CORS_ALLOWED_ORIGINS=https://develop.d1sbjmyazduh3v.amplifyapp.com
-PHONE_VERIFICATION_SMS_MODE=esms
-PHONE_VERIFICATION_ESMS_API_KEY=<eSMS API key>
-PHONE_VERIFICATION_ESMS_SECRET_KEY=<eSMS secret key>
-PHONE_VERIFICATION_ESMS_BRANDNAME=ManabiHub
-PHONE_VERIFICATION_ESMS_SANDBOX=0
+PHONE_VERIFICATION_SMS_MODE=firebase
+WITHDRAWAL_OTP_MODE=firebase
+FIREBASE_PHONE_AUTH_ENABLED=true
+FIREBASE_PROJECT_ID=<Firebase project id>
+FIREBASE_SERVICE_ACCOUNT_JSON_BASE64=<AWS Secrets Manager source; never plain text>
 ```
 
 For the `prod` profile, `VNPAY_RETURN_URL` is mandatory and the backend fails
@@ -70,7 +70,81 @@ available at `deploy/.env.production.example`.
 
 Never commit real passwords, JWT secrets, or OAuth secrets to Git.
 
-### eSMS phone verification
+### Firebase real-SMS verification
+
+This release uses Firebase only as a fresh proof that the signed-in ManabiHub
+user controls the configured phone number. ManabiHub JWT remains the application
+login. The backend creates a one-time challenge, verifies the Firebase ID token,
+checks the exact phone number and recent `auth_time`, and deletes the challenge
+after one successful profile verification or withdrawal request. It never stores
+the SMS code or Firebase ID token.
+
+Configure one Firebase project as follows:
+
+1. Check the quota shown under **Authentication > Sign-in method**. The
+   `manabihub-883a0` Spark project currently receives 10 real verification SMS
+   per day, which is sufficient for a controlled demo. Upgrade to **Blaze** only
+   when a larger quota is required; before upgrading, set a Google Cloud budget
+   and quota alerts.
+2. Under **Authentication > Sign-in method**, enable **Phone**.
+3. Under **Authentication > Settings > SMS region policy**, allow Vietnam. New
+   projects may initially allow no SMS regions.
+4. Add `develop.d1sbjmyazduh3v.amplifyapp.com` under **Authorized domains**.
+5. Register a Web app and copy only its public Web configuration to these
+   Amplify branch variables:
+
+```text
+VITE_FIREBASE_PHONE_AUTH_ENABLED=true
+VITE_FIREBASE_API_KEY=<Firebase Web API key>
+VITE_FIREBASE_AUTH_DOMAIN=<project-id>.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=<project-id>
+VITE_FIREBASE_APP_ID=<Firebase Web app id>
+VITE_FIREBASE_MESSAGING_SENDER_ID=<numeric sender id>
+```
+
+Do not configure fictional/test phone numbers for the deployed demo, and never
+set `appVerificationDisabledForTesting`. The browser uses Firebase's invisible
+reCAPTCHA and `signInWithPhoneNumber`, so a successful request sends a billable
+SMS to the real handset. Firebase sends/stores the supplied phone number for
+anti-abuse processing; the UI discloses this before the first verification.
+
+For backend token verification, generate a Firebase Admin service-account JSON
+and Base64-encode the entire file. If the encoded value is at most 4,096 bytes,
+store it as an encrypted AWS Systems Manager Parameter Store `SecureString`
+(Standard tier). On the current Corretto 25 AL2023 platform, configure
+`FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` with **Source = Parameter Store**, not
+Plain text. Grant the Elastic Beanstalk EC2 instance profile `ssm:GetParameter`
+only for that parameter ARN. If the encoded value exceeds the Parameter Store
+Standard limit, use one AWS Secrets Manager secret and the equally scoped
+`secretsmanager:GetSecretValue` permission instead. Both approaches keep the
+private key out of the combined 4,096-byte plain-property limit.
+
+The remaining backend values are ordinary non-secret environment properties:
+
+```text
+PHONE_VERIFICATION_SMS_MODE=firebase
+WITHDRAWAL_OTP_MODE=firebase
+FIREBASE_PHONE_AUTH_ENABLED=true
+FIREBASE_PROJECT_ID=<same project id as the Web app and service account>
+```
+
+When the AWS parameter or secret is rotated, refresh/apply the Elastic Beanstalk
+environment configuration so instances receive the new value. Never place the service-account
+JSON, Base64 value, private key, Firebase ID token, or SMS code in Git, Amplify,
+screenshots, Jira, logs, or a `VITE_*` variable.
+
+Redeploy Amplify after adding the Firebase Web variables. Then deploy the backend
+bundle so Flyway applies `V081`. Smoke-test in this order: verify one previously
+unverified profile with a real Vietnamese number; reload and confirm it is locked;
+request one withdrawal; receive a new SMS; submit it once; retry the same proof and
+confirm the backend rejects it.
+
+Official setup references: [Firebase phone authentication](https://firebase.google.com/docs/auth/web/phone-auth),
+[Firebase Authentication limits](https://firebase.google.com/docs/auth/limits),
+[Firebase Admin setup](https://firebase.google.com/docs/admin/setup), and
+[Elastic Beanstalk environment secrets](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/AWSHowTo.secrets.env-vars.html).
+
+### Legacy eSMS fallback
 
 The eSMS API key and SecretKey are backend credentials. Store them only as
 Elastic Beanstalk environment properties; never expose them through Amplify or

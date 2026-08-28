@@ -1,7 +1,10 @@
 package com.manabihub.payout.entity;
 
+import com.manabihub.common.enums.PhoneOtpMethod;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -26,10 +29,20 @@ public class WithdrawalOtpChallenge {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "code_hash", nullable = false, length = 128)
+    @Column(name = "challenge_id", nullable = false, unique = true)
+    private UUID challengeId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_method", nullable = false, length = 20)
+    private PhoneOtpMethod verificationMethod;
+
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
+
+    @Column(name = "code_hash", length = 128)
     private String codeHash;
 
-    @Column(nullable = false, length = 64)
+    @Column(length = 64)
     private String nonce;
 
     @Column(name = "expires_at", nullable = false)

@@ -132,10 +132,17 @@ export async function requestStudentPhoneVerification(phoneNumber: string) {
     return response.data.data;
 }
 
-export async function confirmStudentPhoneVerification(phoneNumber: string, code: string) {
+export type PhoneVerificationProof =
+    | { code: string }
+    | { challengeId: string; firebaseIdToken: string };
+
+export async function confirmStudentPhoneVerification(
+    phoneNumber: string,
+    proof: PhoneVerificationProof,
+) {
     const response = await axiosClient.post<ApiEnvelope<PhoneVerificationResponse>>(
         ENDPOINTS.profile.studentPhoneVerificationConfirm,
-        { phoneNumber, code }
+        { phoneNumber, ...proof }
     );
     return response.data.data;
 }
@@ -148,10 +155,13 @@ export async function requestTeacherPhoneVerification(phoneNumber: string) {
     return response.data.data;
 }
 
-export async function confirmTeacherPhoneVerification(phoneNumber: string, code: string) {
+export async function confirmTeacherPhoneVerification(
+    phoneNumber: string,
+    proof: PhoneVerificationProof,
+) {
     const response = await axiosClient.post<ApiEnvelope<PhoneVerificationResponse>>(
         ENDPOINTS.profile.teacherPhoneVerificationConfirm,
-        { phoneNumber, code }
+        { phoneNumber, ...proof }
     );
     return response.data.data;
 }

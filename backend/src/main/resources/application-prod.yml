@@ -60,6 +60,10 @@ management:
       enabled: false
 
 manabihub:
+  firebase-phone-auth:
+    enabled: ${FIREBASE_PHONE_AUTH_ENABLED:false}
+    project-id: ${FIREBASE_PROJECT_ID:}
+    service-account-json-base64: ${FIREBASE_SERVICE_ACCOUNT_JSON_BASE64:}
   kyc:
 # Safe default: synthetic registry. Sandbox may explicitly select direct-sdk;
 # it trusts browser evidence and unlocks sandbox withdrawals. Real production
@@ -77,6 +81,8 @@ manabihub:
       secret-key: ${PHONE_VERIFICATION_ESMS_SECRET_KEY:}
       brandname: ${PHONE_VERIFICATION_ESMS_BRANDNAME:}
       sandbox: ${PHONE_VERIFICATION_ESMS_SANDBOX:true}
+  payout:
+    withdrawal-otp-mode: ${WITHDRAWAL_OTP_MODE:email}
   payment:
     vnpay:
       # Required in production. Startup also verifies HTTPS, the frontend

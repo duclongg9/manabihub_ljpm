@@ -311,6 +311,7 @@ public final class MessageCodes {
     public static final String PAYOUT_EMAIL_REQUIRED = "PAYOUT_EMAIL_REQUIRED";
     public static final String PAYOUT_INVALID_OTP = "PAYOUT_INVALID_OTP";
     public static final String PAYOUT_OTP_RATE_LIMITED = "PAYOUT_OTP_RATE_LIMITED";
+    public static final String PAYOUT_PHONE_AUTH_NOT_CONFIGURED = "PAYOUT_PHONE_AUTH_NOT_CONFIGURED";
     public static final String PHONE_VERIFICATION_OTP_SENT = "PHONE_VERIFICATION_OTP_SENT";
     public static final String PHONE_VERIFICATION_INVALID_OTP = "PHONE_VERIFICATION_INVALID_OTP";
     public static final String PHONE_VERIFICATION_RATE_LIMITED = "PHONE_VERIFICATION_RATE_LIMITED";

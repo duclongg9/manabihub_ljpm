@@ -11,6 +11,7 @@ import type {
   WalletTransactionFilter,
 } from '../types';
 import { toTransactionParams } from './walletTransactionParams';
+import type { PhoneOtpChallengeResponse } from '../../../shared/auth/firebasePhoneAuth';
 
 /** Fetches the current student's money-wallet overview (balance). */
 export async function getStudentWallet(): Promise<StudentWalletResponse> {
@@ -54,8 +55,11 @@ export async function getStudentBankAccounts(): Promise<StudentBankAccount[]> {
   return response.data.data;
 }
 
-export async function sendStudentWithdrawalOtp(): Promise<void> {
-  await axiosClient.post(ENDPOINTS.student.sendWithdrawalOtp);
+export async function sendStudentWithdrawalOtp(): Promise<PhoneOtpChallengeResponse> {
+  const response = await axiosClient.post<ApiResponse<PhoneOtpChallengeResponse>>(
+    ENDPOINTS.student.sendWithdrawalOtp,
+  );
+  return response.data.data;
 }
 
 export async function createStudentWithdrawal(

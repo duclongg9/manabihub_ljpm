@@ -12,6 +12,11 @@ import {PHONE_PATTERN, sanitizeOtpInput, sanitizePhoneInput} from "./phoneValida
 import {useNavigate} from "react-router-dom";
 import {ROUTES} from "../../shared/constants/routes";
 import {getStudentIdentityVerificationStatus, type StudentIdentityVerificationStatus} from "../wallet/services/studentIdentityVerificationService";
+import {
+    firebasePhoneErrorMessage,
+    startFirebasePhoneOtp,
+    type FirebasePhoneOtpSession,
+} from "../../shared/auth/firebasePhoneAuth";
 
 const JLPT_LEVELS = [
     { level: "N5", label: "N5 • 初級" },
@@ -28,6 +33,7 @@ export default function StudentProfilePage() {
     const [phoneVerified, setPhoneVerified] = useState(false);
     const [phoneCode, setPhoneCode] = useState("");
     const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+    const [firebasePhoneSession, setFirebasePhoneSession] = useState<FirebasePhoneOtpSession | null>(null);
     const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
     const [confirmingPhoneOtp, setConfirmingPhoneOtp] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
@@ -41,6 +47,10 @@ export default function StudentProfilePage() {
     useEffect(() => {
         loadProfile();
     }, []);
+
+    useEffect(() => () => {
+        void firebasePhoneSession?.cancel();
+    }, [firebasePhoneSession]);
 
     async function loadProfile() {
         setIdentityStatusLoading(true);
@@ -64,6 +74,7 @@ export default function StudentProfilePage() {
             setPhoneVerified(profile.phoneVerified === true);
             setPhoneCode("");
             setPhoneOtpSent(false);
+            setFirebasePhoneSession(null);
         } catch (error) {
             console.error(error);
             setSnackbar({ open: true, message: "Không thể tải hồ sơ.", severity: "error" });
@@ -130,12 +141,35 @@ export default function StudentProfilePage() {
         if (phoneVerified || !validatePhone()) return;
         try {
             setSendingPhoneOtp(true);
-            await requestStudentPhoneVerification(form.phoneNumber);
+            await firebasePhoneSession?.cancel();
+            setFirebasePhoneSession(null);
+            const challenge = await requestStudentPhoneVerification(form.phoneNumber);
+            if (challenge.verificationMethod === "FIREBASE") {
+                if (!challenge.challengeId || !challenge.phoneNumberE164) {
+                    throw new Error("Backend không trả về challenge Firebase hợp lệ.");
+                }
+                const session = await startFirebasePhoneOtp({
+                    challengeId: challenge.challengeId,
+                    phoneNumberE164: challenge.phoneNumberE164,
+                });
+                setFirebasePhoneSession(session);
+            }
             setPhoneOtpSent(true);
-            setSnackbar({ open: true, message: "Đã gửi mã xác thực SMS.", severity: "success" });
+            setSnackbar({
+                open: true,
+                message: challenge.verificationMethod === "FIREBASE"
+                    ? "Firebase đã gửi SMS thật tới số điện thoại của bạn."
+                    : "Đã gửi mã xác thực SMS.",
+                severity: "success",
+            });
         } catch (error: any) {
             const response = error.response?.data;
-            setSnackbar({ open: true, message: response?.message ?? "Không thể gửi mã SMS.", severity: "error" });
+            setPhoneOtpSent(false);
+            setSnackbar({
+                open: true,
+                message: response?.message ?? firebasePhoneErrorMessage(error),
+                severity: "error",
+            });
         } finally {
             setSendingPhoneOtp(false);
         }
@@ -148,12 +182,23 @@ export default function StudentProfilePage() {
         }
         try {
             setConfirmingPhoneOtp(true);
-            await confirmStudentPhoneVerification(form.phoneNumber, phoneCode);
+            const proof = firebasePhoneSession
+                ? await firebasePhoneSession.confirm(phoneCode).then((firebaseProof) => ({
+                    challengeId: firebaseProof.phoneAuthChallengeId,
+                    firebaseIdToken: firebaseProof.firebaseIdToken,
+                }))
+                : { code: phoneCode };
+            await confirmStudentPhoneVerification(form.phoneNumber, proof);
+            setFirebasePhoneSession(null);
             await loadProfile();
             setSnackbar({ open: true, message: "Số điện thoại đã được xác thực và được khóa thay đổi.", severity: "success" });
         } catch (error: any) {
             const response = error.response?.data;
-            setSnackbar({ open: true, message: response?.message ?? "Mã xác thực không hợp lệ.", severity: "error" });
+            setSnackbar({
+                open: true,
+                message: response?.message ?? firebasePhoneErrorMessage(error),
+                severity: "error",
+            });
         } finally {
             setConfirmingPhoneOtp(false);
         }
@@ -166,7 +211,13 @@ export default function StudentProfilePage() {
                 : event.target.value;
             setForm({ ...form, [field]: value });
             if (field === "fullName") setErrors((prev) => ({ ...prev, fullName: "" }));
-            if (field === "phoneNumber") setErrors((prev) => ({ ...prev, phoneNumber: "" }));
+            if (field === "phoneNumber") {
+                setErrors((prev) => ({ ...prev, phoneNumber: "" }));
+                void firebasePhoneSession?.cancel();
+                setFirebasePhoneSession(null);
+                setPhoneCode("");
+                setPhoneOtpSent(false);
+            }
         };
     }
 
@@ -346,6 +397,11 @@ export default function StudentProfilePage() {
                                         </Button>
                                     )}
                                 </Stack>
+                                {!phoneVerified && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                                        Khi gửi mã, số điện thoại được chuyển tới Google Firebase để chống lạm dụng và gửi SMS; cước SMS tiêu chuẩn có thể áp dụng.
+                                    </Typography>
+                                )}
                                 {!phoneVerified && phoneOtpSent && (
                                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1 }}>
                                         <TextField

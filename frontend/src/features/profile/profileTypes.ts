@@ -56,6 +56,10 @@ export interface PhoneVerificationResponse {
     phoneNumber: string;
     verified: boolean;
     verifiedAt: string | null;
+    verificationMethod: 'SMS' | 'FIREBASE' | null;
+    challengeId: string | null;
+    phoneNumberE164: string | null;
+    expiresAt: string | null;
 }
 
 export interface UpdateTeacherProfileRequest

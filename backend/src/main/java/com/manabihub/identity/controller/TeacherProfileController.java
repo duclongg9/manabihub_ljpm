@@ -73,7 +73,11 @@ public class TeacherProfileController {
             @Valid @RequestBody ConfirmPhoneVerificationRequest request
     ) {
         PhoneVerificationResponse response = phoneVerificationService.confirmCode(
-                currentUserService.getCurrentUserId(), request.phoneNumber(), request.code());
+                currentUserService.getCurrentUserId(),
+                request.phoneNumber(),
+                request.code(),
+                request.challengeId(),
+                request.firebaseIdToken());
         return ResponseEntity.ok(ApiResponse.success(
                 MessageCodes.COMMON_SUCCESS,
                 "Phone number verified.",

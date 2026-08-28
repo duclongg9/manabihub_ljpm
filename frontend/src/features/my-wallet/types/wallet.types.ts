@@ -96,7 +96,9 @@ export type CreateWithdrawalPayload = {
   amount: number;
   bankAccountId?: string;
   bankAccount?: BankAccountPayload;
-  otpCode: string;
+  otpCode?: string;
+  phoneAuthChallengeId?: string;
+  firebaseIdToken?: string;
   saveAccount: boolean;
   bankQrDataUrl: string;
 };
