@@ -129,6 +129,12 @@ public class InternalAdminInvitationServiceImpl implements InternalAdminInvitati
                 || account.getEmail().endsWith("@manabihub.local")) {
             throw invitationConflict();
         }
+        InvitationSummary currentInvitation = latestInvitationSummaries(List.of(accountId))
+                .getOrDefault(accountId, InvitationSummary.none());
+        if (currentInvitation.status() == InternalAdminInvitationStatus.ACCEPTED
+                || currentInvitation.status() == InternalAdminInvitationStatus.NONE) {
+            throw invitationConflict();
+        }
 
         issueInvitation(actor, account);
         auditLogService.logAdminAction(
@@ -145,6 +151,12 @@ public class InternalAdminInvitationServiceImpl implements InternalAdminInvitati
                 )
         );
         return account;
+    }
+
+    @Override
+    @Transactional
+    public void revokeOpenInvitations(UUID accountId, Instant revokedAt) {
+        invitationRepository.revokeOpenInvitations(accountId, revokedAt);
     }
 
     @Override

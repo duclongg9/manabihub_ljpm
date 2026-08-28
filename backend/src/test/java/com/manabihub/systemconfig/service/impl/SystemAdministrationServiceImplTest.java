@@ -7,6 +7,7 @@ import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.entity.InternalAdminAccount;
 import com.manabihub.identity.entity.Role;
 import com.manabihub.identity.enums.AccountStatus;
+import com.manabihub.identity.enums.InternalAdminInvitationStatus;
 import com.manabihub.identity.enums.RoleCode;
 import com.manabihub.identity.event.InternalAdminSessionsInvalidatedEvent;
 import com.manabihub.identity.repository.InternalAdminAccountRepository;
@@ -529,6 +530,152 @@ class SystemAdministrationServiceImplTest {
             );
 
             assertEquals(MessageCodes.SYSTEM_ADMIN_REQUIRED, error.getMessageCode());
+            verify(adminRepository, never()).findByIdForRoleUpdate(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("updateInternalAdminStatus")
+    class UpdateInternalAdminStatus {
+
+        @Test
+        void disablingAnActiveAccountInvalidatesAccessAndCreatesAudit() {
+            UUID targetId = UUID.randomUUID();
+            InternalAdminAccount target = account(
+                    targetId, "course@example.com", RoleCode.COURSE_MANAGER);
+            target.setCredentialVersion(4);
+            when(adminRepository.findByIdForRoleUpdate(targetId)).thenReturn(Optional.of(target));
+            when(adminRepository.save(target)).thenReturn(target);
+
+            var response = service.updateInternalAdminStatus(
+                    actorId, targetId, AccountStatus.DISABLED, "Staff member left the team");
+
+            assertEquals(AccountStatus.DISABLED, response.status());
+            assertEquals(5, target.getCredentialVersion());
+            verify(invitationService).revokeOpenInvitations(eq(targetId), any());
+            ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            InternalAdminSessionsInvalidatedEvent event =
+                    (InternalAdminSessionsInvalidatedEvent) eventCaptor.getValue();
+            assertEquals(targetId, event.adminAccountId());
+            assertEquals("ACCESS_DISABLED", event.reason());
+            verify(auditLogService).logAdminAction(
+                    eq(actorId),
+                    eq("SYSTEM_ADMIN"),
+                    eq("DISABLE_INTERNAL_ADMIN_ACCOUNT"),
+                    eq("INTERNAL_ADMIN_ACCOUNT"),
+                    eq(targetId),
+                    eq(Map.of("status", "ACTIVE")),
+                    eq(Map.of("status", "DISABLED")),
+                    any()
+            );
+        }
+
+        @Test
+        void aPreviouslyActiveAccountCanBeReactivated() {
+            UUID targetId = UUID.randomUUID();
+            InternalAdminAccount target = account(
+                    targetId, "finance@example.com", RoleCode.FINANCE_MANAGER);
+            target.setAccountStatus(AccountStatus.DISABLED);
+            when(adminRepository.findByIdForRoleUpdate(targetId)).thenReturn(Optional.of(target));
+            when(adminRepository.save(target)).thenReturn(target);
+
+            var response = service.updateInternalAdminStatus(
+                    actorId, targetId, AccountStatus.ACTIVE, "Team member returned");
+
+            assertEquals(AccountStatus.ACTIVE, response.status());
+            verify(invitationService, never()).revokeOpenInvitations(any(), any());
+            verify(eventPublisher).publishEvent(any(InternalAdminSessionsInvalidatedEvent.class));
+        }
+
+        @Test
+        void anUnacceptedInvitationCannotBeActivatedByAnAdministrator() {
+            UUID targetId = UUID.randomUUID();
+            InternalAdminAccount target = account(
+                    targetId, "invited@example.com", RoleCode.COURSE_MANAGER);
+            target.setAccountStatus(AccountStatus.DISABLED);
+            when(adminRepository.findByIdForRoleUpdate(targetId)).thenReturn(Optional.of(target));
+            when(invitationService.latestInvitationSummaries(any())).thenReturn(Map.of(
+                    targetId,
+                    new InternalAdminInvitationService.InvitationSummary(
+                            InternalAdminInvitationStatus.PENDING,
+                            java.time.Instant.now().plusSeconds(3600)
+                    )
+            ));
+
+            BusinessException error = assertThrows(
+                    BusinessException.class,
+                    () -> service.updateInternalAdminStatus(
+                            actorId, targetId, AccountStatus.ACTIVE, "Activate manually")
+            );
+
+            assertEquals(MessageCodes.INTERNAL_ADMIN_STATUS_INVALID, error.getMessageCode());
+            verify(adminRepository, never()).save(any());
+        }
+
+        @Test
+        void aBuiltInDemoAccountCannotBeReactivatedOutsideLocalProfile() {
+            UUID targetId = UUID.randomUUID();
+            InternalAdminAccount target = account(
+                    targetId, "course.manager@manabihub.local", RoleCode.COURSE_MANAGER);
+            target.setAccountStatus(AccountStatus.DISABLED);
+            when(adminRepository.findByIdForRoleUpdate(targetId)).thenReturn(Optional.of(target));
+
+            BusinessException error = assertThrows(
+                    BusinessException.class,
+                    () -> service.updateInternalAdminStatus(
+                            actorId, targetId, AccountStatus.ACTIVE, "Enable demo in production")
+            );
+
+            assertEquals(MessageCodes.INTERNAL_ADMIN_STATUS_INVALID, error.getMessageCode());
+            verify(adminRepository, never()).save(any());
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        void anAdministratorCannotDisableTheirOwnAccount() {
+            BusinessException error = assertThrows(
+                    BusinessException.class,
+                    () -> service.updateInternalAdminStatus(
+                            actorId, actorId, AccountStatus.DISABLED, "Disable myself")
+            );
+
+            assertEquals(
+                    MessageCodes.INTERNAL_ADMIN_SELF_DISABLE_FORBIDDEN,
+                    error.getMessageCode()
+            );
+            verify(adminRepository, never()).findByIdForRoleUpdate(any());
+        }
+
+        @Test
+        void theLastActiveSystemAdminCannotBeDisabled() {
+            UUID targetId = UUID.randomUUID();
+            InternalAdminAccount target = account(
+                    targetId, "other-admin@example.com", RoleCode.SYSTEM_ADMIN);
+            when(adminRepository.findByIdForRoleUpdate(targetId)).thenReturn(Optional.of(target));
+            when(adminRepository.findAllByStatusAndRoleCodeForUpdate(
+                    AccountStatus.ACTIVE, RoleCode.SYSTEM_ADMIN))
+                    .thenReturn(List.of(target));
+
+            BusinessException error = assertThrows(
+                    BusinessException.class,
+                    () -> service.updateInternalAdminStatus(
+                            actorId, targetId, AccountStatus.DISABLED, "Remove final admin")
+            );
+
+            assertEquals(MessageCodes.LAST_SYSTEM_ADMIN_REQUIRED, error.getMessageCode());
+            verify(adminRepository, never()).save(any());
+        }
+
+        @Test
+        void lockedIsNotAnAllowedManagedStatus() {
+            BusinessException error = assertThrows(
+                    BusinessException.class,
+                    () -> service.updateInternalAdminStatus(
+                            actorId, UUID.randomUUID(), AccountStatus.LOCKED, "Wrong status")
+            );
+
+            assertEquals(MessageCodes.INTERNAL_ADMIN_STATUS_INVALID, error.getMessageCode());
             verify(adminRepository, never()).findByIdForRoleUpdate(any());
         }
     }

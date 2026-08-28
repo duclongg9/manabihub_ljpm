@@ -205,6 +205,12 @@ public final class MessageCodes {
     public static final String SYSTEM_ADMIN_REQUIRED = "SYSTEM_ADMIN_REQUIRED";
     public static final String INTERNAL_ROLE_UPDATED = "INTERNAL_ROLE_UPDATED";
     public static final String INTERNAL_ROLE_INVALID = "INTERNAL_ROLE_INVALID";
+    public static final String INTERNAL_ADMIN_STATUS_UPDATED =
+            "INTERNAL_ADMIN_STATUS_UPDATED";
+    public static final String INTERNAL_ADMIN_STATUS_INVALID =
+            "INTERNAL_ADMIN_STATUS_INVALID";
+    public static final String INTERNAL_ADMIN_SELF_DISABLE_FORBIDDEN =
+            "INTERNAL_ADMIN_SELF_DISABLE_FORBIDDEN";
     public static final String INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN =
             "INTERNAL_ROLE_SELF_ASSIGNMENT_FORBIDDEN";
     public static final String LAST_SYSTEM_ADMIN_REQUIRED = "LAST_SYSTEM_ADMIN_REQUIRED";

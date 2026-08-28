@@ -1,6 +1,7 @@
 package com.manabihub.systemconfig.service;
 
 import com.manabihub.identity.enums.RoleCode;
+import com.manabihub.identity.enums.AccountStatus;
 import com.manabihub.systemconfig.dto.response.InternalAdminAccountResponse;
 import com.manabihub.systemconfig.dto.response.SystemSettingResponse;
 
@@ -38,6 +39,13 @@ public interface SystemAdministrationService {
             UUID actorId,
             UUID targetAdminId,
             RoleCode roleCode,
+            String reason
+    );
+
+    InternalAdminAccountResponse updateInternalAdminStatus(
+            UUID actorId,
+            UUID targetAdminId,
+            AccountStatus status,
             String reason
     );
 }

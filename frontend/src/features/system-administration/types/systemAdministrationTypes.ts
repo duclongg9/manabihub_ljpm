@@ -41,6 +41,11 @@ export interface UpdateInternalAdminRolePayload {
   reason: string;
 }
 
+export interface UpdateInternalAdminStatusPayload {
+  status: Extract<InternalAdminStatus, 'ACTIVE' | 'DISABLED'>;
+  reason: string;
+}
+
 export interface InviteInternalAdminPayload {
   email: string;
   fullName: string;

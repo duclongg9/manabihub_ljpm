@@ -55,6 +55,8 @@ export const ENDPOINTS = {
       `/v1/admin/internal-accounts/${adminId}/invitation/resend`,
     INTERNAL_ACCOUNT_ROLE: (adminId: string) =>
       `/v1/admin/internal-accounts/${adminId}/role`,
+    INTERNAL_ACCOUNT_STATUS: (adminId: string) =>
+      `/v1/admin/internal-accounts/${adminId}/status`,
   },
   ADMIN_OPERATIONS: {
     OVERVIEW: '/v1/admin/operations/overview',
