@@ -2,6 +2,7 @@ package com.manabihub.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.identity.service.PublicUserSessionService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +45,11 @@ class PublicUserSessionFilterTest {
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
         filterChain = new MockFilterChain();
+        SecurityContextHolder.clearContext();
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
         SecurityContextHolder.clearContext();
     }
 
@@ -125,3 +131,4 @@ class PublicUserSessionFilterTest {
         verify(publicUserSessionService).isSessionValid(sessionId, userId);
     }
 }
+

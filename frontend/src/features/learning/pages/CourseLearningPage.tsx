@@ -832,7 +832,7 @@ function BlockContent({
   }
 }
 
-function VideoBlock({
+export function VideoBlock({
   block,
   onProgressSaved,
   onProgressSaveError,
@@ -851,6 +851,8 @@ function VideoBlock({
   );
   const initialWatchedSeconds = Math.max(block.watchedVideoSeconds ?? 0, checkpoint?.watchedSeconds ?? 0);
   const [playerLoading, setPlayerLoading] = useState(true);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(initialPosition);
   const [mediaDuration, setMediaDuration] = useState(
     checkpoint?.mediaDurationSeconds ?? (block.durationMinutes ? block.durationMinutes * 60 : 0),
@@ -1031,6 +1033,15 @@ function VideoBlock({
     lastObservedTimeRef.current = playerRef.current?.currentTime ?? null;
   };
 
+  const handleVolumeChange = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = event.currentTarget;
+    // ReactPlayer reapplies audio props on every render, including progress updates.
+    if (Number.isFinite(video.volume) && video.volume >= 0 && video.volume <= 1) {
+      setVolume(video.volume);
+    }
+    setMuted(video.muted);
+  };
+
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
     if (Number.isFinite(video.duration) && video.duration > 0) {
@@ -1120,6 +1131,8 @@ function VideoBlock({
           ref={playerRef}
           src={block.videoUrl}
           controls
+          volume={volume}
+          muted={muted}
           width="100%"
           height="100%"
           style={{ position: 'absolute', top: 0, left: 0 }}
@@ -1131,6 +1144,7 @@ function VideoBlock({
           onPlay={handlePlay}
           onSeeking={handleSeeking}
           onSeeked={handleSeeked}
+          onVolumeChange={handleVolumeChange}
           onTimeUpdate={handleTimeUpdate}
           onPause={handlePause}
           onEnded={handleEnded}
