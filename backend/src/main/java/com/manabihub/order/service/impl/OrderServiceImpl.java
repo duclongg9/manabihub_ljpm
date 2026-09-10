@@ -49,11 +49,10 @@ public class OrderServiceImpl implements OrderService {
     private static final DateTimeFormatter ORDER_CODE_TIME =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
     private static final SecureRandom RANDOM = new SecureRandom();
-    private static final Set<EnrollmentStatus> OWNED_STATUSES =
+    private static final Set<EnrollmentStatus> ACTIVE_ACCESS_STATUSES =
             EnumSet.of(
                     EnrollmentStatus.ACTIVE,
-                    EnrollmentStatus.COMPLETED,
-                    EnrollmentStatus.REVOKED);
+                    EnrollmentStatus.COMPLETED);
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CourseRepository courseRepository;
@@ -82,10 +81,20 @@ public class OrderServiceImpl implements OrderService {
                     HttpStatus.BAD_REQUEST);
         }
 
+        Instant purchaseAt = Instant.now();
+        if (!course.resolveEnrollmentExpiry(purchaseAt).isAfter(purchaseAt)) {
+            throw new BusinessException(
+                    MessageCodes.ORDER_COURSE_ACCESS_ENDED,
+                    "Khóa học đã kết thúc thời hạn truy cập và hiện không thể mua hoặc gia hạn.",
+                    HttpStatus.CONFLICT);
+        }
+
         boolean alreadyOwned = enrollmentRepository
                 .findByStudent_IdAndCourse_Id(student.getId(), courseId)
-                .filter(enrollment -> OWNED_STATUSES.contains(enrollment.getStatus())
-                        && !enrollment.isExpired(Instant.now()))
+                .filter(enrollment -> enrollment.getStatus() == EnrollmentStatus.REVOKED
+                        || enrollment.getStatus() == EnrollmentStatus.REFUND_PENDING
+                        || (ACTIVE_ACCESS_STATUSES.contains(enrollment.getStatus())
+                            && !enrollment.isExpired(purchaseAt)))
                 .isPresent();
         if (alreadyOwned) {
             throw new BusinessException(

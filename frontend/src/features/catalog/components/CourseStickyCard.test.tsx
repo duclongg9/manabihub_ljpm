@@ -77,6 +77,47 @@ describe('CourseStickyCard', () => {
     expect(screen.queryByRole('button', { name: /Ví \+ VNPay phần còn lại/ })).not.toBeInTheDocument();
   });
 
+  it('offers renewal when the previous enrollment expired and the course still accepts access', () => {
+    render(
+      <MemoryRouter>
+        <CourseStickyCard
+          course={{
+            ...course,
+            price: 250_000,
+            hasExpiredEnrollment: true,
+            accessDurationDays: 180,
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gia hạn khóa học' }));
+
+    expect(screen.getByRole('dialog', { name: 'Chọn phương thức thanh toán' })).toBeInTheDocument();
+  });
+
+  it('does not offer learning or checkout after the fixed course access period ended', () => {
+    render(
+      <MemoryRouter>
+        <CourseStickyCard
+          course={{
+            ...course,
+            price: 250_000,
+            isEnrolled: true,
+            hasExpiredEnrollment: true,
+            accessExpiresAt: '2000-01-01T00:00:00Z',
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Đã hết hạn truy cập' })).toBeDisabled();
+    expect(screen.getByText(/Vui lòng chờ giảng viên mở lại thời hạn/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tiếp tục học' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mua ngay' })).not.toBeInTheDocument();
+    expect(mocks.createCheckout).not.toHaveBeenCalled();
+  });
+
   it('resolves relative thumbnail URLs through the backend origin', () => {
     render(
       <MemoryRouter>
@@ -120,6 +161,26 @@ describe('CourseStickyCard', () => {
       'Thanh toán chưa hoàn tất và số dư ví chưa bị trừ. Vui lòng thử lại.',
     )).toBeInTheDocument();
     expect(mocks.createCheckout).toHaveBeenCalledWith('course-1', 'WALLET');
+  });
+
+  it('explains a server-side course deadline rejection without starting payment', async () => {
+    mocks.getAuthSession.mockReturnValue({ token: 'student-token' });
+    mocks.createCheckout.mockRejectedValue({
+      response: { data: { messageCode: 'ORDER_COURSE_ACCESS_ENDED' } },
+    });
+
+    render(
+      <MemoryRouter>
+        <CourseStickyCard course={{ ...course, price: 250_000 }} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mua ngay' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Thanh toán toàn bộ bằng ví/ }));
+
+    expect(await screen.findByText(
+      'Khóa học đã kết thúc thời hạn truy cập và hiện không thể mua hoặc gia hạn.',
+    )).toBeInTheDocument();
   });
 
   it('reveals combined payment and cancel only after wallet balance is insufficient', async () => {
@@ -193,6 +254,31 @@ describe('CourseStickyCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Học ngay' }));
 
     expect(mocks.navigate).toHaveBeenCalledWith('/student/courses/course-1/learn');
+  });
+
+  it('confirms renewal after an expired enrollment is paid from the wallet', async () => {
+    mocks.getAuthSession.mockReturnValue({ token: 'student-token' });
+    mocks.createCheckout.mockResolvedValue({ orderId: 'renewal-order' });
+
+    render(
+      <MemoryRouter>
+        <CourseStickyCard
+          course={{
+            ...course,
+            price: 250_000,
+            hasExpiredEnrollment: true,
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gia hạn khóa học' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Thanh toán toàn bộ bằng ví/ }));
+
+    expect(await screen.findByRole('dialog', { name: 'Gia hạn khóa học thành công' }))
+      .toBeInTheDocument();
+    expect(screen.getByText('Quyền truy cập khóa học đã được gia hạn. Bạn có muốn học ngay không?'))
+      .toBeInTheDocument();
   });
 
   it('offers a split wallet and VNPay checkout when the wallet only covers part of the price', async () => {

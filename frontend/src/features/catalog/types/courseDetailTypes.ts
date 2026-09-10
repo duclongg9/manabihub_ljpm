@@ -41,6 +41,7 @@ export interface PublicCourseDetail {
   accessExpiresAt?: string | null;
   teacher: PublicTeacherProfile;
   isEnrolled: boolean;
+  hasExpiredEnrollment?: boolean;
   isTeacherOwner?: boolean;
   totalDurationMinutes: number;
   totalLessons: number;

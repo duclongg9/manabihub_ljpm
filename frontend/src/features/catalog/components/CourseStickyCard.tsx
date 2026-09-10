@@ -8,6 +8,7 @@ import { getAuthSession } from '../../../shared/auth/authSession';
 import { getStudentWallet } from '../../wallet/services/studentWalletService';
 import { ROUTES } from '../../../shared/constants/routes';
 import { resolvePublicAssetUrl } from '../../../shared/utils/assetUtils';
+import { hasCourseAccessPeriodEnded } from '../utils/courseAccess';
 
 interface CourseStickyCardProps {
   course: PublicCourseDetail;
@@ -17,7 +18,10 @@ export interface CourseStickyCardHandle {
   openPurchaseOptions: () => void;
 }
 
-type EnrollmentSuccess = 'FREE' | 'PAID';
+type EnrollmentSuccess = {
+  payment: 'FREE' | 'PAID';
+  renewed: boolean;
+};
 
 export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyCardProps>(({ course }, ref) => {
   const [buying, setBuying] = useState(false);
@@ -30,6 +34,9 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
   const [walletAvailableBalance, setWalletAvailableBalance] = useState<number | null>(null);
   const navigate = useNavigate();
   const thumbnailUrl = resolvePublicAssetUrl(course.thumbnailUrl);
+  const accessPeriodEnded = hasCourseAccessPeriodEnded(course.accessExpiresAt);
+  const isRenewal = Boolean(course.hasExpiredEnrollment);
+  const hasCurrentAccess = !accessPeriodEnded && (course.isEnrolled || locallyEnrolled);
 
   useEffect(() => {
     setWalletAvailableBalance(null);
@@ -53,6 +60,11 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
   const handleContinueLearning = () => navigate(ROUTES.STUDENT.COURSE_LEARN(course.id));
 
   const handleBuy = useCallback(async (paymentMethod: 'VNPAY' | 'WALLET' | 'WALLET_VNPAY' = 'VNPAY') => {
+    if (accessPeriodEnded) {
+      setBuyError('Khóa học đã kết thúc thời hạn truy cập và hiện không thể mua hoặc gia hạn.');
+      setShowPaymentOptions(false);
+      return;
+    }
     if (!getAuthSession('public')) {
       navigate(ROUTES.PUBLIC.LOGIN);
       return;
@@ -64,7 +76,10 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
       if (!checkout.paymentUrl) {
         // Free course OR paid instantly from wallet — enrollment is complete, let the student choose when to learn.
         setLocallyEnrolled(true);
-        setEnrollmentSuccess(course.price === 0 ? 'FREE' : 'PAID');
+        setEnrollmentSuccess({
+          payment: course.price === 0 ? 'FREE' : 'PAID',
+          renewed: isRenewal,
+        });
         setShowPaymentOptions(false);
         setBuying(false);
         return;
@@ -80,16 +95,23 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
       } else {
         const message = code === 'ORDER_ALREADY_ENROLLED'
           ? 'Bạn đã sở hữu khóa học này.'
-          : code === 'COMMON_INTERNAL_ERROR'
-            ? 'Thanh toán chưa hoàn tất và số dư ví chưa bị trừ. Vui lòng thử lại.'
-            : 'Không thể tạo đơn hàng. Vui lòng thử lại.';
+          : code === 'ORDER_COURSE_ACCESS_ENDED'
+            ? 'Khóa học đã kết thúc thời hạn truy cập và hiện không thể mua hoặc gia hạn.'
+            : code === 'COMMON_INTERNAL_ERROR'
+              ? 'Thanh toán chưa hoàn tất và số dư ví chưa bị trừ. Vui lòng thử lại.'
+              : 'Không thể tạo đơn hàng. Vui lòng thử lại.';
         setBuyError(message);
       }
       setBuying(false);
     }
-  }, [course.id, course.price, navigate]);
+  }, [accessPeriodEnded, course.id, course.price, isRenewal, navigate]);
 
   const handlePurchaseClick = useCallback(() => {
+    if (accessPeriodEnded) {
+      setBuyError('Khóa học đã kết thúc thời hạn truy cập và hiện không thể mua hoặc gia hạn.');
+      setShowPaymentOptions(false);
+      return;
+    }
     if (course.price === 0) {
       void handleBuy('VNPAY');
       return;
@@ -97,7 +119,7 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
     setBuyError(null);
     setShowCombinedPaymentOption(false);
     setShowPaymentOptions(true);
-  }, [course.price, handleBuy]);
+  }, [accessPeriodEnded, course.price, handleBuy]);
 
   useImperativeHandle(ref, () => ({ openPurchaseOptions: handlePurchaseClick }), [handlePurchaseClick]);
 
@@ -156,13 +178,26 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
           </span>
         </div>
 
-        {course.isEnrolled || locallyEnrolled ? (
+        {hasCurrentAccess ? (
           <button
             onClick={handleContinueLearning}
             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-md hover:shadow-xl hover:-translate-y-0.5 mb-4"
           >
             Tiếp tục học
           </button>
+        ) : accessPeriodEnded ? (
+          <div className="mb-4">
+            <button
+              type="button"
+              disabled
+              className="w-full cursor-not-allowed rounded-xl bg-slate-200 px-4 py-3.5 font-bold text-slate-500"
+            >
+              Đã hết hạn truy cập
+            </button>
+            <p className="mt-3 text-center text-xs font-medium leading-5 text-red-600">
+              Khóa học đã kết thúc thời hạn truy cập. Vui lòng chờ giảng viên mở lại thời hạn trước khi gia hạn.
+            </p>
+          </div>
         ) : (
           <>
             <button
@@ -170,7 +205,11 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
               disabled={buying}
               className="bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white w-full py-3 rounded-xl font-semibold mb-3 transition-colors"
             >
-              {buying ? 'Đang xử lý…' : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
+              {buying
+                ? 'Đang xử lý…'
+                : isRenewal
+                  ? course.price === 0 ? 'Gia hạn miễn phí' : 'Gia hạn khóa học'
+                  : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
             </button>
             {buyError && !showPaymentOptions && <p className="text-center text-xs text-red-600 font-medium mb-3">{buyError}</p>}
           </>
@@ -317,14 +356,18 @@ export const CourseStickyCard = forwardRef<CourseStickyCardHandle, CourseStickyC
           <div className="w-full max-w-md rounded-3xl bg-white p-7 text-center shadow-2xl">
             <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-500" aria-hidden="true" />
             <h2 id="course-access-success-title" className="mt-5 text-2xl font-extrabold text-slate-900">
-              {enrollmentSuccess === 'FREE'
-                ? 'Đăng ký khóa học thành công'
-                : 'Thanh toán thành công'}
+              {enrollmentSuccess.renewed
+                ? 'Gia hạn khóa học thành công'
+                : enrollmentSuccess.payment === 'FREE'
+                  ? 'Đăng ký khóa học thành công'
+                  : 'Thanh toán thành công'}
             </h2>
             <p id="course-access-success-description" className="mt-3 text-sm leading-6 text-slate-600">
-              {enrollmentSuccess === 'FREE'
-                ? 'Bạn đã tham gia khóa học này. Bạn có muốn bắt đầu học ngay không?'
-                : 'Bạn đã sở hữu khóa học này. Bạn có muốn bắt đầu học ngay không?'}
+              {enrollmentSuccess.renewed
+                ? 'Quyền truy cập khóa học đã được gia hạn. Bạn có muốn học ngay không?'
+                : enrollmentSuccess.payment === 'FREE'
+                  ? 'Bạn đã tham gia khóa học này. Bạn có muốn bắt đầu học ngay không?'
+                  : 'Bạn đã sở hữu khóa học này. Bạn có muốn bắt đầu học ngay không?'}
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <button

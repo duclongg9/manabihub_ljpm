@@ -248,6 +248,7 @@ public final class MessageCodes {
     public static final String ORDER_NOT_FOUND = "ORDER_NOT_FOUND";
     public static final String ORDER_RETRIEVED = "ORDER_RETRIEVED";
     public static final String ORDER_COURSE_NOT_PUBLISHED = "ORDER_COURSE_NOT_PUBLISHED";
+    public static final String ORDER_COURSE_ACCESS_ENDED = "ORDER_COURSE_ACCESS_ENDED";
     public static final String ORDER_ALREADY_ENROLLED = "ORDER_ALREADY_ENROLLED";
     public static final String ORDER_ALREADY_PAID = "ORDER_ALREADY_PAID";
     public static final String ORDER_CANCELLED = "ORDER_CANCELLED";

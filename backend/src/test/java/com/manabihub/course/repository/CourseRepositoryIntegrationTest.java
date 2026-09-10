@@ -83,6 +83,53 @@ public class CourseRepositoryIntegrationTest {
     }
 
     @Test
+    void enrollmentAccessQueries_distinguishCurrentAndElapsedAccess() {
+        UUID teacherId = insertTeacher("access-state");
+        UUID courseId = insertCourse(
+                teacherId,
+                "Course access state",
+                "course-access-state",
+                "PUBLISHED",
+                Instant.parse("2026-07-01T00:00:00Z")
+        );
+        UUID userId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID enrollmentId = UUID.randomUUID();
+
+        jdbcTemplate.update(
+                "INSERT INTO app_users (id, email, full_name, created_at, updated_at) "
+                        + "VALUES (?, ?, 'Access Student', now(), now())",
+                userId,
+                "access-" + userId + "@test.com"
+        );
+        jdbcTemplate.update(
+                "INSERT INTO student_profiles (id, user_id, created_at, updated_at) "
+                        + "VALUES (?, ?, now(), now())",
+                studentId,
+                userId
+        );
+        jdbcTemplate.update(
+                "INSERT INTO enrollments "
+                        + "(id, student_id, course_id, enrollment_status, enrolled_at, expires_at) "
+                        + "VALUES (?, ?, ?, 'ACTIVE', now() - interval '2 days', now() - interval '1 day')",
+                enrollmentId,
+                studentId,
+                courseId
+        );
+
+        assertThat(courseRepository.checkEnrollmentExists(courseId, userId)).isFalse();
+        assertThat(courseRepository.checkExpiredEnrollmentExists(courseId, userId)).isTrue();
+
+        jdbcTemplate.update(
+                "UPDATE enrollments SET expires_at = now() + interval '1 day' WHERE id = ?",
+                enrollmentId
+        );
+
+        assertThat(courseRepository.checkEnrollmentExists(courseId, userId)).isTrue();
+        assertThat(courseRepository.checkExpiredEnrollmentExists(courseId, userId)).isFalse();
+    }
+
+    @Test
     void enrollmentRanking_ordersCompletePublishedCatalogueBeforePagination() {
         UUID teacherId = insertTeacher("rank-enrollment");
         UUID mostEnrolled = insertCourse(

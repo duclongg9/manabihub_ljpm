@@ -106,8 +106,36 @@ public interface CourseRepository extends JpaRepository<Course, UUID>, JpaSpecif
 
     List<Course> findAllByStatusOrderBySubmittedAtAsc(CourseStatus status);
 
-    @org.springframework.data.jpa.repository.Query(value = "SELECT CASE WHEN COUNT(e.id) > 0 THEN true ELSE false END FROM enrollments e JOIN student_profiles sp ON e.student_id = sp.id WHERE e.course_id = :courseId AND sp.user_id = :userId AND e.enrollment_status IN ('ACTIVE', 'COMPLETED')", nativeQuery = true)
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT CASE WHEN COUNT(e.id) > 0 THEN true ELSE false END
+            FROM enrollments e
+            JOIN student_profiles sp ON e.student_id = sp.id
+            WHERE e.course_id = :courseId
+              AND sp.user_id = :userId
+              AND e.enrollment_status IN ('ACTIVE', 'COMPLETED')
+              AND (e.expires_at IS NULL OR e.expires_at > CURRENT_TIMESTAMP)
+            """, nativeQuery = true)
     boolean checkEnrollmentExists(@org.springframework.data.repository.query.Param("courseId") UUID courseId, @org.springframework.data.repository.query.Param("userId") UUID userId);
+
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT CASE WHEN COUNT(e.id) > 0 THEN true ELSE false END
+            FROM enrollments e
+            JOIN student_profiles sp ON e.student_id = sp.id
+            WHERE e.course_id = :courseId
+              AND sp.user_id = :userId
+              AND (
+                    e.enrollment_status = 'EXPIRED'
+                    OR (
+                        e.enrollment_status IN ('ACTIVE', 'COMPLETED')
+                        AND e.expires_at IS NOT NULL
+                        AND e.expires_at <= CURRENT_TIMESTAMP
+                    )
+              )
+            """, nativeQuery = true)
+    boolean checkExpiredEnrollmentExists(
+            @org.springframework.data.repository.query.Param("courseId") UUID courseId,
+            @org.springframework.data.repository.query.Param("userId") UUID userId
+    );
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"teacher.user", "modules"})
     @org.springframework.data.jpa.repository.Query("SELECT c FROM Course c WHERE c.id = :id")
