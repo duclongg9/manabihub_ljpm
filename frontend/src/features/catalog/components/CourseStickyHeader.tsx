@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { PublicCourseDetail } from '../types/courseDetailTypes';
+import { hasCourseAccessPeriodEnded } from '../utils/courseAccess';
 
 interface CourseStickyHeaderProps {
   course: PublicCourseDetail;
@@ -9,6 +10,7 @@ interface CourseStickyHeaderProps {
 
 export const CourseStickyHeader = ({ course, onPurchase, onContinueLearning }: CourseStickyHeaderProps) => {
   const [isVisible, setIsVisible] = useState(false);
+  const accessPeriodEnded = hasCourseAccessPeriodEnded(course.accessExpiresAt);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -43,7 +45,15 @@ export const CourseStickyHeader = ({ course, onPurchase, onContinueLearning }: C
               <div className="text-white font-bold text-lg">{course.price.toLocaleString('vi-VN')} {course.currency}</div>
             )}
           </div>
-          {course.isEnrolled ? (
+          {accessPeriodEnded ? (
+            <button
+              type="button"
+              disabled
+              className="cursor-not-allowed rounded-lg bg-slate-700 px-6 py-2 text-sm font-bold text-slate-300"
+            >
+              Đã hết hạn
+            </button>
+          ) : course.isEnrolled ? (
             <button
               onClick={onContinueLearning}
               className="bg-white hover:bg-slate-100 text-slate-900 font-bold py-2 px-6 rounded-lg transition-colors text-sm"
@@ -55,7 +65,9 @@ export const CourseStickyHeader = ({ course, onPurchase, onContinueLearning }: C
               onClick={onPurchase}
               className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white font-bold py-2 px-6 rounded-lg transition-all shadow-md shadow-indigo-500/20 text-sm"
             >
-              {course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
+              {course.hasExpiredEnrollment
+                ? course.price === 0 ? 'Gia hạn miễn phí' : 'Gia hạn khóa học'
+                : course.price === 0 ? 'Ghi danh ngay' : 'Mua ngay'}
             </button>
           )}
         </div>

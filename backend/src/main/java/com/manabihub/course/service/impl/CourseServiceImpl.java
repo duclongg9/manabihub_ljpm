@@ -473,6 +473,9 @@ public class CourseServiceImpl implements CourseService {
         boolean isEnrolled = currentUserIdOpt.isPresent()
                 && courseRepository.checkEnrollmentExists(course.getId(), currentUserIdOpt.get());
 
+        boolean hasExpiredEnrollment = currentUserIdOpt.isPresent()
+                && courseRepository.checkExpiredEnrollmentExists(course.getId(), currentUserIdOpt.get());
+
         if (course.getStatus() != CourseStatus.PUBLISHED && !isAuthor && !isAdmin && !isEnrolled) {
             throw new BusinessException(
                     MessageCodes.MSG_CATALOG_001,
@@ -535,6 +538,7 @@ public class CourseServiceImpl implements CourseService {
                                 && course.getTeacher().getUser().getUserStatus() == UserStatus.ACTIVE)
                         .build())
                 .isEnrolled(isEnrolled)
+                .hasExpiredEnrollment(hasExpiredEnrollment)
                 .isTeacherOwner(isAuthor)
                 .totalDurationMinutes(totalDurationMinutes)
                 .totalLessons(totalLessons)

@@ -1,5 +1,6 @@
 package com.manabihub.order.service.impl;
 
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.common.response.PageResponse;
 import com.manabihub.course.entity.Course;
@@ -104,7 +105,7 @@ class OrderServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // Sheet 36 — createOrder (UC-08 Purchase Course) — 8 TC
+    // Sheet 36 — createOrder (UC-08 Purchase Course)
     // ══════════════════════════════════════════════════════════════════════
 
     @Nested
@@ -225,6 +226,65 @@ class OrderServiceImplTest {
             assertEquals(0, created.getTotalAmount().compareTo(BigDecimal.ZERO));
             assertEquals(OrderStatus.PENDING, created.getStatus());
             verify(orderItemRepository).save(any(OrderItem.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(9)
+        @DisplayName("Expired fixed course deadline -> ORDER_COURSE_ACCESS_ENDED")
+        void createOrder_fixedCourseDeadlineEnded_rejectsCheckout() {
+            course.setAccessExpiresAt(Instant.now().minusSeconds(60));
+            when(courseRepository.findById(course.getId())).thenReturn(Optional.of(course));
+
+            BusinessException error = assertThrows(
+                    BusinessException.class,
+                    () -> service.createOrder(course.getId())
+            );
+
+            assertEquals(MessageCodes.ORDER_COURSE_ACCESS_ENDED, error.getMessageCode());
+            verify(enrollmentRepository, never())
+                    .findByStudent_IdAndCourse_Id(any(), any());
+            verify(orderRepository, never()).save(any());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(10)
+        @DisplayName("Elapsed ACTIVE enrollment -> repurchase allowed")
+        void createOrder_elapsedActiveEnrollment_allowsRepurchase() {
+            when(courseRepository.findById(course.getId())).thenReturn(Optional.of(course));
+            Enrollment elapsed = Enrollment.builder()
+                    .status(EnrollmentStatus.ACTIVE)
+                    .expiresAt(Instant.now().minusSeconds(60))
+                    .build();
+            when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId()))
+                    .thenReturn(Optional.of(elapsed));
+            when(orderRepository.existsByOrderCode(anyString())).thenReturn(false);
+            when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            Order created = service.createOrder(course.getId());
+
+            assertEquals(OrderStatus.PENDING, created.getStatus());
+            verify(orderItemRepository).save(any(OrderItem.class));
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(11)
+        @DisplayName("REFUND_PENDING enrollment -> ORDER_ALREADY_ENROLLED")
+        void createOrder_refundPendingEnrollment_rejectsRepurchase() {
+            when(courseRepository.findById(course.getId())).thenReturn(Optional.of(course));
+            Enrollment refundPending = Enrollment.builder()
+                    .status(EnrollmentStatus.REFUND_PENDING)
+                    .expiresAt(Instant.now().minusSeconds(60))
+                    .build();
+            when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId()))
+                    .thenReturn(Optional.of(refundPending));
+
+            BusinessException error = assertThrows(
+                    BusinessException.class,
+                    () -> service.createOrder(course.getId())
+            );
+
+            assertEquals(MessageCodes.ORDER_ALREADY_ENROLLED, error.getMessageCode());
+            verify(orderRepository, never()).save(any());
         }
     }
 
