@@ -23,7 +23,12 @@ public interface WalletRepository extends JpaRepository<Wallet, UUID> {
 
     Optional<Wallet> findFirstByOwnerType(WalletOwnerType ownerType);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    // This upsert is also used in the middle of refund settlement. Clearing the
+    // persistence context here detaches the locked refund/order graph and makes
+    // later audit or notification reads fail for students receiving their first
+    // wallet. Flushing is sufficient because the following repository query
+    // reads the canonical row created (or retained) by the database.
+    @Modifying(flushAutomatically = true)
     @Query(value = """
             INSERT INTO wallets (
                 id, owner_type, student_id, balance, frozen_balance, frozen, currency, created_at

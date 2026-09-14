@@ -10,7 +10,9 @@ import com.manabihub.payment.dto.IpnAckResponse;
 import com.manabihub.payment.gateway.PaymentCallbackResult;
 import com.manabihub.payment.gateway.PaymentGateway;
 import com.manabihub.payment.service.PaymentService;
+import com.manabihub.wallet.enums.WalletOwnerType;
 import com.manabihub.wallet.service.StudentWalletService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -82,11 +85,47 @@ class PaymentFinancialIntegrityConcurrencyPostgresTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private EntityManager entityManager;
+
     @MockBean
     private PaymentGateway paymentGateway;
 
     @MockBean
     private EmailService emailService;
+
+    @Test
+    void creatingFirstStudentWalletKeepsSettlementPersistenceContextManaged() {
+        String email = UUID.randomUUID() + "@refund.test";
+        AtomicReference<UUID> createdStudentId = new AtomicReference<>();
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            AppUser user = AppUser.builder()
+                    .email(email)
+                    .fullName("First wallet refund")
+                    .build();
+            entityManager.persist(user);
+            StudentProfile student = StudentProfile.builder()
+                    .user(user)
+                    .build();
+            entityManager.persist(student);
+            entityManager.flush();
+            createdStudentId.set(student.getId());
+
+            assertTrue(entityManager.contains(student));
+            studentWalletService.getOrCreateStudentWallet(student.getId());
+
+            assertTrue(entityManager.contains(student),
+                    "Creating a wallet must not detach the active refund settlement graph");
+            assertEquals(email, student.getUser().getEmail());
+        });
+
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM wallets
+                WHERE owner_type = ? AND student_id = ?
+                """, Integer.class, WalletOwnerType.STUDENT.name(), createdStudentId.get()));
+    }
 
     @Test
     void walletPaymentCommitsDebitEnrollmentEscrowAndNotificationEvent() {
