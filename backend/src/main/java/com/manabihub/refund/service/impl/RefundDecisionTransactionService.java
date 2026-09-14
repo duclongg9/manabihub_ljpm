@@ -45,7 +45,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -106,7 +105,7 @@ public class RefundDecisionTransactionService {
      * persisted before this method is called; settlement still uses the same
      * locked, idempotent wallet-refund path as a manual Finance approval.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(timeout = 30)
     public RefundRequest autoApproveToStudentWallet(UUID refundId) {
         RefundRequest refund = lockRefund(refundId);
         if (refund.getStatus() == RefundStatus.APPROVED) {
@@ -203,6 +202,8 @@ public class RefundDecisionTransactionService {
         refund.setSettlementStatus(RefundSettlementStatus.COMPLETED);
         refund.setSettledAt(Instant.now());
         refund.setWalletTransactionId(walletCredit.getId());
+        refund.setAutoRefundNextAttemptAt(null);
+        refund.setAutoRefundLastErrorCode(null);
         refundRequestRepository.save(refund);
 
         Map<String, Object> approvalEvidence = Map.of(
@@ -494,6 +495,7 @@ public class RefundDecisionTransactionService {
 
         RefundStatus statusBefore = refund.getStatus();
         refund.setStatus(RefundStatus.REJECTED);
+        refund.setAutoRefundNextAttemptAt(null);
         refund.setDecisionReasonCode(decision.getReasonCode());
         refund.setDecisionNote(normalizeDecisionNote(decision.getNote()));
         refund.setDecidedBy(admin);
@@ -727,6 +729,7 @@ public class RefundDecisionTransactionService {
         refund.setStatus(RefundStatus.RECONCILIATION_REQUIRED);
         refund.setProviderStatus(providerStatus);
         refund.setReconciliationReasonCode(reason);
+        refund.setAutoRefundNextAttemptAt(null);
         refundRequestRepository.save(refund);
     }
 

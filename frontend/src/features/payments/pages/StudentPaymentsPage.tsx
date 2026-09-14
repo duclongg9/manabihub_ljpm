@@ -207,6 +207,12 @@ export function StudentPaymentsPage() {
     void loadWithdrawalData();
   }, [loadWalletData, loadWithdrawalData]);
 
+  const approvedRefunds = refunds.filter((refund) => refund.status === 'APPROVED')
+    .map((refund) => refund.id).sort().join(',');
+  useEffect(() => {
+    if (approvedRefunds) void loadWalletData();
+  }, [approvedRefunds, loadWalletData]);
+
   const latestRefundByItem = new Map<string, StudentRefundResponse>();
   refunds.forEach((refund) => {
     if (!latestRefundByItem.has(refund.orderItemId)) {
@@ -695,7 +701,7 @@ function OrderCard({
           const refund = latestRefundByItem.get(item.id);
 
           const isRejected = refund?.status === 'REJECTED';
-          const isPendingOrActive = refund && ['PENDING', 'APPROVED', 'PROCESSED', 'COMPLETED'].includes(refund.status);
+          const isPendingOrActive = refund && ['PENDING', 'PROCESSING', 'RECONCILIATION_REQUIRED', 'APPROVED', 'PROCESSED', 'COMPLETED'].includes(refund.status);
 
           return (
             <Box

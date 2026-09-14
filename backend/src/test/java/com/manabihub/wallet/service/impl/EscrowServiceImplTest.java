@@ -59,6 +59,7 @@ class EscrowServiceImplTest {
     @Mock private OrderItemSnapshotRepository orderItemSnapshotRepository;
     @Mock private PlatformCommissionLedgerRepository platformCommissionLedgerRepository;
     @Mock private CommercialPolicyService commercialPolicyService;
+    @Mock private com.manabihub.order.repository.OrderRepository orderRepository;
 
     @InjectMocks
     private EscrowServiceImpl service;
@@ -183,7 +184,7 @@ class EscrowServiceImplTest {
                 PlatformCommissionLedger.CommissionEventType.COMMISSION_RECOGNIZED,
                 recognized.getEventType());
         assertEquals(new BigDecimal("20000.00"), recognized.getAmount());
-        verifyNoInteractions(commercialPolicyService);
+        verify(commercialPolicyService).getCurrentPolicy();
         verify(auditLogRepository).save(any(AuditLog.class));
     }
 
@@ -191,6 +192,7 @@ class EscrowServiceImplTest {
     void processEscrowRelease_whenRefundIsPendingKeepsFundsHeld() {
         OrderItem item = item(new BigDecimal("100000.00"));
         EscrowLedger escrow = eligibleEscrow(item);
+        configureReleaseGuard(escrow);
         when(escrowLedgerRepository.findByIdForUpdate(escrow.getId())).thenReturn(Optional.of(escrow));
         when(escrowLedgerRepository.existsBlockingRefundRequest(order.getId())).thenReturn(true);
 
@@ -312,6 +314,7 @@ class EscrowServiceImplTest {
             OrderItem item,
             OrderItemSnapshot snapshot
     ) {
+        configureReleaseGuard(escrow);
         when(escrowLedgerRepository.findByIdForUpdate(escrow.getId()))
                 .thenReturn(Optional.of(escrow));
         when(escrowLedgerRepository.existsBlockingRefundRequest(order.getId())).thenReturn(false);
@@ -319,6 +322,39 @@ class EscrowServiceImplTest {
                 .thenReturn(false);
         when(orderItemSnapshotRepository.findByOrderItem_Id(item.getId()))
                 .thenReturn(Optional.of(snapshot));
+    }
+
+    private void configureReleaseGuard(EscrowLedger escrow) {
+        when(escrowLedgerRepository.findOrderIdById(escrow.getId())).thenReturn(Optional.of(order.getId()));
+        when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(commercialPolicyService.getCurrentPolicy()).thenReturn(policy());
+    }
+
+    @Test
+    void processEscrowRelease_oldReleaseDateStillInsideRefundWindow_keepsFundsHeld() {
+        EscrowLedger escrow = eligibleEscrow(item(new BigDecimal("100000.00")));
+        configureReleaseGuard(escrow);
+        when(escrowLedgerRepository.findByIdForUpdate(escrow.getId())).thenReturn(Optional.of(escrow));
+        when(escrowLedgerRepository.isRefundWindowOpen(eq(order.getId()), any())).thenReturn(true);
+
+        assertFalse(service.processEscrowRelease(escrow.getId()));
+
+        assertEquals(EscrowStatus.HELD, escrow.getStatus());
+        verifyNoInteractions(walletService, orderItemSnapshotRepository);
+    }
+
+    @Test
+    void holdForOrder_shortEscrowPolicyStillProtectsEntireRefundWindow() {
+        configureNewAllocation(new BigDecimal("100000.00"));
+        when(commercialPolicyService.getCurrentPolicy()).thenReturn(new CommercialPolicy(
+                "VND", new BigDecimal("0.20"), 14, 20, 1,
+                BigDecimal.ZERO, BigDecimal.ZERO, 1, 2, "short-hold", Instant.now()));
+        Instant before = Instant.now();
+
+        service.holdForOrder(order);
+
+        assertFalse(captureEscrow().getReleaseAt().isBefore(
+                com.manabihub.refund.service.RefundWindow.exclusiveDeadline(before, 14)));
     }
 
     private CommercialPolicy policy() {

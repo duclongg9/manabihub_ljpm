@@ -54,6 +54,8 @@ export interface StudentRefundResponse {
   cancellable: boolean;
   createdAt: string;
   updatedAt?: string | null;
+  automaticRefundPending?: boolean;
+  reconciliationReasonCode?: string | null;
 }
 
 export interface CreateStudentRefundRequest {

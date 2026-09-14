@@ -41,6 +41,9 @@ public class RefundDetailResponse {
     private String providerResultCode;
     private Integer providerAttemptCount;
     private String reconciliationReasonCode;
+    private int autoRefundAttemptCount;
+    private Instant autoRefundNextAttemptAt;
+    private String autoRefundLastErrorCode;
     private String decisionReasonCode;
     private UUID decidedBy;
     private String decisionNote;

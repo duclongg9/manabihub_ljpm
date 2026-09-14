@@ -80,7 +80,6 @@ class StudentRefundServiceImplTest {
     @Mock private PaymentTransactionRepository paymentTransactionRepository;
     @Mock private CommercialPolicyService commercialPolicyService;
     @Mock private LearningProgressDomainService learningProgressDomainService;
-    @Mock private RefundDecisionTransactionService refundDecisionTransactionService;
 
     @InjectMocks private StudentRefundServiceImpl service;
 
@@ -134,7 +133,7 @@ class StudentRefundServiceImplTest {
 
         @Test
         @org.junit.jupiter.api.Order(1)
-        @DisplayName("UTCID01 (N) - day 2, progress 10% -> auto-approved to the wallet")
+        @DisplayName("UTCID01 (N) - day 2, progress 10% -> queued for automatic wallet refund")
         void standardRefund_withinWindowAndLowProgress_autoApprovesToWallet() {
             stubCommon(StudentRefundType.STANDARD);
             when(learningProgressDomainService.calculateProgress(orderItem.getCourse().getId(), enrollment.getId()))
@@ -146,26 +145,22 @@ class StudentRefundServiceImplTest {
                 savedRefund.set(saved);
                 return saved;
             });
-            when(refundDecisionTransactionService.autoApproveToStudentWallet(any())).thenAnswer(invocation -> {
-                RefundRequest approved = savedRefund.get();
-                approved.setStatus(RefundStatus.APPROVED);
-                approved.setDecidedAt(Instant.now());
-                return approved;
-            });
 
             var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
 
-            assertEquals(RefundStatus.APPROVED, response.status());
+            assertEquals(RefundStatus.PENDING, response.status());
+            assertTrue(response.automaticRefundPending());
+            assertEquals(response.eligibilitySnapshot().getRequestedAt(), savedRefund.get().getAutoRefundNextAttemptAt());
             assertEquals(EligibilityResult.STANDARD_ELIGIBLE,
                     response.eligibilitySnapshot().getEligibilityResult());
             assertTrue(response.eligibilitySnapshot().getReasonCodes().contains("WITHIN_REFUND_WINDOW"));
-            verify(refundDecisionTransactionService).autoApproveToStudentWallet(any());
+            assertEquals(RefundStatus.PENDING, savedRefund.get().getStatus());
         }
 
         @Test
         @org.junit.jupiter.api.Order(2)
-        @DisplayName("UTCID01b (N) - wallet settlement runs only after refund request commits")
-        void standardRefund_defersWalletSettlementUntilAfterCommit() {
+        @DisplayName("UTCID01b (N) - neither request nor afterCommit performs wallet settlement")
+        void standardRefund_doesNotSettleOnRequestThreadEvenAfterCommit() {
             stubCommon(StudentRefundType.STANDARD);
             when(learningProgressDomainService.calculateProgress(orderItem.getCourse().getId(), enrollment.getId()))
                     .thenReturn(new LearningProgressDomainService.ProgressResult(1, 10, 10.0));
@@ -180,11 +175,12 @@ class StudentRefundServiceImplTest {
                 var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
 
                 assertEquals(RefundStatus.PENDING, response.status());
-                verify(refundDecisionTransactionService, never()).autoApproveToStudentWallet(any());
+                assertTrue(TransactionSynchronizationManager.getSynchronizations().isEmpty());
 
                 TransactionSynchronizationManager.getSynchronizations()
                         .forEach(TransactionSynchronization::afterCommit);
-                verify(refundDecisionTransactionService).autoApproveToStudentWallet(any());
+                assertEquals(RefundStatus.PENDING, response.status());
+                assertTrue(response.automaticRefundPending());
             } finally {
                 TransactionSynchronizationManager.clearSynchronization();
             }
@@ -192,7 +188,7 @@ class StudentRefundServiceImplTest {
 
         @Test
         @org.junit.jupiter.api.Order(3)
-        @DisplayName("UTCID02 (B) - day 14 + exactly 20% (both upper bounds) -> auto-approved")
+        @DisplayName("UTCID02 (B) - day 14 + exactly 20% (both upper bounds) -> automatic queue")
         void standardRefund_dayFourteenAndExactlyTwentyPercent_autoApprovesToWallet() {
             payment.setSucceededAt(Instant.now().minus(14, ChronoUnit.DAYS));
             stubCommon(StudentRefundType.STANDARD);
@@ -205,23 +201,18 @@ class StudentRefundServiceImplTest {
                 savedRefund.set(saved);
                 return saved;
             });
-            when(refundDecisionTransactionService.autoApproveToStudentWallet(any())).thenAnswer(invocation -> {
-                RefundRequest approved = savedRefund.get();
-                approved.setStatus(RefundStatus.APPROVED);
-                approved.setDecidedAt(Instant.now());
-                return approved;
-            });
 
             var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
 
-            assertEquals(RefundStatus.APPROVED, response.status());
+            assertEquals(RefundStatus.PENDING, response.status());
+            assertTrue(response.automaticRefundPending());
             assertEquals(EligibilityResult.STANDARD_ELIGIBLE,
                     response.eligibilitySnapshot().getEligibilityResult());
-            assertFalse(response.cancellable());
+            assertTrue(response.cancellable());
             assertFalse(response.eligibilitySnapshot().getProtectedMaterialsFullyDownloaded());
             assertEquals(new BigDecimal("799000"),
                     response.eligibilitySnapshot().getActuallyPaidAmount());
-            verify(refundDecisionTransactionService).autoApproveToStudentWallet(any());
+            assertEquals(response.eligibilitySnapshot().getRequestedAt(), savedRefund.get().getAutoRefundNextAttemptAt());
         }
 
         @Test
@@ -244,7 +235,7 @@ class StudentRefundServiceImplTest {
             assertEquals(EligibilityResult.MANUAL_REVIEW_REQUIRED,
                     response.eligibilitySnapshot().getEligibilityResult());
             assertTrue(response.eligibilitySnapshot().getReasonCodes().contains("OUTSIDE_REFUND_WINDOW"));
-            verify(refundDecisionTransactionService, never()).autoApproveToStudentWallet(any());
+            assertFalse(response.automaticRefundPending());
         }
 
         @Test
@@ -267,7 +258,7 @@ class StudentRefundServiceImplTest {
                     response.eligibilitySnapshot().getEligibilityResult());
             assertTrue(response.eligibilitySnapshot().getReasonCodes()
                     .contains("PROGRESS_LIMIT_EXCEEDED"));
-            verify(refundDecisionTransactionService, never()).autoApproveToStudentWallet(any());
+            assertFalse(response.automaticRefundPending());
         }
 
         @Test
@@ -315,7 +306,7 @@ class StudentRefundServiceImplTest {
             assertTrue(response.eligibilitySnapshot().getProtectedMaterialsFullyDownloaded());
             assertTrue(response.eligibilitySnapshot().getReasonCodes()
                     .contains("PROTECTED_MATERIALS_FULLY_DOWNLOADED"));
-            verify(refundDecisionTransactionService, never()).autoApproveToStudentWallet(any());
+            assertFalse(response.automaticRefundPending());
         }
 
         @Test

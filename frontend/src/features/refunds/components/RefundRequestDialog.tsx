@@ -22,7 +22,7 @@ import {
 import { useCommercialPolicy } from '../../help-center/hooks/useCommercialPolicy';
 import type { OrderItemResponse } from '../../checkout/types';
 import type { ApiResponse } from '../../../shared/types/api';
-import { useCancelStudentRefund, useCreateStudentRefund } from '../hooks/useStudentRefunds';
+import { useCancelStudentRefund, useCreateStudentRefund, useStudentRefundDetail } from '../hooks/useStudentRefunds';
 import type { StudentRefundResponse, StudentRefundType } from '../types';
 
 const REFUND_TYPE_OPTIONS: Array<{ value: StudentRefundType; label: string }> = [
@@ -62,6 +62,8 @@ export function RefundRequestDialog({
   const policyQuery = useCommercialPolicy();
   const createMutation = useCreateStudentRefund();
   const cancelMutation = useCancelStudentRefund();
+  const detailQuery = useStudentRefundDetail(existingRefund?.id ?? createMutation.data?.id, open);
+  const currentRefund = detailQuery.data ?? existingRefund ?? createMutation.data;
 
   useEffect(() => {
     if (open) {
@@ -120,8 +122,8 @@ export function RefundRequestDialog({
             </Typography>
           </Box>
 
-          {existingRefund ? (
-            <RefundDetail refund={existingRefund} />
+          {currentRefund ? (
+            <RefundDetail refund={currentRefund} />
           ) : (
             <>
               {policyQuery.isLoading && <Alert severity="info">Đang tải chính sách hiện hành…</Alert>}
@@ -191,10 +193,12 @@ export function RefundRequestDialog({
             <Alert severity="success">
               {existingRefund
                 ? 'Yêu cầu đã được hủy.'
-                : createMutation.data?.status === 'APPROVED'
+                : currentRefund?.status === 'APPROVED'
                   ? 'Yêu cầu đủ điều kiện và đã được tự động hoàn toàn bộ tiền vào ví.'
-                  : createMutation.data?.status === 'PENDING'
-                    ? 'Đã ghi nhận yêu cầu. Hệ thống đang hoàn tiền vào ví; hãy tải lại lịch sử sau ít giây.'
+                  : currentRefund?.automaticRefundPending
+                    ? 'Đã ghi nhận yêu cầu. Hệ thống đang tự động hoàn tiền vào ví và sẽ cập nhật kết quả tại đây.'
+                    : currentRefund?.status === 'RECONCILIATION_REQUIRED'
+                      ? 'Yêu cầu cần đối soát trước khi có thể hoàn tiền. Finance sẽ kiểm tra và xử lý.'
                     : 'Yêu cầu đã được chuyển sang tranh chấp/xét duyệt thủ công.'}
             </Alert>
           )}
@@ -202,7 +206,7 @@ export function RefundRequestDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Đóng</Button>
-        {existingRefund?.cancellable && !submitted && (
+        {currentRefund?.cancellable && existingRefund && !submitted && (
           <Button
             color="error"
             onClick={() => void cancel()}
@@ -235,7 +239,7 @@ function RefundDetail({ refund }: { refund: StudentRefundResponse }) {
   const snapshot = refund.eligibilitySnapshot;
   return (
     <Stack spacing={1.5}>
-      <Chip label={STATUS_LABELS[refund.status]} color={refund.status === 'REJECTED' ? 'error' : 'primary'} />
+      <Chip label={refund.automaticRefundPending ? 'Đang tự động hoàn tiền vào ví' : STATUS_LABELS[refund.status]} color={refund.status === 'REJECTED' ? 'error' : 'primary'} />
       <Typography variant="body2"><strong>Loại:</strong> {refund.refundType}</Typography>
       <Typography variant="body2"><strong>Lý do:</strong> {refund.reason}</Typography>
       <Typography variant="body2">
@@ -252,7 +256,12 @@ function RefundDetail({ refund }: { refund: StudentRefundResponse }) {
         </Alert>
       )}
       {refund.decisionNote && (
-        <Typography variant="body2"><strong>Phản hồi Finance:</strong> {refund.decisionNote}</Typography>
+        <Typography variant="body2"><strong>Kết quả xử lý:</strong> {refund.decisionNote}</Typography>
+      )}
+      {refund.status === 'RECONCILIATION_REQUIRED' && (
+        <Alert severity="warning">
+          Cần Finance kiểm tra trước khi hoàn tiền. Mã đối soát: {refund.reconciliationReasonCode ?? 'LEGACY_REASON_NOT_RECORDED'}.
+        </Alert>
       )}
     </Stack>
   );

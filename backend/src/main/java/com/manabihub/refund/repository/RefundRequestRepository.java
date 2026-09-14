@@ -18,6 +18,13 @@ import java.util.UUID;
 
 public interface RefundRequestRepository extends JpaRepository<RefundRequest, UUID>, JpaSpecificationExecutor<RefundRequest> {
 
+    @Query("""
+            SELECT r FROM RefundRequest r
+            WHERE r.status = 'PENDING' AND r.autoRefundNextAttemptAt <= :now
+            ORDER BY r.autoRefundNextAttemptAt, r.id
+            """)
+    List<RefundRequest> findAutomaticRefundsDue(@Param("now") java.time.Instant now, Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM RefundRequest r WHERE r.id = :id")
     Optional<RefundRequest> findByIdForUpdate(@Param("id") UUID id);

@@ -30,3 +30,10 @@ export async function cancelStudentRefund(id: string): Promise<StudentRefundResp
   );
   return response.data.data;
 }
+
+export async function fetchStudentRefundDetail(id: string): Promise<StudentRefundResponse> {
+  const response = await axiosClient.get<ApiResponse<StudentRefundResponse>>(
+    ENDPOINTS.studentRefunds.detail(id),
+  );
+  return response.data.data;
+}

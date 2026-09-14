@@ -18,6 +18,20 @@ import java.util.UUID;
 @Repository
 public interface EscrowLedgerRepository extends JpaRepository<EscrowLedger, UUID> {
 
+    @Query("SELECT e.order.id FROM EscrowLedger e WHERE e.id = :id")
+    Optional<UUID> findOrderIdById(@Param("id") UUID id);
+
+    @Query(value = """
+            SELECT NOT EXISTS (
+                SELECT 1 FROM payment_transactions p
+                WHERE p.order_id = :orderId AND p.succeeded_at IS NOT NULL
+            ) OR EXISTS (
+                SELECT 1 FROM payment_transactions p
+                WHERE p.order_id = :orderId AND p.succeeded_at >= :cutoff
+            )
+            """, nativeQuery = true)
+    boolean isRefundWindowOpen(@Param("orderId") UUID orderId, @Param("cutoff") Instant cutoff);
+
     interface TeacherCourseRevenueProjection {
         UUID getCourseId();
         String getCourseTitle();
