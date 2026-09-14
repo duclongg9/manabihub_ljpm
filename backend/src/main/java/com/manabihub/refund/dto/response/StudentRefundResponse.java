@@ -23,6 +23,8 @@ public record StudentRefundResponse(
         Instant decidedAt,
         boolean cancellable,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        boolean automaticRefundPending,
+        String reconciliationReasonCode
 ) {
 }

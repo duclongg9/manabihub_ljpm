@@ -69,6 +69,9 @@ export interface RefundQueueResponse extends RefundFinancialEvidence {
 }
 
 export interface RefundDetailResponse extends RefundFinancialEvidence {
+  autoRefundAttemptCount?: number;
+  autoRefundNextAttemptAt?: string | null;
+  autoRefundLastErrorCode?: string | null;
   id: string;
   orderId: string;
   orderCode: string;

@@ -4,6 +4,8 @@ import type { StudentRefundResponse } from '../types';
 
 const REFUND_STATUS_MAP: Record<string, { label: string; bgcolor: string; color: string }> = {
   PENDING: { label: 'Đang chờ', bgcolor: '#FFFBEB', color: '#B45309' },
+  PROCESSING: { label: 'Đang xử lý hoàn tiền', bgcolor: '#EFF6FF', color: '#1D4ED8' },
+  RECONCILIATION_REQUIRED: { label: 'Cần đối soát', bgcolor: '#FFFBEB', color: '#B45309' },
   APPROVED: { label: 'Đã duyệt', bgcolor: '#ECFDF5', color: '#047857' },
   REJECTED: { label: 'Từ chối', bgcolor: '#FEF2F2', color: '#B91C1C' },
   CANCELLED: { label: 'Đã hủy', bgcolor: '#F3F4F6', color: '#4B5563' },
@@ -109,7 +111,7 @@ export function StudentRefundHistory({
 
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <Chip
-                label={badge.label}
+                label={refund.automaticRefundPending ? 'Đang tự động hoàn tiền' : badge.label}
                 size="small"
                 sx={{
                   fontWeight: 700,

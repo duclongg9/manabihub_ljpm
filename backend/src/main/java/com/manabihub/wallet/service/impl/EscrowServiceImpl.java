@@ -13,6 +13,8 @@ import com.manabihub.order.entity.OrderItemSnapshot;
 import com.manabihub.order.enums.OrderStatus;
 import com.manabihub.order.repository.OrderItemRepository;
 import com.manabihub.order.repository.OrderItemSnapshotRepository;
+import com.manabihub.order.repository.OrderRepository;
+import com.manabihub.refund.service.RefundWindow;
 import com.manabihub.systemconfig.model.CommercialPolicy;
 import com.manabihub.systemconfig.service.CommercialPolicyService;
 import com.manabihub.wallet.entity.EscrowLedger;
@@ -52,6 +54,7 @@ public class EscrowServiceImpl implements EscrowService {
     private final PlatformCommissionLedgerRepository platformCommissionLedgerRepository;
     private final CommercialPolicyService commercialPolicyService;
     private final com.manabihub.kyc.repository.TeacherProfileRepository teacherProfileRepository;
+    private final OrderRepository orderRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -96,7 +99,10 @@ public class EscrowServiceImpl implements EscrowService {
 
         CommercialPolicy policy = commercialPolicyService.getCurrentPolicy();
         validateSettlementPolicy(order, items, policy);
-        Instant releaseAt = Instant.now().plus(Duration.ofDays(policy.escrowHoldingDays()));
+        Instant allocatedAt = Instant.now();
+        Instant holdingDeadline = allocatedAt.plus(Duration.ofDays(policy.escrowHoldingDays()));
+        Instant refundDeadline = RefundWindow.exclusiveDeadline(allocatedAt, policy.refundWindowDays());
+        Instant releaseAt = holdingDeadline.isAfter(refundDeadline) ? holdingDeadline : refundDeadline;
         List<EscrowLedger> created = new ArrayList<>();
 
         for (OrderItem item : items) {
@@ -155,6 +161,11 @@ public class EscrowServiceImpl implements EscrowService {
     @Transactional
 
     public boolean processEscrowRelease(UUID escrowId) {
+        // Serialize release with refund submission/settlement using the same order lock.
+        UUID orderId = escrowLedgerRepository.findOrderIdById(escrowId)
+                .orElseThrow(() -> integrityViolation("Escrow record was not found"));
+        orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> integrityViolation("Escrow order was not found"));
         EscrowLedger escrow = escrowLedgerRepository.findByIdForUpdate(escrowId)
                 .orElseThrow(() -> new BusinessException(
                         MessageCodes.WALLET_NOT_FOUND,
@@ -168,6 +179,15 @@ public class EscrowServiceImpl implements EscrowService {
 
         if (escrow.getReleaseAt().isAfter(Instant.now())) {
             log.info("Escrow {} clearing time has not been reached, skipping release", escrowId);
+            return false;
+        }
+
+        // Also protect old HELD rows whose release_at predates this fix, and
+        // policy extensions. Missing payment evidence must never release funds.
+        Instant paymentCutoff = Instant.now().atZone(RefundWindow.BUSINESS_ZONE).toLocalDate()
+                .minusDays(commercialPolicyService.getCurrentPolicy().refundWindowDays())
+                .atStartOfDay(RefundWindow.BUSINESS_ZONE).toInstant();
+        if (escrowLedgerRepository.isRefundWindowOpen(orderId, paymentCutoff)) {
             return false;
         }
 

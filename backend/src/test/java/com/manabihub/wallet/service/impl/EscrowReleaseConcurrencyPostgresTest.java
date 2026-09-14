@@ -82,6 +82,12 @@ class EscrowReleaseConcurrencyPostgresTest {
                 VALUES (?, ?, ?, ?)
                 """, orderItemId, orderId, COURSE_ID, grossAmount);
         jdbcTemplate.update("""
+                INSERT INTO payment_transactions
+                    (id, order_id, provider, provider_transaction_id, amount, status, succeeded_at)
+                VALUES (?, ?, 'VNPAY', ?, ?, 'SUCCESS', ?)
+                """, UUID.randomUUID(), orderId, "release-" + orderId, grossAmount,
+                Timestamp.from(Instant.now().minusSeconds(30L * 86400)));
+        jdbcTemplate.update("""
                 INSERT INTO order_item_snapshots (
                     id,
                     order_item_id,

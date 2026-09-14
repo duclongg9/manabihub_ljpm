@@ -34,8 +34,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -48,7 +46,7 @@ import java.util.UUID;
 @Slf4j
 public class StudentRefundServiceImpl implements StudentRefundService {
 
-    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final ZoneId BUSINESS_ZONE = com.manabihub.refund.service.RefundWindow.BUSINESS_ZONE;
     private static final List<RefundStatus> ACTIVE_STATUSES = List.of(
             RefundStatus.PENDING,
             RefundStatus.PROCESSING,
@@ -65,7 +63,6 @@ public class StudentRefundServiceImpl implements StudentRefundService {
     private final EnrollmentRepository enrollmentRepository;
     private final CommercialPolicyService commercialPolicyService;
     private final LearningProgressDomainService learningProgressDomainService;
-    private final RefundDecisionTransactionService refundDecisionTransactionService;
 
     @Override
     @Transactional
@@ -216,6 +213,7 @@ public class StudentRefundServiceImpl implements StudentRefundService {
                 .status(RefundStatus.PENDING)
                 .reason(request.reason().trim())
                 .eligibilitySnapshot(snapshot)
+                .autoRefundNextAttemptAt(standardEligible ? requestedAt : null)
                 .build();
         RefundRequest saved = refundRequestRepository.saveAndFlush(refund);
         // Lock course access before exposing the pending request. This closes the
@@ -227,52 +225,7 @@ public class StudentRefundServiceImpl implements StudentRefundService {
                     enrollmentRecord.setStatus(com.manabihub.learning.enums.EnrollmentStatus.REFUND_PENDING);
                     enrollmentRepository.save(enrollmentRecord);
         });
-        if (standardEligible) {
-            // Do not settle inside the request transaction. Escrow/wallet data may
-            // require reconciliation; a failed automatic settlement must not
-            // roll back the student's refund request and the REFUND_PENDING lock.
-            // The separate transaction also prevents the outer persistence context
-            // from overwriting a successful wallet settlement with stale PENDING
-            // state at commit time.
-            scheduleAutomaticApproval(saved.getId());
-        }
         return toStudentResponse(saved);
-    }
-
-    private void scheduleAutomaticApproval(UUID refundId) {
-        Runnable approvalTask = () -> {
-            try {
-                refundDecisionTransactionService.autoApproveToStudentWallet(refundId);
-            } catch (BusinessException exception) {
-                log.warn(
-                        "Automatic wallet refund approval requires review for {} ({}): {}",
-                        refundId,
-                        exception.getMessageCode(),
-                        exception.getMessage()
-                );
-            } catch (RuntimeException exception) {
-                log.error(
-                        "Automatic wallet refund approval failed for {} without rolling back the request",
-                        refundId,
-                        exception
-                );
-            }
-        };
-
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            // Keeps the service deterministic in non-transactional unit tests and
-            // in command-line tooling that invokes it without a Spring transaction.
-            approvalTask.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        approvalTask.run();
-                    }
-                }
-        );
     }
 
     @Override
@@ -312,6 +265,7 @@ public class StudentRefundServiceImpl implements StudentRefundService {
             );
         }
         refund.setStatus(RefundStatus.CANCELLED);
+        refund.setAutoRefundNextAttemptAt(null);
         reopenEnrollmentIfPending(student.getId(), refund.getOrderItem().getCourse().getId());
         return toStudentResponse(refundRequestRepository.save(refund));
     }
@@ -358,7 +312,9 @@ public class StudentRefundServiceImpl implements StudentRefundService {
                 refund.getDecidedAt(),
                 isCancellable(refund),
                 refund.getCreatedAt(),
-                refund.getUpdatedAt()
+                refund.getUpdatedAt(),
+                refund.getStatus() == RefundStatus.PENDING && refund.getAutoRefundNextAttemptAt() != null,
+                refund.getReconciliationReasonCode()
         );
     }
 

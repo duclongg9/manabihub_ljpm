@@ -111,6 +111,17 @@ public class RefundRequest {
     @Column(name = "wallet_transaction_id")
     private UUID walletTransactionId;
 
+    // Durable automatic-settlement work, committed with the student's request.
+    @Column(name = "auto_refund_next_attempt_at")
+    private Instant autoRefundNextAttemptAt;
+
+    @Builder.Default
+    @Column(name = "auto_refund_attempt_count", nullable = false)
+    private int autoRefundAttemptCount = 0;
+
+    @Column(name = "auto_refund_last_error_code", length = 80)
+    private String autoRefundLastErrorCode;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

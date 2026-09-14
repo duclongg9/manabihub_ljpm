@@ -606,6 +606,9 @@ export function AdminRefundDetail() {
           <TechnicalItem label="Payment transaction ID" value={detail.paymentProviderTransactionId} />
           <TechnicalItem label="Provider result code" value={detail.providerResultCode} />
           <TechnicalItem label="Reconciliation reason code" value={detail.reconciliationReasonCode} />
+          <TechnicalItem label="Số lần xử lý hoàn tiền tự động" value={String(detail.autoRefundAttemptCount ?? 0)} />
+          <TechnicalItem label="Mã lỗi tự động gần nhất" value={detail.autoRefundLastErrorCode} />
+          <TechnicalItem label="Lần thử tiếp theo" value={detail.autoRefundNextAttemptAt ? formatDate(detail.autoRefundNextAttemptAt) : null} />
         </dl>
       </details>
 
