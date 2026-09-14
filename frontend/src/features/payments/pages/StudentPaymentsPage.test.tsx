@@ -39,6 +39,12 @@ vi.mock('../hooks/useOrderHistory', () => ({
 
 vi.mock('../../refunds/hooks/useStudentRefunds', () => ({
   useStudentRefunds: vi.fn(),
+  useStudentRefundDetail: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  })),
   useCreateStudentRefund: vi.fn(() => ({
     reset: vi.fn(),
     mutateAsync: vi.fn(),
