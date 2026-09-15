@@ -38,6 +38,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.manabihub.common.util.PersonNameNormalizer;
+import com.manabihub.identity.entity.AccountIdentityVerification;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -134,6 +136,7 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
         }
 
         BankAccountSnapshot snapshot = buildSnapshot(student.getId(), request);
+        requireHolderNameMatchesIdentity(userId, student, snapshot.getAccountHolderName());
         otpService.consumeVerification(userId.toString(), request);
 
         WithdrawalRequest withdrawal = WithdrawalRequest.builder()
@@ -336,6 +339,28 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
                         MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND,
                         "Student profile was not found",
                         HttpStatus.NOT_FOUND));
+    }
+
+    /** BR-WAL-04: the payout account must be held by the verified identity. */
+    private void requireHolderNameMatchesIdentity(
+            UUID userId,
+            StudentProfile student,
+            String accountHolderName
+    ) {
+        String verifiedName = accountIdentityVerificationService.findVerified(userId)
+                .map(AccountIdentityVerification::getFullName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse(student.getIdentityFullName());
+
+        String normalizedVerified = PersonNameNormalizer.normalize(verifiedName);
+        String normalizedHolder = PersonNameNormalizer.normalize(accountHolderName);
+
+        if (normalizedVerified.isBlank() || !normalizedVerified.equals(normalizedHolder)) {
+            throw new BusinessException(
+                    MessageCodes.MSG_WALLET_005,
+                    "Tên chủ tài khoản ngân hàng không khớp với danh tính đã xác minh.",
+                    HttpStatus.FORBIDDEN);
+        }
     }
 
     private BusinessException walletNotFound() {

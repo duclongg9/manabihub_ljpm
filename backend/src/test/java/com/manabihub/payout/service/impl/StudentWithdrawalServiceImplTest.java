@@ -81,6 +81,7 @@ class StudentWithdrawalServiceImplTest {
         student.setId(UUID.randomUUID());
         student.setUser(user);
         student.setIdentityVerifiedAt(Instant.now());
+        student.setIdentityFullName("NGUYEN VAN A");
         wallet = Wallet.builder()
                 .id(UUID.randomUUID())
                 .ownerType(WalletOwnerType.STUDENT)
@@ -187,9 +188,12 @@ class StudentWithdrawalServiceImplTest {
     @Test
     void createWithdrawal_acceptsIdentityVerifiedThroughTeacherEntryPoint() {
         student.setIdentityVerifiedAt(null);
+        student.setIdentityFullName(null);
         ReflectionTestUtils.setField(service, "identityVerificationMode", "direct-sdk");
         AccountIdentityVerification sharedVerification = new AccountIdentityVerification();
         sharedVerification.setUserId(userId);
+        sharedVerification.setProvider("VNPT_EKYC_WEB_SDK");
+        sharedVerification.setFullName("NGUYEN VAN A");
         sharedVerification.setProvider("VNPT_EKYC_WEB_SDK");
         when(accountIdentityVerificationService.findVerified(userId))
                 .thenReturn(Optional.of(sharedVerification));
@@ -221,6 +225,28 @@ class StudentWithdrawalServiceImplTest {
         verify(otpService).consumeVerification(userId.toString(), request);
         verify(studentWalletService).reserveForWithdrawal(
                 student.getId(), withdrawalId, request.getAmount());
+    }
+
+    @Test
+    void createWithdrawal_rejectsBankAccountHeldByAnotherPerson() {
+        CreateWithdrawalRequest request = request(new BigDecimal("200000.00"));
+        request.getBankAccount().setAccountHolderName("TRAN VAN KHAC");
+        stubOwnerAndWallet();
+        when(withdrawalRequestRepository.countByStudentIdAndStatus(
+                student.getId(), WithdrawalStatus.PENDING)).thenReturn(0L);
+        when(withdrawalRequestRepository.countByStudentIdAndCreatedAtAfter(
+                eq(student.getId()), any(LocalDateTime.class))).thenReturn(0L);
+        when(securityService.encryptAccountNumber("0123456789"))
+                .thenReturn("enc:student-account");
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.createWithdrawal(userId, request));
+
+        assertEquals(MessageCodes.MSG_WALLET_005, error.getMessageCode());
+        verify(otpService, never()).consumeVerification(any(), any());
+        verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+        verify(studentWalletService, never()).reserveForWithdrawal(any(), any(), any());
     }
 
     @Test

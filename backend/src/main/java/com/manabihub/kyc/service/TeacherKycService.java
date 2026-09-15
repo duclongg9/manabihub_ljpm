@@ -1385,14 +1385,7 @@ public class TeacherKycService {
     }
 
     private String normalizePersonName(String value) {
-        if (value == null) {
-            return "";
-        }
-        String preprocessed = value.replace('Đ', 'D').replace('đ', 'd');
-        return java.text.Normalizer.normalize(preprocessed, java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .replaceAll("[^A-Za-z0-9]", "")
-                .toUpperCase(Locale.ROOT);
+        return com.manabihub.common.util.PersonNameNormalizer.normalize(value);
     }
 
     private String normalizeCertificateOcrText(String value) {
