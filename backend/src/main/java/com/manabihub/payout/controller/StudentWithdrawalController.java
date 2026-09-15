@@ -32,8 +32,8 @@ public class StudentWithdrawalController {
             @Valid @RequestBody CreateWithdrawalRequest request
     ) {
         return ApiResponse.success(
-                MessageCodes.PAYOUT_WITHDRAWAL_REQUEST_CREATED,
-                "Withdrawal request created",
+                MessageCodes.MSG_WALLET_002,
+                "Yêu cầu rút tiền đã được tạo.",
                 withdrawalService.createWithdrawal(userId(jwt), request));
     }
 

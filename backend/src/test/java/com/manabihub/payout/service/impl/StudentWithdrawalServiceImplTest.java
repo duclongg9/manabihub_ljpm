@@ -145,7 +145,7 @@ class StudentWithdrawalServiceImplTest {
                 () -> service.createWithdrawal(
                         userId, request(new BigDecimal("100000.00"))));
 
-        assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, error.getMessageCode());
+        assertEquals(MessageCodes.MSG_WALLET_004, error.getMessageCode());
         verify(otpService, never()).consumeVerification(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
     }
@@ -177,7 +177,7 @@ class StudentWithdrawalServiceImplTest {
                 () -> service.createWithdrawal(
                         userId, request(new BigDecimal("100000.00"))));
 
-        assertEquals(MessageCodes.MSG_KYC_002, error.getMessageCode());
+        assertEquals(MessageCodes.MSG_WALLET_005, error.getMessageCode());
         verify(studentWalletService, never()).getOrCreateStudentWallet(any());
         verify(walletRepository, never()).findByOwnerTypeAndStudent_IdForUpdate(any(), any());
         verify(otpService, never()).consumeVerification(any(), any());
