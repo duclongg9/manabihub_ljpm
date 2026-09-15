@@ -145,7 +145,7 @@ class StudentWithdrawalServiceImplTest {
                 () -> service.createWithdrawal(
                         userId, request(new BigDecimal("100000.00"))));
 
-        assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, error.getMessageCode());
+        assertEquals(MessageCodes.MSG_WALLET_001, error.getMessageCode());
         verify(otpService, never()).consumeVerification(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
     }

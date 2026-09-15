@@ -190,14 +190,14 @@ public class StudentWalletServiceImpl implements StudentWalletService {
         }
         if (reserved == 0 && wallet.isFrozen()) {
             throw new BusinessException(
-                    MessageCodes.PAYOUT_BALANCE_FROZEN,
-                    "Student wallet is frozen and cannot create a withdrawal",
+                    MessageCodes.MSG_WALLET_003,
+                    "Ví doanh thu đang bị tạm khóa do vi phạm hoặc đang chờ xử lý.",
                     HttpStatus.CONFLICT);
         }
         if (reserved == 0) {
             throw new BusinessException(
-                    MessageCodes.WALLET_INSUFFICIENT_BALANCE,
-                    "Insufficient withdrawable balance",
+                    MessageCodes.MSG_WALLET_001,
+                    "Số dư khả dụng không đủ để thực hiện yêu cầu.",
                     HttpStatus.BAD_REQUEST);
         }
 
