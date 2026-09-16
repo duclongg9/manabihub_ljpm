@@ -20,6 +20,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.method.HandlerMethod;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -43,6 +46,9 @@ import com.manabihub.common.exception.ValidationBusinessException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final java.util.regex.Pattern HAS_ROLE_PATTERN =
+            java.util.regex.Pattern.compile("hasRole\\(\\s*['\"]([A-Z_]+)['\"]\\s*\\)");
 
     // ──────────────────────────────────────────────
     // Business errors
@@ -235,16 +241,63 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
-            AccessDeniedException ex, HttpServletRequest request) {
+            AccessDeniedException ex, HttpServletRequest request, HandlerMethod handlerMethod) {
 
         log.warn("Access denied for request to {}", request.getRequestURI());
 
+        String code = resolveRoleMessageCode(handlerMethod);
         ApiResponse<Void> response = ApiResponse.error(
-                MessageCodes.AUTH_FORBIDDEN,
-                "You do not have permission to access this resource",
+                code,
+                roleMessage(code),
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.FORBIDDEN.value()).body(response);
+    }
+
+    /**
+     * §5.2 MSG-ADM-006/007/008: khi endpoint bị chặn bởi @PreAuthorize("hasRole('X')"),
+     * trả về mã tương ứng với vai trò được yêu cầu thay vì mã chung AUTH_FORBIDDEN.
+     */
+    private String resolveRoleMessageCode(HandlerMethod handlerMethod) {
+        if (handlerMethod == null) {
+            return MessageCodes.AUTH_FORBIDDEN;
+        }
+        PreAuthorize annotation = AnnotatedElementUtils.findMergedAnnotation(
+                handlerMethod.getMethod(), PreAuthorize.class);
+        if (annotation == null) {
+            annotation = AnnotatedElementUtils.findMergedAnnotation(
+                    handlerMethod.getBeanType(), PreAuthorize.class);
+        }
+        if (annotation == null || annotation.value() == null) {
+            return MessageCodes.AUTH_FORBIDDEN;
+        }
+        java.util.regex.Matcher matcher = HAS_ROLE_PATTERN.matcher(annotation.value());
+        if (!matcher.find()) {
+            return MessageCodes.AUTH_FORBIDDEN;
+        }
+        switch (matcher.group(1)) {
+            case "SYSTEM_ADMIN":
+                return MessageCodes.MSG_ADM_006;
+            case "COURSE_MANAGER":
+                return MessageCodes.MSG_ADM_007;
+            case "FINANCE_MANAGER":
+                return MessageCodes.MSG_ADM_008;
+            default:
+                return MessageCodes.AUTH_FORBIDDEN;
+        }
+    }
+
+    private String roleMessage(String code) {
+        switch (code) {
+            case MessageCodes.MSG_ADM_006:
+                return "Thao tác này yêu cầu quyền Quản trị viên hệ thống.";
+            case MessageCodes.MSG_ADM_007:
+                return "Thao tác này yêu cầu quyền Quản lý khóa học.";
+            case MessageCodes.MSG_ADM_008:
+                return "Thao tác này yêu cầu quyền Quản lý tài chính.";
+            default:
+                return "You do not have permission to access this resource";
+        }
     }
 
     @ExceptionHandler(AuthenticationException.class)

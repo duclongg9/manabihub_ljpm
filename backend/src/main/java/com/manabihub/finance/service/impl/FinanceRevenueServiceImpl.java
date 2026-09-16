@@ -299,7 +299,7 @@ public class FinanceRevenueServiceImpl implements FinanceRevenueService {
     private void requireFinanceAccess() {
         if (!adminRepository.hasPermission(currentUserService.getCurrentUserId(), VIEW_PERMISSION)) {
             throw new BusinessException(
-                    MessageCodes.ADMIN_PERMISSION_DENIED,
+                    MessageCodes.MSG_ADM_008,
                     "Finance revenue permission is required",
                     HttpStatus.FORBIDDEN
             );
