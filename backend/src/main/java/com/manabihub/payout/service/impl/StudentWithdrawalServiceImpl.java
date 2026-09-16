@@ -232,7 +232,8 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
     @Transactional(readOnly = true)
     public List<StudentBankAccountResponse> getSavedBankAccounts(UUID userId) {
         StudentProfile student = requireStudent(userId);
-        return bankAccountRepository.findByStudentIdOrderByCreatedAtDesc(student.getId())
+        return bankAccountRepository
+                .findByStudentIdAndOwnershipVerifiedTrueOrderByCreatedAtDesc(student.getId())
                 .stream()
                 .map(account -> StudentBankAccountResponse.builder()
                         .id(account.getId())

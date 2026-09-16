@@ -33,6 +33,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import com.manabihub.payout.entity.StudentBankAccount;
+import com.manabihub.payout.dto.response.StudentBankAccountResponse;
+import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -270,6 +274,31 @@ class StudentWithdrawalServiceImplTest {
         assertEquals(MessageCodes.PAYOUT_BANK_OWNERSHIP_REQUIRED, error.getMessageCode());
         verify(otpService, never()).consumeVerification(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void getSavedBankAccounts_returnsOnlyOwnershipVerifiedAccounts() {
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+        StudentBankAccount verified = StudentBankAccount.builder()
+                .id(UUID.randomUUID())
+                .studentId(student.getId())
+                .bankCode("VCB")
+                .bankName("Vietcombank")
+                .accountNumber("enc:student-account")
+                .accountHolderName("NGUYEN VAN A")
+                .ownershipVerified(true)
+                .build();
+        when(bankAccountRepository
+                .findByStudentIdAndOwnershipVerifiedTrueOrderByCreatedAtDesc(student.getId()))
+                .thenReturn(List.of(verified));
+        when(securityService.maskAccountNumber("enc:student-account")).thenReturn("****6789");
+
+        List<StudentBankAccountResponse> accounts = service.getSavedBankAccounts(userId);
+
+        assertEquals(1, accounts.size());
+        assertEquals("VCB", accounts.get(0).getBankCode());
+        assertEquals("****6789", accounts.get(0).getAccountNumber());
+        assertTrue(accounts.get(0).isOwnershipVerified());
     }
 
     @Test
