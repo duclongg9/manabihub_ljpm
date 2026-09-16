@@ -8,6 +8,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -349,5 +350,19 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR.value()).body(response);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpServletRequest request) {
+
+        log.warn("Malformed JSON or invalid enum payload on request to {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ApiResponse<Void> response = ApiResponse.error(
+                MessageCodes.VALIDATION_FAILED,
+                "Input validation failed: Malformed payload or invalid enum format",
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 }
