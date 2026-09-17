@@ -31,6 +31,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
 class ChallengeRewardSettlementServiceTest {
@@ -103,6 +104,7 @@ class ChallengeRewardSettlementServiceTest {
                 eq(WalletTransactionType.GAME_REWARD), eq("WEEKLY_CHALLENGE"),
                 eq(challengeId), anyString(), anyString());
         verify(rewardRepository, times(2)).save(any(WeeklyLearningChallengeReward.class));
+        assertNotNull(challenge.getSettledAt());
         assertEquals(ChallengeStatus.ARCHIVED, challenge.getStatus());
         verify(challengeRepository).save(challenge);
     }
@@ -118,6 +120,7 @@ class ChallengeRewardSettlementServiceTest {
         service.settleWeeklyChallenge(challengeId);
 
         verifyNoInteractions(attemptRepository, rewardRepository, walletService);
+        assertNull(challenge.getSettledAt());
         assertEquals(ChallengeStatus.PUBLISHED, challenge.getStatus());
     }
 
