@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WeeklyChallengeManagementPage } from './WeeklyChallengeManagementPage';
-import { mondayOfCurrentWeek } from './weeklyChallengeDate';
+import { mondayOfCurrentWeek, mondayOfWeek } from './weeklyChallengeDate';
 import { weeklyChallengeAdminService } from './weeklyChallengeAdminService';
+import '@testing-library/jest-dom/vitest';
 
 vi.mock('./weeklyChallengeAdminService', () => ({
   weeklyChallengeAdminService: {
@@ -26,6 +27,15 @@ describe('WeeklyChallengeManagementPage', () => {
 
   it('uses the Vietnam business date when calculating the current Monday', () => {
     expect(mondayOfCurrentWeek(new Date('2026-08-09T17:30:00.000Z'))).toBe('2026-08-10');
+  });
+
+
+  it('snaps any weekday to the Monday of that same week', () => {
+    expect(mondayOfWeek('2026-09-30')).toBe('2026-09-28'); // Thứ Tư
+    expect(mondayOfWeek('2026-10-03')).toBe('2026-09-28'); // Thứ Bảy
+    expect(mondayOfWeek('2026-10-04')).toBe('2026-09-28'); // Chủ Nhật
+    expect(mondayOfWeek('2026-09-28')).toBe('2026-09-28'); // Thứ Hai giữ nguyên
+    expect(mondayOfWeek('')).toBe('');                      // cho phép xóa trắng
   });
 
   it('shows how to activate the weekly game when no challenge exists', async () => {

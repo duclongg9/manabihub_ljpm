@@ -20,3 +20,22 @@ export function mondayOfCurrentWeek(now = new Date()) {
   businessDate.setUTCDate(businessDate.getUTCDate() - Math.max(0, weekdayIndex));
   return businessDate.toISOString().slice(0, 10);
 }
+
+/**
+ * Lùi một ngày bất kỳ về Thứ Hai của chính tuần đó.
+ * Nhận và trả chuỗi 'YYYY-MM-DD'. Chuỗi rỗng hoặc không đúng định dạng được
+ * trả nguyên vẹn, để người dùng vẫn xóa trắng được ô ngày trong lúc nhập.
+ */
+export function mondayOfWeek(isoDate: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
+    return isoDate;
+  }
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(date.getTime())) {
+    return isoDate;
+  }
+  const weekdayIndex = (date.getUTCDay() + 6) % 7; // Thứ Hai = 0 ... Chủ Nhật = 6
+  date.setUTCDate(date.getUTCDate() - weekdayIndex);
+  return date.toISOString().slice(0, 10);
+}
