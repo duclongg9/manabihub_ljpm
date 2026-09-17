@@ -13,5 +13,5 @@ public interface StudentBankAccountRepository extends JpaRepository<StudentBankA
             UUID studentId,
             String accountFingerprint
     );
-    List<StudentBankAccount> findByStudentIdOrderByCreatedAtDesc(UUID studentId);
+    List<StudentBankAccount> findByStudentIdAndOwnershipVerifiedTrueOrderByCreatedAtDesc(UUID studentId);
 }
