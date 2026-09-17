@@ -14,7 +14,7 @@ import {
   weeklyChallengeAdminService, type ChallengePair, type ManagedWeeklyChallenge,
   type WeeklyChallengePayload,
 } from './weeklyChallengeAdminService';
-import { mondayOfCurrentWeek } from './weeklyChallengeDate';
+import { mondayOfCurrentWeek, mondayOfWeek } from './weeklyChallengeDate';
 import { WeeklyChallengeLeaderboardDialog } from '../../shared/components/WeeklyChallengeLeaderboardDialog';
 import type { WeeklyChallengeLeaderboard } from '../../shared/types/weeklyChallengeLeaderboard';
 
@@ -145,8 +145,7 @@ export function WeeklyChallengeManagementPage() {
     <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="md">
       <DialogTitle><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><SportsEsportsOutlinedIcon /><span>{editingId ? 'Sửa thử thách tuần' : 'Tạo thử thách tuần'}</span></Stack></DialogTitle>
       <DialogContent dividers><Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="date" label="Tuần bắt đầu (Thứ Hai)" slotProps={{ inputLabel: { shrink: true } }} value={form.weekStart} onChange={(e) => setForm({ ...form, weekStart: e.target.value })} /></Grid>
-        <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth select label="Cấp độ" value={form.jlptLevel} onChange={(e) => setForm({ ...form, jlptLevel: e.target.value })}>{['N5','N4','N3','N2','N1'].map((level) => <MenuItem key={level} value={level}>{level}</MenuItem>)}</TextField></Grid>
+        <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="date" label="Tuần bắt đầu (Thứ Hai)" slotProps={{ inputLabel: { shrink: true } }} value={form.weekStart} onChange={(e) => setForm({ ...form, weekStart: mondayOfWeek(e.target.value) })} helperText="Chọn ngày bất kỳ trong tuần — hệ thống tự lùi về Thứ Hai." /></Grid>        <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth select label="Cấp độ" value={form.jlptLevel} onChange={(e) => setForm({ ...form, jlptLevel: e.target.value })}>{['N5','N4','N3','N2','N1'].map((level) => <MenuItem key={level} value={level}>{level}</MenuItem>)}</TextField></Grid>
         <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="number" label="Lượt xếp hạng/ngày" value={form.dailyRankedLimit} onChange={(e) => setForm({ ...form, dailyRankedLimit: Number(e.target.value) })} /></Grid>
         <Grid size={{ xs: 12 }}><TextField fullWidth label="Tên thử thách" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Grid>
         <Grid size={{ xs: 12 }}><TextField fullWidth multiline minRows={2} label="Mô tả luật chơi" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Grid>

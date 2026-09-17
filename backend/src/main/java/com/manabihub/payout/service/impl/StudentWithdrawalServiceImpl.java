@@ -38,6 +38,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.manabihub.common.util.PersonNameNormalizer;
+import com.manabihub.identity.entity.AccountIdentityVerification;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -93,8 +95,8 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
                 && (isDirectSdkDemo() || !"VNPT_EKYC_WEB_SDK_DEMO".equals(student.getIdentityProvider()));
         if (!sharedIdentityVerified && !legacyIdentityVerified) {
             throw new BusinessException(
-                    MessageCodes.MSG_KYC_002,
-                    "Vui lòng hoàn tất xác minh CCCD trước khi rút tiền",
+                    MessageCodes.MSG_WALLET_005,
+                    "Bạn cần xác minh danh tính và tài khoản ngân hàng trước khi rút tiền.",
                     HttpStatus.FORBIDDEN);
         }
         studentWalletService.getOrCreateStudentWallet(student.getId());
@@ -102,14 +104,14 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
                 .orElseThrow(this::walletNotFound);
         if (wallet.isFrozen()) {
             throw new BusinessException(
-                    MessageCodes.PAYOUT_BALANCE_FROZEN,
-                    "Student wallet is frozen",
+                    MessageCodes.MSG_WALLET_003,
+                    "Ví doanh thu đang bị tạm khóa do vi phạm hoặc đang chờ xử lý.",
                     HttpStatus.CONFLICT);
         }
         if (wallet.getAvailableWithdrawableBalance().compareTo(request.getAmount()) < 0) {
             throw new BusinessException(
-                    MessageCodes.WALLET_INSUFFICIENT_BALANCE,
-                    "Insufficient withdrawable refund balance",
+                    MessageCodes.MSG_WALLET_004,
+                    "Chỉ số dư hoàn tiền mới được rút. Số tiền yêu cầu vượt quá số dư có thể rút.",
                     HttpStatus.BAD_REQUEST);
         }
         if (withdrawalRequestRepository.countByStudentIdAndStatus(
@@ -134,6 +136,7 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
         }
 
         BankAccountSnapshot snapshot = buildSnapshot(student.getId(), request);
+        requireHolderNameMatchesIdentity(userId, student, snapshot.getAccountHolderName());
         otpService.consumeVerification(userId.toString(), request);
 
         WithdrawalRequest withdrawal = WithdrawalRequest.builder()
@@ -229,7 +232,8 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
     @Transactional(readOnly = true)
     public List<StudentBankAccountResponse> getSavedBankAccounts(UUID userId) {
         StudentProfile student = requireStudent(userId);
-        return bankAccountRepository.findByStudentIdOrderByCreatedAtDesc(student.getId())
+        return bankAccountRepository
+                .findByStudentIdAndOwnershipVerifiedTrueOrderByCreatedAtDesc(student.getId())
                 .stream()
                 .map(account -> StudentBankAccountResponse.builder()
                         .id(account.getId())
@@ -336,6 +340,28 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
                         MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND,
                         "Student profile was not found",
                         HttpStatus.NOT_FOUND));
+    }
+
+    /** BR-WAL-04: the payout account must be held by the verified identity. */
+    private void requireHolderNameMatchesIdentity(
+            UUID userId,
+            StudentProfile student,
+            String accountHolderName
+    ) {
+        String verifiedName = accountIdentityVerificationService.findVerified(userId)
+                .map(AccountIdentityVerification::getFullName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse(student.getIdentityFullName());
+
+        String normalizedVerified = PersonNameNormalizer.normalize(verifiedName);
+        String normalizedHolder = PersonNameNormalizer.normalize(accountHolderName);
+
+        if (normalizedVerified.isBlank() || !normalizedVerified.equals(normalizedHolder)) {
+            throw new BusinessException(
+                    MessageCodes.MSG_WALLET_005,
+                    "Tên chủ tài khoản ngân hàng không khớp với danh tính đã xác minh.",
+                    HttpStatus.FORBIDDEN);
+        }
     }
 
     private BusinessException walletNotFound() {

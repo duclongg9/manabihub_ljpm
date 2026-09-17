@@ -79,7 +79,7 @@ public class TeacherKycController {
 
     @PostMapping(value = "/certificate-submissions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<KycCertificateSubmissionResponse>> submitCertificate(
-            @RequestPart("certificate") MultipartFile certificate,
+            @RequestPart(value = "certificate", required = false) MultipartFile certificate,
             @RequestParam("copyrightAgreementAccepted") boolean copyrightAgreementAccepted,
             @RequestParam("certificateCode") String certificateCode,
             @RequestParam("certificateHolderName") String certificateHolderName,

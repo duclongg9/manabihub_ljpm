@@ -54,6 +54,7 @@ public class CourseReviewServiceImpl implements CourseReviewService {
     private final CourseRepository courseRepository;
     private final CurrentUserService currentUserService;
     private final NotificationService notificationService;
+    private final com.manabihub.audit.service.SecurityEventRecorder securityEventRecorder;
 
     @Override
     public CourseReviewResponse getMyReview(UUID courseId) {
@@ -129,6 +130,20 @@ public class CourseReviewServiceImpl implements CourseReviewService {
         if (course.getTeacher() == null
                 || course.getTeacher().getUser() == null
                 || !currentUserId.equals(course.getTeacher().getUser().getId())) {
+            UUID ownerUserId = course.getTeacher() == null || course.getTeacher().getUser() == null
+                    ? null
+                    : course.getTeacher().getUser().getId();
+            // NFR-SEC-51: vi pham quyen so huu phai duoc ghi nhan truoc khi tu choi.
+            securityEventRecorder.recordAccessDenied(
+                    currentUserId,
+                    "REVIEW_REPLY_OWNERSHIP_DENIED",
+                    "COURSE_REVIEW",
+                    review.getId(),
+                    java.util.Map.of(
+                            "courseId", String.valueOf(course.getId()),
+                            "ownerUserId", String.valueOf(ownerUserId)
+                    )
+            );
             throw new BusinessException(
                     MessageCodes.AUTH_FORBIDDEN,
                     "Bạn chỉ có thể phản hồi bình luận trong khóa học của mình.",

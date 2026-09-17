@@ -285,6 +285,11 @@ public final class MessageCodes {
     // ──────────────────────────────────────────────
     public static final String WALLET_NOT_FOUND = "WALLET_NOT_FOUND";
     public static final String WALLET_INSUFFICIENT_BALANCE = "WALLET_INSUFFICIENT_BALANCE";
+    // SRS Report 3 §5.2 (rows 87-89) — student wallet withdrawal, UC-43
+    public static final String MSG_WALLET_002 = "MSG-WALLET-002";
+    public static final String MSG_WALLET_003 = "MSG-WALLET-003";
+    public static final String MSG_WALLET_004 = "MSG-WALLET-004";
+    public static final String MSG_WALLET_005 = "MSG-WALLET-005";
     public static final String WALLET_TRANSACTION_NOT_FOUND = "WALLET_TRANSACTION_NOT_FOUND";
     public static final String WALLET_HISTORY_UNAVAILABLE = "WALLET_HISTORY_UNAVAILABLE";
 

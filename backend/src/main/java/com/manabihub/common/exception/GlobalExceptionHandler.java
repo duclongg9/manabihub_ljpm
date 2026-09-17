@@ -24,6 +24,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -160,6 +161,21 @@ public class GlobalExceptionHandler {
         ApiResponse<Void> response = ApiResponse.error(
                 MessageCodes.COMMON_BAD_REQUEST,
                 "Missing required parameter: " + ex.getParameterName(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST.value()).body(response);
+    }
+
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingPart(
+            MissingServletRequestPartException ex, HttpServletRequest request) {
+
+        log.warn("Missing request part: {}", ex.getRequestPartName());
+
+        ApiResponse<Void> response = ApiResponse.error(
+                MessageCodes.COMMON_BAD_REQUEST,
+                "Missing required part: " + ex.getRequestPartName(),
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST.value()).body(response);

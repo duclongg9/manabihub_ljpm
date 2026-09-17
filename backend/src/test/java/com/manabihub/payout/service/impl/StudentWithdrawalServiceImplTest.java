@@ -33,6 +33,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import com.manabihub.payout.entity.StudentBankAccount;
+import com.manabihub.payout.dto.response.StudentBankAccountResponse;
+import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -81,6 +85,7 @@ class StudentWithdrawalServiceImplTest {
         student.setId(UUID.randomUUID());
         student.setUser(user);
         student.setIdentityVerifiedAt(Instant.now());
+        student.setIdentityFullName("NGUYEN VAN A");
         wallet = Wallet.builder()
                 .id(UUID.randomUUID())
                 .ownerType(WalletOwnerType.STUDENT)
@@ -145,7 +150,7 @@ class StudentWithdrawalServiceImplTest {
                 () -> service.createWithdrawal(
                         userId, request(new BigDecimal("100000.00"))));
 
-        assertEquals(MessageCodes.WALLET_INSUFFICIENT_BALANCE, error.getMessageCode());
+        assertEquals(MessageCodes.MSG_WALLET_004, error.getMessageCode());
         verify(otpService, never()).consumeVerification(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
     }
@@ -177,7 +182,7 @@ class StudentWithdrawalServiceImplTest {
                 () -> service.createWithdrawal(
                         userId, request(new BigDecimal("100000.00"))));
 
-        assertEquals(MessageCodes.MSG_KYC_002, error.getMessageCode());
+        assertEquals(MessageCodes.MSG_WALLET_005, error.getMessageCode());
         verify(studentWalletService, never()).getOrCreateStudentWallet(any());
         verify(walletRepository, never()).findByOwnerTypeAndStudent_IdForUpdate(any(), any());
         verify(otpService, never()).consumeVerification(any(), any());
@@ -187,9 +192,12 @@ class StudentWithdrawalServiceImplTest {
     @Test
     void createWithdrawal_acceptsIdentityVerifiedThroughTeacherEntryPoint() {
         student.setIdentityVerifiedAt(null);
+        student.setIdentityFullName(null);
         ReflectionTestUtils.setField(service, "identityVerificationMode", "direct-sdk");
         AccountIdentityVerification sharedVerification = new AccountIdentityVerification();
         sharedVerification.setUserId(userId);
+        sharedVerification.setProvider("VNPT_EKYC_WEB_SDK");
+        sharedVerification.setFullName("NGUYEN VAN A");
         sharedVerification.setProvider("VNPT_EKYC_WEB_SDK");
         when(accountIdentityVerificationService.findVerified(userId))
                 .thenReturn(Optional.of(sharedVerification));
@@ -224,6 +232,28 @@ class StudentWithdrawalServiceImplTest {
     }
 
     @Test
+    void createWithdrawal_rejectsBankAccountHeldByAnotherPerson() {
+        CreateWithdrawalRequest request = request(new BigDecimal("200000.00"));
+        request.getBankAccount().setAccountHolderName("TRAN VAN KHAC");
+        stubOwnerAndWallet();
+        when(withdrawalRequestRepository.countByStudentIdAndStatus(
+                student.getId(), WithdrawalStatus.PENDING)).thenReturn(0L);
+        when(withdrawalRequestRepository.countByStudentIdAndCreatedAtAfter(
+                eq(student.getId()), any(LocalDateTime.class))).thenReturn(0L);
+        when(securityService.encryptAccountNumber("0123456789"))
+                .thenReturn("enc:student-account");
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.createWithdrawal(userId, request));
+
+        assertEquals(MessageCodes.MSG_WALLET_005, error.getMessageCode());
+        verify(otpService, never()).consumeVerification(any(), any());
+        verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+        verify(studentWalletService, never()).reserveForWithdrawal(any(), any(), any());
+    }
+
+    @Test
     void createWithdrawal_requiresSimulatedOwnershipVerificationBeforeOtp() {
         CreateWithdrawalRequest request = request(new BigDecimal("100000.00"));
         request.setOwnershipConfirmed(false);
@@ -244,6 +274,31 @@ class StudentWithdrawalServiceImplTest {
         assertEquals(MessageCodes.PAYOUT_BANK_OWNERSHIP_REQUIRED, error.getMessageCode());
         verify(otpService, never()).consumeVerification(any(), any());
         verify(withdrawalRequestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void getSavedBankAccounts_returnsOnlyOwnershipVerifiedAccounts() {
+        when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+        StudentBankAccount verified = StudentBankAccount.builder()
+                .id(UUID.randomUUID())
+                .studentId(student.getId())
+                .bankCode("VCB")
+                .bankName("Vietcombank")
+                .accountNumber("enc:student-account")
+                .accountHolderName("NGUYEN VAN A")
+                .ownershipVerified(true)
+                .build();
+        when(bankAccountRepository
+                .findByStudentIdAndOwnershipVerifiedTrueOrderByCreatedAtDesc(student.getId()))
+                .thenReturn(List.of(verified));
+        when(securityService.maskAccountNumber("enc:student-account")).thenReturn("****6789");
+
+        List<StudentBankAccountResponse> accounts = service.getSavedBankAccounts(userId);
+
+        assertEquals(1, accounts.size());
+        assertEquals("VCB", accounts.get(0).getBankCode());
+        assertEquals("****6789", accounts.get(0).getAccountNumber());
+        assertTrue(accounts.get(0).isOwnershipVerified());
     }
 
     @Test

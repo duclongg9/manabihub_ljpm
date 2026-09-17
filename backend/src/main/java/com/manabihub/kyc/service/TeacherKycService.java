@@ -631,6 +631,7 @@ public class TeacherKycService {
 
     @Transactional
     public KycCertificateSubmissionResponse submitCertificate(
+
             UUID userId,
             MultipartFile certificate,
             String certificateCode,
@@ -641,7 +642,11 @@ public class TeacherKycService {
             boolean copyrightAgreementAccepted,
             String ipAddress,
             String userAgent
-    ) {
+    ) {        // KS02: phan du lieu "certificate" khai bao required=false o controller de
+        // loi thieu file duoc tra ve bang ma nghiep vu MSG-KYC-002 thay vi 500.
+        if (certificate == null || certificate.isEmpty()) {
+            throw invalidFile("file is required");
+        }
         TeacherProfile teacherProfile = resolveTeacher(userId);
         AppUser user = teacherProfile.getUser();
         KycRequest kycRequest = validateCertificateSubmissionAllowed(user, teacherProfile);
@@ -1385,14 +1390,7 @@ public class TeacherKycService {
     }
 
     private String normalizePersonName(String value) {
-        if (value == null) {
-            return "";
-        }
-        String preprocessed = value.replace('Đ', 'D').replace('đ', 'd');
-        return java.text.Normalizer.normalize(preprocessed, java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .replaceAll("[^A-Za-z0-9]", "")
-                .toUpperCase(Locale.ROOT);
+        return com.manabihub.common.util.PersonNameNormalizer.normalize(value);
     }
 
     private String normalizeCertificateOcrText(String value) {
