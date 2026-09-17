@@ -78,6 +78,8 @@ class CourseReviewServiceImplTest {
     private CurrentUserService currentUserService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private com.manabihub.audit.service.SecurityEventRecorder securityEventRecorder;
 
     private CourseReviewServiceImpl service;
     private UUID currentUserId;
@@ -94,7 +96,8 @@ class CourseReviewServiceImplTest {
                 studentProfileRepository,
                 courseRepository,
                 currentUserService,
-                notificationService
+                notificationService,
+                securityEventRecorder
         );
         currentUserId = UUID.randomUUID();
         AppUser user = AppUser.builder()
