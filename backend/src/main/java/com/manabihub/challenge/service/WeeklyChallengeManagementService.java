@@ -9,6 +9,7 @@ import com.manabihub.challenge.repository.*;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.repository.CourseRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class WeeklyChallengeManagementService {
     private static final String ERROR = "WEEKLY_CHALLENGE_INVALID";
+    private static final String CONFLICT_ERROR = "WEEKLY_CHALLENGE_CONFLICT";
     private final WeeklyLearningChallengeRepository challengeRepository;
     private final WeeklyLearningChallengePairRepository pairRepository;
     private final WeeklyLearningChallengeAttemptRepository attemptRepository;
@@ -44,7 +46,15 @@ public class WeeklyChallengeManagementService {
         WeeklyLearningChallenge challenge = WeeklyLearningChallenge.builder()
                 .id(UUID.randomUUID()).status(ChallengeStatus.DRAFT).createdBy(adminId).build();
         apply(challenge, request);
-        challengeRepository.save(challenge);
+        try {
+            // Kiem tra findByWeekStart o tren la doc-roi-ghi khong khoa: hai yeu cau
+            // dong thoi deu co the vuot qua no. uq_weekly_learning_challenges_week moi
+            // la bao dam that, nen phai dich ngoai le cua no thanh 409 thay vi de roi
+            // xuong handler chung va tra 500.
+            challengeRepository.saveAndFlush(challenge);
+        } catch (DataIntegrityViolationException ex) {
+            throw conflict("Tuần này đã có một thử thách");
+        }
         replacePairs(challenge.getId(), request.pairs());
         audit(adminId, "WEEKLY_CHALLENGE_CREATED", challenge.getId(), Map.of("weekStart", request.weekStart().toString()));
         return map(challenge);
@@ -189,5 +199,5 @@ public class WeeklyChallengeManagementService {
     }
 
     private BusinessException invalid(String message) { return new BusinessException(ERROR, message, HttpStatus.BAD_REQUEST); }
-    private BusinessException conflict(String message) { return new BusinessException(ERROR, message, HttpStatus.CONFLICT); }
+    private BusinessException conflict(String message) { return new BusinessException(CONFLICT_ERROR, message, HttpStatus.CONFLICT); }
 }
