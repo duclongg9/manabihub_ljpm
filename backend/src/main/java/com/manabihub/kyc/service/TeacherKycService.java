@@ -631,6 +631,7 @@ public class TeacherKycService {
 
     @Transactional
     public KycCertificateSubmissionResponse submitCertificate(
+
             UUID userId,
             MultipartFile certificate,
             String certificateCode,
@@ -641,7 +642,11 @@ public class TeacherKycService {
             boolean copyrightAgreementAccepted,
             String ipAddress,
             String userAgent
-    ) {
+    ) {        // KS02: phan du lieu "certificate" khai bao required=false o controller de
+        // loi thieu file duoc tra ve bang ma nghiep vu MSG-KYC-002 thay vi 500.
+        if (certificate == null || certificate.isEmpty()) {
+            throw invalidFile("file is required");
+        }
         TeacherProfile teacherProfile = resolveTeacher(userId);
         AppUser user = teacherProfile.getUser();
         KycRequest kycRequest = validateCertificateSubmissionAllowed(user, teacherProfile);
