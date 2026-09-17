@@ -207,7 +207,11 @@ public class SystemExpenseServiceImpl implements SystemExpenseService {
             return toDetail(expense);
         }
         if (reason == null || reason.isBlank()) {
-            throw new BusinessException(MessageCodes.VALIDATION_FAILED, "Void reason is required");
+            throw new BusinessException(
+                    MessageCodes.MSG_EXP_002,
+                    "Vui lòng nhập lý do hủy chứng từ chi phí.",
+                    HttpStatus.BAD_REQUEST
+            );
         }
         ExpenseStatus before = expense.getStatus();
         expense.setStatus(ExpenseStatus.VOID);

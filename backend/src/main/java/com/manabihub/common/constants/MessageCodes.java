@@ -52,6 +52,16 @@ public final class MessageCodes {
     // ──────────────────────────────────────────────
     public static final String AUTH_UNAUTHORIZED = "AUTH_UNAUTHORIZED";
     public static final String AUTH_FORBIDDEN = "AUTH_FORBIDDEN";
+    /** §5.2 MSG-ADM-006: thao tác yêu cầu quyền System Admin. */
+    public static final String MSG_ADM_006 = "MSG-ADM-006";
+    /** §5.2 MSG-ADM-007: thao tác yêu cầu quyền Course Manager. */
+    public static final String MSG_ADM_007 = "MSG-ADM-007";
+    /** §5.2 MSG-ADM-008: thao tác yêu cầu quyền Finance Manager. */
+    public static final String MSG_ADM_008 = "MSG-ADM-008";
+    /** §5.2 MSG-EXP-001: chứng từ chi phí đã được xác nhận. */
+    public static final String MSG_EXP_001 = "MSG-EXP-001";
+    /** §5.2 MSG-EXP-002: bắt buộc nhập lý do khi hủy chứng từ chi phí. */
+    public static final String MSG_EXP_002 = "MSG-EXP-002";
     public static final String AUTH_TOKEN_EXPIRED = "AUTH_TOKEN_EXPIRED";
     public static final String AUTH_TOKEN_INVALID = "AUTH_TOKEN_INVALID";
     public static final String AUTH_LOGIN_SUCCESS = "AUTH_LOGIN_SUCCESS";
