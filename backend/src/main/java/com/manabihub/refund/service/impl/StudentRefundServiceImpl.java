@@ -131,6 +131,20 @@ public class StudentRefundServiceImpl implements StudentRefundService {
                         MessageCodes.COMMON_BAD_REQUEST,
                         "Immutable order-item financial snapshot is missing"
                 ));
+        // MHB-021: the refund terms are the ones in force when the order was paid, not the
+        // ones in force now. Snapshots written before V083 carry no terms; for those, and
+        // only those, the current policy remains the best available answer.
+        boolean termsFrozenAtPurchase = financialSnapshot.getRefundWindowDays() != null
+                && financialSnapshot.getRefundProgressLimitPercent() != null;
+        int effectiveRefundWindowDays = termsFrozenAtPurchase
+                ? financialSnapshot.getRefundWindowDays()
+                : policy.refundWindowDays();
+        int effectiveProgressLimitPercent = termsFrozenAtPurchase
+                ? financialSnapshot.getRefundProgressLimitPercent()
+                : policy.refundProgressLimitPercent();
+        String effectivePolicyVersion = termsFrozenAtPurchase
+                ? financialSnapshot.getCommercialPolicyVersion()
+                : policy.policyVersion();
 
         var enrollment = enrollmentRepository
                 .findByStudent_IdAndCourse_Id(student.getId(), orderItem.getCourse().getId());
@@ -142,11 +156,11 @@ public class StudentRefundServiceImpl implements StudentRefundService {
                 .orElse(new LearningProgressDomainService.ProgressResult(0, 0, 0.0));
 
         boolean withinRefundWindow = elapsedDays >= 0
-                && elapsedDays <= policy.refundWindowDays();
+                && elapsedDays <= effectiveRefundWindowDays;
         // BR-REF-01 says progress must not exceed the threshold, so exactly 20% is eligible.
         boolean withinProgressLimit = Double.compare(
                 progress.percent(),
-                policy.refundProgressLimitPercent()
+                effectiveProgressLimitPercent
         ) <= 0;
         Instant protectedMaterialsDownloadedAt = enrollment
                 .map(enrollmentRecord -> enrollmentRecord.getProtectedMaterialsFullyDownloadedAt())
@@ -182,17 +196,17 @@ public class StudentRefundServiceImpl implements StudentRefundService {
 
         RefundEligibilitySnapshot snapshot = RefundEligibilitySnapshot.builder()
                 .snapshotVersion("v2")
-                .policyVersion(policy.policyVersion())
+                .policyVersion(effectivePolicyVersion)
                 .refundType(request.refundType())
                 .paymentSucceededAt(paymentSucceededAt)
                 .requestedAt(requestedAt)
                 .timezone(BUSINESS_ZONE.getId())
                 .elapsedCalendarDays(elapsedDays)
-                .refundWindowDays(policy.refundWindowDays())
+                .refundWindowDays(effectiveRefundWindowDays)
                 .progressCompleted(progress.completed())
                 .progressTotal(progress.total())
                 .measuredProgressPercent(progress.percent())
-                .progressThresholdPercent(policy.refundProgressLimitPercent())
+                .progressThresholdPercent(effectiveProgressLimitPercent)
                 .protectedMaterialsFullyDownloaded(protectedMaterialsFullyDownloaded)
                 .protectedMaterialsFullyDownloadedAt(protectedMaterialsDownloadedAt)
                 .actuallyPaidAmount(financialSnapshot.getGrossAmount())

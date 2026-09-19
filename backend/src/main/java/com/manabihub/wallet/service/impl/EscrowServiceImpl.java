@@ -124,6 +124,8 @@ public class EscrowServiceImpl implements EscrowService {
                     .teacherNetAmount(teacherNet)
                     .commercialPolicyVersion(policy.policyVersion())
                     .escrowDays(policy.escrowHoldingDays())
+                    .refundWindowDays(policy.refundWindowDays())
+                    .refundProgressLimitPercent(policy.refundProgressLimitPercent())
                     .build());
 
             EscrowLedger escrow = escrowLedgerRepository.save(EscrowLedger.builder()
