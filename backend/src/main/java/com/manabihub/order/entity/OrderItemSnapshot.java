@@ -62,6 +62,12 @@ public class OrderItemSnapshot {
     @Column(name = "escrow_days", nullable = false)
     private Integer escrowDays;
 
+    @Column(name = "refund_window_days")
+    private Integer refundWindowDays;
+
+    @Column(name = "refund_progress_limit_percent")
+    private Integer refundProgressLimitPercent;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
