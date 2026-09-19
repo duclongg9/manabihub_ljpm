@@ -25,6 +25,14 @@ import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.beans.factory.ObjectProvider;
+import com.manabihub.audit.service.SecurityEventRecorder;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import java.util.Map;
+import java.util.UUID;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -47,10 +55,13 @@ import com.manabihub.common.exception.ValidationBusinessException;
  */
 @Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
     private static final java.util.regex.Pattern HAS_ROLE_PATTERN =
             java.util.regex.Pattern.compile("hasRole\\(\\s*['\"]([A-Z_]+)['\"]\\s*\\)");
+
+    private final ObjectProvider<SecurityEventRecorder> securityEventRecorderProvider;
 
     // ──────────────────────────────────────────────
     // Business errors
@@ -263,6 +274,7 @@ public class GlobalExceptionHandler {
         log.warn("Access denied for request to {}", request.getRequestURI());
 
         String code = resolveRoleMessageCode(handlerMethod);
+        recordAccessDeniedEvent(request, code);
         ApiResponse<Void> response = ApiResponse.error(
                 code,
                 roleMessage(code),
@@ -301,6 +313,46 @@ public class GlobalExceptionHandler {
                 return MessageCodes.MSG_ADM_008;
             default:
                 return MessageCodes.AUTH_FORBIDDEN;
+        }
+    }
+
+
+    /**
+     * NFR-SEC-28: mỗi lần bị từ chối vì thiếu quyền phải để lại một bản ghi an ninh.
+     * Recorder chạy REQUIRES_NEW nên bản ghi không bị cuốn theo request đã hỏng, và
+     * mọi lỗi khi ghi đều bị nuốt bên trong nó: một phản hồi 403 không được biến
+     * thành 500 chỉ vì không ghi được nhật ký.
+     */
+    private void recordAccessDeniedEvent(HttpServletRequest request, String messageCode) {
+        // Tuỳ chọn: trong lát cắt @WebMvcTest không có bean này, và một bài test web
+        // không nên hỏng chỉ vì thiếu nhật ký an ninh.
+        SecurityEventRecorder recorder = securityEventRecorderProvider.getIfAvailable();
+        if (recorder == null) {
+            return;
+        }
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Object principal = authentication == null ? null : authentication.getPrincipal();
+        if (!(principal instanceof Jwt jwt)) {
+            // Anonymous hoặc principal không phải JWT: không có danh tính để ghi.
+            return;
+        }
+        UUID actorId;
+        try {
+            actorId = UUID.fromString(jwt.getSubject());
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            log.warn("Access denied nhung subject khong phai UUID: {}", jwt.getSubject());
+            return;
+        }
+        Map<String, Object> metadata = Map.of(
+                "path", request.getRequestURI(),
+                "method", request.getMethod(),
+                "messageCode", messageCode);
+        if ("ADMIN_ACCESS".equals(jwt.getClaimAsString("type"))) {
+            recorder.recordAdminAccessDenied(
+                    actorId, "ACCESS_DENIED", "ENDPOINT", metadata);
+        } else {
+            recorder.recordAccessDenied(
+                    actorId, "ACCESS_DENIED", "ENDPOINT", null, metadata);
         }
     }
 
