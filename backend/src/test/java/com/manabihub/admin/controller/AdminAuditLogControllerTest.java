@@ -22,10 +22,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -91,6 +95,29 @@ class AdminAuditLogControllerTest {
     void anonymousUserCannotReadAuditLogs() throws Exception {
         mockMvc.perform(get("/api/v1/admin/audit-logs"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * MHB-025 / NFR-SEC-35: nhat ky he thong chi doc. Kiem qua MockMvc chu khong
+     * goi thang ham xu ly ngoai le, vi loi nam o cho bo bat-tat-ca gianh mat
+     * ngoai le trong qua trinh dieu phoi - goi thang se xanh gia.
+     */
+    @Test
+    void deletingAnAuditLogIsRejectedWithMethodNotAllowed() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/audit-logs/" + UUID.randomUUID())
+                        .with(adminJwt("SYSTEM_ADMIN")))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Allow", containsString("GET")))
+                .andExpect(jsonPath("$.messageCode").value("COMMON_METHOD_NOT_ALLOWED"));
+    }
+
+    @Test
+    void creatingAnAuditLogIsRejectedWithMethodNotAllowed() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/audit-logs")
+                        .with(adminJwt("SYSTEM_ADMIN")))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Allow", containsString("GET")))
+                .andExpect(jsonPath("$.messageCode").value("COMMON_METHOD_NOT_ALLOWED"));
     }
 
     private org.springframework.security.test.web.servlet.request

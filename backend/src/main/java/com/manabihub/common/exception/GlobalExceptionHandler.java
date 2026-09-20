@@ -12,6 +12,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MissingRequestHeaderException;
@@ -348,6 +349,43 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND.value()).body(response);
     }
+
+    // ──────────────────────────────────────────────
+    // Wrong HTTP method on a mapped path
+    // ──────────────────────────────────────────────
+
+    /**
+     * MHB-025: khong co bo xu ly rieng thi ngoai le nay roi vao bo bat-tat-ca ben
+     * duoi va tra ve 500 kem stack trace o muc ERROR - mot loi cua phia goi bi bao
+     * cao thanh su co may chu. Phai dat trong lop nay chu khong duoc de framework
+     * lo, vi ExceptionHandlerExceptionResolver chay truoc
+     * DefaultHandlerExceptionResolver.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+
+        var supported = ex.getSupportedHttpMethods();
+        String allow = supported == null ? ""
+                : supported.stream().map(Object::toString).collect(Collectors.joining(", "));
+
+        log.warn("Phuong thuc {} khong duoc ho tro cho {} (cho phep: {})",
+                ex.getMethod(), request.getRequestURI(), allow.isEmpty() ? "-" : allow);
+
+        ApiResponse<Void> response = ApiResponse.error(
+                MessageCodes.COMMON_METHOD_NOT_ALLOWED,
+                "The " + ex.getMethod() + " method is not supported for this resource",
+                request.getRequestURI()
+        );
+
+        ResponseEntity.BodyBuilder builder =
+                ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED.value());
+        if (!allow.isEmpty()) {
+            builder.header("Allow", allow);
+        }
+        return builder.body(response);
+    }
+
 
     // ──────────────────────────────────────────────
     // Catch-all for unexpected errors
