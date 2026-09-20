@@ -1,5 +1,6 @@
 package com.manabihub.oversight.controller;
 
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import com.manabihub.common.response.PageResponse;
 import com.manabihub.oversight.dto.request.DecisionReviewFilterRequest;
@@ -45,7 +46,10 @@ public class SystemAdminDecisionReviewController {
 
     @PostMapping("/{auditLogId}/reviewed")
     public ApiResponse<DecisionReviewDetailResponse> markReviewed(@PathVariable UUID auditLogId) {
-        return ApiResponse.success(reviewService.markReviewed(auditLogId));
+        return ApiResponse.success(
+                MessageCodes.ADMIN_ACTION_SUCCESS,
+                "Decision marked as reviewed",
+                reviewService.markReviewed(auditLogId));
     }
 
     @PostMapping("/{auditLogId}/warnings")
@@ -53,6 +57,9 @@ public class SystemAdminDecisionReviewController {
             @PathVariable UUID auditLogId,
             @Valid @RequestBody DecisionWarningRequest request
     ) {
-        return ApiResponse.success(reviewService.sendWarning(auditLogId, request));
-    }
+        return ApiResponse.success(
+                MessageCodes.MSG_OVS_001,
+                "Warning sent to the decision owner",
+                reviewService.sendWarning(auditLogId, request));
+        }
 }
