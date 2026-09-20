@@ -29,6 +29,7 @@ public class SecurityEventRecorder {
 
     private final AuditLogRepository auditLogRepository;
 
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordAccessDenied(
             UUID actorUserId,
@@ -60,6 +61,7 @@ public class SecurityEventRecorder {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordAdminAccessDenied(
             UUID actorAdminId,
+            String actorRoleCode,
             String action,
             String targetType,
             Map<String, Object> metadata
@@ -68,6 +70,7 @@ public class SecurityEventRecorder {
             auditLogRepository.saveAndFlush(AuditLog.builder()
                     .actorType("INTERNAL_ADMIN")
                     .actorAdminId(actorAdminId)
+                    .actorRoleCode(actorRoleCode)
                     .action(action)
                     .targetType(targetType)
                     .metadata(metadata)

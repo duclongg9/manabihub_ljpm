@@ -348,8 +348,11 @@ public class GlobalExceptionHandler {
                 "method", request.getMethod(),
                 "messageCode", messageCode);
         if ("ADMIN_ACCESS".equals(jwt.getClaimAsString("type"))) {
+            // Token admin mang mã vai trò dạng chuỗi, cùng dạng LOGIN_SUCCESS ghi vào
+            // actor_role_code (InternalAdminSessionServiceImpl:221 và AdminAuthServiceImpl:109),
+            // nên bộ lọc ?role= khớp cả hai loại sự kiện của cùng một tài khoản.
             recorder.recordAdminAccessDenied(
-                    actorId, "ACCESS_DENIED", "ENDPOINT", metadata);
+                    actorId, jwt.getClaimAsString("role"), "ACCESS_DENIED", "ENDPOINT", metadata);
         } else {
             recorder.recordAccessDenied(
                     actorId, "ACCESS_DENIED", "ENDPOINT", null, metadata);
