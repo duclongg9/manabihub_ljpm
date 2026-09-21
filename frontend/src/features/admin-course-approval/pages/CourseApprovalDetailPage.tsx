@@ -637,12 +637,11 @@ export const CourseApprovalDetailPage: React.FC = () => {
                 multiline
                 minRows={5}
                 fullWidth
-                label="Lý do / Ghi chú"
-                placeholder="Mô tả rõ nội dung cần chỉnh sửa để giảng viên có thể xử lý..."
+                placeholder="Lý do / Ghi chú"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 disabled={!isReviewable || submitting}
-                slotProps={{ htmlInput: { maxLength: 2000 } }}
+                slotProps={{ htmlInput: { maxLength: 2000, 'aria-label': 'Lý do / Ghi chú' } }}
                 helperText={`${reason.length}/2.000 ký tự`}
               />
               {isReviewable && !detail.approvalReady && suggestedReason && (

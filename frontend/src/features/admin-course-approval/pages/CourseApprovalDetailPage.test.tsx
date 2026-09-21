@@ -92,6 +92,10 @@ describe('CourseApprovalDetailPage', () => {
     expect(await screen.findByText('Tiếng Nhật giao tiếp N5')).toBeInTheDocument();
     expect(screen.getAllByText('Chưa cấu hình bài kiểm tra cuối khóa.').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Phê duyệt khóa học' })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: 'Lý do / Ghi chú' })).toHaveAttribute(
+      'placeholder',
+      'Lý do / Ghi chú',
+    );
 
     fireEvent.click(screen.getByText('Học phần 1: Làm quen'));
     expect(await screen.findByText('Chào hỏi lần đầu')).toBeInTheDocument();

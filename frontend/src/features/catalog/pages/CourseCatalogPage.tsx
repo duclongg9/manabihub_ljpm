@@ -7,6 +7,7 @@ import {
   Stack,
   Typography,
   Chip,
+  IconButton,
   InputAdornment,
   TextField,
   Tabs,
@@ -289,7 +290,29 @@ export const CourseCatalogPage: React.FC = () => {
                 onKeyDown={(event) => { if (event.key === 'Enter') updateKeyword(heroKeyword); }}
                 placeholder="Tìm Kanji, N3, giao tiếp..."
                 aria-label="Tìm khóa học"
-                slotProps={{ input: { endAdornment: <InputAdornment position="end"><Button onClick={() => updateKeyword(heroKeyword)} sx={{ minWidth: 40, color: '#C41E3A' }} aria-label="Tìm kiếm"><SearchRoundedIcon /></Button></InputAdornment> } }}
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          aria-label="Tìm kiếm"
+                          edge="end"
+                          onClick={() => updateKeyword(heroKeyword)}
+                          sx={{
+                            color: '#C41E3A',
+                            bgcolor: 'transparent',
+                            '&:hover': {
+                              color: '#9F1239',
+                              bgcolor: 'transparent',
+                            },
+                          }}
+                        >
+                          <SearchRoundedIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
                 sx={{ maxWidth: 760, bgcolor: '#fff', borderRadius: 1.5, '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
               />
               <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 1.5, flexWrap: 'wrap' }}>
