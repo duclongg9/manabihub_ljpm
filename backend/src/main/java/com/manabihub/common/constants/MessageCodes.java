@@ -399,6 +399,12 @@ public final class MessageCodes {
     public static final String NOTIFICATION_NOT_FOUND = "NOTIFICATION_NOT_FOUND";
 
     // ──────────────────────────────────────────────
+    // OVERSIGHT — System Admin hậu kiểm quyết định của manager
+    // ──────────────────────────────────────────────
+    /** §5.2 MSG-OVS-001: đã gửi cảnh báo hậu kiểm tới chủ quyết định. */
+    public static final String MSG_OVS_001 = "MSG-OVS-001";
+
+    // ──────────────────────────────────────────────
     // SYSTEM — system-level codes
     // ──────────────────────────────────────────────
     public static final String SYSTEM_MAINTENANCE = "SYSTEM_MAINTENANCE";
