@@ -24,7 +24,7 @@ class AdminPasswordResetRequestLimiterTest {
                 "admin-password-reset-ip",
                 "127.0.0.1",
                 "ADMIN_PASSWORD_FORGOT",
-                10,
+                11,
                 900,
                 900
         )).thenReturn(false);
@@ -37,7 +37,7 @@ class AdminPasswordResetRequestLimiterTest {
                 "admin-password-reset-email",
                 "unknown@example.com",
                 "ADMIN_PASSWORD_FORGOT",
-                3,
+                4,
                 900,
                 900
         );
@@ -49,7 +49,7 @@ class AdminPasswordResetRequestLimiterTest {
                 "admin-password-reset-ip",
                 "127.0.0.1",
                 "ADMIN_PASSWORD_FORGOT",
-                10,
+                11,
                 900,
                 900
         )).thenReturn(true);
@@ -57,7 +57,7 @@ class AdminPasswordResetRequestLimiterTest {
                 "admin-password-reset-email",
                 "admin@example.com",
                 "ADMIN_PASSWORD_FORGOT",
-                3,
+                4,
                 900,
                 900
         )).thenReturn(true);
@@ -71,7 +71,7 @@ class AdminPasswordResetRequestLimiterTest {
                 "admin-password-reset-ip",
                 "127.0.0.1",
                 "ADMIN_PASSWORD_FORGOT",
-                10,
+                11,
                 900,
                 900
         );
@@ -79,7 +79,7 @@ class AdminPasswordResetRequestLimiterTest {
                 "admin-password-reset-email",
                 "admin@example.com",
                 "ADMIN_PASSWORD_FORGOT",
-                3,
+                4,
                 900,
                 900
         );
