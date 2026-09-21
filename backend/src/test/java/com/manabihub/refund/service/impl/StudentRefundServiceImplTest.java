@@ -123,7 +123,7 @@ class StudentRefundServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // Sheet 45 — createRefundRequest (UC-18 Request Course Refund) — 12 TC
+    // Sheet 45 — createRefundRequest (UC-18 Request Course Refund) — 14 TC
     // ══════════════════════════════════════════════════════════════════════
 
     @Nested
@@ -440,6 +440,54 @@ class StudentRefundServiceImplTest {
             assertEquals(HttpStatus.CONFLICT, error.getHttpStatus());
             verify(refundRequestRepository, never()).saveAndFlush(any());
         }
+
+        @Test
+        @org.junit.jupiter.api.Order(13)
+        @DisplayName("UTCID13 (N) - MHB-021: window shortened after purchase -> the frozen terms still apply")
+        void standardRefund_usesTheRefundWindowFrozenAtPurchase() {
+            payment.setSucceededAt(Instant.now().minus(3, ChronoUnit.DAYS));
+            // Bought under a 14-day window; an admin has since shortened it to 1 day.
+            stubCommon(policy(1, 20, "policy-v2-shortened"), financialSnapshot(14, 20));
+            when(learningProgressDomainService.calculateProgress(orderItem.getCourse().getId(), enrollment.getId()))
+                    .thenReturn(new LearningProgressDomainService.ProgressResult(0, 10, 0.0));
+            when(refundRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+                RefundRequest saved = invocation.getArgument(0);
+                saved.setId(UUID.randomUUID());
+                return saved;
+            });
+
+            var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
+
+            assertEquals(EligibilityResult.STANDARD_ELIGIBLE,
+                    response.eligibilitySnapshot().getEligibilityResult());
+            assertEquals(14, response.eligibilitySnapshot().getRefundWindowDays());
+            assertEquals("policy-at-purchase", response.eligibilitySnapshot().getPolicyVersion());
+            assertFalse(response.eligibilitySnapshot().getReasonCodes().contains("OUTSIDE_REFUND_WINDOW"));
+            assertEquals(0.0, response.eligibilitySnapshot().getMeasuredProgressPercent());
+        }
+
+        @Test
+        @org.junit.jupiter.api.Order(14)
+        @DisplayName("UTCID14 (B) - MHB-021: a snapshot written before V083 has no frozen terms -> current policy")
+        void standardRefund_withoutFrozenTerms_fallsBackToTheCurrentPolicy() {
+            payment.setSucceededAt(Instant.now().minus(3, ChronoUnit.DAYS));
+            stubCommon(policy(1, 20, "policy-v2-shortened"), financialSnapshot());
+            when(learningProgressDomainService.calculateProgress(orderItem.getCourse().getId(), enrollment.getId()))
+                    .thenReturn(new LearningProgressDomainService.ProgressResult(0, 10, 0.0));
+            when(refundRequestRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+                RefundRequest saved = invocation.getArgument(0);
+                saved.setId(UUID.randomUUID());
+                return saved;
+            });
+
+            var response = service.createRefundRequest(userId, request(StudentRefundType.STANDARD));
+
+            assertEquals(EligibilityResult.MANUAL_REVIEW_REQUIRED,
+                    response.eligibilitySnapshot().getEligibilityResult());
+            assertEquals(1, response.eligibilitySnapshot().getRefundWindowDays());
+            assertEquals("policy-v2-shortened", response.eligibilitySnapshot().getPolicyVersion());
+            assertTrue(response.eligibilitySnapshot().getReasonCodes().contains("OUTSIDE_REFUND_WINDOW"));
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -599,13 +647,17 @@ class StudentRefundServiceImplTest {
     }
 
     private void stubCommon(StudentRefundType type) {
+        stubCommon(policy(), financialSnapshot());
+    }
+
+    private void stubCommon(CommercialPolicy currentPolicy, OrderItemSnapshot snapshot) {
         stubIdentityAndPurchase();
-        when(commercialPolicyService.getCurrentPolicy()).thenReturn(policy());
+        when(commercialPolicyService.getCurrentPolicy()).thenReturn(currentPolicy);
         when(paymentTransactionRepository
                 .findFirstByOrder_IdAndSucceededAtIsNotNullOrderBySucceededAtDesc(order.getId()))
                 .thenReturn(Optional.of(payment));
         when(orderItemSnapshotRepository.findByOrderItem_Id(orderItem.getId()))
-                .thenReturn(Optional.of(financialSnapshot()));
+                .thenReturn(Optional.of(snapshot));
         when(enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), orderItem.getCourse().getId()))
                 .thenReturn(Optional.of(enrollment));
     }
@@ -624,17 +676,21 @@ class StudentRefundServiceImplTest {
     }
 
     private CommercialPolicy policy() {
+        return policy(14, 20, "policy-v1");
+    }
+
+    private CommercialPolicy policy(int refundWindowDays, int refundProgressLimitPercent, String version) {
         return new CommercialPolicy(
                 "VND",
                 new BigDecimal("0.20"),
-                14,
-                20,
+                refundWindowDays,
+                refundProgressLimitPercent,
                 14,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 1,
                 3,
-                "policy-v1",
+                version,
                 Instant.parse("2026-01-01T00:00:00Z")
         );
     }
@@ -643,6 +699,16 @@ class StudentRefundServiceImplTest {
         return OrderItemSnapshot.builder()
                 .grossAmount(new BigDecimal("799000"))
                 .currency("VND")
+                .build();
+    }
+
+    private OrderItemSnapshot financialSnapshot(int refundWindowDays, int refundProgressLimitPercent) {
+        return OrderItemSnapshot.builder()
+                .grossAmount(new BigDecimal("799000"))
+                .currency("VND")
+                .commercialPolicyVersion("policy-at-purchase")
+                .refundWindowDays(refundWindowDays)
+                .refundProgressLimitPercent(refundProgressLimitPercent)
                 .build();
     }
 }
