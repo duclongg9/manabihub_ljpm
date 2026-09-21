@@ -1,6 +1,7 @@
 package com.manabihub.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manabihub.audit.service.AccessDenialAuditService;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import jakarta.servlet.FilterChain;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -48,6 +50,7 @@ public class TeacherEligibilityFilter extends OncePerRequestFilter {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<AccessDenialAuditService> accessDenialAuditServiceProvider;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -100,6 +103,10 @@ public class TeacherEligibilityFilter extends OncePerRequestFilter {
 
     private void writeForbiddenResponse(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
+        AccessDenialAuditService auditService = accessDenialAuditServiceProvider.getIfAvailable();
+        if (auditService != null) {
+            auditService.record(request, MessageCodes.AUTH_FORBIDDEN);
+        }
         ApiResponse<Void> body = ApiResponse.error(
                 MessageCodes.AUTH_FORBIDDEN,
                 "Teacher access is not available for this account.",

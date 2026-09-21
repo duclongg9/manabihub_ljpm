@@ -29,7 +29,6 @@ public class SecurityEventRecorder {
 
     private final AuditLogRepository auditLogRepository;
 
-
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordAccessDenied(
             UUID actorUserId,
@@ -77,6 +76,24 @@ public class SecurityEventRecorder {
                     .build());
         } catch (RuntimeException ex) {
             log.error("Khong ghi duoc su kien an ninh {} cho admin {}", action, actorAdminId, ex);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordUnattributedAccessDenied(
+            String action,
+            String targetType,
+            Map<String, Object> metadata
+    ) {
+        try {
+            auditLogRepository.saveAndFlush(AuditLog.builder()
+                    .actorType("SYSTEM")
+                    .action(action)
+                    .targetType(targetType)
+                    .metadata(metadata)
+                    .build());
+        } catch (RuntimeException ex) {
+            log.error("Khong ghi duoc su kien an ninh {} khong co actor", action, ex);
         }
     }
 }

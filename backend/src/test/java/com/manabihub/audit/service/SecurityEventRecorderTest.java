@@ -72,4 +72,17 @@ class SecurityEventRecorderTest {
         assertNull(saved.getActorAdminId());
         assertNull(saved.getActorRoleCode());
     }
+
+    @Test
+    void unattributedDenialDoesNotInventAnActorId() {
+        securityEventRecorder.recordUnattributedAccessDenied(
+                "ACCESS_DENIED", "ENDPOINT", Map.of("path", "/api/v1/teacher/courses"));
+
+        verify(auditLogRepository).saveAndFlush(auditLogCaptor.capture());
+        AuditLog saved = auditLogCaptor.getValue();
+        assertEquals("SYSTEM", saved.getActorType());
+        assertNull(saved.getActorUserId());
+        assertNull(saved.getActorAdminId());
+        assertEquals("ACCESS_DENIED", saved.getAction());
+    }
 }

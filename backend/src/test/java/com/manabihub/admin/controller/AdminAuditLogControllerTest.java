@@ -3,6 +3,7 @@ package com.manabihub.admin.controller;
 import com.manabihub.audit.dto.AuditLogDetailDto;
 import com.manabihub.audit.dto.AuditLogFilterDto;
 import com.manabihub.audit.service.AuditLogService;
+import com.manabihub.audit.service.AccessDenialAuditService;
 import com.manabihub.common.response.PageResponse;
 import com.manabihub.security.DummyFilterConfig;
 import com.manabihub.security.config.SecurityConfig;
@@ -24,6 +25,8 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,6 +43,7 @@ class AdminAuditLogControllerTest {
     @Autowired private MockMvc mockMvc;
 
     @MockBean private AuditLogService auditLogService;
+    @MockBean private AccessDenialAuditService accessDenialAuditService;
     @MockBean private CustomOAuth2UserService customOAuth2UserService;
     @MockBean private OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     @MockBean private OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
@@ -85,6 +89,7 @@ class AdminAuditLogControllerTest {
         mockMvc.perform(get("/api/v1/admin/audit-logs")
                         .with(adminJwt("COURSE_MANAGER")))
                 .andExpect(status().isForbidden());
+        verify(accessDenialAuditService).record(any(), eq("MSG-ADM-006"));
     }
 
     @Test

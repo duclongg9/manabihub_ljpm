@@ -1,6 +1,8 @@
 package com.manabihub.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manabihub.audit.service.AccessDenialAuditService;
+import com.manabihub.common.constants.MessageCodes;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +59,8 @@ class AppUserStatusFilterTest {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplate.queryForObject(any(String.class), eq(Integer.class), eq(userId)))
                 .thenReturn(0);
-        AppUserStatusFilter filter = filterWith(jdbcTemplate);
+        AccessDenialAuditService auditService = mock(AccessDenialAuditService.class);
+        AppUserStatusFilter filter = filterWith(jdbcTemplate, auditService);
         FilterChain chain = mock(FilterChain.class);
         MockHttpServletResponse response = new MockHttpServletResponse();
         authenticate(userId, "PUBLIC_USER");
@@ -67,6 +70,7 @@ class AppUserStatusFilterTest {
         assertEquals(HttpStatus.FORBIDDEN.value(), response.getStatus());
         assertTrue(response.getContentType().startsWith("application/json"));
         verify(chain, never()).doFilter(any(), any());
+        verify(auditService).record(any(), eq(MessageCodes.AUTH_ACCOUNT_RESTRICTED));
     }
 
     @Test
@@ -89,11 +93,21 @@ class AppUserStatusFilterTest {
     }
 
     private AppUserStatusFilter filterWith(JdbcTemplate jdbcTemplate) {
+        return filterWith(jdbcTemplate, null);
+    }
+
+    private AppUserStatusFilter filterWith(JdbcTemplate jdbcTemplate, AccessDenialAuditService auditService) {
         @SuppressWarnings("unchecked")
         ObjectProvider<JdbcTemplate> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(jdbcTemplate);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<AccessDenialAuditService> auditProvider = mock(ObjectProvider.class);
+        if (auditService != null) {
+            when(auditProvider.getIfAvailable()).thenReturn(auditService);
+        }
         return new AppUserStatusFilter(
                 provider,
+                auditProvider,
                 new ObjectMapper().findAndRegisterModules()
         );
     }

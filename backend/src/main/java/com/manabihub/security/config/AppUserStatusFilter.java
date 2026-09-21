@@ -1,6 +1,7 @@
 package com.manabihub.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.manabihub.audit.service.AccessDenialAuditService;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.response.ApiResponse;
 import jakarta.servlet.FilterChain;
@@ -36,13 +37,16 @@ public class AppUserStatusFilter extends OncePerRequestFilter {
             """;
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final ObjectProvider<AccessDenialAuditService> accessDenialAuditServiceProvider;
     private final ObjectMapper objectMapper;
 
     public AppUserStatusFilter(
             ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
+            ObjectProvider<AccessDenialAuditService> accessDenialAuditServiceProvider,
             ObjectMapper objectMapper
     ) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.accessDenialAuditServiceProvider = accessDenialAuditServiceProvider;
         this.objectMapper = objectMapper;
     }
 
@@ -87,6 +91,10 @@ public class AppUserStatusFilter extends OncePerRequestFilter {
 
     private void writeForbidden(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
+        AccessDenialAuditService auditService = accessDenialAuditServiceProvider.getIfAvailable();
+        if (auditService != null) {
+            auditService.record(request, MessageCodes.AUTH_ACCOUNT_RESTRICTED);
+        }
         ApiResponse<Void> body = ApiResponse.error(
                 MessageCodes.AUTH_ACCOUNT_RESTRICTED,
                 "This account is restricted and cannot access ManabiHub.",
