@@ -50,4 +50,50 @@ public class SecurityEventRecorder {
             log.error("Khong ghi duoc su kien an ninh {} cho user {}", action, actorUserId, ex);
         }
     }
+
+    /**
+     * NFR-SEC-28: từ chối truy cập với admin nội bộ. Phải ghi vào actor_admin_id
+     * chứ không phải actor_user_id: id trong token admin thuộc bảng
+     * internal_admin_accounts, ghi nhầm cột sẽ vi phạm khoá ngoại và bản ghi
+     * biến mất lặng lẽ trong khối catch.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordAdminAccessDenied(
+            UUID actorAdminId,
+            String actorRoleCode,
+            String action,
+            String targetType,
+            Map<String, Object> metadata
+    ) {
+        try {
+            auditLogRepository.saveAndFlush(AuditLog.builder()
+                    .actorType("INTERNAL_ADMIN")
+                    .actorAdminId(actorAdminId)
+                    .actorRoleCode(actorRoleCode)
+                    .action(action)
+                    .targetType(targetType)
+                    .metadata(metadata)
+                    .build());
+        } catch (RuntimeException ex) {
+            log.error("Khong ghi duoc su kien an ninh {} cho admin {}", action, actorAdminId, ex);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordUnattributedAccessDenied(
+            String action,
+            String targetType,
+            Map<String, Object> metadata
+    ) {
+        try {
+            auditLogRepository.saveAndFlush(AuditLog.builder()
+                    .actorType("SYSTEM")
+                    .action(action)
+                    .targetType(targetType)
+                    .metadata(metadata)
+                    .build());
+        } catch (RuntimeException ex) {
+            log.error("Khong ghi duoc su kien an ninh {} khong co actor", action, ex);
+        }
+    }
 }

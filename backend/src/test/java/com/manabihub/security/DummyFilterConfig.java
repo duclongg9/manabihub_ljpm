@@ -21,7 +21,8 @@ public class DummyFilterConfig {
     @Bean
     @Primary
     public TeacherEligibilityFilter teacherEligibilityFilter() {
-        return new TeacherEligibilityFilter(new JdbcTemplate(), new ObjectMapper()) {
+        return new TeacherEligibilityFilter(new JdbcTemplate(), new ObjectMapper(),
+                org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class)) {
             @Override
             protected void doFilterInternal(
                     HttpServletRequest request,

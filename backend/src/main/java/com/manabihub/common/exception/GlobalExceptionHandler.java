@@ -25,6 +25,9 @@ import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.beans.factory.ObjectProvider;
+import com.manabihub.audit.service.AccessDenialAuditService;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -47,10 +50,13 @@ import com.manabihub.common.exception.ValidationBusinessException;
  */
 @Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
     private static final java.util.regex.Pattern HAS_ROLE_PATTERN =
             java.util.regex.Pattern.compile("hasRole\\(\\s*['\"]([A-Z_]+)['\"]\\s*\\)");
+
+    private final ObjectProvider<AccessDenialAuditService> accessDenialAuditServiceProvider;
 
     // ──────────────────────────────────────────────
     // Business errors
@@ -263,6 +269,10 @@ public class GlobalExceptionHandler {
         log.warn("Access denied for request to {}", request.getRequestURI());
 
         String code = resolveRoleMessageCode(handlerMethod);
+        AccessDenialAuditService auditService = accessDenialAuditServiceProvider.getIfAvailable();
+        if (auditService != null) {
+            auditService.record(request, code);
+        }
         ApiResponse<Void> response = ApiResponse.error(
                 code,
                 roleMessage(code),
@@ -303,6 +313,7 @@ public class GlobalExceptionHandler {
                 return MessageCodes.AUTH_FORBIDDEN;
         }
     }
+
 
     private String roleMessage(String code) {
         switch (code) {
