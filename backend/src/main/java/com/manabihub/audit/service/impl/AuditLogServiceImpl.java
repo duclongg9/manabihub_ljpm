@@ -110,6 +110,14 @@ public class AuditLogServiceImpl implements AuditLogService {
                 validOrders.add(order);
             }
         }
+        // MHB-024: neu moi khoa sap xep deu bi loai, phai quay ve mac dinh cua
+        // endpoint (createdAt DESC) chu khong de moi khoa phu id DESC ben duoi.
+        // id la UUID ngau nhien (AuditLog: GenerationType.UUID) nen sap theo id
+        // khong con lien quan gi toi thoi gian: danh sach im lang mat tinh
+        // moi-nhat-truoc ma van tra ve 200.
+        if (validOrders.isEmpty()) {
+            validOrders.add(org.springframework.data.domain.Sort.Order.desc("createdAt"));
+        }
         
         // Ensure ID is stable tie breaker
         if (validOrders.stream().noneMatch(o -> o.getProperty().equals("id"))) {
