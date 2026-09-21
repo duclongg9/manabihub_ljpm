@@ -31,6 +31,7 @@ public final class MessageCodes {
     public static final String COMMON_DELETED = "COMMON_DELETED";
     public static final String COMMON_BAD_REQUEST = "COMMON_BAD_REQUEST";
     public static final String COMMON_NOT_FOUND = "COMMON_NOT_FOUND";
+    public static final String COMMON_METHOD_NOT_ALLOWED = "COMMON_METHOD_NOT_ALLOWED";
     public static final String COMMON_CONFLICT = "COMMON_CONFLICT";
     public static final String COMMON_INTERNAL_ERROR = "COMMON_INTERNAL_ERROR";
     public static final String MSG_COM_002 = "MSG-COM-002"; // Required field is empty
