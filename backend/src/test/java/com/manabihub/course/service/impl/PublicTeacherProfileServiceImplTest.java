@@ -1,6 +1,7 @@
 package com.manabihub.course.service.impl;
 
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.course.dto.response.PublicTeacherProfileResponse;
 import com.manabihub.course.dto.response.PublicTeacherSummaryResponse;
 import com.manabihub.course.entity.Course;
@@ -198,6 +199,7 @@ class PublicTeacherProfileServiceImplTest {
         );
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getHttpStatus());
+        assertEquals(MessageCodes.MSG_CATALOG_001, exception.getMessageCode());
         assertEquals("Teacher profile was not found", exception.getMessage());
     }
 

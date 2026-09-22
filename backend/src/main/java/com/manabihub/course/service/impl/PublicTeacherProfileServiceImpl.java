@@ -110,7 +110,7 @@ public class PublicTeacherProfileServiceImpl implements PublicTeacherProfileServ
                         UserStatus.ACTIVE
                 )
                 .orElseThrow(() -> new BusinessException(
-                        MessageCodes.COMMON_NOT_FOUND,
+                        MessageCodes.MSG_CATALOG_001,
                         PRIVATE_PROFILE_MESSAGE,
                         HttpStatus.NOT_FOUND
                 ));
