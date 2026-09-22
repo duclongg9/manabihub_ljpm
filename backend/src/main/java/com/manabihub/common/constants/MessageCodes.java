@@ -43,6 +43,18 @@ public final class MessageCodes {
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
 
     // ──────────────────────────────────────────────
+    // WEEKLY CHALLENGE — gameplay and administration errors
+    // ──────────────────────────────────────────────
+    public static final String WEEKLY_CHALLENGE_INVALID = "WEEKLY_CHALLENGE_INVALID";
+    public static final String WEEKLY_CHALLENGE_CONFLICT = "WEEKLY_CHALLENGE_CONFLICT";
+    public static final String WEEKLY_CHALLENGE_NOT_FOUND = "WEEKLY_CHALLENGE_NOT_FOUND";
+    public static final String WEEKLY_CHALLENGE_NOT_AVAILABLE = "WEEKLY_CHALLENGE_NOT_AVAILABLE";
+    public static final String WEEKLY_CHALLENGE_ATTEMPT_NOT_FOUND = "WEEKLY_CHALLENGE_ATTEMPT_NOT_FOUND";
+    public static final String WEEKLY_CHALLENGE_NOT_PUBLISHED = "WEEKLY_CHALLENGE_NOT_PUBLISHED";
+    public static final String WEEKLY_CHALLENGE_NOT_CURRENT_WEEK = "WEEKLY_CHALLENGE_NOT_CURRENT_WEEK";
+    public static final String WEEKLY_CHALLENGE_COURSE_MANAGER_REQUIRED = "WEEKLY_CHALLENGE_COURSE_MANAGER_REQUIRED";
+
+    // ──────────────────────────────────────────────
     // REPORT — report/violation errors
     // ──────────────────────────────────────────────
     public static final String MSG_REP_001 = "MSG-REP-001";

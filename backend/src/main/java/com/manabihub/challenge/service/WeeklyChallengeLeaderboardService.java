@@ -6,6 +6,7 @@ import com.manabihub.challenge.entity.WeeklyLearningChallenge;
 import com.manabihub.challenge.enums.ChallengeStatus;
 import com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptRepository;
 import com.manabihub.challenge.repository.WeeklyLearningChallengeRepository;
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.course.repository.CourseRepository;
 import com.manabihub.identity.entity.StudentProfile;
@@ -39,11 +40,11 @@ public class WeeklyChallengeLeaderboardService {
     @Transactional(readOnly = true)
     public WeeklyChallengeLeaderboardResponse forStudent(UUID userId, UUID challengeId) {
         StudentProfile student = studentProfileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new BusinessException("STUDENT_PROFILE_NOT_FOUND",
+                .orElseThrow(() -> new BusinessException(MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND,
                         "Không tìm thấy hồ sơ học viên", HttpStatus.NOT_FOUND));
         WeeklyLearningChallenge challenge = requireChallenge(challengeId);
         if (challenge.getStatus() == ChallengeStatus.DRAFT) {
-            throw new BusinessException("WEEKLY_CHALLENGE_NOT_AVAILABLE",
+            throw new BusinessException(MessageCodes.WEEKLY_CHALLENGE_NOT_AVAILABLE,
                     "Bảng xếp hạng chưa được công khai", HttpStatus.NOT_FOUND);
         }
         return build(challenge, student.getId());
@@ -52,7 +53,7 @@ public class WeeklyChallengeLeaderboardService {
     @Transactional(readOnly = true)
     public WeeklyChallengeLeaderboardResponse forCourseManager(UUID adminId, UUID challengeId) {
         if (!courseRepository.hasAdminRole(adminId, List.of("COURSE_MANAGER"))) {
-            throw new BusinessException("COURSE_MANAGER_REQUIRED",
+            throw new BusinessException(MessageCodes.WEEKLY_CHALLENGE_COURSE_MANAGER_REQUIRED,
                     "Chỉ Course Manager được xem bảng xếp hạng quản trị", HttpStatus.FORBIDDEN);
         }
         return build(requireChallenge(challengeId), null);
@@ -91,7 +92,7 @@ public class WeeklyChallengeLeaderboardService {
 
     private WeeklyLearningChallenge requireChallenge(UUID challengeId) {
         return challengeRepository.findById(challengeId)
-                .orElseThrow(() -> new BusinessException("WEEKLY_CHALLENGE_NOT_FOUND",
+                .orElseThrow(() -> new BusinessException(MessageCodes.WEEKLY_CHALLENGE_NOT_FOUND,
                         "Không tìm thấy thử thách", HttpStatus.NOT_FOUND));
     }
 
