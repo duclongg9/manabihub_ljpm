@@ -1448,6 +1448,7 @@ const KYC_ERROR_MESSAGES: Record<string, string> = {
   KYC_ALREADY_PENDING: 'Hồ sơ của bạn đang được xét duyệt. Vui lòng chờ kết quả trước khi gửi lại.',
   KYC_ALREADY_APPROVED: 'Hồ sơ Giảng viên của bạn đã được phê duyệt.',
   'MSG-KYC-002': 'Thông tin xác minh chưa hợp lệ. Vui lòng kiểm tra và thực hiện lại.',
+  'MSG-KYC-009': 'Không thể xác minh danh tính qua VNPT eKYC. Vui lòng thử lại hoặc gửi lại tài liệu.',
   'MSG-KYC-006': 'Họ tên hoặc ngày sinh trên chứng chỉ không khớp với thông tin CCCD đã xác minh.',
   KYC_CERTIFICATE_OCR_MISMATCH: 'Họ tên hoặc ngày sinh trên chứng chỉ không khớp với thông tin CCCD đã xác minh.',
   CERTIFICATE_IDENTITY_MISMATCH: 'Họ tên hoặc ngày sinh trên chứng chỉ không khớp với thông tin CCCD đã xác minh.',

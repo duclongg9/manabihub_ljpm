@@ -316,6 +316,55 @@ class VnptVerificationCoordinatorTest {
         verify(kycRequestRepository).saveAndFlush(request);
     }
 
+
+    @Test
+    @DisplayName("KS04: provider not configured -> MSG-KYC-009 (503), attempt stays retryable")
+    void orchestrate_providerNotConfigured_throwsKyc009AndStaysPending() {
+        KycRequest mockRequest = stubNewAttempt();
+        when(vnptVerificationPort.verifyTransaction(anyString(), anyString())).thenReturn(
+                VnptServerVerificationResult.failure("tx", "session", "NOT_CONFIGURED", "PROVIDER_NOT_CONFIGURED"));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                coordinator.orchestrate(userId, req("session", "tx"), passSdk(), "127.0.0.1", "agent"));
+
+        assertEquals(MessageCodes.MSG_KYC_009, ex.getMessageCode());
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getHttpStatus());
+        assertEquals(IdentityVerificationStatus.PENDING_SERVER_VERIFICATION, mockRequest.getIdentityStatus());
+        verify(securityAuditService).logVerificationEvent(eq("PROVIDER_NOT_CONFIGURED"),
+                eq(teacherProfile.getId()), eq(mockRequest.getId()), eq(userId), eq("127.0.0.1"), eq("agent"));
+    }
+
+    @Test
+    @DisplayName("KS04: provider timeout -> MSG-KYC-009 (503), attempt stays retryable")
+    void orchestrate_providerTimeout_throwsKyc009AndStaysPending() {
+        KycRequest mockRequest = stubNewAttempt();
+        when(vnptVerificationPort.verifyTransaction(anyString(), anyString()))
+                .thenThrow(new RuntimeException("Connection timeout"));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                coordinator.orchestrate(userId, req("session", "tx"), passSdk(), "127.0.0.1", "agent"));
+
+        assertEquals(MessageCodes.MSG_KYC_009, ex.getMessageCode());
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getHttpStatus());
+        assertEquals(IdentityVerificationStatus.PENDING_SERVER_VERIFICATION, mockRequest.getIdentityStatus());
+        verify(securityAuditService).logVerificationEvent(eq("PROVIDER_TIMEOUT"),
+                eq(teacherProfile.getId()), eq(mockRequest.getId()), eq(userId), eq("127.0.0.1"), eq("agent"));
+    }
+
+    private KycRequest stubNewAttempt() {
+        KycRequest mockRequest = draftRequest("tx", "session");
+        mockRequest.setSubmittedAt(fixedNow.minusSeconds(60));
+        when(teacherProfileRepository.findForUpdateByUserId(userId)).thenReturn(Optional.of(teacherProfile));
+        when(kycRequestRepository.findTopByTeacherProfileIdOrderBySubmittedAtDesc(teacherProfile.getId()))
+                .thenReturn(Optional.empty());
+        when(kycRequestRepository.existsByEkycProviderAndProviderTransactionId(anyString(), anyString()))
+                .thenReturn(false);
+        when(kycRequestRepository.saveAndFlush(any())).thenReturn(mockRequest);
+        when(kycRequestRepository.findByIdForUpdate(any())).thenReturn(Optional.of(mockRequest));
+        when(selfProvider.getObject()).thenReturn(coordinator);
+        return mockRequest;
+    }
+
     // ------------------------------------------------------------------
     // markClaimFailed preserves provider binding
     // ------------------------------------------------------------------
