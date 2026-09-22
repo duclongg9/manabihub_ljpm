@@ -38,6 +38,17 @@ describe('WeeklyChallengeManagementPage', () => {
     expect(mondayOfWeek('')).toBe('');                      // cho phép xóa trắng
   });
 
+  it('shows a Vietnamese validation message and blocks save for an invalid ranked limit', async () => {
+    render(<WeeklyChallengeManagementPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Tạo tuần mới' }));
+
+    fireEvent.change(screen.getByLabelText('Lượt xếp hạng/ngày'), { target: { value: '20' } });
+
+    expect(screen.getByText('Số lượt xếp hạng mỗi ngày phải từ 1 đến 10.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lưu bản nháp' })).toBeDisabled();
+    expect(weeklyChallengeAdminService.create).not.toHaveBeenCalled();
+  });
+
   it('shows how to activate the weekly game when no challenge exists', async () => {
     render(<WeeklyChallengeManagementPage />);
 

@@ -37,6 +37,15 @@ function toPayload(item: ManagedWeeklyChallenge): WeeklyChallengePayload {
     pairs: item.pairs.map(({ prompt, answer }) => ({ prompt, answer })) };
 }
 
+function gameplayValidationMessage(form: WeeklyChallengePayload): string | null {
+  if (form.dailyRankedLimit < 1 || form.dailyRankedLimit > 10) return 'Số lượt xếp hạng mỗi ngày phải từ 1 đến 10.';
+  if (form.wrongPenaltySeconds < 0 || form.wrongPenaltySeconds > 30) return 'Thời gian phạt phải từ 0 đến 30 giây.';
+  if (form.dailyAttendanceReward < 0 || form.dailyAttendanceReward > 10000) return 'Thưởng điểm danh phải từ 0 đến 10.000 đồng.';
+  if ([form.firstPrize, form.secondPrize, form.thirdPrize].some((prize) => prize < 0 || prize > 500000)) return 'Mỗi giải phải từ 0 đến 500.000 đồng.';
+  if (form.firstPrize < form.secondPrize || form.secondPrize < form.thirdPrize) return 'Mức thưởng phải giảm dần theo hạng 1, 2, 3.';
+  return null;
+}
+
 export function WeeklyChallengeManagementPage() {
   const [items, setItems] = useState<ManagedWeeklyChallenge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +60,7 @@ export function WeeklyChallengeManagementPage() {
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<WeeklyChallengeLeaderboard | null>(null);
   const [leaderboardChallengeId, setLeaderboardChallengeId] = useState<string | null>(null);
+  const formValidationError = gameplayValidationMessage(form);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -70,6 +80,10 @@ export function WeeklyChallengeManagementPage() {
     ...current, pairs: current.pairs.map((pair, pairIndex) => pairIndex === index ? { ...pair, [field]: value } : pair),
   }));
   const save = async () => {
+    if (formValidationError) {
+      setError(formValidationError);
+      return;
+    }
     setBusy(true); setError(null);
     try {
       if (editingId) await weeklyChallengeAdminService.update(editingId, form);
@@ -145,15 +159,16 @@ export function WeeklyChallengeManagementPage() {
     <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="md">
       <DialogTitle><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><SportsEsportsOutlinedIcon /><span>{editingId ? 'Sửa thử thách tuần' : 'Tạo thử thách tuần'}</span></Stack></DialogTitle>
       <DialogContent dividers><Grid container spacing={2}>
+        {formValidationError && <Grid size={{ xs: 12 }}><Alert severity="error">{formValidationError}</Alert></Grid>}
         <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="date" label="Tuần bắt đầu (Thứ Hai)" slotProps={{ inputLabel: { shrink: true } }} value={form.weekStart} onChange={(e) => setForm({ ...form, weekStart: mondayOfWeek(e.target.value) })} helperText="Chọn ngày bất kỳ trong tuần — hệ thống tự lùi về Thứ Hai." /></Grid>        <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth select label="Cấp độ" value={form.jlptLevel} onChange={(e) => setForm({ ...form, jlptLevel: e.target.value })}>{['N5','N4','N3','N2','N1'].map((level) => <MenuItem key={level} value={level}>{level}</MenuItem>)}</TextField></Grid>
-        <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="number" label="Lượt xếp hạng/ngày" value={form.dailyRankedLimit} onChange={(e) => setForm({ ...form, dailyRankedLimit: Number(e.target.value) })} /></Grid>
+        <Grid size={{ xs: 12, sm: 4 }}><TextField fullWidth type="number" label="Lượt xếp hạng/ngày" value={form.dailyRankedLimit} onChange={(e) => setForm({ ...form, dailyRankedLimit: Number(e.target.value) })} slotProps={{ htmlInput: { min: 1, max: 10 } }} error={form.dailyRankedLimit < 1 || form.dailyRankedLimit > 10} helperText="Từ 1 đến 10 lượt." /></Grid>
         <Grid size={{ xs: 12 }}><TextField fullWidth label="Tên thử thách" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Grid>
         <Grid size={{ xs: 12 }}><TextField fullWidth multiline minRows={2} label="Mô tả luật chơi" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Grid>
-        <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth type="number" label="Phạt sai (giây)" value={form.wrongPenaltySeconds} onChange={(e) => setForm({ ...form, wrongPenaltySeconds: Number(e.target.value) })} /></Grid>
-        <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth type="number" label="Thưởng điểm danh/ngày" value={form.dailyAttendanceReward} onChange={(e) => setForm({ ...form, dailyAttendanceReward: Number(e.target.value) })} /></Grid>
-        <Grid size={{ xs: 4, sm: 2 }}><TextField fullWidth type="number" label="Hạng 1" value={form.firstPrize} onChange={(e) => setForm({ ...form, firstPrize: Number(e.target.value) })} /></Grid>
-        <Grid size={{ xs: 4, sm: 2 }}><TextField fullWidth type="number" label="Hạng 2" value={form.secondPrize} onChange={(e) => setForm({ ...form, secondPrize: Number(e.target.value) })} /></Grid>
-        <Grid size={{ xs: 4, sm: 2 }}><TextField fullWidth type="number" label="Hạng 3" value={form.thirdPrize} onChange={(e) => setForm({ ...form, thirdPrize: Number(e.target.value) })} /></Grid>
+        <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth type="number" label="Phạt sai (giây)" value={form.wrongPenaltySeconds} onChange={(e) => setForm({ ...form, wrongPenaltySeconds: Number(e.target.value) })} slotProps={{ htmlInput: { min: 0, max: 30 } }} error={form.wrongPenaltySeconds < 0 || form.wrongPenaltySeconds > 30} helperText="Từ 0 đến 30 giây." /></Grid>
+        <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth type="number" label="Thưởng điểm danh/ngày" value={form.dailyAttendanceReward} onChange={(e) => setForm({ ...form, dailyAttendanceReward: Number(e.target.value) })} slotProps={{ htmlInput: { min: 0, max: 10000 } }} error={form.dailyAttendanceReward < 0 || form.dailyAttendanceReward > 10000} helperText="Từ 0 đến 10.000 đồng." /></Grid>
+        <Grid size={{ xs: 4, sm: 2 }}><TextField fullWidth type="number" label="Hạng 1" value={form.firstPrize} onChange={(e) => setForm({ ...form, firstPrize: Number(e.target.value) })} slotProps={{ htmlInput: { min: 0, max: 500000 } }} error={form.firstPrize < form.secondPrize || form.firstPrize > 500000 || form.firstPrize < 0} /></Grid>
+        <Grid size={{ xs: 4, sm: 2 }}><TextField fullWidth type="number" label="Hạng 2" value={form.secondPrize} onChange={(e) => setForm({ ...form, secondPrize: Number(e.target.value) })} slotProps={{ htmlInput: { min: 0, max: 500000 } }} error={form.firstPrize < form.secondPrize || form.secondPrize < form.thirdPrize || form.secondPrize > 500000 || form.secondPrize < 0} /></Grid>
+        <Grid size={{ xs: 4, sm: 2 }}><TextField fullWidth type="number" label="Hạng 3" value={form.thirdPrize} onChange={(e) => setForm({ ...form, thirdPrize: Number(e.target.value) })} slotProps={{ htmlInput: { min: 0, max: 500000 } }} error={form.secondPrize < form.thirdPrize || form.thirdPrize > 500000 || form.thirdPrize < 0} /></Grid>
         <Grid size={{ xs: 12 }}><Typography variant="subtitle1" sx={{ fontWeight: 800 }}>Nội dung ghép cặp</Typography></Grid>
         {form.pairs.map((pair, index) => <Grid size={{ xs: 12 }} key={index}><Stack direction="row" spacing={1}>
           <TextField fullWidth label={`Thuật ngữ ${index + 1}`} value={pair.prompt} onChange={(e) => updatePair(index, 'prompt', e.target.value)} />
@@ -162,7 +177,7 @@ export function WeeklyChallengeManagementPage() {
         </Stack></Grid>)}
         <Grid size={{ xs: 12 }}><Button variant="outlined" disabled={form.pairs.length >= 12} onClick={() => setForm({ ...form, pairs: [...form.pairs, { prompt: '', answer: '' }] })}>Thêm cặp thẻ</Button></Grid>
       </Grid></DialogContent>
-      <DialogActions><Button onClick={() => setOpen(false)} disabled={busy}>Hủy</Button><Button variant="contained" onClick={save} disabled={busy}>{busy ? 'Đang lưu...' : 'Lưu bản nháp'}</Button></DialogActions>
+      <DialogActions><Button onClick={() => setOpen(false)} disabled={busy}>Hủy</Button><Button variant="contained" onClick={save} disabled={busy || Boolean(formValidationError)}>{busy ? 'Đang lưu...' : 'Lưu bản nháp'}</Button></DialogActions>
     </Dialog>
     <WeeklyChallengeLeaderboardDialog open={leaderboardOpen} loading={leaderboardLoading}
       error={leaderboardError} data={leaderboard}
