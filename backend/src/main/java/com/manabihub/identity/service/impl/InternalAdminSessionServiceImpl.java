@@ -200,7 +200,13 @@ public class InternalAdminSessionServiceImpl implements InternalAdminSessionServ
     @Override
     @Transactional
     public void revokeAll(UUID adminAccountId) {
-        sessionRepository.revokeAllForAccount(adminAccountId, Instant.now());
+        Instant now = Instant.now();
+        sessionRepository.revokeAllForAccount(adminAccountId, now);
+        refreshTokenRepository.revokeActiveForAccount(
+                adminAccountId,
+                InternalAdminRefreshTokenStatus.REVOKED,
+                now
+        );
     }
 
     private AdminSessionBundle bundle(
@@ -267,8 +273,10 @@ public class InternalAdminSessionServiceImpl implements InternalAdminSessionServ
             InternalAdminSession session,
             Instant revokedAt
     ) {
-        session.setRevokedAt(revokedAt);
-        sessionRepository.saveAndFlush(session);
+        if (session.getRevokedAt() == null) {
+            session.setRevokedAt(revokedAt);
+            sessionRepository.saveAndFlush(session);
+        }
         refreshTokenRepository.revokeActiveForSession(
                 session.getId(),
                 InternalAdminRefreshTokenStatus.REVOKED,
