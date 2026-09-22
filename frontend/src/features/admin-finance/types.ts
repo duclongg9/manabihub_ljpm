@@ -115,6 +115,7 @@ export interface ExpenseDetail extends ExpenseSummary {
   billingPeriodFrom?: string;
   billingPeriodTo?: string;
   paidAt?: string;
+  paidBy?: string;
   evidenceReference?: string;
   createdBy: string;
   confirmedBy?: string;

@@ -92,6 +92,9 @@ public class SystemExpense {
     @Column(name = "paid_at")
     private Instant paidAt;
 
+    @Column(name = "paid_by")
+    private UUID paidBy;
+
     @Column(name = "evidence_reference", length = 500)
     private String evidenceReference;
 
