@@ -8,6 +8,8 @@ import com.manabihub.challenge.repository.DailyLearningAttendanceRewardRepositor
 import com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptRepository;
 import com.manabihub.challenge.repository.WeeklyLearningChallengeRepository;
 import com.manabihub.challenge.repository.WeeklyLearningChallengeRewardRepository;
+import com.manabihub.audit.entity.AuditLog;
+import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.learning.repository.LessonBlockProgressRepository;
 import com.manabihub.wallet.entity.WalletTransaction;
 import com.manabihub.wallet.enums.WalletTransactionType;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -43,13 +46,14 @@ class ChallengeRewardSettlementServiceTest {
     @Mock private DailyLearningAttendanceRewardRepository attendanceRewardRepository;
     @Mock private LessonBlockProgressRepository progressRepository;
     @Mock private StudentWalletService walletService;
+    @Mock private AuditLogRepository auditLogRepository;
 
     private ChallengeRewardSettlementService service;
 
     @BeforeEach
     void setUp() {
         service = new ChallengeRewardSettlementService(challengeRepository, attemptRepository,
-                rewardRepository, attendanceRewardRepository, progressRepository, walletService);
+                rewardRepository, attendanceRewardRepository, progressRepository, walletService, auditLogRepository);
     }
 
     @Test
@@ -122,6 +126,27 @@ class ChallengeRewardSettlementServiceTest {
         verifyNoInteractions(attemptRepository, rewardRepository, walletService);
         assertNull(challenge.getSettledAt());
         assertEquals(ChallengeStatus.PUBLISHED, challenge.getStatus());
+    }
+
+    @Test
+    void manualRetry_settlesACompletedWeekAndAuditsTheSystemAdmin() {
+        LocalDate completedWeek = LocalDate.now(BUSINESS_ZONE)
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1);
+        UUID adminId = UUID.randomUUID();
+        UUID challengeId = UUID.randomUUID();
+        WeeklyLearningChallenge challenge = challenge(challengeId, completedWeek, ChallengeStatus.PUBLISHED);
+        when(challengeRepository.findByIdForUpdate(challengeId)).thenReturn(Optional.of(challenge));
+        when(attemptRepository.findRankedBestScores(challengeId)).thenReturn(List.of());
+
+        service.retryWeeklySettlement(adminId, challengeId);
+
+        assertNotNull(challenge.getSettledAt());
+        assertEquals(ChallengeStatus.ARCHIVED, challenge.getStatus());
+        ArgumentCaptor<AuditLog> audit = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(audit.capture());
+        assertEquals(adminId, audit.getValue().getActorAdminId());
+        assertEquals("WEEKLY_CHALLENGE_SETTLEMENT_RETRIED", audit.getValue().getAction());
+        assertEquals("SETTLED", audit.getValue().getMetadata().get("outcome"));
     }
 
     @Test
