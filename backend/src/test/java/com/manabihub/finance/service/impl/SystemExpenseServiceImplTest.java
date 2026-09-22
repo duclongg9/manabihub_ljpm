@@ -116,7 +116,7 @@ class SystemExpenseServiceImplTest {
 
         BusinessException error = assertThrows(BusinessException.class, () -> service.create(request()));
 
-        assertEquals(MessageCodes.ADMIN_PERMISSION_DENIED, error.getMessageCode());
+        assertEquals(MessageCodes.MSG_ADM_008, error.getMessageCode());
         verify(expenseRepository, never()).saveAndFlush(any());
     }
 
