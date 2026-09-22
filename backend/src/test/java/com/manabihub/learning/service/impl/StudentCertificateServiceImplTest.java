@@ -3,6 +3,7 @@ package com.manabihub.learning.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.audit.service.SecurityEventRecorder;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.CourseModule;
 import com.manabihub.course.entity.LessonBlock;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Captor;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -41,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,6 +65,8 @@ class StudentCertificateServiceImplTest {
     private CertificateEligibilityService eligibilityService;
     @Mock
     private CurrentUserService currentUserService;
+    @Mock
+    private SecurityEventRecorder securityEventRecorder;
     @Mock
     private NotificationService notificationService;
     @Captor
@@ -129,8 +134,12 @@ class StudentCertificateServiceImplTest {
         assertEquals("An Nguyen", result.studentName());
         assertEquals(course.getTitle(), result.courseTitle());
         assertEquals(enrollment.getCompletedAt(), result.completedAt());
+        assertEquals(Instant.parse("2026-07-24T00:00:00Z"), result.issuedAt());
         assertTrue(result.certificateNumber().startsWith("MHB-"));
-        verify(certificateRepository).save(any(LearningCertificate.class));
+        ArgumentCaptor<LearningCertificate> certificateCaptor =
+                ArgumentCaptor.forClass(LearningCertificate.class);
+        verify(certificateRepository).save(certificateCaptor.capture());
+        assertTrue(certificateCaptor.getValue().getIssuedAt() != null);
         verify(notificationService).createNotificationOnce(
                 "course-completed:" + enrollment.getId(),
                 userId,
@@ -254,6 +263,13 @@ class StudentCertificateServiceImplTest {
         );
 
         assertEquals(MessageCodes.LEARNING_NOT_ENROLLED, exception.getMessageCode());
+        verify(securityEventRecorder).recordAccessDenied(
+                eq(userId),
+                eq("CERTIFICATE_ACCESS_DENIED"),
+                eq("COURSE"),
+                eq(course.getId()),
+                eq(java.util.Map.of("reason", "NO_ACTIVE_ENROLLMENT"))
+        );
     }
 
     private void mockOwnedEnrollment() {

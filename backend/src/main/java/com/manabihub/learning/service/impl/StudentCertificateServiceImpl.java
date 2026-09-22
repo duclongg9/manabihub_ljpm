@@ -3,6 +3,7 @@ package com.manabihub.learning.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.audit.service.SecurityEventRecorder;
 import com.manabihub.course.entity.Course;
 import com.manabihub.course.entity.LessonBlock;
 import com.manabihub.course.repository.CourseRepository;
@@ -31,6 +32,7 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.time.Instant;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -46,6 +48,7 @@ public class StudentCertificateServiceImpl implements StudentCertificateService 
     private final LearningCertificateRepository certificateRepository;
     private final CertificateEligibilityService eligibilityService;
     private final CurrentUserService currentUserService;
+    private final SecurityEventRecorder securityEventRecorder;
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
 
@@ -109,6 +112,7 @@ public class StudentCertificateServiceImpl implements StudentCertificateService 
                         .studentName(studentName)
                         .courseTitle(enrollment.getCourse().getTitle())
                         .eligibilitySnapshot(objectMapper.valueToTree(eligibility))
+                        .issuedAt(Instant.now())
                         .build()
         );
         notificationService.createNotificationOnce(
@@ -131,13 +135,34 @@ public class StudentCertificateServiceImpl implements StudentCertificateService 
                         "Course was not found.",
                         HttpStatus.NOT_FOUND
                 ));
+        UUID currentUserId = currentUserService.getCurrentUserId();
         StudentProfile student = studentProfileRepository
-                .findByUser_Id(currentUserService.getCurrentUserId())
-                .orElseThrow(() -> notEnrolled("You are not enrolled in this course."));
-        return enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId())
+                .findByUser_Id(currentUserId)
+                .orElse(null);
+        if (student == null) {
+            recordCertificateAccessDenied(currentUserId, course.getId(), "NO_STUDENT_PROFILE");
+            throw notEnrolled("You are not enrolled in this course.");
+        }
+
+        Enrollment enrollment = enrollmentRepository.findByStudent_IdAndCourse_Id(student.getId(), course.getId())
                 .filter(value -> value.getStatus() == EnrollmentStatus.ACTIVE
                         || value.getStatus() == EnrollmentStatus.COMPLETED)
-                .orElseThrow(() -> notEnrolled("You are not enrolled in this course."));
+                .orElse(null);
+        if (enrollment == null) {
+            recordCertificateAccessDenied(currentUserId, course.getId(), "NO_ACTIVE_ENROLLMENT");
+            throw notEnrolled("You are not enrolled in this course.");
+        }
+        return enrollment;
+    }
+
+    private void recordCertificateAccessDenied(UUID actorUserId, UUID courseId, String reason) {
+        securityEventRecorder.recordAccessDenied(
+                actorUserId,
+                "CERTIFICATE_ACCESS_DENIED",
+                "COURSE",
+                courseId,
+                Map.of("reason", reason)
+        );
     }
 
     private BusinessException notEnrolled(String message) {
