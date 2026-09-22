@@ -279,6 +279,10 @@ class StudentWithdrawalServiceImplTest {
     @Test
     void getSavedBankAccounts_returnsOnlyOwnershipVerifiedAccounts() {
         when(studentProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(student));
+        AccountIdentityVerification verifiedIdentity = new AccountIdentityVerification();
+        verifiedIdentity.setFullName("NGUYEN VAN A");
+        when(accountIdentityVerificationService.findVerified(userId))
+                .thenReturn(Optional.of(verifiedIdentity));
         StudentBankAccount verified = StudentBankAccount.builder()
                 .id(UUID.randomUUID())
                 .studentId(student.getId())
@@ -288,9 +292,18 @@ class StudentWithdrawalServiceImplTest {
                 .accountHolderName("NGUYEN VAN A")
                 .ownershipVerified(true)
                 .build();
+        StudentBankAccount holderNameMismatch = StudentBankAccount.builder()
+                .id(UUID.randomUUID())
+                .studentId(student.getId())
+                .bankCode("MB")
+                .bankName("MB Bank")
+                .accountNumber("enc:mismatched-account")
+                .accountHolderName("TRAN VAN B")
+                .ownershipVerified(true)
+                .build();
         when(bankAccountRepository
                 .findByStudentIdAndOwnershipVerifiedTrueOrderByCreatedAtDesc(student.getId()))
-                .thenReturn(List.of(verified));
+                .thenReturn(List.of(verified, holderNameMismatch));
         when(securityService.maskAccountNumber("enc:student-account")).thenReturn("****6789");
 
         List<StudentBankAccountResponse> accounts = service.getSavedBankAccounts(userId);
