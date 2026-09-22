@@ -50,6 +50,32 @@ public class SecurityAuditService {
     }
 
     /**
+     * Persists a student duplicate-CCCD attempt independently of the failed
+     * verification transaction. Raw CCCD values and fingerprints are never logged.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logStudentDuplicateIdentityAudit(UUID studentId, UUID actorUserId) {
+        AuditLog auditLog = AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(actorUserId)
+                .actorRoleCode("STUDENT")
+                .action("BR-KYC-CCCD-DUPLICATE")
+                .targetType("STUDENT_PROFILE")
+                .targetId(studentId)
+                .afterValue(Map.of(
+                        "reason", "Duplicate CCCD identity claim detected across different accounts",
+                        "status", "BLOCKED"
+                ))
+                .metadata(Map.of(
+                        "module", "IDENTITY_VERIFICATION",
+                        "msg", MessageCodes.MSG_IDV_002
+                ))
+                .build();
+
+        auditLogRepository.save(auditLog);
+    }
+
+    /**
      * Logs security event when an invalid or mismatched transaction binding is detected.
      * Uses REQUIRES_NEW propagation to ensure audit log is saved even if outer transaction rolls back.
      */

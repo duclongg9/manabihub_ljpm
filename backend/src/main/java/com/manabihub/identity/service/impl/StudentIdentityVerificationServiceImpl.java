@@ -2,6 +2,7 @@ package com.manabihub.identity.service.impl;
 
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.audit.service.SecurityAuditService;
 import com.manabihub.identity.dto.request.StudentIdentityVerificationRequest;
 import com.manabihub.identity.dto.response.StudentIdentityVerificationResponse;
 import com.manabihub.identity.entity.AccountIdentityVerification;
@@ -77,6 +78,7 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
     private final VnptIdentityTransactionClaimRepository vnptIdentityTransactionClaimRepository;
     private final DatabaseAuthRateLimiter vnptKycRateLimiter;
     private final AccountIdentityVerificationService accountIdentityVerificationService;
+    private final SecurityAuditService securityAuditService;
 
     @Value("${manabihub.kyc.identity-secret:}")
     private String identitySecret;
@@ -197,14 +199,21 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
             bindProviderTransaction(userId, providerBinding, Instant.now());
         }
 
-        accountIdentityVerificationService.recordVerified(
-                userId,
-                identityFingerprint,
-                verifiedIdentity.provider(),
-                verifiedFullName,
-                verifiedDateOfBirth,
-                verifiedAt,
-                "STUDENT");
+        try {
+            accountIdentityVerificationService.recordVerified(
+                    userId,
+                    identityFingerprint,
+                    verifiedIdentity.provider(),
+                    verifiedFullName,
+                    verifiedDateOfBirth,
+                    verifiedAt,
+                    "STUDENT");
+        } catch (BusinessException exception) {
+            if (MessageCodes.MSG_KYC_008.equals(exception.getMessageCode())) {
+                throw duplicateIdentity(student, userId, exception);
+            }
+            throw exception;
+        }
 
         student.setIdentityFingerprint(identityFingerprint);
         student.setIdentityProvider(verifiedIdentity.provider());
@@ -216,11 +225,17 @@ public class StudentIdentityVerificationServiceImpl implements StudentIdentityVe
         } catch (DataIntegrityViolationException ex) {
             // The fingerprint is unique across students. Do not leak the raw
             // identity or database constraint to the client.
-            throw new BusinessException(
-                    MessageCodes.MSG_KYC_008,
-                "CCCD này đã được liên kết với một tài khoản khác.",
-                    HttpStatus.CONFLICT);
+            throw duplicateIdentity(student, userId, ex);
         }
+    }
+
+    private BusinessException duplicateIdentity(StudentProfile student, UUID userId, Throwable cause) {
+        securityAuditService.logStudentDuplicateIdentityAudit(student.getId(), userId);
+        return new BusinessException(
+                MessageCodes.MSG_IDV_002,
+                "CCCD này đã được liên kết với một tài khoản khác.",
+                HttpStatus.CONFLICT,
+                cause);
     }
 
     private VerifiedIdentity verifyWithVnptServer(ProviderBinding providerBinding) {

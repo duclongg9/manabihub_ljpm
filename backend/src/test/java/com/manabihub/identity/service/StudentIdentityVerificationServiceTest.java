@@ -1,6 +1,8 @@
 package com.manabihub.identity.service;
 
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.audit.service.SecurityAuditService;
 import com.manabihub.identity.dto.request.StudentIdentityVerificationRequest;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.entity.AccountIdentityVerification;
@@ -62,6 +64,9 @@ class StudentIdentityVerificationServiceTest {
 
     @Mock
     private AccountIdentityVerificationService accountIdentityVerificationService;
+
+    @Mock
+    private SecurityAuditService securityAuditService;
 
     @InjectMocks
     private StudentIdentityVerificationServiceImpl service;
@@ -139,6 +144,30 @@ class StudentIdentityVerificationServiceTest {
 
         assertEquals("MSG-KYC-002", error.getMessageCode());
         assertEquals(HttpStatus.BAD_REQUEST, error.getHttpStatus());
+    }
+
+    @Test
+    void verify_duplicateCccdReturnsIdv002AndRecordsSecurityAudit() {
+        when(nationalIdRegistry.findActiveByIdNumber("027204002711"))
+                .thenReturn(Optional.of(new NationalIdRecordDto(
+                        "027204002711", "NGUYEN XUAN DAT", LocalDate.of(2004, 8, 31))));
+        when(accountIdentityVerificationService.recordVerified(
+                any(), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new BusinessException(
+                        MessageCodes.MSG_KYC_008,
+                        "This CCCD is already linked to another account",
+                        HttpStatus.CONFLICT));
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.verify(
+                new StudentIdentityVerificationRequest(
+                        null,
+                        null,
+                        validSdkResult("027204002711", "NGUYEN XUAN DAT", "2004-08-31"))));
+
+        assertEquals(MessageCodes.MSG_IDV_002, error.getMessageCode());
+        assertEquals(HttpStatus.CONFLICT, error.getHttpStatus());
+        verify(securityAuditService).logStudentDuplicateIdentityAudit(student.getId(), userId);
+        verify(studentProfileRepository, never()).save(any());
     }
 
     @Test

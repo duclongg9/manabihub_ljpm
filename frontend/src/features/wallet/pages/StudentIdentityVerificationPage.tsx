@@ -195,6 +195,9 @@ function readErrorMessage(error: unknown, fallback: string) {
   if (data?.messageCode === 'MSG-KYC-008') {
     return 'CCCD này đã được liên kết hoặc lượt xác minh đang xung đột. Vui lòng tải lại trạng thái.';
   }
+  if (data?.messageCode === 'MSG-IDV-002') {
+    return 'CCCD này đã được liên kết với một tài khoản khác và không thể dùng để xác minh.';
+  }
   const message = data?.message;
   return message || (error instanceof Error ? error.message : fallback);
 }
