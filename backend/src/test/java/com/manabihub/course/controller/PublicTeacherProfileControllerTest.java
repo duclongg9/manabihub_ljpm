@@ -1,7 +1,9 @@
 package com.manabihub.course.controller;
 
 import com.manabihub.course.dto.response.PublicTeacherCourseResponse;
+import com.manabihub.course.dto.response.PublicTeacherCredentialResponse;
 import com.manabihub.course.dto.response.PublicTeacherProfileResponse;
+import com.manabihub.course.dto.response.PublicTeacherRatingSummaryResponse;
 import com.manabihub.course.dto.response.PublicTeacherSummaryResponse;
 import com.manabihub.course.enums.JlptLevel;
 import com.manabihub.course.service.PublicTeacherProfileService;
@@ -74,6 +76,8 @@ class PublicTeacherProfileControllerTest {
                         "N5 grammar teacher",
                         true,
                         1,
+                        List.of(new PublicTeacherCredentialResponse("JLPT", "N5", "APPROVED")),
+                        new PublicTeacherRatingSummaryResponse(new BigDecimal("4.8"), 16),
                         List.of(course)
                 ));
 
@@ -83,6 +87,11 @@ class PublicTeacherProfileControllerTest {
                 .andExpect(jsonPath("$.data.id", is(teacherId.toString())))
                 .andExpect(jsonPath("$.data.displayName", is("Sensei An")))
                 .andExpect(jsonPath("$.data.verified", is(true)))
+                .andExpect(jsonPath("$.data.credentials[0].type", is("JLPT")))
+                .andExpect(jsonPath("$.data.credentials[0].level", is("N5")))
+                .andExpect(jsonPath("$.data.credentials[0].verificationStatus", is("APPROVED")))
+                .andExpect(jsonPath("$.data.ratingSummary.averageRating", is(4.8)))
+                .andExpect(jsonPath("$.data.ratingSummary.reviewCount", is(16)))
                 .andExpect(jsonPath("$.data.courses", hasSize(1)))
                 .andExpect(jsonPath("$.data.courses[0].slug", is("n5-foundations")))
                 .andExpect(jsonPath("$.data.email").doesNotExist())
