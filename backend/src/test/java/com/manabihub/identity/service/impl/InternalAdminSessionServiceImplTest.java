@@ -172,6 +172,35 @@ class InternalAdminSessionServiceImplTest {
         verify(accountRepository, never()).findByIdForRoleUpdate(any());
     }
 
+
+    @Test
+    void refreshOfAlreadyRevokedSessionKeepsTheOriginalRevocationTime() {
+        InternalAdminAccount account = account();
+        InternalAdminSession session = activeSession(account);
+        Instant originalRevocation = Instant.parse("2026-09-21T04:18:05.314696Z");
+        session.setRevokedAt(originalRevocation);
+        InternalAdminRefreshToken token = activeRefreshToken(session);
+        when(tokenService.hash("old-refresh")).thenReturn("old-hash");
+        when(tokenService.matches("old-csrf", "csrf-hash")).thenReturn(true);
+        when(refreshTokenRepository.findByTokenHashForUpdate("old-hash"))
+                .thenReturn(Optional.of(token));
+        when(sessionRepository.findByIdForUpdate(session.getId()))
+                .thenReturn(Optional.of(session));
+
+        assertThrows(
+                BusinessException.class,
+                () -> service.refresh("old-refresh", "old-csrf", "JUnit")
+        );
+
+        assertEquals(originalRevocation, session.getRevokedAt());
+        verify(sessionRepository, never()).saveAndFlush(any());
+        verify(refreshTokenRepository).revokeActiveForSession(
+                eq(session.getId()),
+                eq(InternalAdminRefreshTokenStatus.REVOKED),
+                any()
+        );
+    }
+
     private InternalAdminAccount account() {
         Role role = new Role();
         role.setCode(RoleCode.SYSTEM_ADMIN);

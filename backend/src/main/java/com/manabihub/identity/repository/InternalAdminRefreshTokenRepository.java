@@ -39,4 +39,23 @@ public interface InternalAdminRefreshTokenRepository
             @Param("status") InternalAdminRefreshTokenStatus status,
             @Param("usedAt") Instant usedAt
     );
+
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update InternalAdminRefreshToken refreshToken
+            set refreshToken.status = :status,
+                refreshToken.usedAt = :usedAt
+            where refreshToken.status = com.manabihub.identity.enums.InternalAdminRefreshTokenStatus.ACTIVE
+              and refreshToken.sessionId in (
+                  select session.id
+                  from InternalAdminSession session
+                  where session.adminAccountId = :adminAccountId
+              )
+            """)
+    int revokeActiveForAccount(
+            @Param("adminAccountId") UUID adminAccountId,
+            @Param("status") InternalAdminRefreshTokenStatus status,
+            @Param("usedAt") Instant usedAt
+    );
 }

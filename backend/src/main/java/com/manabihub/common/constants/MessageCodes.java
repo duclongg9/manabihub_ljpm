@@ -118,6 +118,7 @@ public final class MessageCodes {
     public static final String MSG_KYC_008 = "MSG-KYC-008";
     public static final String MSG_KYC_009 = "MSG-KYC-009";
     public static final String MSG_KYC_010 = "MSG-KYC-010";
+    public static final String MSG_IDV_002 = "MSG-IDV-002";
     public static final String MSG_ADM_002 = "MSG-ADM-002";
 
     // ──────────────────────────────────────────────
