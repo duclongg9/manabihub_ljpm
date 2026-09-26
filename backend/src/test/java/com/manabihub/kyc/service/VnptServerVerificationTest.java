@@ -352,7 +352,10 @@ class VnptServerVerificationTest {
         );
 
         // Act
-        service.verifyIdentity(userId, request, "127.0.0.1", "Test-Agent");
+        com.manabihub.common.exception.BusinessException ex = org.junit.jupiter.api.Assertions.assertThrows(
+                com.manabihub.common.exception.BusinessException.class,
+                () -> service.verifyIdentity(userId, request, "127.0.0.1", "Test-Agent"));
+        assertThat(ex.getMessageCode()).isEqualTo(com.manabihub.common.constants.MessageCodes.MSG_KYC_009);
 
         // Assert - should remain PENDING for retry
         verify(kycRequestRepository, atLeastOnce()).saveAndFlush(requestCaptor.capture());

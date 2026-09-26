@@ -40,6 +40,9 @@ public class VnptVerificationCoordinator {
     private static final Duration SERVER_VERIFICATION_TTL = Duration.ofMinutes(30);
     private static final Duration CLOCK_SKEW_TOLERANCE = Duration.ofMinutes(5);
     private static final int MAX_SERVER_VERIFICATION_ATTEMPTS = 3;
+    /** Provider reason codes meaning "the provider could not verify", not "the identity failed". */
+    private static final java.util.Set<String> PROVIDER_UNAVAILABLE_REASONS =
+            java.util.Set.of("PROVIDER_NOT_CONFIGURED");
     private static final Duration RETRY_COOLDOWN = Duration.ofSeconds(30);
 
     private final TeacherProfileRepository teacherProfileRepository;
@@ -411,9 +414,13 @@ public class VnptVerificationCoordinator {
             securityAuditService.logVerificationEvent("IDENTITY_CLAIM_FAILED", r.getTeacherProfile().getId(), r.getId(), userId, ipAddress, userAgent);
         });
     }
-
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public VerificationOutcome recordProviderTimeout(UUID requestId, UUID userId, String ipAddress, String userAgent) {
+        return recordProviderUnavailable(requestId, userId, ipAddress, userAgent, "PROVIDER_TIMEOUT");
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public VerificationOutcome recordProviderUnavailable(UUID requestId, UUID userId, String ipAddress, String userAgent, String auditType) {
         return kycRequestRepository.findByIdForUpdate(requestId).map(r -> {
             int attempts = r.getServerVerificationAttemptCount();
             if (attempts >= MAX_SERVER_VERIFICATION_ATTEMPTS) {
@@ -422,7 +429,7 @@ public class VnptVerificationCoordinator {
                 securityAuditService.logVerificationEvent("MAX_ATTEMPTS", r.getTeacherProfile().getId(), r.getId(), userId, ipAddress, userAgent);
                 return new VerificationOutcome(requestId, r.getTeacherProfile().getId(), userId, IdentityVerificationStatus.FAILED, true);
             } else {
-                securityAuditService.logVerificationEvent("PROVIDER_TIMEOUT", r.getTeacherProfile().getId(), r.getId(), userId, ipAddress, userAgent);
+                securityAuditService.logVerificationEvent(auditType, r.getTeacherProfile().getId(), r.getId(), userId, ipAddress, userAgent);
                 return new VerificationOutcome(requestId, r.getTeacherProfile().getId(), userId, IdentityVerificationStatus.PENDING_SERVER_VERIFICATION, true);
             }
         }).orElseGet(() -> new VerificationOutcome(requestId, null, userId, IdentityVerificationStatus.FAILED, false));
@@ -474,7 +481,16 @@ public class VnptVerificationCoordinator {
             );
         } catch (Exception ex) {
             log.warn("VNPT server verification network/timeout error for tx: {}", bindResult.providerTransactionId(), ex);
-            return self.recordProviderTimeout(bindResult.requestId(), bindResult.userId(), ipAddress, userAgent);
+            self.recordProviderTimeout(bindResult.requestId(), bindResult.userId(), ipAddress, userAgent);
+            throw providerUnavailable();
+        }
+
+        if (isProviderUnavailable(providerResult)) {
+            log.warn("VNPT server verification unavailable ({}) for tx: {}",
+                    providerResult.reasonCode(), bindResult.providerTransactionId());
+            self.recordProviderUnavailable(bindResult.requestId(), bindResult.userId(),
+                    ipAddress, userAgent, providerResult.reasonCode());
+            throw providerUnavailable();
         }
 
         try {
@@ -488,6 +504,20 @@ public class VnptVerificationCoordinator {
             self.markClaimFailed(bindResult.requestId(), bindResult.userId(), ipAddress, userAgent);
             return new VerificationOutcome(bindResult.requestId(), bindResult.teacherProfileId(), bindResult.userId(), IdentityVerificationStatus.FAILED, true);
         }
+    }
+
+    private boolean isProviderUnavailable(VnptServerVerificationResult result) {
+        return result != null
+                && !result.verified()
+                && PROVIDER_UNAVAILABLE_REASONS.contains(result.reasonCode());
+    }
+
+    private BusinessException providerUnavailable() {
+        return new BusinessException(
+                MessageCodes.MSG_KYC_009,
+                "VNPT identity verification is temporarily unavailable. Please try again later.",
+                HttpStatus.SERVICE_UNAVAILABLE
+        );
     }
 
     private UUID resolveTeacherProfileIdSafe(UUID userId) {
