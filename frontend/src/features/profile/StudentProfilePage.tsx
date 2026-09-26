@@ -26,6 +26,8 @@ const JLPT_LEVELS = [
     { level: "N1", label: "N1 • 上級" }
 ];
 
+const PHONE_OTP_RESEND_COOLDOWN_SECONDS = 60;
+
 export default function StudentProfilePage() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
@@ -33,6 +35,7 @@ export default function StudentProfilePage() {
     const [phoneVerified, setPhoneVerified] = useState(false);
     const [phoneCode, setPhoneCode] = useState("");
     const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+    const [phoneOtpCooldownSeconds, setPhoneOtpCooldownSeconds] = useState(0);
     const [firebasePhoneSession, setFirebasePhoneSession] = useState<FirebasePhoneOtpSession | null>(null);
     const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
     const [confirmingPhoneOtp, setConfirmingPhoneOtp] = useState(false);
@@ -51,6 +54,14 @@ export default function StudentProfilePage() {
     useEffect(() => () => {
         void firebasePhoneSession?.cancel();
     }, [firebasePhoneSession]);
+
+    useEffect(() => {
+        if (phoneOtpCooldownSeconds <= 0) return;
+        const timer = window.setTimeout(() => {
+            setPhoneOtpCooldownSeconds((seconds) => Math.max(0, seconds - 1));
+        }, 1000);
+        return () => window.clearTimeout(timer);
+    }, [phoneOtpCooldownSeconds]);
 
     async function loadProfile() {
         setIdentityStatusLoading(true);
@@ -74,6 +85,7 @@ export default function StudentProfilePage() {
             setPhoneVerified(profile.phoneVerified === true);
             setPhoneCode("");
             setPhoneOtpSent(false);
+            setPhoneOtpCooldownSeconds(0);
             setFirebasePhoneSession(null);
         } catch (error) {
             console.error(error);
@@ -138,23 +150,23 @@ export default function StudentProfilePage() {
     }
 
     async function handleRequestPhoneOtp() {
-        if (phoneVerified || !validatePhone()) return;
+        if (phoneVerified || phoneOtpCooldownSeconds > 0 || !validatePhone()) return;
         try {
             setSendingPhoneOtp(true);
-            await firebasePhoneSession?.cancel();
-            setFirebasePhoneSession(null);
             const challenge = await requestStudentPhoneVerification(form.phoneNumber);
+            let nextFirebaseSession: FirebasePhoneOtpSession | null = null;
             if (challenge.verificationMethod === "FIREBASE") {
                 if (!challenge.challengeId || !challenge.phoneNumberE164) {
                     throw new Error("Backend không trả về challenge Firebase hợp lệ.");
                 }
-                const session = await startFirebasePhoneOtp({
+                nextFirebaseSession = await startFirebasePhoneOtp({
                     challengeId: challenge.challengeId,
                     phoneNumberE164: challenge.phoneNumberE164,
                 });
-                setFirebasePhoneSession(session);
             }
+            setFirebasePhoneSession(nextFirebaseSession);
             setPhoneOtpSent(true);
+            setPhoneOtpCooldownSeconds(PHONE_OTP_RESEND_COOLDOWN_SECONDS);
             setSnackbar({
                 open: true,
                 message: challenge.verificationMethod === "FIREBASE"
@@ -164,7 +176,6 @@ export default function StudentProfilePage() {
             });
         } catch (error: any) {
             const response = error.response?.data;
-            setPhoneOtpSent(false);
             setSnackbar({
                 open: true,
                 message: response?.message ?? firebasePhoneErrorMessage(error),
@@ -217,6 +228,7 @@ export default function StudentProfilePage() {
                 setFirebasePhoneSession(null);
                 setPhoneCode("");
                 setPhoneOtpSent(false);
+                setPhoneOtpCooldownSeconds(0);
             }
         };
     }
@@ -390,10 +402,14 @@ export default function StudentProfilePage() {
                                         <Button
                                             variant="outlined"
                                             onClick={handleRequestPhoneOtp}
-                                            disabled={saving || sendingPhoneOtp || !form.phoneNumber}
+                                            disabled={saving || sendingPhoneOtp || phoneOtpCooldownSeconds > 0 || !form.phoneNumber}
                                             sx={{ minWidth: 150, height: 56, whiteSpace: "nowrap", borderColor: '#C41E3A', color: '#C41E3A' }}
                                         >
-                                            {sendingPhoneOtp ? "Đang gửi..." : "Gửi mã SMS"}
+                                            {sendingPhoneOtp
+                                                ? "Đang gửi..."
+                                                : phoneOtpCooldownSeconds > 0
+                                                    ? `Gửi lại sau ${phoneOtpCooldownSeconds}s`
+                                                    : phoneOtpSent ? "Gửi lại mã SMS" : "Gửi mã SMS"}
                                         </Button>
                                     )}
                                 </Stack>
