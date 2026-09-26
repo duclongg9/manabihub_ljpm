@@ -232,9 +232,15 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
     @Transactional(readOnly = true)
     public List<StudentBankAccountResponse> getSavedBankAccounts(UUID userId) {
         StudentProfile student = requireStudent(userId);
+        String verifiedIdentityName = verifiedIdentityName(userId, student);
+        if (PersonNameNormalizer.normalize(verifiedIdentityName).isBlank()) {
+            return List.of();
+        }
         return bankAccountRepository
                 .findByStudentIdAndOwnershipVerifiedTrueOrderByCreatedAtDesc(student.getId())
                 .stream()
+                .filter(account -> holderNameMatchesIdentity(
+                        account.getAccountHolderName(), verifiedIdentityName))
                 .map(account -> StudentBankAccountResponse.builder()
                         .id(account.getId())
                         .bankCode(account.getBankCode())
@@ -348,20 +354,25 @@ public class StudentWithdrawalServiceImpl implements StudentWithdrawalService {
             StudentProfile student,
             String accountHolderName
     ) {
-        String verifiedName = accountIdentityVerificationService.findVerified(userId)
-                .map(AccountIdentityVerification::getFullName)
-                .filter(name -> name != null && !name.isBlank())
-                .orElse(student.getIdentityFullName());
-
-        String normalizedVerified = PersonNameNormalizer.normalize(verifiedName);
-        String normalizedHolder = PersonNameNormalizer.normalize(accountHolderName);
-
-        if (normalizedVerified.isBlank() || !normalizedVerified.equals(normalizedHolder)) {
+        if (!holderNameMatchesIdentity(accountHolderName, verifiedIdentityName(userId, student))) {
             throw new BusinessException(
                     MessageCodes.MSG_WALLET_005,
                     "Tên chủ tài khoản ngân hàng không khớp với danh tính đã xác minh.",
                     HttpStatus.FORBIDDEN);
         }
+    }
+
+    private String verifiedIdentityName(UUID userId, StudentProfile student) {
+        return accountIdentityVerificationService.findVerified(userId)
+                .map(AccountIdentityVerification::getFullName)
+                .filter(name -> name != null && !name.isBlank())
+                .orElse(student.getIdentityFullName());
+    }
+
+    private boolean holderNameMatchesIdentity(String accountHolderName, String verifiedIdentityName) {
+        String normalizedVerified = PersonNameNormalizer.normalize(verifiedIdentityName);
+        String normalizedHolder = PersonNameNormalizer.normalize(accountHolderName);
+        return !normalizedVerified.isBlank() && normalizedVerified.equals(normalizedHolder);
     }
 
     private BusinessException walletNotFound() {
