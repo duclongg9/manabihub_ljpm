@@ -3,6 +3,8 @@ package com.manabihub.writing.service.impl;
 import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.common.response.PageResponse;
+import com.manabihub.audit.entity.AuditLog;
+import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.identity.service.CurrentUserService;
 import com.manabihub.kyc.domain.TeacherProfile;
 import com.manabihub.kyc.repository.TeacherProfileRepository;
@@ -51,6 +53,7 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
     private final WritingSubmissionRepository writingSubmissionRepository;
     private final AiWritingSuggestionRepository aiWritingSuggestionRepository;
     private final TeacherWritingFeedbackRepository teacherWritingFeedbackRepository;
+    private final AuditLogRepository auditLogRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -165,6 +168,9 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
                 && submission.getStatus() == WritingSubmissionStatus.TEACHER_FEEDBACK_READY;
 
         if (!unchanged) {
+            boolean creatingFeedback = feedback.getId() == null;
+            BigDecimal previousScore = feedback.getScore();
+            String previousComment = feedback.getComment();
             feedback.setScore(request.score());
             feedback.setComment(normalizedComment);
             feedback.setTeacher(teacher);
@@ -173,6 +179,15 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
 
             submission.setStatus(WritingSubmissionStatus.TEACHER_FEEDBACK_READY);
             writingSubmissionRepository.save(submission);
+
+            recordFeedbackAudit(
+                    currentUserService.getCurrentUserId(),
+                    submission,
+                    feedback,
+                    previousScore,
+                    previousComment,
+                    creatingFeedback
+            );
 
             notificationService.createNotification(
                     submission.getStudent().getUser().getId(),
@@ -187,6 +202,39 @@ public class TeacherWritingReviewServiceImpl implements TeacherWritingReviewServ
         }
 
         return toDetailResponse(submission);
+    }
+
+    private void recordFeedbackAudit(
+            UUID actorUserId,
+            WritingSubmission submission,
+            TeacherWritingFeedback feedback,
+            BigDecimal previousScore,
+            String previousComment,
+            boolean creatingFeedback
+    ) {
+        auditLogRepository.save(AuditLog.builder()
+                .actorType("USER")
+                .actorUserId(actorUserId)
+                .actorRoleCode("TEACHER")
+                .action(creatingFeedback
+                        ? "TEACHER_WRITING_FEEDBACK_CREATED"
+                        : "TEACHER_WRITING_FEEDBACK_UPDATED")
+                .targetType("WRITING_SUBMISSION")
+                .targetId(submission.getId())
+                .beforeValue(feedbackSnapshot(previousScore, previousComment))
+                .afterValue(feedbackSnapshot(feedback.getScore(), feedback.getComment()))
+                .metadata(Map.of(
+                        "feedbackId", String.valueOf(feedback.getId()),
+                        "official", true
+                ))
+                .build());
+    }
+
+    private Map<String, Object> feedbackSnapshot(BigDecimal score, String comment) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("score", score == null ? null : score.toPlainString());
+        snapshot.put("commentLength", comment == null ? 0 : comment.length());
+        return snapshot;
     }
 
     private TeacherProfile getCurrentTeacher() {

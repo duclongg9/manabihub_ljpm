@@ -1,6 +1,8 @@
 package com.manabihub.writing.service.impl;
 
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.audit.entity.AuditLog;
+import com.manabihub.audit.repository.AuditLogRepository;
 import com.manabihub.identity.entity.AppUser;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.service.CurrentUserService;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -61,6 +64,9 @@ class TeacherWritingReviewServiceImplTest {
 
     @Mock
     private TeacherWritingFeedbackRepository teacherWritingFeedbackRepository;
+
+    @Mock
+    private AuditLogRepository auditLogRepository;
 
     @Mock
     private NotificationService notificationService;
@@ -262,6 +268,17 @@ class TeacherWritingReviewServiceImplTest {
                 eq("TEACHER_WRITING_FEEDBACK"),
                 eq("/student/courses/" + submission.getEnrollment().getCourse().getId() + "/learn")
         );
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog audit = auditCaptor.getValue();
+        assertThat(audit.getActorUserId()).isEqualTo(userId);
+        assertThat(audit.getActorRoleCode()).isEqualTo("TEACHER");
+        assertThat(audit.getAction()).isEqualTo("TEACHER_WRITING_FEEDBACK_UPDATED");
+        assertThat(audit.getTargetType()).isEqualTo("WRITING_SUBMISSION");
+        assertThat(audit.getTargetId()).isEqualTo(submissionId);
+        assertThat(audit.getAfterValue()).containsEntry("score", "8.50")
+                .containsEntry("commentLength", 14);
+        assertThat(audit.getAfterValue()).doesNotContainKey("comment");
     }
 
     @Test
@@ -296,5 +313,6 @@ class TeacherWritingReviewServiceImplTest {
         verify(teacherWritingFeedbackRepository, never()).save(any());
         verify(writingSubmissionRepository, never()).save(any());
         verifyNoInteractions(notificationService);
+        verify(auditLogRepository, never()).save(any());
     }
 }
