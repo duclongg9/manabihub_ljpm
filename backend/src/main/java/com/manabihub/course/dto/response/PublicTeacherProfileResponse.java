@@ -10,6 +10,8 @@ public record PublicTeacherProfileResponse(
         String bio,
         boolean verified,
         long publishedCourseCount,
+        List<PublicTeacherCredentialResponse> credentials,
+        PublicTeacherRatingSummaryResponse ratingSummary,
         List<PublicTeacherCourseResponse> courses
 ) {
 }
