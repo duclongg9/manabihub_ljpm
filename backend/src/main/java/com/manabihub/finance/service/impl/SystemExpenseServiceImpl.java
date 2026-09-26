@@ -192,6 +192,7 @@ public class SystemExpenseServiceImpl implements SystemExpenseService {
         requireStatus(expense, ExpenseStatus.CONFIRMED, "Only a confirmed expense can be marked paid");
         expense.setStatus(ExpenseStatus.PAID);
         expense.setPaidAt(Instant.now());
+        expense.setPaidBy(adminId);
         SystemExpense saved = expenseRepository.save(expense);
         audit(saved, adminId, "EXPENSE_PAID", ExpenseStatus.CONFIRMED, ExpenseStatus.PAID,
                 Map.of("amountVnd", saved.getTotalAmountVnd()));
@@ -407,7 +408,7 @@ public class SystemExpenseServiceImpl implements SystemExpenseService {
                 expense.getCurrency(), expense.getExchangeRate(), expense.getOriginalTotal(),
                 expense.getTotalAmountVnd(), expense.getIncurredAt(), expense.getDueDate(),
                 expense.getExchangeRateDate(), expense.getExchangeRateSource(), expense.getBillingPeriodFrom(),
-                expense.getBillingPeriodTo(), expense.getPaidAt(), expense.getEvidenceReference(),
+                expense.getBillingPeriodTo(), expense.getPaidAt(), expense.getPaidBy(), expense.getEvidenceReference(),
                 expense.getStatus(), expense.getSourceType(), expense.getCreatedBy(), expense.getConfirmedBy(),
                 expense.getConfirmedAt(), expense.getVoidedBy(), expense.getVoidedAt(), expense.getVoidReason(),
                 expense.getVersion(), expense.getCreatedAt(), expense.getUpdatedAt(), lines

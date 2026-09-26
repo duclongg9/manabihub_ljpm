@@ -106,6 +106,7 @@ class SystemExpenseServiceImplTest {
         assertNotNull(confirmed.confirmedAt());
         assertEquals(ExpenseStatus.PAID, paid.status());
         assertNotNull(paid.paidAt());
+        assertEquals(adminId, paid.paidBy());
     }
 
     @Test

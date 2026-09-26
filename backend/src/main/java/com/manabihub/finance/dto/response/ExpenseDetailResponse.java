@@ -27,6 +27,7 @@ public record ExpenseDetailResponse(
         LocalDate billingPeriodFrom,
         LocalDate billingPeriodTo,
         Instant paidAt,
+        UUID paidBy,
         String evidenceReference,
         ExpenseStatus status,
         ExpenseSourceType sourceType,
