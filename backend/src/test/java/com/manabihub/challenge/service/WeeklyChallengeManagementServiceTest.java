@@ -11,7 +11,9 @@ import com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptReposito
 import com.manabihub.challenge.repository.WeeklyLearningChallengePairRepository;
 import com.manabihub.challenge.repository.WeeklyLearningChallengeRepository;
 import com.manabihub.challenge.repository.WeeklyLearningChallengeRewardRepository;
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.common.exception.ValidationBusinessException;
 import com.manabihub.course.repository.CourseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -115,6 +117,27 @@ class WeeklyChallengeManagementServiceTest {
         assertEquals(managerId, auditLog.getActorAdminId());
         assertEquals("COURSE_MANAGER", auditLog.getActorRoleCode());
         assertEquals("WEEKLY_CHALLENGE_CREATED", auditLog.getAction());
+    }
+
+    @Test
+    void create_rejectsAscendingPrizesWithTheStandardValidationCode() {
+        UpsertWeeklyChallengeRequest request = new UpsertWeeklyChallengeRequest(
+                LocalDate.of(2026, 8, 17), "Thử thách Kanji tuần", "Ghép từ Kanji với cách đọc.",
+                "N5", 3, 2, new BigDecimal("1000"), new BigDecimal("100000"),
+                new BigDecimal("200000"), new BigDecimal("50000"), List.of(
+                new ChallengePairRequest("月", "mặt trăng"),
+                new ChallengePairRequest("火", "lửa"),
+                new ChallengePairRequest("水", "nước"),
+                new ChallengePairRequest("木", "cây")
+        ));
+
+        ValidationBusinessException error = assertThrows(ValidationBusinessException.class,
+                () -> service.create(managerId, request));
+
+        assertEquals(MessageCodes.VALIDATION_FAILED, error.getMessageCode());
+        assertEquals("Mức thưởng phải giảm dần theo hạng 1, 2, 3", error.getMessage());
+        assertEquals("secondPrize", error.getValidationErrors().getFirst().code());
+        verifyNoInteractions(challengeRepository);
     }
 
     private WeeklyLearningChallenge challenge(UUID id, ChallengeStatus status) {

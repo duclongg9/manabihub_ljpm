@@ -6,8 +6,11 @@ import com.manabihub.challenge.dto.*;
 import com.manabihub.challenge.entity.*;
 import com.manabihub.challenge.enums.ChallengeStatus;
 import com.manabihub.challenge.repository.*;
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
+import com.manabihub.common.exception.ValidationBusinessException;
 import com.manabihub.course.repository.CourseRepository;
+import com.manabihub.course.dto.response.ValidationError;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -130,7 +133,7 @@ public class WeeklyChallengeManagementService {
         }
         if (request.firstPrize().compareTo(request.secondPrize()) < 0
                 || request.secondPrize().compareTo(request.thirdPrize()) < 0) {
-            throw invalid("Mức thưởng phải giảm dần theo hạng 1, 2, 3");
+            throw validation("Mức thưởng phải giảm dần theo hạng 1, 2, 3");
         }
         Set<String> prompts = new HashSet<>();
         for (ChallengePairRequest pair : request.pairs()) {
@@ -199,5 +202,12 @@ public class WeeklyChallengeManagementService {
     }
 
     private BusinessException invalid(String message) { return new BusinessException(ERROR, message, HttpStatus.BAD_REQUEST); }
+    private ValidationBusinessException validation(String message) {
+        return new ValidationBusinessException(
+                MessageCodes.VALIDATION_FAILED,
+                message,
+                List.of(new ValidationError("secondPrize", message, "error"))
+        );
+    }
     private BusinessException conflict(String message) { return new BusinessException(CONFLICT_ERROR, message, HttpStatus.CONFLICT); }
 }
