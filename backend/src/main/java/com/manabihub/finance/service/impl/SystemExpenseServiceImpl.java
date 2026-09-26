@@ -322,7 +322,7 @@ public class SystemExpenseServiceImpl implements SystemExpenseService {
         UUID adminId = currentUserService.getCurrentUserId();
         if (!adminRepository.hasPermission(adminId, permission)) {
             throw new BusinessException(
-                    MessageCodes.ADMIN_PERMISSION_DENIED,
+                    MessageCodes.MSG_ADM_008,
                     "Finance expense permission is required: " + permission,
                     HttpStatus.FORBIDDEN
             );
