@@ -66,7 +66,7 @@ class WeeklyChallengeManagementServiceTest {
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.unpublish(managerId, challengeId));
 
-        assertEquals("WEEKLY_CHALLENGE_CONFLICT", error.getMessageCode());
+        assertEquals(MessageCodes.WEEKLY_CHALLENGE_CONFLICT, error.getMessageCode());
         assertEquals(ChallengeStatus.PUBLISHED, challenge.getStatus());
         verifyNoInteractions(auditLogRepository);
     }

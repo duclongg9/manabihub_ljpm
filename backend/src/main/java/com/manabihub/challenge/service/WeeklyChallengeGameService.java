@@ -4,6 +4,7 @@ import com.manabihub.challenge.dto.*;
 import com.manabihub.challenge.entity.*;
 import com.manabihub.challenge.enums.*;
 import com.manabihub.challenge.repository.*;
+import com.manabihub.common.constants.MessageCodes;
 import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
@@ -35,7 +36,7 @@ public class WeeklyChallengeGameService {
         LocalDate today = LocalDate.now(BUSINESS_ZONE);
         LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         WeeklyLearningChallenge challenge = challengeRepository.findByWeekStartAndStatus(weekStart, ChallengeStatus.PUBLISHED)
-                .orElseThrow(() -> new BusinessException("WEEKLY_CHALLENGE_NOT_AVAILABLE",
+                .orElseThrow(() -> new BusinessException(MessageCodes.WEEKLY_CHALLENGE_NOT_AVAILABLE,
                         "Tuần này chưa có thử thách được công khai", HttpStatus.NOT_FOUND));
         long attempts = attemptRepository.countByChallengeIdAndStudentIdAndRankedDayAndRankedTrue(
                 challenge.getId(), student.getId(), today);
@@ -83,7 +84,7 @@ public class WeeklyChallengeGameService {
     public ChallengeAttemptResponse match(UUID userId, UUID attemptId, MatchCardsRequest request) {
         StudentProfile student = requireStudent(userId);
         WeeklyLearningChallengeAttempt attempt = attemptRepository.findOwnedByIdForUpdate(attemptId, student.getId())
-                .orElseThrow(() -> new BusinessException("WEEKLY_CHALLENGE_ATTEMPT_NOT_FOUND",
+                .orElseThrow(() -> new BusinessException(MessageCodes.WEEKLY_CHALLENGE_ATTEMPT_NOT_FOUND,
                         "Không tìm thấy lượt chơi", HttpStatus.NOT_FOUND));
         WeeklyLearningChallenge challenge = challengeRepository.findById(attempt.getChallengeId())
                 .orElseThrow(() -> invalid("Thử thách không còn tồn tại"));
@@ -141,9 +142,14 @@ public class WeeklyChallengeGameService {
         // Serializing starts on the challenge row prevents concurrent requests
         // from both observing the same remaining daily ranked slot.
         WeeklyLearningChallenge challenge = challengeRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new BusinessException("WEEKLY_CHALLENGE_NOT_FOUND", "Không tìm thấy thử thách", HttpStatus.NOT_FOUND));
-        if (challenge.getStatus() != ChallengeStatus.PUBLISHED || !challenge.getWeekStart().equals(weekStart)) {
-            throw conflict("Thử thách không còn mở trong tuần hiện tại");
+                .orElseThrow(() -> new BusinessException(MessageCodes.WEEKLY_CHALLENGE_NOT_FOUND, "Không tìm thấy thử thách", HttpStatus.NOT_FOUND));
+        if (challenge.getStatus() != ChallengeStatus.PUBLISHED) {
+            throw new BusinessException(MessageCodes.WEEKLY_CHALLENGE_NOT_PUBLISHED,
+                    "Thử thách chưa được công khai", HttpStatus.CONFLICT);
+        }
+        if (!challenge.getWeekStart().equals(weekStart)) {
+            throw new BusinessException(MessageCodes.WEEKLY_CHALLENGE_NOT_CURRENT_WEEK,
+                    "Thử thách không thuộc tuần hiện tại", HttpStatus.CONFLICT);
         }
         return challenge;
     }
@@ -172,9 +178,9 @@ public class WeeklyChallengeGameService {
 
     private StudentProfile requireStudent(UUID userId) {
         return studentProfileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new BusinessException("STUDENT_PROFILE_NOT_FOUND", "Không tìm thấy hồ sơ học viên", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(MessageCodes.LEARNING_STUDENT_PROFILE_NOT_FOUND, "Không tìm thấy hồ sơ học viên", HttpStatus.NOT_FOUND));
     }
 
-    private BusinessException invalid(String message) { return new BusinessException("WEEKLY_CHALLENGE_INVALID", message, HttpStatus.BAD_REQUEST); }
-    private BusinessException conflict(String message) { return new BusinessException("WEEKLY_CHALLENGE_CONFLICT", message, HttpStatus.CONFLICT); }
+    private BusinessException invalid(String message) { return new BusinessException(MessageCodes.WEEKLY_CHALLENGE_INVALID, message, HttpStatus.BAD_REQUEST); }
+    private BusinessException conflict(String message) { return new BusinessException(MessageCodes.WEEKLY_CHALLENGE_CONFLICT, message, HttpStatus.CONFLICT); }
 }

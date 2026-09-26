@@ -23,8 +23,8 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class WeeklyChallengeManagementService {
-    private static final String ERROR = "WEEKLY_CHALLENGE_INVALID";
-    private static final String CONFLICT_ERROR = "WEEKLY_CHALLENGE_CONFLICT";
+    private static final String ERROR = MessageCodes.WEEKLY_CHALLENGE_INVALID;
+    private static final String CONFLICT_ERROR = MessageCodes.WEEKLY_CHALLENGE_CONFLICT;
     private final WeeklyLearningChallengeRepository challengeRepository;
     private final WeeklyLearningChallengePairRepository pairRepository;
     private final WeeklyLearningChallengeAttemptRepository attemptRepository;
@@ -180,7 +180,7 @@ public class WeeklyChallengeManagementService {
 
     private WeeklyLearningChallenge requireLocked(UUID id) {
         return challengeRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new BusinessException("WEEKLY_CHALLENGE_NOT_FOUND", "Không tìm thấy thử thách", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(MessageCodes.WEEKLY_CHALLENGE_NOT_FOUND, "Không tìm thấy thử thách", HttpStatus.NOT_FOUND));
     }
 
     private boolean hasRecordedActivity(UUID challengeId) {
@@ -191,7 +191,7 @@ public class WeeklyChallengeManagementService {
 
     private void requireCourseManager(UUID adminId) {
         if (!courseRepository.hasAdminRole(adminId, List.of("COURSE_MANAGER"))) {
-            throw new BusinessException("COURSE_MANAGER_REQUIRED", "Chỉ Course Manager được quản lý trò chơi", HttpStatus.FORBIDDEN);
+            throw new BusinessException(MessageCodes.WEEKLY_CHALLENGE_COURSE_MANAGER_REQUIRED, "Chỉ Course Manager được quản lý trò chơi", HttpStatus.FORBIDDEN);
         }
     }
 

@@ -13,6 +13,8 @@ import com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptCardRepo
 import com.manabihub.challenge.repository.WeeklyLearningChallengeAttemptRepository;
 import com.manabihub.challenge.repository.WeeklyLearningChallengePairRepository;
 import com.manabihub.challenge.repository.WeeklyLearningChallengeRepository;
+import com.manabihub.common.constants.MessageCodes;
+import com.manabihub.common.exception.BusinessException;
 import com.manabihub.identity.entity.StudentProfile;
 import com.manabihub.identity.repository.StudentProfileRepository;
 import org.junit.jupiter.api.Test;
@@ -130,5 +132,30 @@ class WeeklyChallengeGameServiceTest {
         assertEquals(20000L, response.totalMillis());
         verify(attemptRepository, never()).save(any());
         verify(cardRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void start_reportsWhetherTheChallengeIsUnpublishedOrFromAnotherWeek() {
+        UUID userId = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        UUID challengeId = UUID.randomUUID();
+        LocalDate currentWeek = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"))
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        when(studentProfileRepository.findByUser_Id(userId))
+                .thenReturn(Optional.of(StudentProfile.builder().id(studentId).build()));
+
+        WeeklyLearningChallenge draft = WeeklyLearningChallenge.builder()
+                .id(challengeId).weekStart(currentWeek).status(ChallengeStatus.DRAFT).build();
+        when(challengeRepository.findByIdForUpdate(challengeId)).thenReturn(Optional.of(draft));
+        BusinessException unpublished = assertThrows(BusinessException.class,
+                () -> service.start(userId, challengeId));
+        assertEquals(MessageCodes.WEEKLY_CHALLENGE_NOT_PUBLISHED, unpublished.getMessageCode());
+
+        WeeklyLearningChallenge previousWeek = WeeklyLearningChallenge.builder()
+                .id(challengeId).weekStart(currentWeek.minusWeeks(1)).status(ChallengeStatus.PUBLISHED).build();
+        when(challengeRepository.findByIdForUpdate(challengeId)).thenReturn(Optional.of(previousWeek));
+        BusinessException wrongWeek = assertThrows(BusinessException.class,
+                () -> service.start(userId, challengeId));
+        assertEquals(MessageCodes.WEEKLY_CHALLENGE_NOT_CURRENT_WEEK, wrongWeek.getMessageCode());
     }
 }
